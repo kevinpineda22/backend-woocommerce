@@ -12,13 +12,7 @@
   ],
   "routes": [
     {
-      "src": "/api/trazabilidad/(.*)",
-      "methods": ["OPTIONS"],
-      "dest": "/app.js"
-    },
-    {
-      "src": "/api/trazabilidad/(.*)",
-      "methods": ["GET", "POST", "PUT", "PATCH", "DELETE"],
+      "src": "/api/orders/(.*)",
       "dest": "/app.js"
     },
     {
