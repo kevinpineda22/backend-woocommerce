@@ -5,31 +5,26 @@ const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 // 1. Obtener pedidos pendientes (CRUZADO CON SUPABASE)
 exports.getPendingOrders = async (req, res) => {
   try {
-    // A. Traemos pedidos de WooCommerce (Procesando)
     const { data: wcOrders } = await WooCommerce.get("orders", {
       status: "processing", 
       per_page: 50,
       order: "asc",
     });
 
-    // B. Traemos las asignaciones activas de Supabase
     const { data: activeAssignments } = await supabase
       .from("wc_asignaciones_pedidos")
       .select("id_pedido, nombre_recolectora, fecha_inicio")
       .eq("estado_asignacion", "en_proceso");
 
-    // C. Mapa para búsqueda rápida
     const assignmentMap = {};
     activeAssignments.forEach((a) => {
       assignmentMap[a.id_pedido] = a;
     });
 
-    // D. Cruzar datos: Inyectamos la info de asignación al pedido de WC
     const mergedOrders = wcOrders.map((order) => {
       const assignment = assignmentMap[order.id];
       return {
         ...order,
-        // Flags personalizadas para el Frontend
         is_assigned: !!assignment, 
         assigned_to: assignment ? assignment.nombre_recolectora : null,
         started_at: assignment ? assignment.fecha_inicio : null,
@@ -90,18 +85,17 @@ exports.assignOrder = async (req, res) => {
   }
 };
 
-// 4. Detalle del pedido (Con lógica de Pasillos)
+// 4. Detalle del pedido
 exports.getOrderById = async (req, res) => {
   const { id } = req.params;
   try {
     const { data: order } = await WooCommerce.get(`orders/${id}`);
     
-    // Enriquecer items con pasillos
     const items = await Promise.all(order.line_items.map(async (item) => {
       if (!item.product_id) return { ...item, pasillo: "N/A", priority: 99 };
       try {
         const { data: prod } = await WooCommerce.get(`products/${item.product_id}`);
-        const info = obtenerInfoPasillo(prod.categories, prod.name); // Pasamos nombre también
+        const info = obtenerInfoPasillo(prod.categories, prod.name);
         return { 
             ...item, 
             image_src: prod.images[0]?.src, 
@@ -119,13 +113,12 @@ exports.getOrderById = async (req, res) => {
   }
 };
 
-// 5. Finalizar Recolección (Actualiza Supabase y WooCommerce)
+// 5. Finalizar Recolección
 exports.completeCollection = async (req, res) => {
   const { id_pedido, id_recolectora } = req.body;
   try {
     const now = new Date();
     
-    // A. Actualizar Supabase (Historial)
     const { data: asignacion } = await supabase
       .from("wc_asignaciones_pedidos")
       .select("fecha_inicio")
@@ -144,14 +137,12 @@ exports.completeCollection = async (req, res) => {
       })
       .eq("id_pedido", id_pedido);
 
-    // B. Liberar Recolectora
     await supabase
       .from("wc_recolectoras")
       .update({ estado_recolectora: "disponible", id_pedido_actual: null })
       .eq("id", id_recolectora);
 
-    // C. OPCIONAL: Actualizar estado en WooCommerce a "Completed"
-    // await WooCommerce.put(`orders/${id_pedido}`, { status: "completed" });
+    // OPCIONAL: await WooCommerce.put(`orders/${id_pedido}`, { status: "completed" });
 
     res.status(200).json({ message: "Orden finalizada" });
   } catch (error) {
@@ -159,7 +150,7 @@ exports.completeCollection = async (req, res) => {
   }
 };
 
-// 6. Obtener Historial (MODIFICADO: Filtra por recolectora si se pide)
+// 6. Obtener Historial (Filtrado por Recolectora)
 exports.getHistory = async (req, res) => {
   const { id_recolectora } = req.query; 
 
@@ -170,11 +161,10 @@ exports.getHistory = async (req, res) => {
       .eq("estado_asignacion", "completado")
       .order("fecha_fin", { ascending: false });
 
-    // Si nos envían un ID, filtramos solo por esa persona
+    // Si hay ID, filtramos por esa persona. Si no, traemos los últimos 50 generales.
     if (id_recolectora) {
       query = query.eq("id_recolectora", id_recolectora);
     } else {
-      // Si es general, limitamos a 50
       query = query.limit(50);
     }
 
