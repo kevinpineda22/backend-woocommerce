@@ -101,12 +101,13 @@ exports.getOrderById = async (req, res) => {
       if (!item.product_id) return { ...item, pasillo: "N/A", priority: 99 };
       try {
         const { data: prod } = await WooCommerce.get(`products/${item.product_id}`);
-        const info = obtenerInfoPasillo(prod.categories);
+        const info = obtenerInfoPasillo(prod.categories, prod.name); // Pasamos nombre también
         return { 
             ...item, 
             image_src: prod.images[0]?.src, 
             pasillo: info.pasillo, 
-            prioridad: info.prioridad 
+            prioridad: info.prioridad,
+            categorias: prod.categories.map(c => c.name)
         };
       } catch (e) { return item; }
     }));
@@ -149,7 +150,7 @@ exports.completeCollection = async (req, res) => {
       .update({ estado_recolectora: "disponible", id_pedido_actual: null })
       .eq("id", id_recolectora);
 
-    // C. OPCIONAL: Actualizar estado en WooCommerce a "Completed" o personalizado
+    // C. OPCIONAL: Actualizar estado en WooCommerce a "Completed"
     // await WooCommerce.put(`orders/${id_pedido}`, { status: "completed" });
 
     res.status(200).json({ message: "Orden finalizada" });
@@ -158,15 +159,26 @@ exports.completeCollection = async (req, res) => {
   }
 };
 
-// 6. Obtener Historial (Nuevo Endpoint)
+// 6. Obtener Historial (MODIFICADO: Filtra por recolectora si se pide)
 exports.getHistory = async (req, res) => {
+  const { id_recolectora } = req.query; 
+
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("wc_asignaciones_pedidos")
       .select("*")
       .eq("estado_asignacion", "completado")
-      .order("fecha_fin", { ascending: false })
-      .limit(50);
+      .order("fecha_fin", { ascending: false });
+
+    // Si nos envían un ID, filtramos solo por esa persona
+    if (id_recolectora) {
+      query = query.eq("id_recolectora", id_recolectora);
+    } else {
+      // Si es general, limitamos a 50
+      query = query.limit(50);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     res.status(200).json(data);
