@@ -1,0 +1,233 @@
+/* Mobile First Design for Recolectora View */
+:root {
+  --reco-bg: #f8fafc;
+  --reco-primary: #2563eb;
+  --reco-white: #ffffff;
+  --reco-text: #1e293b;
+  --reco-text-light: #64748b;
+  --reco-success: #22c55e;
+  --reco-danger: #ef4444;
+  --reco-border: #e2e8f0;
+}
+
+.reco-container {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+  background-color: var(--reco-bg);
+  min-height: 100vh;
+  padding-bottom: 80px;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Header & Timer */
+.reco-header {
+  background: var(--reco-white);
+  padding: 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.reco-timer-card {
+  background: var(--reco-text);
+  color: var(--reco-white);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.reco-order-id {
+  font-weight: 800;
+  color: var(--reco-primary);
+  font-size: 1.1rem;
+}
+
+/* Pasillos Layout */
+.reco-aisle-section {
+  margin: 20px 0;
+}
+
+.reco-aisle-header {
+  padding: 10px 20px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-weight: 800;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 65px; /* Adjust based on header height */
+  z-index: 40;
+}
+
+.reco-aisle-progress {
+  font-size: 0.75rem;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* Product Item with Swipe */
+.reco-item-container {
+  background: var(--reco-bg);
+  border-bottom: 1px solid var(--reco-border);
+  position: relative;
+  overflow: hidden;
+  height: 90px; /* Fixed height for consistency */
+}
+
+/* Swipe Actions Background */
+.reco-swipe-bg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: flex-end; /* Align right for completion swipe */
+  align-items: center;
+  padding-right: 25px;
+  background-color: var(--reco-success);
+  color: white;
+  font-weight: bold;
+}
+
+.reco-swipe-icon {
+  font-size: 1.5rem;
+}
+
+/* The actual card content */
+.reco-item-content {
+  background: var(--reco-white);
+  height: 100%;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  position: relative;
+  z-index: 2;
+  transition: transform 0.2s;
+  /* Ensure touch actions work */
+  touch-action: pan-y;
+}
+
+.reco-item-img {
+  width: 60px;
+  height: 60px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #f1f5f9;
+  padding: 4px;
+}
+
+.reco-item-details {
+  flex: 1;
+}
+
+.reco-item-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+  color: var(--reco-text);
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.reco-item-meta {
+  color: var(--reco-text-light);
+  font-size: 0.85rem;
+}
+
+.reco-item-qty {
+  background: #eff6ff;
+  color: var(--reco-primary);
+  font-weight: 800;
+  font-size: 1.1rem;
+  min-width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #bfdbfe;
+}
+
+/* Completed State */
+.reco-item-container.completed .reco-item-content {
+  background: #f0fdf4;
+}
+.reco-item-container.completed .reco-item-name {
+  text-decoration: line-through;
+  color: #86efac;
+}
+
+/* Empty State / Loading */
+.reco-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 80vh;
+  color: var(--reco-text-light);
+  text-align: center;
+  padding: 20px;
+}
+
+.reco-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e2e8f0;
+  border-top-color: var(--reco-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+/* Footer Actions */
+.reco-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: var(--reco-white);
+  padding: 15px 20px;
+  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
+  display: flex;
+  gap: 10px;
+  z-index: 100;
+}
+
+.reco-btn-finish {
+  background: var(--reco-success);
+  color: white;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.reco-btn-finish:disabled {
+  background: #94a3b8;
+  box-shadow: none;
+}

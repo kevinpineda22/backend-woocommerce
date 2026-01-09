@@ -1,201 +1,176 @@
 const WooCommerce = require("../services/wooService");
 const { supabase } = require("../services/supabaseClient");
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
-const dayjs = require("dayjs");
 
-// 0. Obtener pedidos pendientes
+// 1. Obtener pedidos pendientes (CRUZADO CON SUPABASE)
 exports.getPendingOrders = async (req, res) => {
   try {
-    const { data } = await WooCommerce.get("orders", {
-      status: "pending,processing", // Ajusta seg�n tus estados
+    // A. Traemos pedidos de WooCommerce (Procesando)
+    const { data: wcOrders } = await WooCommerce.get("orders", {
+      status: "processing", 
       per_page: 50,
+      order: "asc",
     });
-    res.status(200).json(data);
+
+    // B. Traemos las asignaciones activas de Supabase
+    const { data: activeAssignments } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("id_pedido, nombre_recolectora, fecha_inicio")
+      .eq("estado_asignacion", "en_proceso");
+
+    // C. Mapa para búsqueda rápida
+    const assignmentMap = {};
+    activeAssignments.forEach((a) => {
+      assignmentMap[a.id_pedido] = a;
+    });
+
+    // D. Cruzar datos: Inyectamos la info de asignación al pedido de WC
+    const mergedOrders = wcOrders.map((order) => {
+      const assignment = assignmentMap[order.id];
+      return {
+        ...order,
+        // Flags personalizadas para el Frontend
+        is_assigned: !!assignment, 
+        assigned_to: assignment ? assignment.nombre_recolectora : null,
+        started_at: assignment ? assignment.fecha_inicio : null,
+      };
+    });
+
+    res.status(200).json(mergedOrders);
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener pedidos pendientes" });
+    console.error(error);
+    res.status(500).json({ error: "Error al obtener pedidos cruzados" });
   }
 };
 
-// 1. Obtener lista de recolectoras desde Supabase (ENRIQUECIDO PARA VISTA MOVIL)
+// 2. Obtener lista de recolectoras
 exports.getRecolectoras = async (req, res) => {
   const { email } = req.query;
-
   try {
     let query = supabase
       .from("wc_recolectoras")
       .select("*")
       .order("nombre_completo", { ascending: true });
 
-    if (email) {
-      query = query.eq("email", email);
-    }
+    if (email) query = query.eq("email", email);
 
-    const { data: recolectoras, error } = await query;
-
+    const { data, error } = await query;
     if (error) throw error;
-
-    // Enriquecer con fecha de inicio si est�n ocupadas (para el temporizador)
-    const recolectorasEnriquecidas = await Promise.all(
-      recolectoras.map(async (rec) => {
-        if (rec.estado_recolectora === "recolectando" && rec.id_pedido_actual) {
-          const { data: asignacion } = await supabase
-            .from("wc_asignaciones_pedidos")
-            .select("fecha_inicio")
-            .eq("id_pedido", rec.id_pedido_actual)
-            .eq("id_recolectora", rec.id)
-            .eq("estado_asignacion", "en_proceso")
-            .limit(1)
-            .single();
-
-          if (asignacion) {
-            return { ...rec, fecha_inicio_orden: asignacion.fecha_inicio };
-          }
-        }
-        return rec;
-      })
-    );
-
-    res.status(200).json(recolectorasEnriquecidas);
+    res.status(200).json(data);
   } catch (error) {
-    res.status(500).json({
-      error: "Error al obtener recolectoras",
-      details: error.message,
-    });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// 2. Asignar un pedido a una recolectora
+// 3. Asignar pedido
 exports.assignOrder = async (req, res) => {
   const { id_pedido, id_recolectora, nombre_recolectora } = req.body;
-
   try {
-    // A. Crear registro en la tabla de asignaciones
-    const { data: asignacion, error: errorAsignacion } = await supabase
+    const { data, error } = await supabase
       .from("wc_asignaciones_pedidos")
-      .insert([
-        {
-          id_pedido,
-          id_recolectora,
-          nombre_recolectora,
-          estado_asignacion: "en_proceso",
-        },
-      ])
+      .insert([{ 
+        id_pedido, 
+        id_recolectora, 
+        nombre_recolectora, 
+        estado_asignacion: "en_proceso" 
+      }])
       .select()
       .single();
 
-    if (errorAsignacion) throw errorAsignacion;
+    if (error) throw error;
 
-    // B. Actualizar estado de la recolectora
-    const { error: errorRepo } = await supabase
+    await supabase
       .from("wc_recolectoras")
-      .update({
-        estado_recolectora: "recolectando",
-        id_pedido_actual: id_pedido,
-      })
+      .update({ estado_recolectora: "recolectando", id_pedido_actual: id_pedido })
       .eq("id", id_recolectora);
 
-    if (errorRepo) throw errorRepo;
-
-    res.status(200).json({ message: "Pedido asignado con �xito", asignacion });
+    res.status(200).json(data);
   } catch (error) {
-    res
-      .status(500)
-      .json({ error: "Error en la asignaci�n", details: error.message });
+    res.status(500).json({ error: error.message });
   }
 };
 
-// 3. Obtener detalle del pedido ORDENADO POR PASILLOS
+// 4. Detalle del pedido (Con lógica de Pasillos)
 exports.getOrderById = async (req, res) => {
   const { id } = req.params;
   try {
     const { data: order } = await WooCommerce.get(`orders/${id}`);
+    
+    // Enriquecer items con pasillos
+    const items = await Promise.all(order.line_items.map(async (item) => {
+      if (!item.product_id) return { ...item, pasillo: "N/A", priority: 99 };
+      try {
+        const { data: prod } = await WooCommerce.get(`products/${item.product_id}`);
+        const info = obtenerInfoPasillo(prod.categories);
+        return { 
+            ...item, 
+            image_src: prod.images[0]?.src, 
+            pasillo: info.pasillo, 
+            prioridad: info.prioridad 
+        };
+      } catch (e) { return item; }
+    }));
 
-    const itemsEnriquecidos = await Promise.all(
-      order.line_items.map(async (item) => {
-        try {
-          if (!item.product_id)
-            return { ...item, pasillo: "S/N", prioridad: 99 };
-
-          const { data: product } = await WooCommerce.get(
-            `products/${item.product_id}`
-          );
-          const infoPasillo = obtenerInfoPasillo(product.categories);
-
-          return {
-            ...item,
-            image_src: product.images?.[0]?.src || null,
-            pasillo: infoPasillo.pasillo,
-            prioridad: infoPasillo.prioridad,
-            categorias: product.categories.map((c) => c.name),
-          };
-        } catch (err) {
-          return { ...item, pasillo: "Error", prioridad: 100 };
-        }
-      })
-    );
-
-    // Ordenamos por la prioridad de tu ruta log�stica
-    order.line_items = itemsEnriquecidos.sort(
-      (a, b) => a.prioridad - b.prioridad
-    );
-
+    order.line_items = items.sort((a, b) => a.prioridad - b.prioridad);
     res.status(200).json(order);
   } catch (error) {
-    res.status(500).json({ error: "Error al procesar el pedido detallado" });
+    res.status(500).json({ error: "Error obteniendo detalle" });
   }
 };
 
-// 4. Finalizar Recolecci�n
+// 5. Finalizar Recolección (Actualiza Supabase y WooCommerce)
 exports.completeCollection = async (req, res) => {
   const { id_pedido, id_recolectora } = req.body;
-
   try {
-    const fechaFin = new Date();
-
-    // 0. Obtener fecha de inicio para calcular duraci�n
-    const { data: asignacionExistente } = await supabase
+    const now = new Date();
+    
+    // A. Actualizar Supabase (Historial)
+    const { data: asignacion } = await supabase
       .from("wc_asignaciones_pedidos")
       .select("fecha_inicio")
       .eq("id_pedido", id_pedido)
-      .eq("id_recolectora", id_recolectora)
       .eq("estado_asignacion", "en_proceso")
       .single();
+      
+    const duration = asignacion ? Math.floor((now - new Date(asignacion.fecha_inicio)) / 1000) : 0;
 
-    let segundosTotales = 0;
-    if (asignacionExistente && asignacionExistente.fecha_inicio) {
-      const inicio = new Date(asignacionExistente.fecha_inicio);
-      segundosTotales = Math.floor((fechaFin - inicio) / 1000);
-    }
-
-    // A. Marcar asignaci�n como completada y guardar tiempo
-    const { error: errorAsignacion } = await supabase
+    await supabase
       .from("wc_asignaciones_pedidos")
-      .update({
-        estado_asignacion: "completado",
-        fecha_fin: fechaFin.toISOString(),
-        tiempo_total_segundos: segundosTotales,
+      .update({ 
+        estado_asignacion: "completado", 
+        fecha_fin: now, 
+        tiempo_total_segundos: duration 
       })
-      .eq("id_pedido", id_pedido)
-      .eq("id_recolectora", id_recolectora);
+      .eq("id_pedido", id_pedido);
 
-    if (errorAsignacion) throw errorAsignacion;
-
-    // B. Liberar recolectora
-    const { error: errorRecolectora } = await supabase
+    // B. Liberar Recolectora
+    await supabase
       .from("wc_recolectoras")
-      .update({
-        estado_recolectora: "disponible",
-        id_pedido_actual: null,
-      })
+      .update({ estado_recolectora: "disponible", id_pedido_actual: null })
       .eq("id", id_recolectora);
 
-    if (errorRecolectora) throw errorRecolectora;
+    // C. OPCIONAL: Actualizar estado en WooCommerce a "Completed" o personalizado
+    // await WooCommerce.put(`orders/${id_pedido}`, { status: "completed" });
 
-    res.status(200).json({ message: "Recolecci�n finalizada correctamente" });
+    res.status(200).json({ message: "Orden finalizada" });
   } catch (error) {
-    res.status(500).json({
-      error: "Error al finalizar recolecci�n",
-      details: error.message,
-    });
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// 6. Obtener Historial (Nuevo Endpoint)
+exports.getHistory = async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("*")
+      .eq("estado_asignacion", "completado")
+      .order("fecha_fin", { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 };

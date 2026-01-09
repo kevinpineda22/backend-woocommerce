@@ -3,9 +3,10 @@ const router = express.Router();
 const orderController = require("../controllers/orderController");
 
 router.get("/pendientes", orderController.getPendingOrders);
-router.get("/recolectoras", orderController.getRecolectoras); // Nueva
-router.post("/asignar", orderController.assignOrder); // Nueva
-router.post("/finalizar-recoleccion", orderController.completeCollection); // Nueva
+router.get("/historial", orderController.getHistory); // <--- NUEVA RUTA
+router.get("/recolectoras", orderController.getRecolectoras);
+router.post("/asignar", orderController.assignOrder);
+router.post("/finalizar-recoleccion", orderController.completeCollection);
 router.get("/:id", orderController.getOrderById);
 
 module.exports = router;

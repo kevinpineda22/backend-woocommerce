@@ -1,0 +1,989 @@
+/* PedidosAdmin.css */
+
+/* Variables inspiradas en AdminTrazabilidad */
+:root {
+  --pa-primary-dark: #210d65;
+  --pa-primary-medium: #3b1a9a;
+  --pa-primary-light: #5c3eb8;
+  --pa-accent-blue: #2196f3;
+  --pa-accent-green: #4caf50;
+  --pa-bg-main: #f4f6fb;
+  --pa-card-bg: #ffffff;
+  --pa-text-dark: #1f2933;
+  --pa-text-muted: #64748b;
+  --pa-border: #d9e2ec;
+  --pa-shadow: 0 8px 24px rgba(18, 38, 63, 0.08);
+  --pa-radius: 12px;
+  --pa-font: "Poppins", "Segoe UI", sans-serif;
+}
+
+/* --- Layout Container (Sidebar + Content) --- */
+.pedidos-layout-main-container {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--pa-bg-main);
+  font-family: var(--pa-font);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* --- Sidebar --- */
+.pedidos-layout-sidebar {
+  width: 280px;
+  background: linear-gradient(
+    180deg,
+    var(--pa-primary-dark) 0%,
+    var(--pa-primary-medium) 100%
+  );
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding-top: 1rem;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.pedidos-layout-sidebar-header {
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  position: relative;
+}
+
+.pedidos-back-button {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  color: white;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.pedidos-back-button:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  color: #ffffff;
+}
+
+.pedidos-layout-logo {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--pa-primary-dark);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.pedidos-layout-sidebar-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0.5rem 0 0 0;
+  color: #fff;
+  opacity: 0.9;
+}
+
+.pedidos-layout-sidebar-nav {
+  flex: 1;
+  padding: 1.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow-y: auto;
+}
+
+.pedidos-layout-sidebar-button {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.5rem;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-left: 3px solid transparent;
+  width: 100%;
+  text-decoration: none;
+}
+
+.pedidos-layout-sidebar-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border-left-color: var(--pa-accent-green);
+}
+
+.pedidos-layout-sidebar-button.active {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-weight: 600;
+  border-left-color: var(--pa-accent-green);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.pedidos-layout-sidebar-footer {
+  padding: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  text-align: center;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* --- Main Content Area --- */
+.pedidos-layout-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto; /* Scroll is here */
+  background-color: var(--pa-bg-main);
+  position: relative;
+}
+
+.pedidos-layout-header {
+  background-color: var(--pa-card-bg);
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid var(--pa-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pedidos-layout-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--pa-primary-dark);
+  margin: 0;
+}
+
+.pedidos-layout-body {
+  padding: 2rem;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Reset for older container if needed */
+.pedidos-admin-container {
+  padding: 0;
+  background-color: transparent;
+  min-height: auto;
+}
+
+/* --- Base Styles (Restored) --- */
+
+/* Header & Actions */
+.pedidos-admin-header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  background: var(--pa-card-bg);
+  padding: 1.5rem 2rem;
+  border-radius: var(--pa-radius);
+  box-shadow: var(--pa-shadow);
+  border-bottom: 4px solid var(--pa-primary-medium);
+}
+
+.pedidos-admin-page-title {
+  color: var(--pa-primary-dark);
+  margin: 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pedidos-admin-refresh-btn {
+  background: linear-gradient(
+    135deg,
+    var(--pa-primary-light),
+    var(--pa-primary-medium)
+  );
+  color: white;
+  border: none;
+  padding: 12px 28px;
+  border-radius: 50px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 12px rgba(59, 26, 154, 0.3);
+}
+
+.pedidos-admin-refresh-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 26, 154, 0.4);
+}
+
+/* Filters Section */
+.pedidos-admin-filters-container {
+  background: var(--pa-card-bg);
+  padding: 1.5rem 2rem;
+  border-radius: var(--pa-radius);
+  box-shadow: var(--pa-shadow);
+  margin-bottom: 2.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: flex-end;
+  border: 1px solid var(--pa-border);
+}
+
+.pedidos-admin-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 220px;
+}
+
+.pedidos-admin-filter-group label {
+  font-size: 0.9rem;
+  color: var(--pa-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pedidos-admin-filter-input {
+  padding: 12px 16px;
+  border: 2px solid #eef2f6;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.3s;
+  background-color: #f8fafc;
+  color: var(--pa-text-dark);
+}
+
+.pedidos-admin-filter-input:focus {
+  border-color: var(--pa-primary-light);
+  background-color: #fff;
+  outline: none;
+}
+
+/* Orders Grid */
+.pedidos-admin-orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 30px;
+}
+
+.pedidos-admin-order-card {
+  background: var(--pa-card-bg);
+  border-radius: var(--pa-radius);
+  padding: 0;
+  box-shadow: var(--pa-shadow);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border: 1px solid var(--pa-border);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.pedidos-admin-order-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 15px 35px rgba(18, 38, 63, 0.12);
+  border-color: var(--pa-primary-light);
+}
+
+.pedidos-admin-order-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 6px;
+  background-color: #ccc;
+}
+.pedidos-admin-order-card.status-processing::before {
+  background-color: var(--pa-accent-blue);
+}
+.pedidos-admin-order-card.status-pending::before {
+  background-color: #f39c12;
+}
+.pedidos-admin-order-card.status-completed::before {
+  background-color: var(--pa-accent-green);
+}
+.pedidos-admin-order-card.status-cancelled::before {
+  background-color: #e74c3c;
+}
+
+.pedidos-admin-card-header {
+  padding: 1.2rem 1.5rem;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fdfdfd;
+}
+
+.pedidos-admin-order-id {
+  font-weight: 800;
+  color: var(--pa-primary-dark);
+  font-size: 1.3rem;
+}
+
+.pedidos-admin-status-badge {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.pedidos-admin-status-pending {
+  background-color: #fff3e0;
+  color: #e67e22;
+}
+.pedidos-admin-status-processing {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+.pedidos-admin-status-completed {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+.pedidos-admin-status-cancelled {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.pedidos-admin-card-body {
+  padding: 1.5rem;
+  flex: 1;
+}
+
+.pedidos-admin-card-body h3 {
+  margin: 0 0 10px 0;
+  color: var(--pa-text-dark);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.pedidos-admin-card-body p {
+  margin: 8px 0;
+  color: var(--pa-text-muted);
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pedidos-click-hint {
+  margin-top: 20px;
+  text-align: right;
+  font-size: 0.9rem;
+  color: var(--pa-primary-light);
+  font-weight: 600;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+.pedidos-admin-order-card:hover .pedidos-click-hint {
+  opacity: 1;
+}
+
+/* --- MODAL ESTILO TRAZABILIDAD --- */
+.pedidos-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.7); /* Oscuro y moderno */
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.pedidos-modal-content {
+  background: #f8f9fc; /* Fondo muy suave */
+  width: 100%;
+  max-width: 1100px;
+  height: 90vh; /* Máxima altura */
+  border-radius: 20px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pedidos-modal-header {
+  background: var(--pa-primary-dark); /* Cabecera oscura */
+  padding: 1.5rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+}
+
+.pedidos-modal-header h2 {
+  margin: 0;
+  font-size: 1.8rem;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-weight: 600;
+}
+
+.pedidos-modal-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+.pedidos-modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.pedidos-modal-body {
+  padding: 2rem;
+  overflow-y: auto;
+  flex: 1;
+  position: relative;
+}
+
+/* Info Sections in Modal */
+.pedidos-detail-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 2rem;
+}
+
+.pedidos-detail-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eff2f7;
+}
+
+.pedidos-info-block h4 {
+  margin-top: 0;
+  color: var(--pa-primary-light);
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 10px;
+}
+
+/* --- PRODUCT GRID REDISEÑADO --- */
+.pedidos-products-section-title {
+  font-size: 1.4rem;
+  color: var(--pa-primary-dark);
+  margin-bottom: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pedidos-products-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(280px, 1fr)
+  ); /* Tarjetas más anchas */
+  gap: 25px;
+}
+
+.pedidos-product-card {
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  border: 1px solid #eaeaea;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s;
+}
+.pedidos-product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.pedidos-product-img-wrapper {
+  height: 250px; /* Imagen grande */
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.pedidos-product-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+.pedidos-product-card:hover .pedidos-product-img {
+  transform: scale(1.05);
+}
+
+.pedidos-product-qty-tag {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: var(--pa-accent-green);
+  color: white;
+  font-weight: 800;
+  font-size: 1.4rem;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%; /* Circular */
+  box-shadow: 0 4px 10px rgba(76, 175, 80, 0.4);
+  z-index: 2;
+  border: 3px solid white;
+}
+
+.pedidos-product-details {
+  padding: 1.2rem;
+  background: white;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pedidos-product-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--pa-text-dark);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.pedidos-product-meta {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px dashed #eee;
+  display: flex;
+  justify-content: space-between;
+  color: var(--pa-text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* Modal Footer */
+.pedidos-modal-footer {
+  padding: 1.5rem 2rem;
+  background-color: white;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pedidos-total-display {
+  display: flex;
+  flex-direction: column;
+}
+.pedidos-total-label {
+  font-size: 0.9rem;
+  color: var(--pa-text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+.pedidos-total-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--pa-primary-dark);
+  line-height: 1;
+}
+
+.pedidos-btn-actions-group {
+  display: flex;
+  gap: 15px;
+}
+
+.pedidos-btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pedidos-btn-secondary:hover {
+  background: #e2e8f0;
+}
+
+.pedidos-btn-primary {
+  background: linear-gradient(135deg, var(--pa-accent-green), #43a047);
+  color: white;
+  border: none;
+  padding: 12px 30px;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pedidos-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+}
+
+/* Skeleton / Loading */
+.pedidos-skeleton {
+  background: #e0e0e0;
+  border-radius: 8px;
+  animation: pedidos-pulse 1.5s infinite;
+}
+@keyframes pedidos-pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.pedidos-loading-overlay {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(2px);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+  border-radius: 20px;
+}
+.pedidos-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--pa-primary-medium);
+  border-radius: 50%;
+  animation: pedidos-spin 1s linear infinite;
+}
+@keyframes pedidos-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsiveness Update */
+@media (max-width: 1024px) {
+  .pedidos-layout-sidebar {
+    width: 240px;
+  }
+}
+
+@media (max-width: 768px) {
+  .pedidos-layout-main-container {
+    flex-direction: column;
+    position: relative;
+    height: auto;
+    overflow-y: visible;
+  }
+
+  .pedidos-layout-sidebar {
+    width: 100%;
+    height: auto;
+    min-height: 120px;
+    max-height: 120px;
+    position: relative;
+    padding-top: 10px;
+    padding-bottom: 0;
+  }
+
+  /* Compact header in sidebar for mobile */
+  .pedidos-layout-sidebar-header {
+    flex-direction: row;
+    padding: 0.5rem 1rem;
+    gap: 15px;
+    justify-content: flex-start;
+    border-bottom: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .pedidos-layout-logo {
+    width: 40px;
+    height: 40px;
+    font-size: 1.1rem;
+  }
+
+  .pedidos-layout-sidebar-title {
+    font-size: 1rem;
+    margin: 0;
+  }
+  .pedidos-layout-sidebar-footer {
+    display: none;
+  }
+
+  /* Make sidebar nav horizontal scroll on mobile */
+  .pedidos-layout-sidebar-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0 1rem 0.5rem 1rem;
+    gap: 10px;
+    align-items: center;
+    /* Hide scrollbar for cleaner look */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+  .pedidos-layout-sidebar-nav::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+
+  .pedidos-layout-sidebar-button {
+    flex-direction: row; /* Keep icon and text side by side nicely or stack compact */
+    text-align: center;
+    padding: 0.5rem 1rem;
+    border-left: 0;
+    border-bottom: 3px solid transparent;
+    min-width: max-content;
+    border-radius: 20px;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    margin-bottom: 5px;
+  }
+
+  .pedidos-layout-sidebar-button span {
+    display: inline-block;
+    margin-left: 5px;
+  }
+
+  .pedidos-layout-sidebar-button.active {
+    border-left: 0;
+    border-bottom: 0;
+    background: white;
+    color: var(--pa-primary-dark);
+    font-weight: 700;
+  }
+
+  .pedidos-layout-content {
+    overflow-y: visible; /* Let body scroll naturally on mobile */
+    height: auto;
+  }
+
+  .pedidos-layout-body {
+    padding: 1rem;
+  }
+
+  /* Header adjustments */
+  .pedidos-admin-header-actions {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+    gap: 15px;
+    padding: 1rem;
+  }
+
+  .pedidos-admin-page-title {
+    justify-content: center;
+    font-size: 1.4rem;
+  }
+
+  .pedidos-admin-refresh-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Filters stack */
+  .pedidos-admin-filters-container {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem;
+  }
+
+  .pedidos-admin-filter-group {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* Modal Fullscreen on Mobile */
+  .pedidos-modal-content {
+    height: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+    width: 100vw;
+  }
+
+  .pedidos-modal-body {
+    padding: 1rem;
+  }
+
+  .pedidos-products-grid {
+    grid-template-columns: 1fr; /* Single column products */
+  }
+
+  .pedidos-product-img-wrapper {
+    height: 200px;
+  }
+
+  .pedidos-detail-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .pedidos-modal-footer {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  .pedidos-btn-actions-group {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .pedidos-btn-primary,
+  .pedidos-btn-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .pedidos-layout-sidebar {
+    min-height: 110px;
+    max-height: 110px;
+  }
+  .pedidos-layout-logo {
+    width: 35px;
+    height: 35px;
+    font-size: 0.9rem;
+  }
+
+  .pedidos-admin-orders-grid {
+    grid-template-columns: 1fr; /* Single column orders */
+  }
+
+  .pedidos-product-qty-tag {
+    width: 40px;
+    height: 40px;
+    font-size: 1.1rem;
+  }
+}
+
+/* Estilos para Asignaci�n de Recolectoras */
+.pedidos-recolectoras-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pedidos-recolectora-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border: 1px solid var(--pa-border);
+  border-radius: var(--pa-radius);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pedidos-recolectora-card.disponible:hover {
+  border-color: var(--pa-accent-green);
+  background-color: #f0fdf4;
+}
+
+.pedidos-recolectora-card.recolectando {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #f8fafc;
+}
+
+.pedidos-recolectora-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.pedidos-badge-ok {
+  color: #2e7d32;
+  font-weight: bold;
+  font-size: 0.85rem;
+}
+.pedidos-badge-busy {
+  color: #d32f2f;
+  font-weight: bold;
+  font-size: 0.85rem;
+}
+
