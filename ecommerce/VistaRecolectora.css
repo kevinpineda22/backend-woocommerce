@@ -66,19 +66,24 @@
 .ec-tabs {
   display: flex;
   background: var(--ec-card-bg);
+  justify-content: space-between; /* Distribución uniforme */
 }
 
 .ec-tab {
   flex: 1;
-  padding: 14px;
+  padding: 14px 4px; /* Menos padding lateral para que quepan bien los 3 */
   background: none;
   border: none;
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 0.85rem; /* Texto ligeramente más pequeño para móvil */
+  font-weight: 700;
   color: var(--ec-text-muted);
   cursor: pointer;
   border-bottom: 3px solid transparent;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Centrado perfecto */
+  text-align: center;
 }
 
 .ec-tab.active {

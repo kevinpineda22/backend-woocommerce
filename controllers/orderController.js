@@ -94,8 +94,42 @@ exports.assignOrder = async (req, res) => {
 exports.getOrderById = async (req, res) => {
   const { id } = req.params;
   try {
+    // 1. Obtener pedido de WooCommerce
     const { data: order } = await WooCommerce.get(`orders/${id}`);
 
+    // 2. Intentar obtener el Snapshot de la asiganción completada (Más rápido y preciso)
+    const { data: asignacion } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("reporte_snapshot")
+      .eq("id_pedido", id)
+      .eq("estado_asignacion", "completado")
+      .limit(1)
+      .maybeSingle();
+
+    let reporteFinal = null;
+
+    if (asignacion && asignacion.reporte_snapshot) {
+      // Opción A: Tenemos un snapshot guardado (Sistema Nuevo)
+      reporteFinal = asignacion.reporte_snapshot;
+    } else {
+      // Opción B: No hay snapshot, reconstruimos desde los logs (Retrocompatibilidad)
+      const { data: logs } = await supabase
+        .from("wc_log_recoleccion")
+        .select("*")
+        .eq("id_pedido", id);
+
+      if (logs && logs.length > 0) {
+        reporteFinal = { recolectados: [], retirados: [] };
+        logs.forEach((log) => {
+          const item = { id: log.id_producto, name: log.nombre_producto };
+          if (log.accion === "recolectado")
+            reporteFinal.recolectados.push(item);
+          if (log.accion === "retirado") reporteFinal.retirados.push(item);
+        });
+      }
+    }
+
+    // 3. Inyectar metadatos de productos (imágenes, pasillos)
     const items = await Promise.all(
       order.line_items.map(async (item) => {
         if (!item.product_id) return { ...item, pasillo: "N/A", priority: 99 };
@@ -118,19 +152,25 @@ exports.getOrderById = async (req, res) => {
     );
 
     order.line_items = items.sort((a, b) => a.prioridad - b.prioridad);
+
+    // Inyectamos el reporte encontrado (Snapshot o Logs)
+    if (reporteFinal) {
+      order.reporte_items = reporteFinal;
+    }
+
     res.status(200).json(order);
   } catch (error) {
     res.status(500).json({ error: "Error obteniendo detalle" });
   }
 };
 
-// 5. Finalizar Recolección
+// 5. Finalizar Recolección (Sistema Híbrido: Snapshot + Logs)
 exports.completeCollection = async (req, res) => {
-  const { id_pedido, id_recolectora } = req.body;
+  const { id_pedido, id_recolectora, reporte_items } = req.body;
   try {
     const now = new Date();
 
-    // Buscamos la asignación específica (limit 1) para evitar fallos si hay duplicados
+    // Validar asignación activa
     const { data: asignaciones } = await supabase
       .from("wc_asignaciones_pedidos")
       .select("id, fecha_inicio")
@@ -140,34 +180,71 @@ exports.completeCollection = async (req, res) => {
 
     const asignacion =
       asignaciones && asignaciones.length > 0 ? asignaciones[0] : null;
-    const duration = asignacion
-      ? Math.floor((now - new Date(asignacion.fecha_inicio)) / 1000)
-      : 0;
 
-    // Actualizamos SOLO esa asignación por su ID único
+    // Calcular duración real (evitar negativos)
+    let duration = 0;
+    if (asignacion && asignacion.fecha_inicio) {
+      const diff = (now - new Date(asignacion.fecha_inicio)) / 1000;
+      duration = diff > 0 ? Math.floor(diff) : 0;
+    }
+
+    // 1. Estrategia de Actualización: Guardar SNAPSHOT JSON para UI rápida
+    // Agregamos 'reporte_snapshot' al update. Si la columna no existe en BD, esto fallaría.
+    // Por eso TIENES que ejecutar el SQL provisto.
+    const updatePayload = {
+      estado_asignacion: "completado",
+      fecha_fin: now,
+      tiempo_total_segundos: duration,
+      reporte_snapshot: reporte_items || null,
+    };
+
+    let asignacionId = null;
+
     if (asignacion) {
+      asignacionId = asignacion.id;
       await supabase
         .from("wc_asignaciones_pedidos")
-        .update({
-          estado_asignacion: "completado",
-          fecha_fin: now,
-          tiempo_total_segundos: duration,
-        })
+        .update(updatePayload)
         .eq("id", asignacion.id);
     } else {
-      // Fallback: si no se halló en_proceso, forzamos update por id_pedido (legacy fix)
-      // pero esto podría causar duplicados de historia si hay mucha basura.
-      // Lo dejaremos con update general si no hay asignación específica detectada,
-      // O podríamos optar por no hacer nada para prevenir "falsos" historiales.
-      // Opción segura: update por id_pedido pero solo si no hallamos uno activo.
+      // Fallback
       await supabase
         .from("wc_asignaciones_pedidos")
-        .update({
-          estado_asignacion: "completado",
-          fecha_fin: now,
-          tiempo_total_segundos: duration,
-        })
+        .update(updatePayload)
         .eq("id_pedido", id_pedido);
+    }
+
+    // 2. Estrategia de Auditoría: Guardar LOGS individuales para Analítica
+    if (reporte_items) {
+      const logsToInsert = [];
+
+      // Helper para procesar listas
+      const procesarLista = (lista, accion) => {
+        if (!lista) return;
+        lista.forEach((item) => {
+          logsToInsert.push({
+            id_asignacion: asignacionId, // Vinculación FK
+            id_pedido: id_pedido,
+            id_producto: item.id,
+            nombre_producto: item.name,
+            accion: accion,
+            fecha_registro: new Date(),
+          });
+        });
+      };
+
+      procesarLista(reporte_items.recolectados, "recolectado");
+      procesarLista(reporte_items.retirados, "retirado");
+      // Los pendientes forzados cuentan como retirados/no_encontrados en el log?
+      // Depende de la regla de negocio. Por ahora solo procesamos lo explícito.
+
+      if (logsToInsert.length > 0) {
+        const { error: logError } = await supabase
+          .from("wc_log_recoleccion")
+          .insert(logsToInsert);
+        if (logError)
+          console.error("Error guardando logs de auditoría:", logError);
+      }
     }
 
     await supabase
@@ -175,10 +252,9 @@ exports.completeCollection = async (req, res) => {
       .update({ estado_recolectora: "disponible", id_pedido_actual: null })
       .eq("id", id_recolectora);
 
-    // OPCIONAL: await WooCommerce.put(`orders/${id_pedido}`, { status: "completed" });
-
-    res.status(200).json({ message: "Orden finalizada" });
+    res.status(200).json({ message: "Orden finalizada correctamente" });
   } catch (error) {
+    console.error("Error finalizando orden:", error);
     res.status(500).json({ error: error.message });
   }
 };

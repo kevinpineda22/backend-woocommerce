@@ -19,23 +19,53 @@ import "./VistaRecolectora.css";
 // --- COMPONENTE SWIPEABLE ---
 const SwipeCard = ({ item, onSwipe }) => {
   const x = useMotionValue(0);
-  const opacity = useTransform(x, [0, 150], [1, 0]);
-  const backgroundOpacity = useTransform(x, [0, 50], [0, 1]);
+  // Aumentamos el rango de opacidad para que no desaparezca tan rápido
+  // Ahora require arrastrar más para desaparecer visualmente del todo
+  const opacity = useTransform(x, [-250, 0, 250], [0.5, 1, 0.5]);
+
+  // Backgrounds opacity: empiezan a verse antes, pero se validan más lejos
+  // Ajuste para que se vea claro la intención
+  const rightBgOpacity = useTransform(x, [50, 150], [0, 1]);
+  const leftBgOpacity = useTransform(x, [-150, -50], [1, 0]);
 
   const handleDragEnd = (event, info) => {
-    if (info.offset.x > 100) {
-      onSwipe(item.id);
+    // Aumentada la sensibilidad requerida: de 100 a 170 pixels
+    // Esto evita falsos positivos al scrollear verticalmente o tocar sin querer.
+    if (info.offset.x > 170) {
+      onSwipe(item.id, "picked");
+    } else if (info.offset.x < -170) {
+      onSwipe(item.id, "removed");
     }
   };
 
   return (
     <div className="ec-swipe-wrapper">
+      {/* Background Left: Removed */}
       <motion.div
-        className="ec-swipe-background"
-        style={{ opacity: backgroundOpacity }}
+        className="ec-swipe-background left"
+        style={{
+          opacity: leftBgOpacity,
+          backgroundColor: "#ef4444",
+          justifyContent: "flex-end",
+          paddingRight: 20,
+        }}
       >
-        <FaCheck size={30} color="white" />
-        <span>AGREGAR AL CARRITO</span>
+        <span>RETIRAR</span>
+        <FaUndo size={30} color="white" style={{ marginLeft: 10 }} />
+      </motion.div>
+
+      {/* Background Right: Picked */}
+      <motion.div
+        className="ec-swipe-background right"
+        style={{
+          opacity: rightBgOpacity,
+          backgroundColor: "#22c55e",
+          justifyContent: "flex-start",
+          paddingLeft: 20,
+        }}
+      >
+        <FaCheck size={30} color="white" style={{ marginRight: 10 }} />
+        <span>AGREGAR</span>
       </motion.div>
 
       <motion.div
@@ -82,8 +112,12 @@ const SwipeCard = ({ item, onSwipe }) => {
 };
 
 // --- COMPONENTE ITEM COMPLETADO ---
-const CompletedCard = ({ item, onUndo }) => (
-  <div className="ec-product-card completed">
+const CompletedCard = ({ item, onUndo, type = "picked" }) => (
+  <div
+    className={`ec-product-card ${
+      type === "removed" ? "removed-item" : "completed"
+    }`}
+  >
     <div className="ec-img-wrapper grayscale">
       {item.image_src ? (
         <img src={item.image_src} className="ec-prod-img" alt={item.name} />
@@ -93,7 +127,9 @@ const CompletedCard = ({ item, onUndo }) => (
     </div>
     <div className="ec-info completed-text">
       <h4 className="ec-name">{item.name}</h4>
-      <span className="ec-picked-label">Recogido</span>
+      <span className="ec-picked-label">
+        {type === "removed" ? "Retirado" : "Recogido"}
+      </span>
     </div>
     <button className="ec-btn-undo" onClick={() => onUndo(item.id)}>
       <FaUndo />
@@ -105,7 +141,8 @@ const VistaRecolectora = () => {
   const [loading, setLoading] = useState(true);
   const [currentOrder, setCurrentOrder] = useState(null);
   const [collectorStatus, setCollectorStatus] = useState(null);
-  const [pickedItems, setPickedItems] = useState({});
+  const [startTime, setStartTime] = useState(null); // Nuevo estado para el inicio real
+  const [pickedItems, setPickedItems] = useState({}); // { [id]: 'picked' | 'removed' | false }
   const [activeTab, setActiveTab] = useState("pending");
   const [timer, setTimer] = useState("00:00:00");
   const [userEmail, setUserEmail] = useState("");
@@ -116,20 +153,14 @@ const VistaRecolectora = () => {
       try {
         setLoading(true);
 
-        // 1. Buscamos email en distintos lugares (URL, LocalStorage específico, LocalStorage general, Sesión)
+        // 1. Buscamos email en distintos lugares
         const params = new URLSearchParams(window.location.search);
         let emailToUse = params.get("email");
 
-        if (!emailToUse) {
-          emailToUse = localStorage.getItem("recolectora_email");
-        }
+        if (!emailToUse) emailToUse = localStorage.getItem("recolectora_email");
+        if (!emailToUse) emailToUse = localStorage.getItem("correo_empleado");
 
         if (!emailToUse) {
-          emailToUse = localStorage.getItem("correo_empleado");
-        }
-
-        if (!emailToUse) {
-          // Fallback: Check active Supabase session
           const {
             data: { user },
           } = await supabase.auth.getUser();
@@ -142,6 +173,7 @@ const VistaRecolectora = () => {
         }
         setUserEmail(emailToUse);
 
+        // 2. Obtener Perfil Recolectora
         const statusRes = await axios.get(
           `https://backend-woocommerce.vercel.app/api/orders/recolectoras?email=${encodeURIComponent(
             emailToUse
@@ -151,11 +183,26 @@ const VistaRecolectora = () => {
 
         if (me && me.id_pedido_actual) {
           setCollectorStatus(me);
+
+          // 3. Obtener Asignación REAL para el tiempo correcto (Fix Timer)
+          const { data: assignmentData } = await supabase
+            .from("wc_asignaciones_pedidos")
+            .select("fecha_inicio")
+            .eq("id_pedido", me.id_pedido_actual)
+            .eq("estado_asignacion", "en_proceso")
+            .maybeSingle();
+
+          if (assignmentData && assignmentData.fecha_inicio) {
+            setStartTime(new Date(assignmentData.fecha_inicio).getTime());
+          }
+
+          // 4. Obtener Pedido WooCommerce
           const orderRes = await axios.get(
             `https://backend-woocommerce.vercel.app/api/orders/${me.id_pedido_actual}`
           );
           setCurrentOrder(orderRes.data);
 
+          // Inicializar items (esto podría persistirse en LocalStorage para no perder avance al refrescar)
           const initialPicked = {};
           orderRes.data.line_items.forEach(
             (i) => (initialPicked[i.id] = false)
@@ -171,32 +218,35 @@ const VistaRecolectora = () => {
     init();
   }, []);
 
-  // 2. Lógica del Temporizador
+  // 2. Lógica del Temporizador (Usando startTime real)
   useEffect(() => {
-    if (!collectorStatus?.fecha_inicio_orden) return;
+    if (!startTime) return;
 
-    const interval = setInterval(() => {
-      const start = new Date(collectorStatus.fecha_inicio_orden).getTime();
+    const updateTimer = () => {
       const now = Date.now();
-      const diff = now - start;
+      const diff = now - startTime;
 
       if (diff > 0) {
         const h = Math.floor(diff / 3600000);
         const m = Math.floor((diff % 3600000) / 60000);
         const s = Math.floor((diff % 60000) / 1000);
         setTimer(
-          `${h}:${m.toString().padStart(2, "0")}:${s
+          `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s
             .toString()
             .padStart(2, "0")}`
         );
       }
-    }, 1000);
+    };
+
+    updateTimer(); // Iniciar inmediatamente
+    const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [collectorStatus]);
+  }, [startTime]);
 
   // 3. Manejo de Swipe/Acciones
-  const handleSwipe = (id) => {
-    setPickedItems((prev) => ({ ...prev, [id]: true }));
+  const handleSwipe = (id, action) => {
+    // action: 'picked' | 'removed'
+    setPickedItems((prev) => ({ ...prev, [id]: action }));
   };
 
   const handleUndo = (id) => {
@@ -204,13 +254,57 @@ const VistaRecolectora = () => {
   };
 
   const handleFinish = async () => {
-    if (!window.confirm("¿Finalizar pedido y liberar turno?")) return;
+    // 1. Verificar si quedan pendientes
+    const hasPending = stats.total - stats.picked - stats.removed > 0;
+
+    if (hasPending) {
+      if (
+        !window.confirm(
+          `Tienes ${
+            stats.total - stats.picked - stats.removed
+          } productos PENDIENTES. ¿Deseas marcarlos como RETIRADOS y finalizar?`
+        )
+      ) {
+        return;
+      }
+    } else {
+      if (!window.confirm("¿Finalizar pedido y liberar turno?")) return;
+    }
+
     try {
+      // 2. Construir Reporte
+      const reporte = {
+        recolectados: [],
+        retirados: [],
+        pendientes: [],
+      };
+
+      currentOrder.line_items.forEach((item) => {
+        const status = pickedItems[item.id];
+        const simpleItem = {
+          id: item.id,
+          sku: item.sku,
+          name: item.name,
+          qty: item.quantity,
+        };
+
+        if (status === "picked") {
+          reporte.recolectados.push(simpleItem);
+        } else if (status === "removed") {
+          reporte.retirados.push(simpleItem);
+        } else {
+          // Si el usuario confirmó finalizar con pendientes, los tratamos como retirados (o "no encontrados")
+          // Para la lógica de negocio, asumiremos que pasan a retirados/no encontrados
+          reporte.retirados.push(simpleItem);
+        }
+      });
+
       await axios.post(
         "https://backend-woocommerce.vercel.app/api/orders/finalizar-recoleccion",
         {
           id_pedido: currentOrder.id,
           id_recolectora: collectorStatus.id,
+          reporte_items: reporte,
         }
       );
       alert("¡Pedido Completado! Excelente trabajo.");
@@ -230,23 +324,27 @@ const VistaRecolectora = () => {
   };
 
   // 4. Agrupación y Filtrado
-  const { pendingGroups, completedList, stats } = useMemo(() => {
+  const { pendingGroups, completedList, removedList, stats } = useMemo(() => {
     if (!currentOrder)
       return {
         pendingGroups: [],
         completedList: [],
-        stats: { total: 0, picked: 0 },
+        removedList: [],
+        stats: { total: 0, picked: 0, removed: 0 },
       };
 
     const pendingMap = new Map();
     const completed = [];
-    let pickedCount = 0;
+    const removed = [];
 
     currentOrder.line_items.forEach((item) => {
-      if (pickedItems[item.id]) {
+      const status = pickedItems[item.id];
+      if (status === "picked") {
         completed.push(item);
-        pickedCount++;
+      } else if (status === "removed") {
+        removed.push(item);
       } else {
+        // Pending
         const pasilloKey =
           item.pasillo === "S/N" || item.pasillo === "Otros"
             ? "OTROS / GENERAL"
@@ -263,7 +361,12 @@ const VistaRecolectora = () => {
         items: v,
       })),
       completedList: completed,
-      stats: { total: currentOrder.line_items.length, picked: pickedCount },
+      removedList: removed,
+      stats: {
+        total: currentOrder.line_items.length,
+        picked: completed.length,
+        removed: removed.length,
+      },
     };
   }, [currentOrder, pickedItems]);
 
@@ -294,10 +397,20 @@ const VistaRecolectora = () => {
         {/* TABS */}
         <div className="ec-tabs">
           <button
+            className={`ec-tab ${activeTab === "removed" ? "active" : ""}`}
+            onClick={() => setActiveTab("removed")}
+          >
+            Retirados ({stats.removed})
+          </button>
+          <button
             className={`ec-tab ${activeTab === "pending" ? "active" : ""}`}
             onClick={() => setActiveTab("pending")}
+            style={{
+              borderLeft: "1px solid #e2e8f0",
+              borderRight: "1px solid #e2e8f0",
+            }}
           >
-            Pendientes ({stats.total - stats.picked})
+            Pendient. ({stats.total - stats.picked - stats.removed})
           </button>
           <button
             className={`ec-tab ${activeTab === "completed" ? "active" : ""}`}
@@ -307,7 +420,7 @@ const VistaRecolectora = () => {
           </button>
         </div>
 
-        {/* Barra de Progreso */}
+        {/* Barra de Progreso (Consideramos retirados como 'procesados' también? Normalmente solo recogidos cuentan para progreso positivo) */}
         <div className="ec-reco-progress-track">
           <div
             className="ec-reco-progress-fill"
@@ -321,8 +434,8 @@ const VistaRecolectora = () => {
 
       {/* Contenido Scrollable */}
       <div className="ec-reco-scroll-container">
-        {activeTab === "pending" ? (
-          pendingGroups.length > 0 ? (
+        {activeTab === "pending" &&
+          (pendingGroups.length > 0 ? (
             pendingGroups.map((group, idx) => (
               <div key={idx} className="ec-reco-aisle-group">
                 <div className="ec-reco-aisle-header">
@@ -345,16 +458,48 @@ const VistaRecolectora = () => {
           ) : (
             <div className="ec-empty-tab">
               <FaCheck size={50} color="#22c55e" />
-              <p>¡Todo listo! Revisa la pestaña Agregados.</p>
+              <p>No tienes pendientes.</p>
             </div>
-          )
-        ) : (
+          ))}
+
+        {activeTab === "completed" && (
           <div className="ec-completed-list">
-            {completedList.map((item) => (
-              <CompletedCard key={item.id} item={item} onUndo={handleUndo} />
-            ))}
+            {completedList.length > 0 ? (
+              completedList.map((item) => (
+                <CompletedCard
+                  key={item.id}
+                  item={item}
+                  onUndo={handleUndo}
+                  type="picked"
+                />
+              ))
+            ) : (
+              <div className="ec-empty-tab">
+                <p>Aún no has agregado productos.</p>
+              </div>
+            )}
           </div>
         )}
+
+        {activeTab === "removed" && (
+          <div className="ec-completed-list">
+            {removedList.length > 0 ? (
+              removedList.map((item) => (
+                <CompletedCard
+                  key={item.id}
+                  item={item}
+                  onUndo={handleUndo}
+                  type="removed"
+                />
+              ))
+            ) : (
+              <div className="ec-empty-tab">
+                <p>No has retirado ningún producto.</p>
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ height: 80 }}></div>
       </div>
 
