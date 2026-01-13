@@ -1,98 +1,135 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
-import {
-  motion,
-  useMotionValue,
-  useTransform,
-  AnimatePresence,
-} from "framer-motion";
+import { supabase } from "../../supabaseClient";
+import { motion, useMotionValue, useTransform } from "framer-motion";
 import {
   FaClock,
   FaCheck,
-  FaCheckCircle,
-  FaSpinner,
+  FaMapMarkerAlt,
   FaBoxOpen,
+  FaArrowRight,
+  FaUndo,
+  FaShoppingBasket,
+  FaSync,
+  FaClipboardList,
+  FaUserClock,
 } from "react-icons/fa";
 import "./VistaRecolectora.css";
 
-const SwipeableItem = ({ item, onToggle }) => {
+// --- COMPONENTE SWIPEABLE ---
+const SwipeCard = ({ item, onSwipe }) => {
   const x = useMotionValue(0);
-  const backgroundOpacity = useTransform(x, [-100, 0], [1, 0]);
-  const isCompleted = item.picked;
+  const opacity = useTransform(x, [0, 150], [1, 0]);
+  const backgroundOpacity = useTransform(x, [0, 50], [0, 1]);
 
   const handleDragEnd = (event, info) => {
-    if (info.offset.x < -80) {
-      // Swiped left enough
-      // Toggle picked state
-      onToggle(item.id);
+    if (info.offset.x > 100) {
+      onSwipe(item.id);
     }
   };
 
   return (
-    <div className={`reco-item-container ${isCompleted ? "completed" : ""}`}>
-      {/* Background Layer (Success/Picked) */}
+    <div className="ec-swipe-wrapper">
       <motion.div
-        className="reco-swipe-bg"
-        style={{ opacity: isCompleted ? 1 : backgroundOpacity }}
+        className="ec-swipe-background"
+        style={{ opacity: backgroundOpacity }}
       >
-        <FaCheck className="reco-swipe-icon" />
+        <FaCheck size={30} color="white" />
+        <span>AGREGAR AL CARRITO</span>
       </motion.div>
 
-      {/* Foreground Card */}
       <motion.div
-        className="reco-item-content"
+        className="ec-product-card"
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.1}
+        dragElastic={0.7}
         onDragEnd={handleDragEnd}
-        // If completed, we might want to slide it permanently or just color it
-        animate={{ x: 0 }}
-        style={{ x }}
+        style={{ x, opacity }}
         whileTap={{ cursor: "grabbing" }}
       >
-        <img
-          src={item.image_src || "https://placehold.co/60x60?text=No+Img"}
-          alt={item.name}
-          className="reco-item-img"
-        />
-        <div className="reco-item-details">
-          <div className="reco-item-name">{item.name}</div>
-          <div className="reco-item-meta">SKU: {item.sku || "N/A"}</div>
+        <div className="ec-img-wrapper">
+          {item.image_src ? (
+            <img src={item.image_src} alt={item.name} className="ec-prod-img" />
+          ) : (
+            <div className="ec-no-img">
+              <FaBoxOpen />
+            </div>
+          )}
         </div>
-        <div className="reco-item-qty">{item.quantity}</div>
+
+        <div className="ec-info">
+          <div className="ec-badges">
+            <span className="ec-badge-pasillo">
+              {item.pasillo === "S/N" || item.pasillo === "Otros"
+                ? "General"
+                : `Pasillo ${item.pasillo}`}
+            </span>
+            <span className="ec-badge-cat">
+              {item.categorias?.[0] || "General"}
+            </span>
+          </div>
+          <h4 className="ec-name">{item.name}</h4>
+          {item.sku && <div className="ec-sku">SKU: {item.sku}</div>}
+        </div>
+
+        <div className="ec-qty-wrapper">
+          <div className="ec-qty-circle">{item.quantity}</div>
+          <span className="ec-unit">UND</span>
+        </div>
       </motion.div>
     </div>
   );
 };
 
+// --- COMPONENTE ITEM COMPLETADO ---
+const CompletedCard = ({ item, onUndo }) => (
+  <div className="ec-product-card completed">
+    <div className="ec-img-wrapper grayscale">
+      {item.image_src ? (
+        <img src={item.image_src} className="ec-prod-img" alt={item.name} />
+      ) : (
+        <FaBoxOpen />
+      )}
+    </div>
+    <div className="ec-info completed-text">
+      <h4 className="ec-name">{item.name}</h4>
+      <span className="ec-picked-label">Recogido</span>
+    </div>
+    <button className="ec-btn-undo" onClick={() => onUndo(item.id)}>
+      <FaUndo />
+    </button>
+  </div>
+);
+
 const VistaRecolectora = () => {
   const [loading, setLoading] = useState(true);
-  const [collectorStatus, setCollectorStatus] = useState(null);
   const [currentOrder, setCurrentOrder] = useState(null);
-  const [pickedItems, setPickedItems] = useState({}); // { itemId: true/false }
+  const [collectorStatus, setCollectorStatus] = useState(null);
+  const [pickedItems, setPickedItems] = useState({});
+  const [activeTab, setActiveTab] = useState("pending");
   const [timer, setTimer] = useState("00:00:00");
-
   const [userEmail, setUserEmail] = useState("");
 
-  // Fetch Collector Status
+  // 1. Carga Inicial
   useEffect(() => {
     const init = async () => {
       try {
         setLoading(true);
 
-        // 1. Determine user email: URL param OR LocalStorage OR Session
+        // 1. Buscamos email en distintos lugares (URL, LocalStorage específico, LocalStorage general, Sesión)
         const params = new URLSearchParams(window.location.search);
         let emailToUse = params.get("email");
 
         if (!emailToUse) {
-          // Check specific recolectora email OR general employee login email
-          emailToUse =
-            localStorage.getItem("recolectora_email") ||
-            localStorage.getItem("correo_empleado");
+          emailToUse = localStorage.getItem("recolectora_email");
         }
 
-        // Fallback: Check active Supabase session
         if (!emailToUse) {
+          emailToUse = localStorage.getItem("correo_empleado");
+        }
+
+        if (!emailToUse) {
+          // Fallback: Check active Supabase session
           const {
             data: { user },
           } = await supabase.auth.getUser();
@@ -101,110 +138,73 @@ const VistaRecolectora = () => {
 
         if (!emailToUse) {
           setLoading(false);
-          return; // Show email input screen
+          return;
         }
-
         setUserEmail(emailToUse);
 
-        // 2. Get Collector Status (Active Order ID)
-        const encodedEmail = encodeURIComponent(emailToUse);
         const statusRes = await axios.get(
-          `https://backend-woocommerce.vercel.app/api/orders/recolectoras?email=${encodedEmail}`
+          `https://backend-woocommerce.vercel.app/api/orders/recolectoras?email=${encodeURIComponent(
+            emailToUse
+          )}`
         );
+        const me = statusRes.data[0];
 
-        // API returns an array, find the one matching our email
-        const myProfile = statusRes.data.find((r) => r.email === emailToUse);
-
-        if (myProfile && myProfile.id_pedido_actual) {
-          setCollectorStatus(myProfile);
-          // 3. Fetch the actual order
+        if (me && me.id_pedido_actual) {
+          setCollectorStatus(me);
           const orderRes = await axios.get(
-            `https://backend-woocommerce.vercel.app/api/orders/${myProfile.id_pedido_actual}`
+            `https://backend-woocommerce.vercel.app/api/orders/${me.id_pedido_actual}`
           );
           setCurrentOrder(orderRes.data);
 
-          // Initialize picked items from simple local state (or localStorage in refresh)
           const initialPicked = {};
           orderRes.data.line_items.forEach(
             (i) => (initialPicked[i.id] = false)
           );
           setPickedItems(initialPicked);
-        } else {
-          setCollectorStatus(null);
         }
-      } catch (err) {
-        console.error("Error loading recolectora view", err);
+      } catch (e) {
+        console.error(e);
       } finally {
         setLoading(false);
       }
     };
-
     init();
   }, []);
 
-  // Timer Logic
+  // 2. Lógica del Temporizador
   useEffect(() => {
     if (!collectorStatus?.fecha_inicio_orden) return;
 
     const interval = setInterval(() => {
       const start = new Date(collectorStatus.fecha_inicio_orden).getTime();
-      const now = new Date().getTime();
+      const now = Date.now();
       const diff = now - start;
 
       if (diff > 0) {
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
         setTimer(
-          `${hours.toString().padStart(2, "0")}:${minutes
+          `${h}:${m.toString().padStart(2, "0")}:${s
             .toString()
-            .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+            .padStart(2, "0")}`
         );
       }
     }, 1000);
-
     return () => clearInterval(interval);
   }, [collectorStatus]);
 
-  // Grouping Logic (Mock Pasillos if not present)
-  const groupedItems = useMemo(() => {
-    if (!currentOrder) return {};
-
-    const groups = {};
-    currentOrder.line_items.forEach((item) => {
-      // Try to find 'Pasillo' in meta_data, otherwise Random/Default
-      const pasilloMeta = item.meta_data?.find(
-        (m) => m.key === "pa_pasillo" || m.key === "pasillo"
-      );
-      const pasilloName = pasilloMeta
-        ? pasilloMeta.value
-        : "PASILLO GENERAL (Sin Asignar)"; // Fallback
-
-      if (!groups[pasilloName]) groups[pasilloName] = [];
-      groups[pasilloName].push({
-        ...item,
-        picked: pickedItems[item.id] || false,
-      });
-    });
-    return groups;
-  }, [currentOrder, pickedItems]);
-
-  const handleToggleItem = (itemId) => {
-    setPickedItems((prev) => ({
-      ...prev,
-      [itemId]: !prev[itemId],
-    }));
+  // 3. Manejo de Swipe/Acciones
+  const handleSwipe = (id) => {
+    setPickedItems((prev) => ({ ...prev, [id]: true }));
   };
 
-  const allPicked = useMemo(() => {
-    if (!currentOrder) return false;
-    return currentOrder.line_items.every((i) => pickedItems[i.id]);
-  }, [currentOrder, pickedItems]);
+  const handleUndo = (id) => {
+    setPickedItems((prev) => ({ ...prev, [id]: false }));
+  };
 
-  const handleFinishOrder = async () => {
-    if (!window.confirm("¿Confirmar que has recolectado todos los productos?"))
-      return;
-
+  const handleFinish = async () => {
+    if (!window.confirm("¿Finalizar pedido y liberar turno?")) return;
     try {
       await axios.post(
         "https://backend-woocommerce.vercel.app/api/orders/finalizar-recoleccion",
@@ -213,140 +213,219 @@ const VistaRecolectora = () => {
           id_recolectora: collectorStatus.id,
         }
       );
-      alert("¡Excelente trabajo! Pedido completado.");
-      setCollectorStatus(null);
-      setCurrentOrder(null);
-    } catch (err) {
-      alert("Error al finalizar: " + err.message);
+      alert("¡Pedido Completado! Excelente trabajo.");
+      window.location.reload();
+    } catch (e) {
+      alert(e.message);
     }
   };
 
   const handleLogin = (e) => {
     e.preventDefault();
-    const email = e.target.elements.email.value;
-    if (email) {
-      localStorage.setItem("recolectora_email", email);
+    const val = e.target.elements.email.value;
+    if (val) {
+      localStorage.setItem("recolectora_email", val);
       window.location.reload();
     }
   };
 
-  if (!userEmail && !loading) {
-    return (
-      <div className="reco-container reco-loading-state">
-        <h2>Identificación</h2>
-        <p>Ingresa tu correo de recolectora para ver tus asignaciones.</p>
-        <form
-          onSubmit={handleLogin}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "10px",
-            marginTop: "20px",
-          }}
-        >
-          <input
-            type="email"
-            name="email"
-            placeholder="ejemplo@merkahorro.com"
-            style={{
-              padding: "10px",
-              borderRadius: "5px",
-              border: "1px solid #ccc",
-            }}
-            required
-          />
-          <button
-            type="submit"
-            className="reco-btn-finish"
-            style={{ width: "100%", background: "#3b82f6" }}
-          >
-            Ingresar
-          </button>
-        </form>
-      </div>
-    );
-  }
+  // 4. Agrupación y Filtrado
+  const { pendingGroups, completedList, stats } = useMemo(() => {
+    if (!currentOrder)
+      return {
+        pendingGroups: [],
+        completedList: [],
+        stats: { total: 0, picked: 0 },
+      };
 
-  if (loading) {
-    return (
-      <div className="reco-container reco-loading-state">
-        <div className="reco-spinner"></div>
-        <h3>Cargando misión...</h3>
-      </div>
-    );
-  }
+    const pendingMap = new Map();
+    const completed = [];
+    let pickedCount = 0;
 
-  if (!currentOrder) {
+    currentOrder.line_items.forEach((item) => {
+      if (pickedItems[item.id]) {
+        completed.push(item);
+        pickedCount++;
+      } else {
+        const pasilloKey =
+          item.pasillo === "S/N" || item.pasillo === "Otros"
+            ? "OTROS / GENERAL"
+            : `PASILLO ${item.pasillo}`;
+
+        if (!pendingMap.has(pasilloKey)) pendingMap.set(pasilloKey, []);
+        pendingMap.get(pasilloKey).push(item);
+      }
+    });
+
+    return {
+      pendingGroups: Array.from(pendingMap.entries()).map(([k, v]) => ({
+        title: k,
+        items: v,
+      })),
+      completedList: completed,
+      stats: { total: currentOrder.line_items.length, picked: pickedCount },
+    };
+  }, [currentOrder, pickedItems]);
+
+  // --- RENDER ---
+  if (!userEmail) return <LoginScreen onSubmit={handleLogin} />;
+
+  if (loading)
     return (
-      <div className="reco-container reco-loading-state">
-        <FaBoxOpen size={50} style={{ color: "#cbd5e1", marginBottom: 20 }} />
-        <h2>Sin Misión Activa</h2>
-        <p>No tienes pedidos asignados en este momento.</p>
-        <button
-          className="reco-btn-finish"
-          style={{ marginTop: 20, width: "auto", background: "#3b82f6" }}
-          onClick={() => window.location.reload()}
-        >
-          Actualizar
-        </button>
+      <div className="ec-reco-centered-view">
+        <div className="ec-reco-spinner"></div>
+        <p>Cargando pedido...</p>
       </div>
     );
-  }
+
+  if (!currentOrder) return <EmptyScreen />;
 
   return (
-    <div className="reco-container">
-      {/* Sticky Header */}
-      <header className="reco-header">
-        <div className="reco-order-id">#{currentOrder.id}</div>
-        <div className="reco-timer-card">
-          <FaClock /> {timer}
+    <div className="ec-reco-main-layout">
+      {/* Header Fijo */}
+      <header className="ec-reco-sticky-header">
+        <div className="ec-reco-header-row">
+          <div className="ec-reco-order-badge">#{currentOrder.id}</div>
+          <div className="ec-reco-timer-pill">
+            <FaClock /> {timer}
+          </div>
+        </div>
+
+        {/* TABS */}
+        <div className="ec-tabs">
+          <button
+            className={`ec-tab ${activeTab === "pending" ? "active" : ""}`}
+            onClick={() => setActiveTab("pending")}
+          >
+            Pendientes ({stats.total - stats.picked})
+          </button>
+          <button
+            className={`ec-tab ${activeTab === "completed" ? "active" : ""}`}
+            onClick={() => setActiveTab("completed")}
+          >
+            Agregados ({stats.picked})
+          </button>
+        </div>
+
+        {/* Barra de Progreso */}
+        <div className="ec-reco-progress-track">
+          <div
+            className="ec-reco-progress-fill"
+            style={{ width: `${(stats.picked / stats.total) * 100}%` }}
+          ></div>
+          <span className="ec-reco-progress-label">
+            {stats.picked} / {stats.total} Productos
+          </span>
         </div>
       </header>
 
-      {/* Aisle List */}
-      <div className="reco-content">
-        {Object.entries(groupedItems).map(([aisleName, items]) => {
-          const pickedCount = items.filter((i) => i.picked).length;
-          const totalCount = items.length;
-          return (
-            <div key={aisleName} className="reco-aisle-section">
-              <div className="reco-aisle-header">
-                <span>{aisleName}</span>
-                <span className="reco-aisle-progress">
-                  {pickedCount}/{totalCount}
-                </span>
+      {/* Contenido Scrollable */}
+      <div className="ec-reco-scroll-container">
+        {activeTab === "pending" ? (
+          pendingGroups.length > 0 ? (
+            pendingGroups.map((group, idx) => (
+              <div key={idx} className="ec-reco-aisle-group">
+                <div className="ec-reco-aisle-header">
+                  <span className="ec-reco-aisle-title">{group.title}</span>
+                  <span className="ec-reco-aisle-count">
+                    {group.items.length} items
+                  </span>
+                </div>
+                <div className="ec-reco-aisle-items">
+                  {group.items.map((item) => (
+                    <SwipeCard
+                      key={item.id}
+                      item={item}
+                      onSwipe={handleSwipe}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="reco-items-list">
-                {items.map((item) => (
-                  <SwipeableItem
-                    key={item.id}
-                    item={item}
-                    onToggle={handleToggleItem}
-                  />
-                ))}
-              </div>
+            ))
+          ) : (
+            <div className="ec-empty-tab">
+              <FaCheck size={50} color="#22c55e" />
+              <p>¡Todo listo! Revisa la pestaña Agregados.</p>
             </div>
-          );
-        })}
+          )
+        ) : (
+          <div className="ec-completed-list">
+            {completedList.map((item) => (
+              <CompletedCard key={item.id} item={item} onUndo={handleUndo} />
+            ))}
+          </div>
+        )}
+        <div style={{ height: 80 }}></div>
       </div>
 
-      {/* Footer Actions */}
-      <footer className="reco-footer">
-        <button
-          className="reco-btn-finish"
-          disabled={!allPicked}
-          onClick={handleFinishOrder}
-        >
-          {allPicked
-            ? "Finalizar Recolección"
-            : `Faltan items (${
-                currentOrder.line_items.length -
-                Object.values(pickedItems).filter(Boolean).length
-              })`}
-        </button>
-      </footer>
+      {/* Botón Flotante */}
+      {stats.picked === stats.total && stats.total > 0 && (
+        <div className="ec-reco-fab-wrapper">
+          <button
+            className="ec-reco-fab-btn ec-reco-ready"
+            onClick={handleFinish}
+          >
+            <span className="ec-reco-fab-icon">
+              <FaShoppingBasket />
+            </span>
+            <span className="ec-reco-btn-text">FINALIZAR PEDIDO</span>
+            <FaArrowRight />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
+
+// Subcomponentes
+const LoginScreen = ({ onSubmit }) => (
+  <div className="ec-reco-centered-view">
+    <h2>👋 Hola Recolectora</h2>
+    <p>Ingresa tu correo para ver tu asignación actual.</p>
+    <form onSubmit={onSubmit} className="ec-reco-login-form">
+      <input
+        name="email"
+        type="email"
+        placeholder="Tu correo corporativo"
+        className="ec-reco-input"
+        required
+      />
+      <button type="submit" className="ec-reco-btn-primary">
+        Ingresar al Sistema
+      </button>
+    </form>
+  </div>
+);
+
+// PANTALLA VACÍA ACTUALIZADA
+const EmptyScreen = () => (
+  <motion.div
+    className="ec-empty-state-container"
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+  >
+    <div className="ec-empty-illustration">
+      <FaClipboardList className="ec-empty-icon-main" />
+      <div className="ec-empty-icon-badge">
+        <FaUserClock />
+      </div>
+    </div>
+
+    <h2 className="ec-empty-title">¡Todo listo por ahora!</h2>
+    <p className="ec-empty-description">
+      No tienes pedidos asignados en este momento. El administrador te asignará
+      un nuevo pedido pronto.
+    </p>
+
+    <button
+      onClick={() => window.location.reload()}
+      className="ec-reco-btn-primary ec-btn-large"
+    >
+      <FaSync className="ec-spin" style={{ marginRight: 10 }} />
+      Actualizar estado
+    </button>
+  </motion.div>
+);
 
 export default VistaRecolectora;

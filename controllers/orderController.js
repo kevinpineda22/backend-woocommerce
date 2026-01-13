@@ -6,7 +6,7 @@ const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 exports.getPendingOrders = async (req, res) => {
   try {
     const { data: wcOrders } = await WooCommerce.get("orders", {
-      status: "processing", 
+      status: "processing",
       per_page: 50,
       order: "asc",
     });
@@ -25,7 +25,7 @@ exports.getPendingOrders = async (req, res) => {
       const assignment = assignmentMap[order.id];
       return {
         ...order,
-        is_assigned: !!assignment, 
+        is_assigned: !!assignment,
         assigned_to: assignment ? assignment.nombre_recolectora : null,
         started_at: assignment ? assignment.fecha_inicio : null,
       };
@@ -63,12 +63,14 @@ exports.assignOrder = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("wc_asignaciones_pedidos")
-      .insert([{ 
-        id_pedido, 
-        id_recolectora, 
-        nombre_recolectora, 
-        estado_asignacion: "en_proceso" 
-      }])
+      .insert([
+        {
+          id_pedido,
+          id_recolectora,
+          nombre_recolectora,
+          estado_asignacion: "en_proceso",
+        },
+      ])
       .select()
       .single();
 
@@ -76,7 +78,10 @@ exports.assignOrder = async (req, res) => {
 
     await supabase
       .from("wc_recolectoras")
-      .update({ estado_recolectora: "recolectando", id_pedido_actual: id_pedido })
+      .update({
+        estado_recolectora: "recolectando",
+        id_pedido_actual: id_pedido,
+      })
       .eq("id", id_recolectora);
 
     res.status(200).json(data);
@@ -90,21 +95,27 @@ exports.getOrderById = async (req, res) => {
   const { id } = req.params;
   try {
     const { data: order } = await WooCommerce.get(`orders/${id}`);
-    
-    const items = await Promise.all(order.line_items.map(async (item) => {
-      if (!item.product_id) return { ...item, pasillo: "N/A", priority: 99 };
-      try {
-        const { data: prod } = await WooCommerce.get(`products/${item.product_id}`);
-        const info = obtenerInfoPasillo(prod.categories, prod.name);
-        return { 
-            ...item, 
-            image_src: prod.images[0]?.src, 
-            pasillo: info.pasillo, 
+
+    const items = await Promise.all(
+      order.line_items.map(async (item) => {
+        if (!item.product_id) return { ...item, pasillo: "N/A", priority: 99 };
+        try {
+          const { data: prod } = await WooCommerce.get(
+            `products/${item.product_id}`
+          );
+          const info = obtenerInfoPasillo(prod.categories, prod.name);
+          return {
+            ...item,
+            image_src: prod.images[0]?.src,
+            pasillo: info.pasillo,
             prioridad: info.prioridad,
-            categorias: prod.categories.map(c => c.name)
-        };
-      } catch (e) { return item; }
-    }));
+            categorias: prod.categories.map((c) => c.name),
+          };
+        } catch (e) {
+          return item;
+        }
+      })
+    );
 
     order.line_items = items.sort((a, b) => a.prioridad - b.prioridad);
     res.status(200).json(order);
@@ -118,24 +129,46 @@ exports.completeCollection = async (req, res) => {
   const { id_pedido, id_recolectora } = req.body;
   try {
     const now = new Date();
-    
-    const { data: asignacion } = await supabase
+
+    // Buscamos la asignación específica (limit 1) para evitar fallos si hay duplicados
+    const { data: asignaciones } = await supabase
       .from("wc_asignaciones_pedidos")
-      .select("fecha_inicio")
+      .select("id, fecha_inicio")
       .eq("id_pedido", id_pedido)
       .eq("estado_asignacion", "en_proceso")
-      .single();
-      
-    const duration = asignacion ? Math.floor((now - new Date(asignacion.fecha_inicio)) / 1000) : 0;
+      .limit(1);
 
-    await supabase
-      .from("wc_asignaciones_pedidos")
-      .update({ 
-        estado_asignacion: "completado", 
-        fecha_fin: now, 
-        tiempo_total_segundos: duration 
-      })
-      .eq("id_pedido", id_pedido);
+    const asignacion =
+      asignaciones && asignaciones.length > 0 ? asignaciones[0] : null;
+    const duration = asignacion
+      ? Math.floor((now - new Date(asignacion.fecha_inicio)) / 1000)
+      : 0;
+
+    // Actualizamos SOLO esa asignación por su ID único
+    if (asignacion) {
+      await supabase
+        .from("wc_asignaciones_pedidos")
+        .update({
+          estado_asignacion: "completado",
+          fecha_fin: now,
+          tiempo_total_segundos: duration,
+        })
+        .eq("id", asignacion.id);
+    } else {
+      // Fallback: si no se halló en_proceso, forzamos update por id_pedido (legacy fix)
+      // pero esto podría causar duplicados de historia si hay mucha basura.
+      // Lo dejaremos con update general si no hay asignación específica detectada,
+      // O podríamos optar por no hacer nada para prevenir "falsos" historiales.
+      // Opción segura: update por id_pedido pero solo si no hallamos uno activo.
+      await supabase
+        .from("wc_asignaciones_pedidos")
+        .update({
+          estado_asignacion: "completado",
+          fecha_fin: now,
+          tiempo_total_segundos: duration,
+        })
+        .eq("id_pedido", id_pedido);
+    }
 
     await supabase
       .from("wc_recolectoras")
@@ -152,7 +185,7 @@ exports.completeCollection = async (req, res) => {
 
 // 6. Obtener Historial (Filtrado por Recolectora)
 exports.getHistory = async (req, res) => {
-  const { id_recolectora } = req.query; 
+  const { id_recolectora } = req.query;
 
   try {
     let query = supabase
@@ -171,7 +204,39 @@ exports.getHistory = async (req, res) => {
     const { data, error } = await query;
 
     if (error) throw error;
-    res.status(200).json(data);
+
+    // Remove duplicates: keep the first occurrence of each id_pedido
+    // Data is ordered by fecha_fin descending, so we keep the latest one.
+    const uniqueMap = new Map();
+    const uniqueData = [];
+
+    for (const item of data) {
+      if (!uniqueMap.has(item.id_pedido)) {
+        uniqueMap.set(item.id_pedido, true);
+        uniqueData.push(item);
+      }
+    }
+
+    // Formatear duración para mostrar en frontend (minutos o horas y minutos)
+    const formattedData = uniqueData.map((item) => {
+      const seconds = item.tiempo_total_segundos || 0;
+      const totalMinutes = Math.floor(seconds / 60);
+
+      let duracionTexto = `${totalMinutes} min`;
+      if (totalMinutes > 60) {
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        // Ej: "1 h 25 min"
+        duracionTexto = `${hours} h ${mins} min`;
+      }
+
+      return {
+        ...item,
+        tiempo_formateado: duracionTexto, // Campo extra para el frontend
+      };
+    });
+
+    res.status(200).json(formattedData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

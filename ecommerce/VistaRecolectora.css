@@ -1,149 +1,250 @@
-/* Mobile First Design for Recolectora View */
+/* VistaRecolectora.css */
+/* Estilos alineados estrictamente con el JSX Mobile-First */
+
 :root {
-  --reco-bg: #f8fafc;
-  --reco-primary: #2563eb;
-  --reco-white: #ffffff;
-  --reco-text: #1e293b;
-  --reco-text-light: #64748b;
-  --reco-success: #22c55e;
-  --reco-danger: #ef4444;
-  --reco-border: #e2e8f0;
+  --ec-bg-color: #f3f4f6;       /* Fondo gris muy suave */
+  --ec-card-bg: #ffffff;        /* Blanco puro */
+  --ec-primary: #2563eb;        /* Azul fuerte */
+  --ec-primary-dark: #1e40af;
+  --ec-text-main: #1e293b;      /* Texto casi negro */
+  --ec-text-muted: #64748b;     /* Gris texto secundario */
+  --ec-success: #22c55e;        /* Verde éxito */
+  --ec-border: #e2e8f0;         /* Bordes suaves */
+  --ec-aisle-bg: #dbeafe;       /* Fondo azul claro para pasillos */
+  --ec-aisle-text: #1e40af;     /* Texto azul para pasillos */
+  --ec-timer-bg: #0f172a;       /* Fondo oscuro para el reloj */
 }
 
-.reco-container {
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
-  background-color: var(--reco-bg);
+/* --- Layout Principal --- */
+.ec-reco-main-layout {
+  background-color: var(--ec-bg-color);
   min-height: 100vh;
-  padding-bottom: 80px;
-  max-width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding-bottom: 100px; /* Espacio para botón flotante */
+  color: var(--ec-text-main);
   overflow-x: hidden;
 }
 
-/* Header & Timer */
-.reco-header {
-  background: var(--reco-white);
-  padding: 1rem;
+/* --- Header Sticky --- */
+.ec-reco-sticky-header {
   position: sticky;
   top: 0;
-  z-index: 50;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  z-index: 100;
+  background: var(--ec-card-bg);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.ec-reco-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ec-border);
 }
 
-.reco-timer-card {
-  background: var(--reco-text);
-  color: var(--reco-white);
-  padding: 8px 16px;
+.ec-reco-order-badge {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--ec-primary);
+  letter-spacing: -0.5px;
+}
+
+.ec-reco-timer-pill {
+  background: var(--ec-timer-bg);
+  color: #fff;
+  padding: 6px 14px;
   border-radius: 20px;
+  font-family: monospace;
+  font-size: 1rem;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* --- Pestañas (Tabs) --- */
+.ec-tabs {
+  display: flex;
+  background: var(--ec-card-bg);
+}
+
+.ec-tab {
+  flex: 1;
+  padding: 14px;
+  background: none;
+  border: none;
   font-size: 0.95rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  font-weight: 600;
+  color: var(--ec-text-muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
 }
 
-.reco-order-id {
-  font-weight: 800;
-  color: var(--reco-primary);
-  font-size: 1.1rem;
+.ec-tab.active {
+  color: var(--ec-primary);
+  border-bottom-color: var(--ec-primary);
+  background-color: #eff6ff;
 }
 
-/* Pasillos Layout */
-.reco-aisle-section {
-  margin: 20px 0;
+/* --- Barra de Progreso --- */
+.ec-reco-progress-track {
+  height: 24px;
+  background: var(--ec-border);
+  position: relative;
+  overflow: hidden;
 }
 
-.reco-aisle-header {
-  padding: 10px 20px;
-  background: #dbeafe;
-  color: #1e40af;
-  font-weight: 800;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.ec-reco-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ec-primary), #60a5fa);
+  transition: width 0.4s ease;
+}
+
+.ec-reco-progress-label {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* --- Contenedor Scroll y Pasillos --- */
+.ec-reco-scroll-container {
+  padding: 16px;
+}
+
+.ec-reco-aisle-group {
+  margin-bottom: 24px;
+}
+
+.ec-reco-aisle-header {
+  background: var(--ec-aisle-bg);
+  color: var(--ec-aisle-text);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: sticky;
-  top: 65px; /* Adjust based on header height */
-  z-index: 40;
 }
 
-.reco-aisle-progress {
-  font-size: 0.75rem;
-  background: rgba(255, 255, 255, 0.5);
+.ec-reco-aisle-title {
+  font-weight: 800;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ec-reco-aisle-count {
+  background: rgba(255,255,255,0.6);
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
 }
 
-/* Product Item with Swipe */
-.reco-item-container {
-  background: var(--reco-bg);
-  border-bottom: 1px solid var(--reco-border);
+/* --- Tarjetas de Producto (Swipe) --- */
+.ec-swipe-wrapper {
   position: relative;
-  overflow: hidden;
-  height: 90px; /* Fixed height for consistency */
+  margin-bottom: 16px;
+  border-radius: 16px;
+  background-color: var(--ec-success);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 
-/* Swipe Actions Background */
-.reco-swipe-bg {
+.ec-swipe-background {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
   display: flex;
-  justify-content: flex-end; /* Align right for completion swipe */
   align-items: center;
-  padding-right: 25px;
-  background-color: var(--reco-success);
+  padding-left: 24px;
   color: white;
-  font-weight: bold;
+  font-weight: 800;
+  gap: 12px;
+  z-index: 1;
+  border-radius: 16px;
 }
 
-.reco-swipe-icon {
-  font-size: 1.5rem;
-}
-
-/* The actual card content */
-.reco-item-content {
-  background: var(--reco-white);
-  height: 100%;
-  padding: 10px 20px;
+/* Estructura de la Tarjeta */
+.ec-product-card {
+  background: var(--ec-card-bg);
+  padding: 16px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 16px;
   position: relative;
   z-index: 2;
-  transition: transform 0.2s;
-  /* Ensure touch actions work */
-  touch-action: pan-y;
+  border: 1px solid var(--ec-border);
+  touch-action: pan-y; /* Crucial para móviles */
 }
 
-.reco-item-img {
-  width: 60px;
-  height: 60px;
+.ec-img-wrapper {
+  width: 70px;
+  height: 70px;
+  background: #f8fafc;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ec-border);
+  flex-shrink: 0;
+}
+
+.ec-prod-img {
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
-  border-radius: 8px;
-  background: #f1f5f9;
   padding: 4px;
 }
 
-.reco-item-details {
-  flex: 1;
+.ec-no-img {
+  color: #cbd5e1;
+  font-size: 1.5rem;
 }
 
-.reco-item-name {
+/* Info del Item */
+.ec-info {
+  flex: 1;
+  min-width: 0; /* Permite truncar */
+}
+
+.ec-badges {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.ec-badge-pasillo {
+  font-size: 0.65rem;
+  background: #e0e7ff;
+  color: #3730a3;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.ec-badge-cat {
+  font-size: 0.65rem;
+  background: #f1f5f9;
+  color: var(--ec-text-muted);
+  padding: 3px 8px;
+  border-radius: 6px;
   font-weight: 600;
-  font-size: 0.95rem;
+}
+
+.ec-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ec-text-main);
+  line-height: 1.3;
   margin-bottom: 4px;
-  color: var(--reco-text);
-  line-height: 1.2;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -151,83 +252,264 @@
   overflow: hidden;
 }
 
-.reco-item-meta {
-  color: var(--reco-text-light);
-  font-size: 0.85rem;
+.ec-sku {
+  font-size: 0.75rem;
+  color: var(--ec-text-muted);
+  font-family: monospace;
 }
 
-.reco-item-qty {
-  background: #eff6ff;
-  color: var(--reco-primary);
-  font-weight: 800;
-  font-size: 1.1rem;
-  min-width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #bfdbfe;
-}
-
-/* Completed State */
-.reco-item-container.completed .reco-item-content {
-  background: #f0fdf4;
-}
-.reco-item-container.completed .reco-item-name {
-  text-decoration: line-through;
-  color: #86efac;
-}
-
-/* Empty State / Loading */
-.reco-loading-state {
+/* Círculo de Cantidad */
+.ec-qty-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 80vh;
-  color: var(--reco-text-light);
-  text-align: center;
-  padding: 20px;
+  flex-shrink: 0;
 }
 
-.reco-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e2e8f0;
-  border-top-color: var(--reco-primary);
+.ec-qty-circle {
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 20px;
-}
-
-/* Footer Actions */
-.reco-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  background: var(--reco-white);
-  padding: 15px 20px;
-  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
+  background: #eff6ff;
+  border: 3px solid var(--ec-primary);
+  color: var(--ec-primary);
+  font-weight: 900;
+  font-size: 1.3rem;
   display: flex;
-  gap: 10px;
-  z-index: 100;
+  align-items: center;
+  justify-content: center;
 }
 
-.reco-btn-finish {
-  background: var(--reco-success);
-  color: white;
+.ec-unit {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--ec-text-muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+/* --- Estados Completados --- */
+.ec-product-card.completed {
+  opacity: 0.8;
+  background-color: #f8fafc;
+  border-color: transparent;
+}
+
+.ec-img-wrapper.grayscale {
+  filter: grayscale(100%);
+  opacity: 0.6;
+}
+
+.completed-text .ec-name {
+  text-decoration: line-through;
+  color: var(--ec-text-muted);
+}
+
+.ec-picked-label {
+  color: var(--ec-success);
+  font-weight: 800;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.ec-btn-undo {
+  background: none;
+  border: none;
+  color: var(--ec-primary);
+  font-size: 1.2rem;
+  padding: 10px;
+}
+
+/* --- Botón Flotante (FAB) --- */
+.ec-reco-fab-wrapper {
+  position: fixed;
+  bottom: 24px;
+  left: 20px;
+  right: 20px;
+  z-index: 200;
+}
+
+.ec-reco-fab-btn {
   width: 100%;
+  background: var(--ec-text-main);
+  color: white;
+  padding: 18px;
+  border: none;
+  border-radius: 16px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.4);
+  transition: transform 0.2s, background-color 0.3s;
+  cursor: pointer;
+}
+
+.ec-reco-fab-btn.ec-reco-ready {
+  background: linear-gradient(135deg, var(--ec-success), #15803d);
+  box-shadow: 0 10px 25px -5px rgba(34, 197, 94, 0.5);
+  animation: ec-pulse 2s infinite;
+}
+
+.ec-reco-fab-icon {
+  background: rgba(255,255,255,0.2);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes ec-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); }
+  70% { box-shadow: 0 0 0 15px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+/* --- Login, Loading y Empty States --- */
+.ec-reco-centered-view {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  background-color: var(--ec-bg-color);
+  color: var(--ec-text-muted);
+}
+
+.ec-reco-login-form {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.ec-reco-input {
   padding: 14px;
+  font-size: 1rem;
+  border: 2px solid var(--ec-border);
+  border-radius: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.ec-reco-input:focus {
+  outline: none;
+  border-color: var(--ec-primary);
+}
+
+.ec-reco-btn-primary {
+  padding: 14px;
+  background: var(--ec-primary);
+  color: white;
   border: none;
   border-radius: 12px;
   font-weight: 700;
   font-size: 1rem;
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.reco-btn-finish:disabled {
-  background: #94a3b8;
-  box-shadow: none;
+.ec-reco-spinner {
+  width: 48px;
+  height: 48px;
+  border: 5px solid var(--ec-border);
+  border-top-color: var(--ec-primary);
+  border-radius: 50%;
+  animation: ec-spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes ec-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --- Pantalla Vacía (Empty State) --- */
+.ec-empty-state-container {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  text-align: center;
+  background: linear-gradient(135deg, var(--ec-bg-color) 0%, #e0e7ff 100%);
+  color: var(--ec-text-main);
+  animation: ec-fade-in 0.5s ease-out;
+}
+
+@keyframes ec-fade-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ec-empty-illustration {
+  position: relative;
+  margin-bottom: 30px;
+  color: var(--ec-primary);
+}
+
+.ec-empty-icon-main {
+  font-size: 6rem;
+  opacity: 0.2;
+}
+
+.ec-empty-icon-badge {
+  position: absolute;
+  bottom: -10px;
+  right: -10px;
+  background: var(--ec-card-bg);
+  padding: 15px;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  font-size: 2.5rem;
+  color: var(--ec-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ec-empty-title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+  color: var(--ec-primary-dark);
+}
+
+.ec-empty-description {
+  font-size: 1rem;
+  color: var(--ec-text-muted);
+  max-width: 300px;
+  margin-bottom: 30px;
+  line-height: 1.5;
+}
+
+.ec-btn-large {
+  padding: 16px 32px;
+  font-size: 1.1rem;
+  width: auto;
+  min-width: 220px;
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.ec-btn-large:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+}
+
+/* Animación para el icono de recarga */
+.ec-spin {
+  animation: ec-spin 1s linear infinite;
 }

@@ -1,15 +1,34 @@
 import React, { useState, useEffect } from "react";
-import { supabase } from "../services/supabaseClient";
+import axios from "axios";
+import { supabase } from "../../supabaseClient";
 import { UserForm } from "../admin/UserForm";
 import "../admin/AdminUsuarios.css";
 import "./GestionRecolectoras.css";
-import { FaUserPlus, FaSync, FaArrowLeft } from "react-icons/fa";
+import {
+  FaUserPlus,
+  FaSync,
+  FaArrowLeft,
+  FaHistory,
+  FaClock,
+  FaCalendarAlt,
+  FaCheckCircle,
+} from "react-icons/fa";
 
 export const GestionRecolectoras = () => {
   const [recolectoras, setRecolectoras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+
+  // Estados para el Historial (Lista de pedidos realizados)
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedRecolectora, setSelectedRecolectora] = useState(null);
+  const [recolectoraHistory, setRecolectoraHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Estados para el Detalle del Pedido Histórico (Productos, etc.)
+  const [detailedOrder, setDetailedOrder] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const fetchRecolectoras = async () => {
     setLoading(true);
@@ -30,6 +49,47 @@ export const GestionRecolectoras = () => {
     fetchRecolectoras();
   }, []);
 
+  // --- ACCIÓN: ABRIR HISTORIAL DE UNA RECOLECTORA ---
+  const handleViewHistory = async (recolectora) => {
+    setSelectedRecolectora(recolectora);
+    setHistoryModalOpen(true);
+    setHistoryLoading(true);
+    try {
+      const res = await axios.get(
+        `https://backend-woocommerce.vercel.app/api/orders/historial?id_recolectora=${recolectora.id}`
+      );
+      setRecolectoraHistory(res.data);
+    } catch (error) {
+      console.error("Error cargando historial", error);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // --- ACCIÓN: VER DETALLE DE UN PEDIDO ANTIGUO ---
+  const handleHistoryItemClick = async (historyItem) => {
+    setDetailLoading(true);
+    setDetailedOrder({ id: historyItem.id_pedido }); // Abrir modal vacío mientras carga
+    try {
+      const response = await axios.get(
+        `https://backend-woocommerce.vercel.app/api/orders/${historyItem.id_pedido}`
+      );
+      setDetailedOrder(response.data);
+    } catch (error) {
+      console.error("Error loading order details", error);
+      alert("No se pudieron cargar los detalles de este pedido.");
+      setDetailedOrder(null);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDetailModal = () => {
+    setDetailedOrder(null);
+    setDetailLoading(false);
+  };
+
+  // --- LÓGICA DE CREACIÓN/EDICIÓN USUARIOS ---
   const handleCreateClick = () => {
     setEditingUser(null);
     setShowForm(true);
@@ -38,74 +98,17 @@ export const GestionRecolectoras = () => {
   const handleUserSaved = async (formData) => {
     if (formData && formData.isNew) {
       try {
-        // Buscar el perfil recién creado para obtener su ID
-        // Esperamos un momento breve para asegurar que el trigger o proceso async (si hubiese) haya terminado
-        // Aunque el UserForm espera respuesta del edge function, profiles debería estar listo.
-
-        let attempts = 0;
-        let profile = null;
-
-        // Reintentamos un par de veces por si hay lag en la replicación
-        while (attempts < 3 && !profile) {
-          const { data } = await supabase
-            .from("profiles")
-            .select("user_id")
-            .eq("correo", formData.email)
-            .maybeSingle();
-          profile = data;
-          if (!profile) await new Promise((r) => setTimeout(r, 1000));
-          attempts++;
-        }
-
-        if (profile) {
-          const { error: insertError } = await supabase
-            .from("wc_recolectoras")
-            .insert([
-              {
-                id: profile.user_id,
-                nombre_completo: formData.nombre,
-                email: formData.email,
-                estado_recolectora: "disponible",
-              },
-            ]);
-          if (insertError)
-            console.error("Error inserting into wc_recolectoras", insertError);
-        } else {
-          console.warn(
-            "No se encontró el perfil para el email",
-            formData.email,
-            "creando en wc_recolectoras sin ID linkeado (generado auto)"
-          );
-          await supabase.from("wc_recolectoras").insert([
-            {
-              nombre_completo: formData.nombre,
-              email: formData.email,
-              estado_recolectora: "disponible",
-            },
-          ]);
-        }
+        await supabase.from("wc_recolectoras").insert([
+          {
+            nombre_completo: formData.nombre,
+            email: formData.email,
+            estado_recolectora: "disponible",
+          },
+        ]);
       } catch (err) {
         console.error("Error syncing to wc_recolectoras:", err);
       }
     }
-
-    // Si editamos, actualizamos nombre en wc_recolectoras
-    if (!formData.isNew && formData.uid) {
-      await supabase
-        .from("wc_recolectoras")
-        .update({
-          nombre_completo: formData.nombre,
-        })
-        .eq("id", formData.uid);
-      // Fallback por si usan email para matchear
-      await supabase
-        .from("wc_recolectoras")
-        .update({
-          nombre_completo: formData.nombre,
-        })
-        .eq("email", formData.email);
-    }
-
     setShowForm(false);
     fetchRecolectoras();
   };
@@ -156,7 +159,7 @@ export const GestionRecolectoras = () => {
                 <th>Email</th>
                 <th>Estado</th>
                 <th>Pedido Actual</th>
-                <th>Última Actividad</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -200,15 +203,203 @@ export const GestionRecolectoras = () => {
                       {r.id_pedido_actual ? `#${r.id_pedido_actual}` : "-"}
                     </td>
                     <td>
-                      {r.ultima_actividad
-                        ? new Date(r.ultima_actividad).toLocaleString()
-                        : "-"}
+                      <button
+                        className="btn-view-history"
+                        onClick={() => handleViewHistory(r)}
+                      >
+                        <FaHistory /> Ver Historial
+                      </button>
                     </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* --- MODAL 1: LISTA DE HISTORIAL --- */}
+      {historyModalOpen && selectedRecolectora && (
+        <div className="pedidos-modal-overlay">
+          <div className="pedidos-modal-content" style={{ maxWidth: "900px" }}>
+            <div className="pedidos-modal-header">
+              <h2>Historial de {selectedRecolectora.nombre_completo}</h2>
+              <button
+                className="pedidos-modal-close-btn"
+                onClick={() => setHistoryModalOpen(false)}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="pedidos-modal-body">
+              {historyLoading ? (
+                <div style={{ textAlign: "center", padding: 20 }}>
+                  Cargando historial...
+                </div>
+              ) : recolectoraHistory.length === 0 ? (
+                <div
+                  style={{ textAlign: "center", padding: 40, color: "#999" }}
+                >
+                  <FaHistory size={40} style={{ marginBottom: 10 }} />
+                  <p>Esta recolectora aún no ha completado pedidos.</p>
+                </div>
+              ) : (
+                <div className="history-grid-list">
+                  {recolectoraHistory.map((h) => (
+                    <div
+                      key={h.id}
+                      className="history-item-card clickable"
+                      onClick={() => handleHistoryItemClick(h)}
+                      title="Clic para ver detalle completo"
+                    >
+                      <div className="history-item-header">
+                        <span className="history-order-id">
+                          Pedido #{h.id_pedido}
+                        </span>
+                        <span className="history-date">
+                          <FaCalendarAlt style={{ marginRight: 5 }} />
+                          {new Date(h.fecha_fin).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="history-item-stats">
+                        <div className="stat-pill time">
+                          <FaClock style={{ marginRight: 5 }} />
+                          {h.tiempo_formateado ||
+                            `${Math.floor(
+                              h.tiempo_total_segundos / 60
+                            )} min`}{" "}
+                        </div>
+                        <div className="stat-pill completed">
+                          <FaCheckCircle /> Completado
+                        </div>
+                      </div>
+                      <div className="history-item-times">
+                        <small>
+                          Inicio:{" "}
+                          {new Date(h.fecha_inicio).toLocaleTimeString()}
+                        </small>
+                        <small>
+                          Fin: {new Date(h.fecha_fin).toLocaleTimeString()}
+                        </small>
+                      </div>
+                      <div className="history-click-hint">
+                        Ver Detalle &rarr;
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL 2: DETALLE DEL PEDIDO HISTÓRICO --- */}
+      {detailedOrder && (
+        <div className="pedidos-modal-overlay" style={{ zIndex: 3000 }}>
+          <div className="pedidos-modal-content" style={{ maxWidth: "1000px" }}>
+            <div
+              className="pedidos-modal-header"
+              style={{ backgroundColor: "#2c3e50" }}
+            >
+              <h2>Detalle Pedido #{detailedOrder.id}</h2>
+              <button
+                className="pedidos-modal-close-btn"
+                onClick={closeDetailModal}
+              >
+                &times;
+              </button>
+            </div>
+            <div className="pedidos-modal-body">
+              {detailLoading || !detailedOrder.billing ? (
+                <div className="pedidos-loading-overlay">
+                  <div className="pedidos-spinner"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="pedidos-detail-row">
+                    <div className="pedidos-detail-section pedidos-info-block">
+                      <h4>👤 Cliente</h4>
+                      <p>
+                        <strong>Nombre:</strong>{" "}
+                        {detailedOrder.billing?.first_name}{" "}
+                        {detailedOrder.billing?.last_name}
+                      </p>
+                      <p>
+                        <strong>Email:</strong> {detailedOrder.billing?.email}
+                      </p>
+                      <p>
+                        <strong>Teléfono:</strong>{" "}
+                        {detailedOrder.billing?.phone}
+                      </p>
+                    </div>
+                    <div className="pedidos-detail-section pedidos-info-block">
+                      <h4>📍 Envío</h4>
+                      <p>
+                        <strong>Dir:</strong> {detailedOrder.billing?.address_1}{" "}
+                        {detailedOrder.billing?.address_2}
+                      </p>
+                      <p>
+                        <strong>Ciudad:</strong> {detailedOrder.billing?.city}
+                      </p>
+                      {detailedOrder.customer_note && (
+                        <p
+                          style={{
+                            marginTop: "10px",
+                            fontStyle: "italic",
+                            background: "#ffebee",
+                            padding: "10px",
+                            borderRadius: "8px",
+                            color: "#c62828",
+                          }}
+                        >
+                          📝 <strong>Nota:</strong> "
+                          {detailedOrder.customer_note}"
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pedidos-products-section-title">
+                    🛒 Productos ({detailedOrder.line_items?.length})
+                  </div>
+                  <div className="pedidos-products-grid">
+                    {detailedOrder.line_items?.map((item, idx) => (
+                      <div
+                        key={item.id || idx}
+                        className="pedidos-product-card"
+                      >
+                        <div className="pedidos-product-img-wrapper">
+                          {item.image_src ? (
+                            <img
+                              src={item.image_src}
+                              alt={item.name}
+                              className="pedidos-product-img"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="pedidos-no-image">
+                              <span>📷</span>
+                              <small>Sin Imagen</small>
+                            </div>
+                          )}
+                          <div className="pedidos-product-qty-tag">
+                            {item.quantity}
+                          </div>
+                        </div>
+                        <div className="pedidos-product-details">
+                          <h4 className="pedidos-product-name">{item.name}</h4>
+                          <div className="pedidos-product-price">
+                            ${parseFloat(item.total).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
