@@ -69,6 +69,7 @@ exports.assignOrder = async (req, res) => {
           id_recolectora,
           nombre_recolectora,
           estado_asignacion: "en_proceso",
+          fecha_inicio: new Date().toISOString(),
         },
       ])
       .select()

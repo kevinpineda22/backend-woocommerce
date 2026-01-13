@@ -69,12 +69,23 @@ export const GestionRecolectoras = () => {
   // --- ACCIÓN: VER DETALLE DE UN PEDIDO ANTIGUO ---
   const handleHistoryItemClick = async (historyItem) => {
     setDetailLoading(true);
-    setDetailedOrder({ id: historyItem.id_pedido }); // Abrir modal vacío mientras carga
+    // Preservar el snapshot del reporte histórico
+    setDetailedOrder({
+      id: historyItem.id_pedido,
+      reporte_items: historyItem.reporte_snapshot, // Asignamos el snapshot como reporte para la visualización
+    });
+
     try {
       const response = await axios.get(
         `https://backend-woocommerce.vercel.app/api/orders/${historyItem.id_pedido}`
       );
-      setDetailedOrder(response.data);
+      // Fusionamos los datos de WC con el reporte que ya tenemos del historial
+      setDetailedOrder((prev) => ({
+        ...prev,
+        ...response.data,
+        // Aseguramos que reporte_items persista si response.data no lo trae
+        reporte_items: prev.reporte_items,
+      }));
     } catch (error) {
       console.error("Error loading order details", error);
       alert("No se pudieron cargar los detalles de este pedido.");
@@ -364,37 +375,82 @@ export const GestionRecolectoras = () => {
                     🛒 Productos ({detailedOrder.line_items?.length})
                   </div>
                   <div className="pedidos-products-grid">
-                    {detailedOrder.line_items?.map((item, idx) => (
-                      <div
-                        key={item.id || idx}
-                        className="pedidos-product-card"
-                      >
-                        <div className="pedidos-product-img-wrapper">
-                          {item.image_src ? (
-                            <img
-                              src={item.image_src}
-                              alt={item.name}
-                              className="pedidos-product-img"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div className="pedidos-no-image">
-                              <span>📷</span>
-                              <small>Sin Imagen</small>
+                    {detailedOrder.line_items?.map((item, idx) => {
+                      let statusBadge = null;
+                      if (detailedOrder.reporte_items) {
+                        const pickedItem =
+                          detailedOrder.reporte_items.recolectados?.find(
+                            (r) => r.id === item.id
+                          );
+                        const removedItem =
+                          detailedOrder.reporte_items.retirados?.find(
+                            (r) => r.id === item.id
+                          );
+
+                        if (pickedItem) {
+                          statusBadge = (
+                            <span
+                              className="pedidos-badge-ok"
+                              style={{ fontSize: "0.7rem" }}
+                            >
+                              Recolectado
+                            </span>
+                          );
+                        }
+                        if (removedItem) {
+                          statusBadge = (
+                            <span
+                              className="pedidos-badge-busy"
+                              style={{
+                                fontSize: "0.7rem",
+                                backgroundColor: "#e74c3c",
+                              }}
+                            >
+                              {removedItem.reason ||
+                                removedItem.motivo ||
+                                "No Encontrado"}
+                            </span>
+                          );
+                        }
+                      }
+
+                      return (
+                        <div
+                          key={item.id || idx}
+                          className="pedidos-product-card"
+                        >
+                          <div className="pedidos-product-img-wrapper">
+                            {item.image_src ? (
+                              <img
+                                src={item.image_src}
+                                alt={item.name}
+                                className="pedidos-product-img"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="pedidos-no-image">
+                                <span>📷</span>
+                                <small>Sin Imagen</small>
+                              </div>
+                            )}
+                            <div className="pedidos-product-qty-tag">
+                              {item.quantity}
                             </div>
-                          )}
-                          <div className="pedidos-product-qty-tag">
-                            {item.quantity}
+                          </div>
+                          <div className="pedidos-product-details">
+                            <h4 className="pedidos-product-name">
+                              {item.name}
+                            </h4>
+                            <div className="pedidos-product-price">
+                              ${parseFloat(item.total).toLocaleString()}
+                            </div>
+                            {statusBadge && (
+                              <div style={{ marginTop: 5 }}>{statusBadge}</div>
+                            )}
                           </div>
                         </div>
-                        <div className="pedidos-product-details">
-                          <h4 className="pedidos-product-name">{item.name}</h4>
-                          <div className="pedidos-product-price">
-                            ${parseFloat(item.total).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}

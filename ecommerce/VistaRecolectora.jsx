@@ -8,6 +8,7 @@ import {
   FaMapMarkerAlt,
   FaBoxOpen,
   FaArrowRight,
+  FaArrowLeft,
   FaUndo,
   FaShoppingBasket,
   FaSync,
@@ -187,19 +188,22 @@ const VistaRecolectora = () => {
       try {
         setLoading(true);
 
-        // 1. Buscamos email en distintos lugares
+        // 1. Buscamos email en distintos lugares (Orden de Prioridad Ajustado)
         const params = new URLSearchParams(window.location.search);
         let emailToUse = params.get("email");
 
-        if (!emailToUse) emailToUse = localStorage.getItem("recolectora_email");
-        if (!emailToUse) emailToUse = localStorage.getItem("correo_empleado");
-
+        // PRIORIDAD ALTA: Usuario autenticado en Supabase
+        // Esto evita que si estás logueado con tu cuenta personal, veas órdenes de un usuario "kiosco" guardado en localStorage
         if (!emailToUse) {
           const {
             data: { user },
           } = await supabase.auth.getUser();
           if (user) emailToUse = user.email;
         }
+
+        // FALLBACK: LocalStorage (Solo si no hay usuario autenticado ni params)
+        if (!emailToUse) emailToUse = localStorage.getItem("recolectora_email");
+        if (!emailToUse) emailToUse = localStorage.getItem("correo_empleado");
 
         if (!emailToUse) {
           setLoading(false);
@@ -227,7 +231,30 @@ const VistaRecolectora = () => {
             .maybeSingle();
 
           if (assignmentData && assignmentData.fecha_inicio) {
-            setStartTime(new Date(assignmentData.fecha_inicio).getTime());
+            let serverDate = new Date(assignmentData.fecha_inicio).getTime();
+            const now = Date.now();
+
+            // Fix Timezone / Futuro: Si la fecha es futura (ej: server UTC vs local),
+            // asumimos que en realidad empezó 'ahora' o ajustamos.
+            // Para "en_proceso", fecha_inicio no puede ser futuro.
+            if (serverDate > now) {
+              console.warn(
+                "Detectada fecha futura (posible error TZ). Ajustando a ahora."
+              );
+              serverDate = now;
+            }
+
+            if (!isNaN(serverDate)) {
+              setStartTime(serverDate);
+            } else {
+              setStartTime(now);
+            }
+          } else {
+            // Fallback Crítico: Si existe asignación pero no hay fecha (datos antiguos bugs), iniciar YA.
+            console.warn(
+              "No se encontró fecha_inicio válida en asignación, usando tiempo actual."
+            );
+            setStartTime(Date.now());
           }
 
           // 4. Obtener Pedido WooCommerce
@@ -382,15 +409,6 @@ const VistaRecolectora = () => {
     }
   };
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-    const val = e.target.elements.email.value;
-    if (val) {
-      localStorage.setItem("recolectora_email", val);
-      window.location.reload();
-    }
-  };
-
   // 4. Agrupación y Filtrado
   const { pendingGroups, completedList, removedList, stats } = useMemo(() => {
     if (!currentOrder)
@@ -439,7 +457,43 @@ const VistaRecolectora = () => {
   }, [currentOrder, pickedItems]);
 
   // --- RENDER ---
-  if (!userEmail) return <LoginScreen onSubmit={handleLogin} />;
+  if (!userEmail) {
+    if (loading) {
+      return (
+        <div className="ec-reco-centered-view">
+          <div className="ec-reco-spinner"></div>
+          <p>Identificando usuario...</p>
+        </div>
+      );
+    }
+    return (
+      <div className="ec-reco-centered-view">
+        <h3>⛔ Acceso no identificado</h3>
+        <p>No se pudo detectar tu cuenta de recolectora.</p>
+        <p style={{ fontSize: "0.9rem", color: "#95a5a6", marginTop: 5 }}>
+          Inicia sesión en Admin o usa el enlace directo.
+        </p>
+        <button
+          onClick={() => (window.location.href = "/acceso")}
+          style={{
+            marginTop: "20px",
+            background: "var(--ec-primary)",
+            color: "white",
+            border: "none",
+            padding: "12px 24px",
+            borderRadius: "12px",
+            fontSize: "1rem",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <FaArrowLeft /> Volver al inicio
+        </button>
+      </div>
+    );
+  }
 
   if (loading)
     return (
@@ -633,26 +687,6 @@ const VistaRecolectora = () => {
   );
 };
 
-// Subcomponentes
-const LoginScreen = ({ onSubmit }) => (
-  <div className="ec-reco-centered-view">
-    <h2>👋 Hola Recolectora</h2>
-    <p>Ingresa tu correo para ver tu asignación actual.</p>
-    <form onSubmit={onSubmit} className="ec-reco-login-form">
-      <input
-        name="email"
-        type="email"
-        placeholder="Tu correo corporativo"
-        className="ec-reco-input"
-        required
-      />
-      <button type="submit" className="ec-reco-btn-primary">
-        Ingresar al Sistema
-      </button>
-    </form>
-  </div>
-);
-
 // PANTALLA VACÍA ACTUALIZADA
 const EmptyScreen = () => (
   <motion.div
@@ -680,6 +714,23 @@ const EmptyScreen = () => (
     >
       <FaSync className="ec-spin" style={{ marginRight: 10 }} />
       Actualizar estado
+    </button>
+
+    <button
+      onClick={() => (window.location.href = "/acceso")}
+      style={{
+        marginTop: "20px",
+        background: "transparent",
+        color: "var(--ec-text-muted)",
+        border: "none",
+        fontSize: "1rem",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+      }}
+    >
+      <FaArrowLeft /> Volver al inicio
     </button>
   </motion.div>
 );

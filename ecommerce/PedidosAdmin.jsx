@@ -17,6 +17,7 @@ import "./PedidosAdmin.css";
 
 const PedidosAdmin = () => {
   const [orders, setOrders] = useState([]);
+  const [stats, setStats] = useState({ pending: 0, process: 0 }); // Nuevo estado para contadores
   const [loading, setLoading] = useState(true);
 
   // Vistas: 'pending', 'process', 'completed', 'recolectoras'
@@ -35,16 +36,43 @@ const PedidosAdmin = () => {
   const [filterZone, setFilterZone] = useState("");
 
   // --- CARGA DE DATOS ---
+  const fetchStats = async () => {
+    try {
+      const res = await axios.get(
+        `https://backend-woocommerce.vercel.app/api/orders/pendientes?t=${Date.now()}`
+      );
+      const list = res.data;
+      setStats({
+        pending: list.filter((o) => !o.is_assigned).length,
+        process: list.filter((o) => o.is_assigned).length,
+      });
+      return list;
+    } catch (e) {
+      console.error("Error fetching stats", e);
+      return [];
+    }
+  };
+
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      let url = "https://backend-woocommerce.vercel.app/api/orders/pendientes";
       if (currentView === "completed") {
-        url = "https://backend-woocommerce.vercel.app/api/orders/historial";
+        // En Historial: cargamos historial para la tabla Y estadísticas frescas
+        const [resHist] = await Promise.all([
+          axios.get(
+            `https://backend-woocommerce.vercel.app/api/orders/historial?t=${Date.now()}`
+          ),
+          fetchStats(),
+        ]);
+        setOrders(resHist.data);
+      } else if (currentView === "recolectoras") {
+        // En Recolectoras: solo actualizamos estadísticas para el sidebar
+        await fetchStats();
+      } else {
+        // En Pendientes/Proceso: Usamos la misma lista para tabla y stats
+        const list = await fetchStats();
+        setOrders(list);
       }
-
-      const resOrders = await axios.get(url);
-      setOrders(resOrders.data);
     } catch (error) {
       console.error("Error fetching data", error);
     } finally {
@@ -53,9 +81,7 @@ const PedidosAdmin = () => {
   };
 
   useEffect(() => {
-    if (currentView !== "recolectoras") {
-      fetchOrders();
-    }
+    fetchOrders();
   }, [currentView]);
 
   // --- LÓGICA DE FILTRADO ---
@@ -221,9 +247,7 @@ const PedidosAdmin = () => {
             onClick={() => setCurrentView("pending")}
           >
             <FaBox /> <span>Por Asignar</span>
-            <span className="pedidos-badge-count">
-              {orders.filter((o) => !o.is_assigned).length}
-            </span>
+            <span className="pedidos-badge-count">{stats.pending}</span>
           </button>
 
           <button
@@ -233,9 +257,7 @@ const PedidosAdmin = () => {
             onClick={() => setCurrentView("process")}
           >
             <FaRunning /> <span>En Proceso</span>
-            <span className="pedidos-badge-count-blue">
-              {orders.filter((o) => o.is_assigned).length}
-            </span>
+            <span className="pedidos-badge-count-blue">{stats.process}</span>
           </button>
 
           <button
@@ -578,16 +600,16 @@ const PedidosAdmin = () => {
                 {selectedOrder.line_items?.map((item, idx) => {
                   let statusBadge = null;
                   if (selectedOrder.reporte_items) {
-                    const isPicked =
-                      selectedOrder.reporte_items.recolectados?.some(
+                    const pickedItem =
+                      selectedOrder.reporte_items.recolectados?.find(
                         (r) => r.id === item.id
                       );
-                    const isRemoved =
-                      selectedOrder.reporte_items.retirados?.some(
+                    const removedItem =
+                      selectedOrder.reporte_items.retirados?.find(
                         (r) => r.id === item.id
                       );
 
-                    if (isPicked)
+                    if (pickedItem)
                       statusBadge = (
                         <span
                           className="pedidos-badge-ok"
@@ -596,7 +618,7 @@ const PedidosAdmin = () => {
                           Recolectado
                         </span>
                       );
-                    if (isRemoved)
+                    if (removedItem)
                       statusBadge = (
                         <span
                           className="pedidos-badge-busy"
@@ -605,7 +627,9 @@ const PedidosAdmin = () => {
                             backgroundColor: "#e74c3c",
                           }}
                         >
-                          No Encontrado
+                          {removedItem.reason ||
+                            removedItem.motivo ||
+                            "No Encontrado"}
                         </span>
                       );
                   }
