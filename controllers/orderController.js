@@ -124,7 +124,8 @@ exports.getOrderById = async (req, res) => {
           const item = { id: log.id_producto, name: log.nombre_producto };
           if (log.accion === "recolectado")
             reporteFinal.recolectados.push(item);
-          if (log.accion === "retirado") reporteFinal.retirados.push(item);
+          if (log.accion === "retirado")
+            reporteFinal.retirados.push({ ...item, reason: log.motivo });
         });
       }
     }
@@ -228,6 +229,7 @@ exports.completeCollection = async (req, res) => {
             id_producto: item.id,
             nombre_producto: item.name,
             accion: accion,
+            motivo: item.reason || null, // <--- GUARDAMOS EL MOTIVO
             fecha_registro: new Date(),
           });
         });

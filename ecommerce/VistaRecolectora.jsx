@@ -34,9 +34,14 @@ const SwipeCard = ({ item, onSwipe }) => {
     if (info.offset.x > 170) {
       onSwipe(item.id, "picked");
     } else if (info.offset.x < -170) {
-      onSwipe(item.id, "removed");
+      // CAMBIO: Ahora pasamos 'request-removal' para abrir modal
+      onSwipe(item.id, "request-removal");
     }
   };
+
+  // Reset position (si no se deslizó lo suficiente) se maneja solo porque x está vinculado al drag
+  // Pero framer motion 'drag' reseteará la posición visualmente si no hay onDragEnd que lo elimine del DOM
+  // Aquí la lógica de desaparición la maneja el padre al cambiar state.
 
   return (
     <div className="ec-swipe-wrapper">
@@ -112,7 +117,13 @@ const SwipeCard = ({ item, onSwipe }) => {
 };
 
 // --- COMPONENTE ITEM COMPLETADO ---
-const CompletedCard = ({ item, onUndo, type = "picked" }) => (
+const CompletedCard = ({
+  item,
+  onUndo,
+  onRecover,
+  type = "picked",
+  reason,
+}) => (
   <div
     className={`ec-product-card ${
       type === "removed" ? "removed-item" : "completed"
@@ -128,12 +139,32 @@ const CompletedCard = ({ item, onUndo, type = "picked" }) => (
     <div className="ec-info completed-text">
       <h4 className="ec-name">{item.name}</h4>
       <span className="ec-picked-label">
-        {type === "removed" ? "Retirado" : "Recogido"}
+        {type === "removed"
+          ? reason
+            ? `Retirado: ${reason}`
+            : "Retirado"
+          : "Recogido"}
       </span>
     </div>
-    <button className="ec-btn-undo" onClick={() => onUndo(item.id)}>
-      <FaUndo />
-    </button>
+    <div style={{ display: "flex", gap: "0" }}>
+      {type === "removed" && (
+        <button
+          className="ec-btn-undo"
+          onClick={() => onRecover(item.id)}
+          style={{ color: "var(--ec-success)" }}
+          title="Recuperar (Mover a Agregados)"
+        >
+          <FaCheck />
+        </button>
+      )}
+      <button
+        className="ec-btn-undo"
+        onClick={() => onUndo(item.id)}
+        title="Deshacer (Volver a Pendientes)"
+      >
+        <FaUndo />
+      </button>
+    </div>
   </div>
 );
 
@@ -143,6 +174,9 @@ const VistaRecolectora = () => {
   const [collectorStatus, setCollectorStatus] = useState(null);
   const [startTime, setStartTime] = useState(null); // Nuevo estado para el inicio real
   const [pickedItems, setPickedItems] = useState({}); // { [id]: 'picked' | 'removed' | false }
+  const [removedReasons, setRemovedReasons] = useState({}); // { [id]: 'motivo' }
+  const [pendingRemoval, setPendingRemoval] = useState(null); // { id: 123 } para modal
+
   const [activeTab, setActiveTab] = useState("pending");
   const [timer, setTimer] = useState("00:00:00");
   const [userEmail, setUserEmail] = useState("");
@@ -226,16 +260,17 @@ const VistaRecolectora = () => {
       const now = Date.now();
       const diff = now - startTime;
 
-      if (diff > 0) {
-        const h = Math.floor(diff / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-        setTimer(
-          `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s
-            .toString()
-            .padStart(2, "0")}`
-        );
-      }
+      // Permitimos que muestre 00:00:00 si es negativo por desincronización
+      const safeDiff = Math.max(0, diff);
+
+      const h = Math.floor(safeDiff / 3600000);
+      const m = Math.floor((safeDiff % 3600000) / 60000);
+      const s = Math.floor((safeDiff % 60000) / 1000);
+      setTimer(
+        `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s
+          .toString()
+          .padStart(2, "0")}`
+      );
     };
 
     updateTimer(); // Iniciar inmediatamente
@@ -245,23 +280,53 @@ const VistaRecolectora = () => {
 
   // 3. Manejo de Swipe/Acciones
   const handleSwipe = (id, action) => {
-    // action: 'picked' | 'removed'
-    setPickedItems((prev) => ({ ...prev, [id]: action }));
+    // action: 'picked' | 'removed' | 'request-removal'
+    if (action === "request-removal") {
+      setPendingRemoval({ id });
+    } else {
+      setPickedItems((prev) => ({ ...prev, [id]: action }));
+    }
+  };
+
+  const confirmRemoval = (reason) => {
+    if (pendingRemoval) {
+      setRemovedReasons((prev) => ({ ...prev, [pendingRemoval.id]: reason }));
+      setPickedItems((prev) => ({ ...prev, [pendingRemoval.id]: "removed" }));
+      setPendingRemoval(null); // Close modal
+    }
   };
 
   const handleUndo = (id) => {
     setPickedItems((prev) => ({ ...prev, [id]: false }));
+    setRemovedReasons((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  };
+
+  const handleRecover = (id) => {
+    // Mover directamente a Agregados (Picked) y limpiar motivo
+    setPickedItems((prev) => ({ ...prev, [id]: "picked" }));
+    setRemovedReasons((prev) => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
   };
 
   const handleFinish = async () => {
-    // 1. Verificar si quedan pendientes
-    const hasPending = stats.total - stats.picked - stats.removed > 0;
+    // 1. Verificar si quedan pendientes (Total procesado vs Total real)
+    const processedCount = stats.picked + stats.removed;
+    const hasPending = stats.total - processedCount > 0;
 
     if (hasPending) {
+      // En caso de forzar finalización, los pendientes se marcan como retirados/omitted
+      // Podríamos pedir motivo o asumir "No encontrado"
       if (
         !window.confirm(
           `Tienes ${
-            stats.total - stats.picked - stats.removed
+            stats.total - processedCount
           } productos PENDIENTES. ¿Deseas marcarlos como RETIRADOS y finalizar?`
         )
       ) {
@@ -286,6 +351,7 @@ const VistaRecolectora = () => {
           sku: item.sku,
           name: item.name,
           qty: item.quantity,
+          reason: removedReasons[item.id] || null, // Añadir motivo
         };
 
         if (status === "picked") {
@@ -293,9 +359,11 @@ const VistaRecolectora = () => {
         } else if (status === "removed") {
           reporte.retirados.push(simpleItem);
         } else {
-          // Si el usuario confirmó finalizar con pendientes, los tratamos como retirados (o "no encontrados")
-          // Para la lógica de negocio, asumiremos que pasan a retirados/no encontrados
-          reporte.retirados.push(simpleItem);
+          // Pendientes forzados
+          reporte.retirados.push({
+            ...simpleItem,
+            reason: "No encontrado (Forzado)",
+          });
         }
       });
 
@@ -424,10 +492,12 @@ const VistaRecolectora = () => {
         <div className="ec-reco-progress-track">
           <div
             className="ec-reco-progress-fill"
-            style={{ width: `${(stats.picked / stats.total) * 100}%` }}
+            style={{
+              width: `${((stats.picked + stats.removed) / stats.total) * 100}%`,
+            }}
           ></div>
           <span className="ec-reco-progress-label">
-            {stats.picked} / {stats.total} Productos
+            {stats.picked + stats.removed} / {stats.total} Productos
           </span>
         </div>
       </header>
@@ -489,7 +559,9 @@ const VistaRecolectora = () => {
                   key={item.id}
                   item={item}
                   onUndo={handleUndo}
+                  onRecover={handleRecover}
                   type="removed"
+                  reason={removedReasons[item.id]}
                 />
               ))
             ) : (
@@ -503,8 +575,47 @@ const VistaRecolectora = () => {
         <div style={{ height: 80 }}></div>
       </div>
 
+      {/* MODAL DE MOTIVO DE RETIRO */}
+      {pendingRemoval && (
+        <div className="ec-modal-overlay">
+          <div className="ec-modal-content">
+            <h3>Motivo del Retiro</h3>
+            <p>¿Por qué no se puede recolectar este producto?</p>
+            <div className="ec-modal-options">
+              <button
+                className="ec-modal-option"
+                style={{ background: "#e74c3c", color: "white" }}
+                onClick={() => confirmRemoval("No encontrado")}
+              >
+                🔍 No encontrado
+              </button>
+              <button
+                className="ec-modal-option"
+                style={{ background: "#f39c12", color: "white" }}
+                onClick={() => confirmRemoval("Agotado")}
+              >
+                📉 Agotado
+              </button>
+              <button
+                className="ec-modal-option"
+                style={{ background: "#7f8c8d", color: "white" }}
+                onClick={() => confirmRemoval("Cancelado por Cliente")}
+              >
+                🚫 El cliente lo canceló
+              </button>
+            </div>
+            <button
+              className="ec-modal-cancel"
+              onClick={() => setPendingRemoval(null)}
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Botón Flotante */}
-      {stats.picked === stats.total && stats.total > 0 && (
+      {stats.picked + stats.removed === stats.total && stats.total > 0 && (
         <div className="ec-reco-fab-wrapper">
           <button
             className="ec-reco-fab-btn ec-reco-ready"

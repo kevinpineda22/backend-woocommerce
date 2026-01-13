@@ -518,3 +518,69 @@
 .ec-spin {
   animation: ec-spin 1s linear infinite;
 }
+/* --- Modal y Motivos --- */
+.ec-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+}
+
+.ec-modal-content {
+  background: white;
+  padding: 24px;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  animation: ec-fade-in 0.2s ease-out;
+}
+
+.ec-modal-content h3 {
+  margin: 0 0 12px 0;
+  color: var(--ec-text-main);
+  font-size: 1.3rem;
+}
+
+.ec-modal-content p {
+  color: var(--ec-text-muted);
+  margin-bottom: 24px;
+}
+
+.ec-modal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ec-modal-option {
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.ec-modal-option:active {
+  transform: scale(0.98);
+}
+
+.ec-modal-cancel {
+  margin-top: 16px;
+  background: white;
+  border: 1px solid var(--ec-border);
+  color: var(--ec-text-muted);
+  padding: 12px;
+  border-radius: 12px;
+  width: 100%;
+  font-weight: 600;
+  cursor: pointer;
+}
