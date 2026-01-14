@@ -1,20 +1,30 @@
 const { supabase } = require("../services/supabaseClient");
 
-// 1. Estadísticas de Rendimiento por Recolectora
+// 1. Estadísticas de Rendimiento por Recolectora (Mejorado con Velocidad y Precisión)
 exports.getCollectorPerformance = async (req, res) => {
   try {
-    // Obtenemos todas las asignaciones completadas
-    const { data: asignaciones, error } = await supabase
+    // 1. Obtenemos asignaciones completadas (Base para Tiempo y Cantidad de Pedidos)
+    const { data: asignaciones, error: asigError } = await supabase
       .from("wc_asignaciones_pedidos")
       .select(
-        "id_recolectora, nombre_recolectora, tiempo_total_segundos, fecha_fin"
+        "id_recolectora, nombre_recolectora, tiempo_total_segundos, id_pedido"
       )
       .eq("estado_asignacion", "completado");
 
-    if (error) throw error;
+    if (asigError) throw asigError;
+
+    // 2. Obtenemos Logs para calcular Items por Minuto y Tasa de Error
+    // Nota: Traemos solo lo necesario para agrupar
+    const { data: logs, error: logError } = await supabase
+      .from("wc_log_recoleccion")
+      .select("accion, wc_asignaciones_pedidos!inner(id_recolectora)");
+      // .limit(10000); // Podríamos limitar si crece mucho
+
+    if (logError) throw logError;
 
     const stats = {};
 
+    // Inicializar Estructura y sumar tiempos/pedidos
     asignaciones.forEach((a) => {
       const id = a.id_recolectora;
       if (!stats[id]) {
@@ -23,22 +33,42 @@ exports.getCollectorPerformance = async (req, res) => {
           nombre: a.nombre_recolectora,
           total_pedidos: 0,
           tiempo_total_acumulado: 0,
-          promedio_minutos: 0,
+          total_items_recolectados: 0,
+          total_items_retirados: 0,
         };
       }
       stats[id].total_pedidos += 1;
       stats[id].tiempo_total_acumulado += a.tiempo_total_segundos || 0;
     });
 
-    // Calcular promedios
+    // Sumar conteo de items (acciones) a cada recolectora
+    logs.forEach((log) => {
+      // log.wc_asignaciones_pedidos es un objeto gracias al join (!inner)
+      const id = log.wc_asignaciones_pedidos?.id_recolectora;
+      if (stats[id]) {
+        if (log.accion === "recolectado") stats[id].total_items_recolectados += 1;
+        else if (log.accion === "retirado") stats[id].total_items_retirados += 1;
+      }
+    });
+
+    // Calcular Métricas Derivadas
     const result = Object.values(stats)
-      .map((s) => ({
-        ...s,
-        promedio_minutos: Math.round(
-          s.tiempo_total_acumulado / s.total_pedidos / 60
-        ),
-      }))
-      .sort((a, b) => b.total_pedidos - a.total_pedidos); // Ordenar por actividad
+      .map((s) => {
+        const minutos_totales = s.tiempo_total_acumulado / 60 || 1; // Evitar div 0
+        const total_intentos = s.total_items_recolectados + s.total_items_retirados;
+        
+        return {
+          ...s,
+          promedio_minutos: Math.round(minutos_totales / s.total_pedidos),
+          // Velocidad: Items recolectados por minuto de trabajo activo
+          velocidad_picking: parseFloat((s.total_items_recolectados / minutos_totales).toFixed(2)),
+          // Precisión: % de items recolectados vs intentos totales
+          tasa_precision: total_intentos > 0 
+            ? Math.round((s.total_items_recolectados / total_intentos) * 100) 
+            : 0
+        };
+      })
+      .sort((a, b) => b.velocidad_picking - a.velocidad_picking); // Ordenar por velocidad (productividad)
 
     res.status(200).json(result);
   } catch (error) {

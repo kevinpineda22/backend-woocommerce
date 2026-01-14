@@ -94,7 +94,7 @@ const AnaliticaRecolectoras = () => {
           {/* CARD 1: RENDIMIENTO RECOLECTORAS */}
           <div className="card-analitica">
             <div className="card-title">
-              <span>🏆 Top Recolectoras</span>
+              <span>🏆 Rendimiento y Calidad de Recolección</span>
               <FaTrophy color="#f1c40f" />
             </div>
             <table className="rank-table">
@@ -103,35 +103,81 @@ const AnaliticaRecolectoras = () => {
                   <th>#</th>
                   <th>Nombre</th>
                   <th>Pedidos</th>
-                  <th>Tiempo Prom.</th>
+                  <th>Velocidad</th>
+                  <th>Precisión</th>
                 </tr>
               </thead>
               <tbody>
                 {performanceData.map((p, idx) => (
                   <tr key={p.id}>
                     <td className="rank-number">{idx + 1}</td>
-                    <td>{p.nombre}</td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{p.nombre}</div>
+                      <div style={{ fontSize: "0.75rem", color: "#7f8c8d" }}>
+                        ~{p.promedio_minutos} min/pedido
+                      </div>
+                    </td>
                     <td style={{ fontWeight: "bold" }}>{p.total_pedidos}</td>
                     <td>
                       <span
                         style={{
-                          background:
-                            p.promedio_minutos < 15 ? "#def7ec" : "#fde8e8",
-                          color:
-                            p.promedio_minutos < 15 ? "#03543f" : "#9b1c1c",
+                          background: "#ebf8ff",
+                          color: "#3182ce",
                           padding: "2px 6px",
                           borderRadius: 4,
-                          fontSize: "0.8rem",
+                          fontWeight: "bold",
                         }}
                       >
-                        {p.promedio_minutos} min
+                        {p.velocidad_picking}
+                      </span>{" "}
+                      <span style={{ fontSize: "0.7rem", color: "#7f8c8d" }}>
+                        it/min
                       </span>
+                    </td>
+                    <td>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 24,
+                            height: 4,
+                            background: "#edf2f7",
+                            borderRadius: 2,
+                            flexShrink: 0,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: `${p.tasa_precision}%`,
+                              height: "100%",
+                              background:
+                                p.tasa_precision >= 95 ? "#48bb78" : "#ed8936",
+                              borderRadius: 2,
+                            }}
+                          ></div>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "0.85rem",
+                            color:
+                              p.tasa_precision >= 95 ? "#2f855a" : "#c05621",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {p.tasa_precision}%
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 ))}
                 {performanceData.length === 0 && (
                   <tr>
-                    <td colSpan="4">Sin datos aún</td>
+                    <td colSpan="5">Sin datos aún</td>
                   </tr>
                 )}
               </tbody>
