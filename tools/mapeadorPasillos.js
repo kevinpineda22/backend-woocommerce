@@ -130,7 +130,6 @@ const DEFINICION_PASILLOS = [
       "azucar",
       "grano",
       "sal",
-      "aceite",
       "salsa",
       "aderezo",
       "vinagre",
