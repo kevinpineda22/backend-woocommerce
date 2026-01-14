@@ -318,7 +318,15 @@ const matchesKey = (text, key) => {
 const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
   // 1. Estrategia Principal: Búsqueda por NOMBRE DE CATEGORÍA
   if (categoriasWC && categoriasWC.length > 0) {
-    const nombresCategorias = categoriasWC.map((c) => c.name || "").join(" ");
+    // FILTRO: Ignoramos la categoría genérica "Despensa" para obligar a usar la específica
+    // El usuario indica que "Despensa" es basura y quiere usar la segunda categoría.
+    const categoriasValidas = categoriasWC.filter(
+      (c) => c.name && removeAccents(c.name).toLowerCase() !== "despensa"
+    );
+
+    const nombresCategorias = categoriasValidas
+      .map((c) => c.name || "")
+      .join(" ");
 
     for (const regla of REGLAS_PASILLOS) {
       if (regla.keys.some((key) => matchesKey(nombresCategorias, key))) {
