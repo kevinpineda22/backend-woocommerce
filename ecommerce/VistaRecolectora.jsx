@@ -107,7 +107,42 @@ const SwipeCard = ({ item, onSwipe }) => {
             </span>
           </div>
           <h4 className="ec-name">{item.name}</h4>
-          {item.sku && <div className="ec-sku">SKU: {item.sku}</div>}
+          <div
+            className="ec-sku-container"
+            style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}
+          >
+            {item.sku && (
+              <div
+                className="ec-sku"
+                style={{
+                  background: "#e0e7ff",
+                  color: "#3730a3",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                  fontSize: "0.7rem",
+                }}
+              >
+                Item: {item.sku}
+              </div>
+            )}
+            {item.barcode && (
+              <div
+                className="ec-sku"
+                style={{
+                  background: "#dcfce7",
+                  color: "#166534",
+                  padding: "2px 6px",
+                  borderRadius: "4px",
+                  fontSize: "0.7rem",
+                }}
+              >
+                EAN: {item.barcode}
+              </div>
+            )}
+            {!item.sku && !item.barcode && (
+              <div className="ec-sku">Sin Código</div>
+            )}
+          </div>
         </div>
 
         <div className="ec-qty-wrapper">
@@ -438,14 +473,22 @@ const VistaRecolectora = () => {
       if (!itemToScan) return;
 
       const scanned = (decodedText || "").trim().toUpperCase();
-      const expected = (itemToScan.sku || "").trim().toUpperCase();
+      const expectedSku = (itemToScan.sku || "").trim().toUpperCase();
+      const expectedBarcode = (itemToScan.barcode || "").trim().toUpperCase();
 
-      if (scanned === expected) {
+      // Validamos contra cualquiera de los dos (Barcode tiene prioridad lógica pero aceptamos ambos)
+      const isMatch =
+        (expectedBarcode && scanned === expectedBarcode) ||
+        (expectedSku && scanned === expectedSku);
+
+      if (isMatch) {
         setPickedItems((prev) => ({ ...prev, [itemToScan.id]: "picked" }));
         setItemToScan(null);
       } else {
         alert(
-          `Código incorrecto.\nEscaneado: ${scanned}\nEsperado: ${expected}`
+          `Código incorrecto.\nEscaneado: ${scanned}\nEsperaba EAN: ${
+            expectedBarcode || "N/A"
+          }\nO Item: ${expectedSku}`
         );
       }
       setIsScanning(false);

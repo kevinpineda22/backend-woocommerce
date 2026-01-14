@@ -152,6 +152,28 @@ exports.getOrderById = async (req, res) => {
               return !normalizado.includes("despensa");
             });
 
+          // BUSQUEDA DE CÓDIGO DE BARRAS (EAN/UPC)
+          let codigoBarras = null;
+          // 1. Meta Data (Comun en plugins)
+          if (prod.meta_data) {
+            const meta = prod.meta_data.find((m) =>
+              ["barcode", "_barcode", "ean", "_ean", "gtin", "_gtin"].includes(
+                m.key.toLowerCase()
+              )
+            );
+            if (meta) codigoBarras = meta.value;
+          }
+          // 2. Atributos
+          if (!codigoBarras && prod.attributes) {
+            const attr = prod.attributes.find((a) =>
+              ["ean", "barcode", "codigo de barras"].includes(
+                a.name.toLowerCase()
+              )
+            );
+            if (attr && attr.options && attr.options.length > 0)
+              codigoBarras = attr.options[0];
+          }
+
           return {
             ...item,
             image_src: prod.images[0]?.src,
@@ -161,6 +183,7 @@ exports.getOrderById = async (req, res) => {
               categoriasVisuales.length > 0
                 ? categoriasVisuales
                 : prod.categories.map((c) => c.name), // Fallback si se queda vacío
+            barcode: codigoBarras || "", // Nuevo campo
           };
         } catch (e) {
           return item;
