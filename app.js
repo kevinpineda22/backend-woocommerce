@@ -3,6 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 const orderRoutes = require("./routes/orderRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.json());
 
 // Rutas
 app.use("/api/orders", orderRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 // Ruta de prueba para saber que el backend vive
 app.get("/", (req, res) => res.send("Backend del Supermercado Funcionando 🛒"));

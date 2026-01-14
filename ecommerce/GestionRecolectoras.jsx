@@ -297,22 +297,6 @@ export const GestionRecolectoras = () => {
                   >
                     No hay recolectoras registradas
                   </td>
-                  {r.id_pedido_actual && (
-                    <button
-                      className="btn-view-history"
-                      title="Cancelar Asignación / Liberar Recolectora"
-                      onClick={() => handleCancelAssignment(r)}
-                      style={{
-                        fontSize: "0.8rem",
-                        padding: "6px 12px",
-                        background: "#e74c3c", // Rojo alerta
-                        color: "white",
-                        marginRight: "5px",
-                      }}
-                    >
-                      <FaBan /> Liberar
-                    </button>
-                  )}
                 </tr>
               ) : (
                 recolectoras.map((r) => (
@@ -337,6 +321,22 @@ export const GestionRecolectoras = () => {
                     </td>
                     <td>
                       <div style={{ display: "flex", gap: "10px" }}>
+                        {r.id_pedido_actual && (
+                          <button
+                            className="btn-view-history"
+                            title="Cancelar Asignación / Liberar Recolectora"
+                            onClick={() => handleCancelAssignment(r)}
+                            style={{
+                              fontSize: "0.8rem",
+                              padding: "6px 12px",
+                              background: "#e74c3c", // Rojo alerta
+                              color: "white",
+                              marginRight: "5px",
+                            }}
+                          >
+                            <FaBan /> Liberar
+                          </button>
+                        )}
                         <button
                           className="btn-view-history"
                           onClick={() => handleViewHistory(r)}

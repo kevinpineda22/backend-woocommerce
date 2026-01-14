@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import { GestionRecolectoras } from "./GestionRecolectoras";
+import AnaliticaRecolectoras from "./AnaliticaRecolectoras";
 import {
   FaBox,
   FaArrowLeft,
@@ -12,6 +13,7 @@ import {
   FaUserTag,
   FaRunning,
   FaHistory,
+  FaChartLine,
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
 
@@ -274,6 +276,14 @@ const PedidosAdmin = () => {
           </div>
           <button
             className={`pedidos-layout-sidebar-button ${
+              currentView === "analitica" ? "active" : ""
+            }`}
+            onClick={() => setCurrentView("analitica")}
+          >
+            <FaChartLine /> <span>Centro Inteligencia</span>
+          </button>
+          <button
+            className={`pedidos-layout-sidebar-button ${
               currentView === "recolectoras" ? "active" : ""
             }`}
             onClick={() => setCurrentView("recolectoras")}
@@ -290,6 +300,8 @@ const PedidosAdmin = () => {
       <main className="pedidos-layout-content">
         {currentView === "recolectoras" ? (
           <GestionRecolectoras />
+        ) : currentView === "analitica" ? (
+          <AnaliticaRecolectoras />
         ) : (
           <>
             <header className="pedidos-layout-header">
