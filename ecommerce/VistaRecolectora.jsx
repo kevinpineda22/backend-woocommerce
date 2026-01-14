@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import { supabase } from "../../supabaseClient";
@@ -433,20 +433,25 @@ const VistaRecolectora = () => {
     }
   }, [isSessionLoaded, collectorStatus, pickedItems, removedReasons]);
 
-  const handleScanMatch = (decodedText) => {
-    if (!itemToScan) return;
+  const handleScanMatch = useCallback(
+    (decodedText) => {
+      if (!itemToScan) return;
 
-    const scanned = (decodedText || "").trim().toUpperCase();
-    const expected = (itemToScan.sku || "").trim().toUpperCase();
+      const scanned = (decodedText || "").trim().toUpperCase();
+      const expected = (itemToScan.sku || "").trim().toUpperCase();
 
-    if (scanned === expected) {
-      setPickedItems((prev) => ({ ...prev, [itemToScan.id]: "picked" }));
-      setItemToScan(null);
-    } else {
-      alert(`Código incorrecto.\nEscaneado: ${scanned}\nEsperado: ${expected}`);
-    }
-    setIsScanning(false);
-  };
+      if (scanned === expected) {
+        setPickedItems((prev) => ({ ...prev, [itemToScan.id]: "picked" }));
+        setItemToScan(null);
+      } else {
+        alert(
+          `Código incorrecto.\nEscaneado: ${scanned}\nEsperado: ${expected}`
+        );
+      }
+      setIsScanning(false);
+    },
+    [itemToScan]
+  );
 
   const handleManualConfirm = () => {
     if (!itemToScan) return;

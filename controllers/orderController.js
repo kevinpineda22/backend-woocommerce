@@ -140,12 +140,27 @@ exports.getOrderById = async (req, res) => {
             `products/${item.product_id}`
           );
           const info = obtenerInfoPasillo(prod.categories, prod.name);
+
+          // Filtramos categorías visuales (para que el frontend no muestre "Despensa")
+          const categoriasVisuales = prod.categories
+            .map((c) => c.name)
+            .filter((name) => {
+              const normalizado = name
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase();
+              return !normalizado.includes("despensa");
+            });
+
           return {
             ...item,
             image_src: prod.images[0]?.src,
             pasillo: info.pasillo,
             prioridad: info.prioridad,
-            categorias: prod.categories.map((c) => c.name),
+            categorias:
+              categoriasVisuales.length > 0
+                ? categoriasVisuales
+                : prod.categories.map((c) => c.name), // Fallback si se queda vacío
           };
         } catch (e) {
           return item;
