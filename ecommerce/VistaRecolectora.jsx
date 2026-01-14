@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
 import { supabase } from "../../supabaseClient";
 import { motion, useMotionValue, useTransform } from "framer-motion";
@@ -16,6 +17,7 @@ import {
   FaUserClock,
 } from "react-icons/fa";
 import "./VistaRecolectora.css";
+import EscanerBarras from "../DesarrolloSurtido_API/EscanerBarras";
 
 // --- COMPONENTE SWIPEABLE ---
 const SwipeCard = ({ item, onSwipe }) => {
@@ -169,6 +171,64 @@ const CompletedCard = ({
   </div>
 );
 
+// --- COMPONENTE OVERLAY MANUAL (Portal) ---
+const ManualConfirmOverlay = ({ isOpen, onConfirm, itemName }) => {
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div
+      style={{
+        position: "fixed",
+        bottom: "40px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 2147483647, // Mismo Z-Index máximo para estar a la par con Escaner
+        width: "90%",
+        maxWidth: "340px",
+        textAlign: "center",
+      }}
+    >
+      <button
+        onClick={onConfirm}
+        style={{
+          width: "100%",
+          padding: "16px",
+          background: "var(--ec-success)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+          border: "2px solid rgba(255,255,255,0.2)",
+          borderRadius: "16px",
+          color: "white",
+          fontSize: "16px",
+          fontWeight: "bold",
+          cursor: "pointer",
+          backdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "10px",
+        }}
+      >
+        <FaClipboardList />
+        Confirmar Manualmente
+      </button>
+      <div
+        style={{
+          marginTop: "8px",
+          color: "rgba(255,255,255,0.7)",
+          fontSize: "12px",
+          background: "rgba(0,0,0,0.5)",
+          padding: "4px 8px",
+          borderRadius: "4px",
+          display: "inline-block",
+        }}
+      >
+        O escanea el código de <b>{itemName}</b>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 const VistaRecolectora = () => {
   const [loading, setLoading] = useState(true);
   const [currentOrder, setCurrentOrder] = useState(null);
@@ -178,9 +238,14 @@ const VistaRecolectora = () => {
   const [removedReasons, setRemovedReasons] = useState({}); // { [id]: 'motivo' }
   const [pendingRemoval, setPendingRemoval] = useState(null); // { id: 123 } para modal
 
+  // Estados para Escaner
+  const [isScanning, setIsScanning] = useState(false);
+  const [itemToScan, setItemToScan] = useState(null);
+
   const [activeTab, setActiveTab] = useState("pending");
   const [timer, setTimer] = useState("00:00:00");
   const [userEmail, setUserEmail] = useState("");
+  const [isSessionLoaded, setIsSessionLoaded] = useState(false); // [NEW] Flag to prevent overwriting storage
 
   // 1. Carga Inicial
   useEffect(() => {
@@ -230,13 +295,13 @@ const VistaRecolectora = () => {
             .eq("estado_asignacion", "en_proceso")
             .maybeSingle();
 
+          let finalStartTime = null;
+
           if (assignmentData && assignmentData.fecha_inicio) {
             let serverDate = new Date(assignmentData.fecha_inicio).getTime();
             const now = Date.now();
 
-            // Fix Timezone / Futuro: Si la fecha es futura (ej: server UTC vs local),
-            // asumimos que en realidad empezó 'ahora' o ajustamos.
-            // Para "en_proceso", fecha_inicio no puede ser futuro.
+            // Fix Timezone / Futuro
             if (serverDate > now) {
               console.warn(
                 "Detectada fecha futura (posible error TZ). Ajustando a ahora."
@@ -245,16 +310,30 @@ const VistaRecolectora = () => {
             }
 
             if (!isNaN(serverDate)) {
-              setStartTime(serverDate);
-            } else {
-              setStartTime(now);
+              finalStartTime = serverDate;
             }
+          }
+
+          // [MODIFIED] Check local storage for timer fallback if server calc failed or as a secondary check
+          const storageKeyTime = `recolectora_timer_${me.id_pedido_actual}`;
+          const savedStartTime = localStorage.getItem(storageKeyTime);
+
+          if (finalStartTime) {
+            setStartTime(finalStartTime);
+            // Sync storage with server truth
+            localStorage.setItem(storageKeyTime, finalStartTime.toString());
+          } else if (savedStartTime && !isNaN(parseInt(savedStartTime))) {
+            // Fallback to local storage if server didn't return a valid start time
+            console.log("Usando tiempo de inicio guardado localmente");
+            setStartTime(parseInt(savedStartTime));
           } else {
-            // Fallback Crítico: Si existe asignación pero no hay fecha (datos antiguos bugs), iniciar YA.
+            // Fallback final: Iniciar YA
             console.warn(
-              "No se encontró fecha_inicio válida en asignación, usando tiempo actual."
+              "No se encontró fecha_inicio válida, usando tiempo actual."
             );
-            setStartTime(Date.now());
+            const now = Date.now();
+            setStartTime(now);
+            localStorage.setItem(storageKeyTime, now.toString());
           }
 
           // 4. Obtener Pedido WooCommerce
@@ -264,11 +343,42 @@ const VistaRecolectora = () => {
           setCurrentOrder(orderRes.data);
 
           // Inicializar items (esto podría persistirse en LocalStorage para no perder avance al refrescar)
-          const initialPicked = {};
-          orderRes.data.line_items.forEach(
-            (i) => (initialPicked[i.id] = false)
-          );
-          setPickedItems(initialPicked);
+          // [MODIFIED] Check local storage first
+          const storageKeyItems = `recolectora_items_${me.id_pedido_actual}`;
+          const storageKeyReasons = `recolectora_reasons_${me.id_pedido_actual}`;
+
+          const savedItems = localStorage.getItem(storageKeyItems);
+          const savedReasons = localStorage.getItem(storageKeyReasons);
+
+          if (savedItems) {
+            try {
+              setPickedItems(JSON.parse(savedItems));
+            } catch (err) {
+              console.error("Error parsing saved items", err);
+              // Fallback initialization
+              const initialPicked = {};
+              orderRes.data.line_items.forEach(
+                (i) => (initialPicked[i.id] = false)
+              );
+              setPickedItems(initialPicked);
+            }
+          } else {
+            const initialPicked = {};
+            orderRes.data.line_items.forEach(
+              (i) => (initialPicked[i.id] = false)
+            );
+            setPickedItems(initialPicked);
+          }
+
+          if (savedReasons) {
+            try {
+              setRemovedReasons(JSON.parse(savedReasons));
+            } catch (err) {
+              console.error("Error parsing saved reasons", err);
+            }
+          }
+
+          setIsSessionLoaded(true);
         }
       } catch (e) {
         console.error(e);
@@ -305,11 +415,72 @@ const VistaRecolectora = () => {
     return () => clearInterval(interval);
   }, [startTime]);
 
-  // 3. Manejo de Swipe/Acciones
+  // [NEW] 2.1 Persistencia de sesión
+  useEffect(() => {
+    if (
+      isSessionLoaded &&
+      collectorStatus &&
+      collectorStatus.id_pedido_actual
+    ) {
+      const storageKeyItems = `recolectora_items_${collectorStatus.id_pedido_actual}`;
+      const storageKeyReasons = `recolectora_reasons_${collectorStatus.id_pedido_actual}`;
+
+      // Note: Timer is saved only on init currently, or we could update it here if needed,
+      // but start time usually doesn't change during session.
+
+      localStorage.setItem(storageKeyItems, JSON.stringify(pickedItems));
+      localStorage.setItem(storageKeyReasons, JSON.stringify(removedReasons));
+    }
+  }, [isSessionLoaded, collectorStatus, pickedItems, removedReasons]);
+
+  const handleScanMatch = (decodedText) => {
+    if (!itemToScan) return;
+
+    const scanned = (decodedText || "").trim().toUpperCase();
+    const expected = (itemToScan.sku || "").trim().toUpperCase();
+
+    if (scanned === expected) {
+      setPickedItems((prev) => ({ ...prev, [itemToScan.id]: "picked" }));
+      setItemToScan(null);
+    } else {
+      alert(`Código incorrecto.\nEscaneado: ${scanned}\nEsperado: ${expected}`);
+    }
+    setIsScanning(false);
+  };
+
+  const handleManualConfirm = () => {
+    if (!itemToScan) return;
+    if (
+      window.confirm(
+        `¿Confirmar "${itemToScan.name}" manualmente sin escanear?`
+      )
+    ) {
+      setPickedItems((prev) => ({ ...prev, [itemToScan.id]: "picked" }));
+      setItemToScan(null);
+      setIsScanning(false);
+    }
+  };
+
   const handleSwipe = (id, action) => {
     // action: 'picked' | 'removed' | 'request-removal'
     if (action === "request-removal") {
       setPendingRemoval({ id });
+    } else if (action === "picked") {
+      // Buscar item para validar SKU
+      const item = currentOrder?.line_items?.find((i) => i.id === id);
+      if (item && item.sku) {
+        setItemToScan(item);
+        setIsScanning(true);
+      } else {
+        // Fallback si no tiene SKU
+        if (
+          window.confirm(
+            "El producto no tiene código SKU para validar. ¿Confirmar recolección manual?"
+          )
+        ) {
+          setPickedItems((prev) => ({ ...prev, [id]: "picked" }));
+        }
+      }
     } else {
       setPickedItems((prev) => ({ ...prev, [id]: action }));
     }
@@ -402,6 +573,12 @@ const VistaRecolectora = () => {
           reporte_items: reporte,
         }
       );
+
+      // [NEW] Clear local storage for this order
+      localStorage.removeItem(`recolectora_items_${currentOrder.id}`);
+      localStorage.removeItem(`recolectora_reasons_${currentOrder.id}`);
+      localStorage.removeItem(`recolectora_timer_${currentOrder.id}`);
+
       alert("¡Pedido Completado! Excelente trabajo.");
       window.location.reload();
     } catch (e) {
@@ -628,6 +805,19 @@ const VistaRecolectora = () => {
 
         <div style={{ height: 80 }}></div>
       </div>
+
+      <EscanerBarras
+        isScanning={isScanning}
+        setIsScanning={setIsScanning}
+        onScan={handleScanMatch}
+      />
+
+      {/* Botón flotante para confirmar manual SOBRE el escáner */}
+      <ManualConfirmOverlay
+        isOpen={isScanning && itemToScan}
+        onConfirm={handleManualConfirm}
+        itemName={itemToScan?.name || "producto"}
+      />
 
       {/* MODAL DE MOTIVO DE RETIRO */}
       {pendingRemoval && (

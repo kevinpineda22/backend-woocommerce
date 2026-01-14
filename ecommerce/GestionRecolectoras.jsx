@@ -12,6 +12,7 @@ import {
   FaClock,
   FaCalendarAlt,
   FaCheckCircle,
+  FaEdit,
 } from "react-icons/fa";
 
 export const GestionRecolectoras = () => {
@@ -32,15 +33,89 @@ export const GestionRecolectoras = () => {
 
   const fetchRecolectoras = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("wc_recolectoras")
-      .select("*")
-      .order("nombre_completo", { ascending: true });
+    try {
+      // 1. Obtener usuarios con rol 'recolectora' desde la tabla maestra PROFILES
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("role", "recolectora");
 
-    if (error) {
-      console.error("Error fetching recolectoras:", error);
-    } else {
-      setRecolectoras(data || []);
+      if (profilesError) throw profilesError;
+
+      // 2. Obtener estado actual (operativo) de WC_RECOLECTORAS
+      const { data: wcData, error: wcError } = await supabase
+        .from("wc_recolectoras")
+        .select("*");
+
+      if (wcError) throw wcError;
+
+      // 3. SINCRONIZACIÓN AUTOMÁTICA
+      // Queremos que la lista final incluya todos los del paso 1.
+      // Si no están en wc_recolectoras, los creamos en memoria (o en BD si se desea estricto).
+      // Preferiblemente actualizamos la BD para que tengan ID válido.
+
+      const syncedList = [];
+      const wcMap = new Map();
+      wcData.forEach((wc) => wcMap.set(wc.email, wc)); // Mapear por email
+
+      for (const profile of profilesData) {
+        let wcRecord = wcMap.get(profile.correo); // profiles usa 'correo'
+
+        if (!wcRecord) {
+          // Si existe en Profile pero no en WC, insertarlo automáticamente
+          console.log(
+            `Syncing new user ${profile.nombre} into wc_recolectoras...`
+          );
+          const { data: newWc, error: insertError } = await supabase
+            .from("wc_recolectoras")
+            .insert([
+              {
+                nombre_completo: profile.nombre,
+                email: profile.correo,
+                estado_recolectora: "disponible",
+              },
+            ])
+            .select()
+            .single();
+
+          if (!insertError && newWc) {
+            wcRecord = newWc;
+          } else {
+            // Fallback visual si falla insert
+            wcRecord = {
+              id: "temp_" + profile.user_id,
+              nombre_completo: profile.nombre,
+              email: profile.correo,
+              estado_recolectora: "disponible",
+              id_pedido_actual: null,
+            };
+          }
+        } else {
+          // Si ya existe, verificar si cambió el nombre y actualizar silenciosamente
+          if (wcRecord.nombre_completo !== profile.nombre) {
+            await supabase
+              .from("wc_recolectoras")
+              .update({ nombre_completo: profile.nombre })
+              .eq("id", wcRecord.id);
+            wcRecord.nombre_completo = profile.nombre;
+          }
+        }
+
+        // Añadir meta-data de profile a la vista
+        syncedList.push({
+          ...wcRecord,
+          uid: profile.user_id, // Guardar UID para facilitar ediciones futuras
+          profileData: profile, // Guardar perfil completo para edición
+        });
+      }
+
+      // Ordenar por nombre
+      syncedList.sort((a, b) =>
+        a.nombre_completo.localeCompare(b.nombre_completo)
+      );
+      setRecolectoras(syncedList);
+    } catch (error) {
+      console.error("Error fetching/syncing recolectoras:", error);
     }
     setLoading(false);
   };
@@ -106,22 +181,27 @@ export const GestionRecolectoras = () => {
     setShowForm(true);
   };
 
-  const handleUserSaved = async (formData) => {
-    if (formData && formData.isNew) {
-      try {
-        await supabase.from("wc_recolectoras").insert([
-          {
-            nombre_completo: formData.nombre,
-            email: formData.email,
-            estado_recolectora: "disponible",
-          },
-        ]);
-      } catch (err) {
-        console.error("Error syncing to wc_recolectoras:", err);
-      }
+  const handleEditClick = (recolectora) => {
+    // Si tenemos el perfil sincronizado, lo usamos para rellenar el formulario
+    if (recolectora.profileData) {
+      setEditingUser(recolectora.profileData);
+    } else {
+      // Fallback (solo nombre/email)
+      setEditingUser({
+        nombre: recolectora.nombre_completo,
+        correo: recolectora.email,
+        role: "recolectora",
+      });
     }
+    setShowForm(true);
+  };
+
+  const handleUserSaved = async (formData) => {
+    // La creación/edición la maneja UserForm contra 'profiles'.
+    // Aquí solo refrescamos para que la lógica de sincronización
+    // actualice la tabla 'wc_recolectoras' y la vista.
+    await fetchRecolectoras();
     setShowForm(false);
-    fetchRecolectoras();
   };
 
   return (
@@ -214,12 +294,27 @@ export const GestionRecolectoras = () => {
                       {r.id_pedido_actual ? `#${r.id_pedido_actual}` : "-"}
                     </td>
                     <td>
-                      <button
-                        className="btn-view-history"
-                        onClick={() => handleViewHistory(r)}
-                      >
-                        <FaHistory /> Ver Historial
-                      </button>
+                      <div style={{ display: "flex", gap: "10px" }}>
+                        <button
+                          className="btn-view-history"
+                          onClick={() => handleViewHistory(r)}
+                          style={{ fontSize: "0.8rem", padding: "6px 12px" }}
+                        >
+                          <FaHistory /> Historial
+                        </button>
+                        <button
+                          className="btn-view-history"
+                          title="Editar Datos"
+                          onClick={() => handleEditClick(r)}
+                          style={{
+                            fontSize: "0.8rem",
+                            padding: "6px 12px",
+                            background: "#f39c12",
+                          }}
+                        >
+                          <FaEdit /> Editar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
