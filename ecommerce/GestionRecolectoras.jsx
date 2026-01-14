@@ -13,6 +13,7 @@ import {
   FaCalendarAlt,
   FaCheckCircle,
   FaEdit,
+  FaBan,
 } from "react-icons/fa";
 
 export const GestionRecolectoras = () => {
@@ -204,6 +205,31 @@ export const GestionRecolectoras = () => {
     setShowForm(false);
   };
 
+  // --- ACCIÓN: CANCELAR PEDIDO ACTUAL (LIBERAR RECOLECTORA) ---
+  const handleCancelAssignment = async (recolectora) => {
+    if (
+      !window.confirm(
+        `¿Estás seguro de cancelar la asignación del pedido #${recolectora.id_pedido_actual} para ${recolectora.nombre_completo}?\n\nLa recolectora quedará libre inmediatamente.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await axios.post(
+        "https://backend-woocommerce.vercel.app/api/orders/cancelar-asignacion",
+        {
+          id_recolectora: recolectora.id,
+        }
+      );
+      alert("Asignación cancelada exitosamente.");
+      fetchRecolectoras(); // Refrescar lista
+    } catch (error) {
+      console.error("Error cancelando asignación:", error);
+      alert("Hubo un error al intentar cancelar la asignación.");
+    }
+  };
+
   return (
     <div className="gestion-recolectoras-container">
       <div className="gestion-recolectoras-header">
@@ -271,6 +297,22 @@ export const GestionRecolectoras = () => {
                   >
                     No hay recolectoras registradas
                   </td>
+                  {r.id_pedido_actual && (
+                    <button
+                      className="btn-view-history"
+                      title="Cancelar Asignación / Liberar Recolectora"
+                      onClick={() => handleCancelAssignment(r)}
+                      style={{
+                        fontSize: "0.8rem",
+                        padding: "6px 12px",
+                        background: "#e74c3c", // Rojo alerta
+                        color: "white",
+                        marginRight: "5px",
+                      }}
+                    >
+                      <FaBan /> Liberar
+                    </button>
+                  )}
                 </tr>
               ) : (
                 recolectoras.map((r) => (

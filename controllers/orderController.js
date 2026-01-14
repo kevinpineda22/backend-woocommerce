@@ -320,3 +320,49 @@ exports.getHistory = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// 7. Cancelar/Liberar Asignación (Admin)
+exports.cancelAssignment = async (req, res) => {
+  const { id_recolectora } = req.body;
+
+  try {
+    // 1. Obtener la recolectora para saber qué pedido tenía
+    const { data: recolectora, error: recError } = await supabase
+      .from("wc_recolectoras")
+      .select("id_pedido_actual")
+      .eq("id", id_recolectora)
+      .single();
+
+    if (recError) throw recError;
+
+    const id_pedido = recolectora.id_pedido_actual;
+
+    if (id_pedido) {
+      // 2. Marcar asignación como 'cancelado'
+      await supabase
+        .from("wc_asignaciones_pedidos")
+        .update({
+          estado_asignacion: "cancelado",
+          fecha_fin: new Date(),
+        })
+        .eq("id_pedido", id_pedido)
+        .eq("estado_asignacion", "en_proceso");
+    }
+
+    // 3. Liberar recolectora
+    await supabase
+      .from("wc_recolectoras")
+      .update({
+        estado_recolectora: "disponible",
+        id_pedido_actual: null,
+      })
+      .eq("id", id_recolectora);
+
+    res
+      .status(200)
+      .json({ message: "Asignación cancelada y recolectora liberada" });
+  } catch (error) {
+    console.error("Error cancelando asignación:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
