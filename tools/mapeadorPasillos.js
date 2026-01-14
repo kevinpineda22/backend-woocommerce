@@ -316,6 +316,17 @@ const matchesKey = (text, key) => {
  * @param {String} nombreProducto - (Opcional) El nombre del producto para búsqueda de respaldo
  */
 const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
+  // DEBUG LOGGING
+  if (nombreProducto) {
+    console.log(`\n--- Procesando: "${nombreProducto}" ---`);
+    if (categoriasWC) {
+      console.log(
+        "Categorias RAW:",
+        categoriasWC.map((c) => c.name)
+      );
+    }
+  }
+
   // 1. Estrategia Principal: Búsqueda por NOMBRE DE CATEGORÍA
   if (categoriasWC && categoriasWC.length > 0) {
     // FILTRO: Ignoramos la categoría genérica "Despensa" para obligar a usar la específica
@@ -324,7 +335,7 @@ const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
       if (!c.name) return false;
       const nombreNormalizado = removeAccents(c.name).toLowerCase().trim();
       // Filtramos cualquier variante de "despensa"
-      return nombreNormalizado !== "despensa";
+      return !nombreNormalizado.includes("despensa");
     });
 
     const nombresCategorias = categoriasValidas
