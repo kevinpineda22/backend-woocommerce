@@ -67,6 +67,7 @@ const DEFINICION_PASILLOS = [
       "cremas corporales",
       "higiene capilar",
       "cremas detales",
+      
     ],
   },
 
@@ -135,6 +136,8 @@ const DEFINICION_PASILLOS = [
       "vinagre",
       "vinagretas",
       "sazonador",
+      "panela",
+      "panelas",
     ],
   },
   {
@@ -165,6 +168,7 @@ const DEFINICION_PASILLOS = [
       "leche larga vida",
       "refrescos en polvo",
       "arequipe",
+      "modificadores",
     ],
   },
   {
@@ -271,6 +275,7 @@ const DEFINICION_PASILLOS = [
       "gaseosas",
       "fruver",
       "pasabocas",
+      "medicamentos",
     ],
   },
 ];
