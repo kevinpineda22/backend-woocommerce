@@ -17,6 +17,7 @@ const AnaliticaRecolectoras = () => {
   const [activeTab, setActiveTab] = useState("dashboard"); // dashboard | logs
   const [performanceData, setPerformanceData] = useState([]);
   const [heatmapData, setHeatmapData] = useState([]);
+  const [aisleData, setAisleData] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +35,14 @@ const AnaliticaRecolectoras = () => {
       ]);
 
       setPerformanceData(perfRes.data);
-      setHeatmapData(heatRes.data);
+      // Soporte para estructura nueva { products, aisles } o antigua [products]
+      if (heatRes.data.products) {
+          setHeatmapData(heatRes.data.products);
+          setAisleData(heatRes.data.aisles || []);
+      } else {
+          setHeatmapData(heatRes.data);
+          setAisleData([]);
+      }
       setAuditLogs(auditRes.data);
     } catch (error) {
       console.error("Error fetching analytics:", error);
@@ -242,10 +250,175 @@ const AnaliticaRecolectoras = () => {
             </div>
           </div>
 
-          {/* CARD 3: MAPA DE CALOR (PRODUCTOS POPULARES) */}
+          {/* CARD 3: MAPA DE CALOR DE PASILLOS (VISUAL) */}
           <div className="card-analitica" style={{ gridColumn: "span 2" }}>
             <div className="card-title">
-              <span>🔥 Mapa de Calor (Productos más movidos)</span>
+              <span>🗺️ Mapa de Calor del Almacén (Pasillos)</span>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 15,
+                  fontSize: "0.75rem",
+                  fontWeight: "normal",
+                  color: "#64748b",
+                }}
+              >
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div
+                    style={{
+                      width: 10,
+                      height: 10,
+                      background: "#e0f2fe",
+                      borderRadius: 2,
+                    }}
+                  ></div>{" "}
+                  Tráfico Bajo
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div
+                    style={{
+                      width: 10,
+                      height: 10,
+                      background: "#0284c7",
+                      borderRadius: 2,
+                    }}
+                  ></div>{" "}
+                  Tráfico Intenso
+                </span>
+                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div
+                    style={{
+                      width: 10,
+                      height: 10,
+                      border: "2px solid #ef4444",
+                      background: "#fef2f2",
+                      borderRadius: 2,
+                    }}
+                  ></div>{" "}
+                  Alta Tasa de Retiro
+                </span>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+                gap: 12,
+                marginTop: 10,
+              }}
+            >
+              {aisleData.length > 0 ? (
+                aisleData.map((aisle) => {
+                  // Calcular intensidad del calor (0 a 1)
+                  const maxInteractions = Math.max(
+                    ...aisleData.map((a) => a.total_interacciones)
+                  );
+                  const intensity =
+                    aisle.total_interacciones / (maxInteractions || 1);
+
+                  // Estilos dinámicos
+                  const hasIssues =
+                    aisle.total_fallos > 0 &&
+                    aisle.total_fallos / aisle.total_interacciones > 0.05; // >5% error
+
+                  return (
+                    <div
+                      key={aisle.pasillo}
+                      style={{
+                        position: "relative",
+                        background: hasIssues
+                          ? "#fff5f5"
+                          : `rgba(2, 132, 199, ${0.1 + intensity * 0.9})`,
+                        color:
+                          !hasIssues && intensity > 0.6 ? "white" : "#1e293b",
+                        border: hasIssues
+                          ? "2px solid #fc8181"
+                          : "1px solid transparent",
+                        padding: "12px 8px",
+                        borderRadius: 8,
+                        textAlign: "center",
+                        transition: "all 0.2s ease",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      }}
+                    >
+                      {hasIssues && (
+                        <FaExclamationTriangle
+                          style={{
+                            position: "absolute",
+                            top: 6,
+                            right: 6,
+                            color: "#c53030",
+                            fontSize: "0.7rem",
+                          }}
+                        />
+                      )}
+                      
+                      <div
+                        style={{
+                          fontSize: "0.7rem",
+                          textTransform: "uppercase",
+                          opacity: 0.8,
+                          marginBottom: 2,
+                        }}
+                      >
+                        Pasillo
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "1.4rem",
+                          fontWeight: 800,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {aisle.pasillo === "Otros" ? "?" : aisle.pasillo}
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 6,
+                          fontSize: "0.7rem",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {aisle.total_interacciones} acc
+                      </div>
+                      {aisle.total_fallos > 0 && (
+                        <div
+                          style={{
+                            fontSize: "0.65rem",
+                            color: hasIssues
+                              ? "#c53030"
+                              : !hasIssues && intensity > 0.6
+                              ? "#e2e8f0"
+                              : "#718096",
+                          }}
+                        >
+                          ({aisle.total_fallos} fallos)
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div
+                  style={{
+                    gridColumn: "1/-1",
+                    padding: 20,
+                    textAlign: "center",
+                    color: "#94a3b8",
+                  }}
+                >
+                  No se pudo generar el mapa de pasillos. Faltan datos de
+                  recolección.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* CARD 4: TOP PRODUCTOS */}
+          <div className="card-analitica" style={{ gridColumn: "span 2" }}>
+            <div className="card-title">
+              <span>🔥 Nube de Productos (Top Movimientos)</span>
               <FaChartLine color="#3498db" />
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>

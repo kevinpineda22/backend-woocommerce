@@ -1,6 +1,7 @@
 const { supabase } = require("../services/supabaseClient");
+const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 
-// 1. Estadísticas de Rendimiento por Recolectora (Mejorado con Velocidad y Precisión)
+// 1. Estadísticas de Rendimiento por Recolectora (Mejorado con Velocidad y Precisión) (Mejorado con Velocidad y Precisión)
 exports.getCollectorPerformance = async (req, res) => {
   try {
     // 1. Obtenemos asignaciones completadas (Base para Tiempo y Cantidad de Pedidos)
@@ -77,14 +78,10 @@ exports.getCollectorPerformance = async (req, res) => {
   }
 };
 
-// 2. Mapa de Calor de Productos (Top Recolectados y Top Reportados)
+// 2. Mapa de Calor de Productos y Pasillos
 exports.getProductHeatmap = async (req, res) => {
   try {
-    // Usamos rpc (Remote Procedure Call) si existiera, pero como no tengo acceso a crear funciones SQL complejas
-    // desde aquí fácilmente sin migraciones, haré la agregación en JS (menos eficiente pero viable para miles de registros).
-    // Si la tabla crece mucho, esto debería moverse a una View de SQL.
-
-    // Traemos todo el log (limitado a últimos 5000 registros por seguridad de memoria)
+    // Traemos todo el log (limitado a últimos 5000 registros)
     const { data: logs, error } = await supabase
       .from("wc_log_recoleccion")
       .select("nombre_producto, accion, motivo")
@@ -94,9 +91,12 @@ exports.getProductHeatmap = async (req, res) => {
     if (error) throw error;
 
     const productMap = {};
+    const aisleMap = {};
 
     logs.forEach((log) => {
       const name = log.nombre_producto || "Desconocido";
+      
+      // 1. Agregación por Producto
       if (!productMap[name]) {
         productMap[name] = {
           name,
@@ -114,18 +114,46 @@ exports.getProductHeatmap = async (req, res) => {
         productMap[name].motivos[motivo] =
           (productMap[name].motivos[motivo] || 0) + 1;
       }
+
+      // 2. Agregación por Pasillo (Heatmap Físico)
+      // Asumimos que no tenemos categorías a mano en el log, usamos solo nombre
+      const { pasillo } = obtenerInfoPasillo(name, []);
+      const pasilloKey = pasillo || "Otros";
+
+      if (!aisleMap[pasilloKey]) {
+        aisleMap[pasilloKey] = {
+          pasillo: pasilloKey,
+          total_interacciones: 0,
+          total_fallos: 0, // Retiros
+        };
+      }
+      aisleMap[pasilloKey].total_interacciones += 1;
+      if (log.accion === "retirado") {
+        aisleMap[pasilloKey].total_fallos += 1;
+      }
     });
 
-    // Convertir a array y determinar top
-    const heatmap = Object.values(productMap)
+    // Convertir Maps a Arrays
+    const products = Object.values(productMap)
       .map((p) => ({
         ...p,
         total_interacciones: p.total_picks + p.total_removed,
         tasa_exito: p.total_picks / (p.total_picks + p.total_removed || 1),
       }))
-      .sort((a, b) => b.total_interacciones - a.total_interacciones);
+      .sort((a, b) => b.total_interacciones - a.total_interacciones)
+      .slice(0, 50);
 
-    res.status(200).json(heatmap.slice(0, 50)); // Top 50
+    const aisles = Object.values(aisleMap).sort(
+      // Ordenamos numéricamente si es posible, o alfabéticamente
+      (a, b) => {
+          const numA = parseInt(a.pasillo);
+          const numB = parseInt(b.pasillo);
+          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+          return a.pasillo.localeCompare(b.pasillo);
+      }
+    );
+
+    res.status(200).json({ products, aisles });
   } catch (error) {
     console.error("Error en getProductHeatmap:", error);
     res.status(500).json({ error: error.message });
