@@ -246,6 +246,7 @@ const DEFINICION_PASILLOS = [
       "papa",
       "gaseosas",
       "fruver",
+      "pasabocas",
     ],
   },
 ];
