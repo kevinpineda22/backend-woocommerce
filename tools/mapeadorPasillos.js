@@ -1,8 +1,32 @@
 // tools/mapeadorPasillos.js
 
 /**
- * CONFIGURACIÓN DE PASILLOS Y SUS CATEGORÍAS
- * Define qué categorías (o palabras clave de categoría) pertenecen a qué pasillo.
+ * CONFIGURACIÓN DE ORDEN DE RUTA (SERPENTEAR)
+ * Este mapa define el ORDEN OFICIAL de recorrido para la recolectora.
+ * El número indica la posición en la ruta (1 = Primero, 2 = Segundo, etc.)
+ */
+const ORDEN_RUTA = {
+  2: 1,
+  1: 2,
+  3: 3,
+  4: 4,
+  6: 5,
+  5: 6,
+  7: 7,
+  8: 8,
+  10: 9,
+  9: 10,
+  11: 11,
+  12: 12,
+  13: 13,
+  14: 14,
+  Otros: 99, // Todo lo desconocido al final
+};
+
+/**
+ * CONFIGURACIÓN DE PASILLOS Y SUS CATEGORÍAS (REGLAS DE MATCHING)
+ * El orden aquí es para PRIORIDAD DE DETECCIÓN (qué palabra gana sobre otra).
+ * NO afecta el orden de la ruta en la app, eso lo controla ORDEN_RUTA.
  */
 const DEFINICION_PASILLOS = [
   // --- PRIORIDAD ALTA: Productos Específicos que pueden confundirse ---
@@ -258,10 +282,11 @@ const removeAccents = (str) => {
 
 // Generamos las reglas automáticamente basadas en la definición del usuario.
 // Usamos la misma definición tanto para categorías como para nombres.
-const REGLAS_PASILLOS = DEFINICION_PASILLOS.map((def, index) => ({
+const REGLAS_PASILLOS = DEFINICION_PASILLOS.map((def) => ({
   keys: def.categorias,
   pasillo: def.pasillo,
-  prioridad: index + 1, // Prioridad basada en el orden de la lista
+  // La prioridad de ruta se define en ORDEN_RUTA, no en el índice del array de definición
+  prioridad: ORDEN_RUTA[def.pasillo] || 99,
 }));
 
 // Función de matching inteligente
@@ -313,7 +338,8 @@ const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
   }
 
   // 3. Default
-  return { pasillo: "Otros", prioridad: 90 };
+  // Si no se encuentra regla, se asigna a "Otros" con prioridad 99
+  return { pasillo: "Otros", prioridad: ORDEN_RUTA["Otros"] };
 };
 
 module.exports = { obtenerInfoPasillo };
