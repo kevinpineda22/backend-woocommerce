@@ -338,12 +338,24 @@ const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
       return !nombreNormalizado.includes("despensa");
     });
 
+    // LOG DE CONTROL: Mostrar qué categorías sobrevivieron al filtro
+    if (nombreProducto && categoriasWC) {
+      console.log(
+        "Categorias FILTRADAS:",
+        categoriasValidas.map((c) => c.name)
+      );
+    }
+
     const nombresCategorias = categoriasValidas
       .map((c) => c.name || "")
       .join(" ");
 
     for (const regla of REGLAS_PASILLOS) {
       if (regla.keys.some((key) => matchesKey(nombresCategorias, key))) {
+        if (nombreProducto)
+          console.log(
+            `✓ ASIGNADO (por Categ): Pasillo ${regla.pasillo} (${regla.nombre})`
+          );
         return { pasillo: regla.pasillo, prioridad: regla.prioridad };
       }
     }
@@ -355,6 +367,10 @@ const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
 
   for (const regla of REGLAS_PASILLOS) {
     if (regla.keys.some((key) => matchesKey(nombreParaBusqueda, key))) {
+      if (nombreProducto)
+        console.log(
+          `✓ ASIGNADO (por Nombre): Pasillo ${regla.pasillo} (${regla.nombre})`
+        );
       return { pasillo: regla.pasillo, prioridad: regla.prioridad };
     }
   }
