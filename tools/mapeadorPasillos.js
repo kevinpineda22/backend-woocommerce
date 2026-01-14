@@ -320,9 +320,12 @@ const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
   if (categoriasWC && categoriasWC.length > 0) {
     // FILTRO: Ignoramos la categoría genérica "Despensa" para obligar a usar la específica
     // El usuario indica que "Despensa" es basura y quiere usar la segunda categoría.
-    const categoriasValidas = categoriasWC.filter(
-      (c) => c.name && removeAccents(c.name).toLowerCase() !== "despensa"
-    );
+    const categoriasValidas = categoriasWC.filter((c) => {
+      if (!c.name) return false;
+      const nombreNormalizado = removeAccents(c.name).toLowerCase().trim();
+      // Filtramos cualquier variante de "despensa"
+      return nombreNormalizado !== "despensa";
+    });
 
     const nombresCategorias = categoriasValidas
       .map((c) => c.name || "")
