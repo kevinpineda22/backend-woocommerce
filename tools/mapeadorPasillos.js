@@ -1,6 +1,173 @@
 // tools/mapeadorPasillos.js
 
-const DEFINICION_PASILLOS = require("../data/categoriaPasillos");
+/**
+ * CONFIGURACIÓN DE PASILLOS Y SUS CATEGORÍAS
+ * Define qué categorías (o palabras clave de categoría) pertenecen a qué pasillo.
+ */
+const DEFINICION_PASILLOS = [
+  {
+    pasillo: "2",
+    nombre: "Despensa Básica",
+    categorias: ["huevos", "atunes", "enlatados", "pastas"],
+  },
+  {
+    pasillo: "1",
+    nombre: "Granos y Condimentos",
+    categorias: [
+      "arroz",
+      "azucar",
+      "grano",
+      "vinagretas",
+      "salsas",
+      "sazonador",
+    ],
+  },
+  {
+    pasillo: "3",
+    nombre: "Aceites y Harinas",
+    categorias: [
+      "harinas",
+      "margarinas",
+      "sopas",
+      "aceite vegetal",
+      "aceite soya",
+      "aceite oliva",
+      "aceite",
+    ],
+  },
+  {
+    pasillo: "4",
+    nombre: "Polvos y Repostería",
+    categorias: [
+      "refrescos en polvo",
+      "gelatina",
+      "reposteria",
+      "arequipe",
+      "leche larga vida",
+    ],
+  },
+  {
+    pasillo: "6",
+    nombre: "Café y Panadería",
+    categorias: [
+      "pan de sal",
+      "chocolate",
+      "cafe molido",
+      "cafe premium",
+      "cafe soluble",
+      "cafe",
+      "pan",
+    ],
+  },
+  {
+    pasillo: "5",
+    nombre: "Galletas y Dulces",
+    categorias: [
+      "pan dulce",
+      "avenas",
+      "galleta salada",
+      "galleta dulce",
+      "galleta saludable",
+      "galletas",
+    ],
+  },
+  {
+    pasillo: "7",
+    nombre: "Bebé y Adulto",
+    categorias: [
+      "adulto",
+      "pañitos humedos",
+      "pañales",
+      "cereales",
+      "leche en polvo",
+      "granola",
+      "bebe",
+    ],
+  },
+  {
+    pasillo: "8",
+    nombre: "Cuidado Personal",
+    categorias: [
+      "femenina",
+      "cremas dentales",
+      "cremas detales",
+      "cremas corporales",
+      "jabon de baño",
+      "higiene capilar",
+      "desodorantes",
+      "oral",
+    ],
+  },
+  {
+    pasillo: "10",
+    nombre: "Aseo Ropa",
+    categorias: [
+      "jabon barra",
+      "detergente liquido",
+      "detergente en polvo",
+      "insecticidas",
+      "blanqueadores",
+      "suavizantes",
+      "ropa",
+    ],
+  },
+  {
+    pasillo: "9",
+    nombre: "Aseo Hogar",
+    categorias: [
+      "escobas",
+      "papel higienico",
+      "traperas",
+      "limpia piso",
+      "velas",
+      "aseo hogar",
+    ],
+  },
+  {
+    pasillo: "11",
+    nombre: "Mascotas y Cocina",
+    categorias: [
+      "mascotas",
+      "esponjas",
+      "guantes",
+      "lavaplatos",
+      "desengrasante",
+    ],
+  },
+  {
+    pasillo: "12",
+    nombre: "Bebidas y Desechables",
+    categorias: [
+      "bebidas",
+      "pasabocas",
+      "servilletas",
+      "papel cocina",
+      "desechables",
+    ],
+  },
+  {
+    pasillo: "13",
+    nombre: "Refrigerados y Carnes",
+    categorias: [
+      "lacteos derivados",
+      "lacteos",
+      "cervezas",
+      "mani",
+      "golosinas",
+      "nueces",
+      "mexicano",
+      "saludable",
+      "carnes frias",
+      "carniceria",
+      "embutidos",
+    ],
+  },
+  {
+    pasillo: "14",
+    nombre: "Gaseosas y Fruver",
+    categorias: ["gaseosas", "fruver", "fruta", "verdura"],
+  },
+];
 
 // Función auxiliar para quitar acentos
 const removeAccents = (str) => {
