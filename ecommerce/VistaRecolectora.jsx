@@ -109,38 +109,58 @@ const SwipeCard = ({ item, onSwipe }) => {
           <h4 className="ec-name">{item.name}</h4>
           <div
             className="ec-sku-container"
-            style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "4px",
+              marginTop: "4px",
+              alignItems: "flex-start",
+            }}
           >
-            {item.sku && (
+            {item.sku ? (
               <div
                 className="ec-sku"
                 style={{
                   background: "#e0e7ff",
                   color: "#3730a3",
-                  padding: "2px 6px",
-                  borderRadius: "4px",
-                  fontSize: "0.7rem",
+                  padding: "2px 8px",
+                  borderRadius: "6px",
+                  fontSize: "0.75rem",
+                  fontWeight: "700",
                 }}
               >
                 Item: {item.sku}
               </div>
-            )}
-            {item.barcode && (
+            ) : null}
+
+            {item.barcode ? (
               <div
                 className="ec-sku"
                 style={{
                   background: "#dcfce7",
                   color: "#166534",
-                  padding: "2px 6px",
-                  borderRadius: "4px",
-                  fontSize: "0.7rem",
+                  padding: "2px 8px",
+                  borderRadius: "6px",
+                  fontSize: "0.75rem",
+                  fontWeight: "700",
                 }}
               >
                 EAN: {item.barcode}
               </div>
-            )}
-            {!item.sku && !item.barcode && (
-              <div className="ec-sku">Sin Código</div>
+            ) : (
+              <div
+                className="ec-sku"
+                style={{
+                  background: "#f1f5f9",
+                  color: "#94a3b8",
+                  padding: "2px 8px",
+                  borderRadius: "6px",
+                  fontSize: "0.7rem",
+                  fontStyle: "italic",
+                }}
+              >
+                Sin EAN
+              </div>
             )}
           </div>
         </div>

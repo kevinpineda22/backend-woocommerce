@@ -153,9 +153,12 @@ exports.getOrderById = async (req, res) => {
             });
 
           // BUSQUEDA DE CÓDIGO DE BARRAS (EAN/UPC)
-          let codigoBarras = null;
-          // 1. Meta Data (Comun en plugins)
-          if (prod.meta_data) {
+          // Prioridad: global_unique_id (Plugin EAN oficial) > MetaData > Atributos
+          let codigoBarras =
+            item.global_unique_id || prod.global_unique_id || null;
+
+          // 1. Meta Data (Comun en otros plugins)
+          if (!codigoBarras && prod.meta_data) {
             const meta = prod.meta_data.find((m) =>
               ["barcode", "_barcode", "ean", "_ean", "gtin", "_gtin"].includes(
                 m.key.toLowerCase()
