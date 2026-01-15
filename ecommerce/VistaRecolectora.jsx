@@ -145,7 +145,7 @@ const SwipeCard = ({ item, onSwipe }) => {
                   fontWeight: "700",
                 }}
               >
-                EAN: {item.barcode}
+                Codigo de barras: {item.barcode}
               </div>
             ) : (
               <div
@@ -159,7 +159,7 @@ const SwipeCard = ({ item, onSwipe }) => {
                   fontStyle: "italic",
                 }}
               >
-                Sin EAN
+                Sin Codigo de barras
               </div>
             )}
           </div>
@@ -234,7 +234,7 @@ const ManualConfirmOverlay = ({ isOpen, onConfirm, itemName }) => {
     <div
       style={{
         position: "fixed",
-        bottom: "40px",
+        top: "80px", // Mover arriba para liberar controles de zoom abajo
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 2147483647, // Mismo Z-Index máximo para estar a la par con Escaner
@@ -506,7 +506,7 @@ const VistaRecolectora = () => {
         setItemToScan(null);
       } else {
         alert(
-          `Código incorrecto.\nEscaneado: ${scanned}\nEsperaba EAN: ${
+          `Código incorrecto.\nEscaneado: ${scanned}\nEsperaba Codigo de barras: ${
             expectedBarcode || "N/A"
           }\nO Item: ${expectedSku}`
         );

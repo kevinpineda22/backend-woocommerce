@@ -59,7 +59,6 @@ const DEFINICION_PASILLOS = [
       "corporal",
       "femenina",
       "bebe",
-      "pañal",
       "desodorante",
       "shampoo",
       "jabon de baño",
@@ -164,11 +163,9 @@ const DEFINICION_PASILLOS = [
       "flan",
       "pudin",
       "reposteria",
-      "leche en polvo",
       "leche larga vida",
       "refrescos en polvo",
       "arequipe",
-      "modificadores",
     ],
   },
   {
@@ -184,6 +181,7 @@ const DEFINICION_PASILLOS = [
       "galleta salada",
       "galleta saludable",
       "galletas",
+      "modificadores"
     ],
   },
 
@@ -199,7 +197,9 @@ const DEFINICION_PASILLOS = [
       "pañales",
       "cereales",
       "granola",
+      "leche en polvo",
       "bebe",
+      "pañal"
     ],
   },
   {
