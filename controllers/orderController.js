@@ -38,10 +38,50 @@ exports.getPendingOrders = async (req, res) => {
   }
 };
 
-// 2. Obtener lista de pickers
+// 2. Obtener lista de pickers (con Sincronización Automática)
 exports.getPickers = async (req, res) => {
   const { email } = req.query;
   try {
+    // --- SYNC START: Asegurar que todos los 'picker' de profiles existan en wc_pickers ---
+    // Esto corrige el problema de que al crear un usuario no se cree su registro operativo
+    if (!email) {
+      const { data: profiles, error: pError } = await supabase
+        .from("profiles")
+        .select("correo, nombre")
+        .eq("role", "picker");
+
+      if (!pError && profiles) {
+        const { data: existingPickers } = await supabase
+          .from("wc_pickers")
+          .select("email");
+
+        const existingEmails = new Set(
+          existingPickers?.map((p) => p.email) || []
+        );
+        const missingProfiles = profiles.filter(
+          (p) => !existingEmails.has(p.correo)
+        );
+
+        if (missingProfiles.length > 0) {
+          console.log(
+            `Sincronizando ${missingProfiles.length} nuevos pickers...`
+          );
+          const newPickers = missingProfiles.map((p) => ({
+            nombre_completo: p.nombre || "Nuevo Picker",
+            email: p.correo,
+            estado_picker: "disponible",
+          }));
+
+          const { error: insertError } = await supabase
+            .from("wc_pickers")
+            .insert(newPickers);
+
+          if (insertError) console.error("Error sync pickers:", insertError);
+        }
+      }
+    }
+    // --- SYNC END ---
+
     let query = supabase
       .from("wc_pickers")
       .select("*")
@@ -53,6 +93,7 @@ exports.getPickers = async (req, res) => {
     if (error) throw error;
     res.status(200).json(data);
   } catch (error) {
+    console.error("Error getPickers:", error);
     res.status(500).json({ error: error.message });
   }
 };
