@@ -115,7 +115,7 @@ exports.getProductHeatmap = async (req, res) => {
 
       // 2. Agregación por Pasillos (Nueva lógica usando mapeadorPasillos)
       // obtenerInfoPasillo retorna { pasillo: "6", prioridad: 5 }
-      const { pasillo } = obtenerInfoPasillo(name); 
+      const { pasillo } = obtenerInfoPasillo([], name); 
       
       // Si el nombre es null o undefined, pasillo será undefined, pero obtenerInfoPasillo maneja defaults
       const pasilloKey = pasillo || "Otros";
