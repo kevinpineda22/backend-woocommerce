@@ -162,7 +162,7 @@ exports.getOrderById = async (req, res) => {
     // 2. Intentar obtener el Snapshot de la asiganción MÁS RECIENTE (Activa o Completada)
     const { data: asignacion } = await supabase
       .from("wc_asignaciones_pedidos")
-      .select("reporte_snapshot, estado_asignacion")
+      .select("id, reporte_snapshot, estado_asignacion") // <--- SOLICITAR ID EXPLICITAMENTE
       .eq("id_pedido", id)
       .in("estado_asignacion", ["completado", "en_proceso"])
       .order("fecha_inicio", { ascending: false }) // Priorizar el último intento
@@ -260,6 +260,11 @@ exports.getOrderById = async (req, res) => {
     // Inyectamos el reporte encontrado (Snapshot o Logs)
     if (reporteFinal) {
       order.reporte_items = reporteFinal;
+    }
+
+    // Inyectamos ID de Asignación para validación de sesión local
+    if (asignacion && asignacion.id) {
+      order.current_assignment_id = asignacion.id;
     }
 
     res.status(200).json(order);

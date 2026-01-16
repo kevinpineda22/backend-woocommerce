@@ -308,24 +308,54 @@ const VistaPicker = () => {
 
           // Sesión y Timer
           const storageKeyItems = `picker_items_${me.id_pedido_actual}`;
+          const storageAssignmentKey = `picker_assignment_id_${me.id_pedido_actual}`;
+
           const savedItems = localStorage.getItem(storageKeyItems);
-          if (savedItems) setPickedItems(JSON.parse(savedItems));
-          else {
+          const savedAssignmentId = localStorage.getItem(storageAssignmentKey);
+          const serverAssignmentId = orderRes.data.current_assignment_id;
+
+          // -- VALIDACIÓN DE SESIÓN (RESET SI NUEVA ASIGNACIÓN) --
+          if (serverAssignmentId && savedAssignmentId !== serverAssignmentId) {
+            console.log("Nueva asignación detectada. Reseteando sesión local.");
+            localStorage.removeItem(storageKeyItems);
+            localStorage.removeItem(`picker_timer_${me.id_pedido_actual}`);
+            localStorage.setItem(storageAssignmentKey, serverAssignmentId);
+
+            // Iniciar limpio
             const initial = {};
             orderRes.data.line_items.forEach((i) => (initial[i.id] = false));
             setPickedItems(initial);
-          }
 
-          const savedTime = localStorage.getItem(
-            `picker_timer_${me.id_pedido_actual}`
-          );
-          if (savedTime) {
-            setStartTime(parseInt(savedTime));
+            const now = Date.now();
+            setStartTime(now);
+            localStorage.setItem(`picker_timer_${me.id_pedido_actual}`, now);
+          } else if (savedItems) {
+            // Restaurar sesión válida
+            setPickedItems(JSON.parse(savedItems));
+
+            const savedTime = localStorage.getItem(
+              `picker_timer_${me.id_pedido_actual}`
+            );
+            if (savedTime) setStartTime(parseInt(savedTime));
+            else {
+              const now = Date.now();
+              setStartTime(now);
+              localStorage.setItem(`picker_timer_${me.id_pedido_actual}`, now);
+            }
           } else {
+            // Primera vez (sin historial local)
+            if (serverAssignmentId)
+              localStorage.setItem(storageAssignmentKey, serverAssignmentId);
+
+            const initial = {};
+            orderRes.data.line_items.forEach((i) => (initial[i.id] = false));
+            setPickedItems(initial);
+
             const now = Date.now();
             setStartTime(now);
             localStorage.setItem(`picker_timer_${me.id_pedido_actual}`, now);
           }
+
           setIsSessionLoaded(true);
         }
       } catch (e) {
