@@ -418,7 +418,7 @@ const AnaliticaPickers = () => {
                               <div className="ap-tags-container">
                                   {selectedPicker.drilldown.gaps.map((g, i) => (
                                       <span key={i} className="ap-gap-tag">
-                                          {g.start} - {g.end} ({g.duration})
+                                          {new Date(g.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(g.end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ({g.duration})
                                       </span>
                                   ))}
                               </div>
@@ -441,7 +441,7 @@ const AnaliticaPickers = () => {
                           <div className="ap-logs-table">
                               {selectedPicker.drilldown?.recent_logs?.map((L, i) => (
                                   <div key={i} className="ap-log-row">
-                                      <span className="ap-log-time">{L.hora}</span>
+                                      <span className="ap-log-time">{new Date(L.hora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                                       <span className={`ap-log-badge ap-log-${L.accion}`}>{L.accion}</span>
                                       {L.motivo && <span className="ap-log-reason">{L.motivo}</span>}
                                   </div>

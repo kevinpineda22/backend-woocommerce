@@ -16,9 +16,10 @@ exports.getCollectorPerformance = async (req, res) => {
 
     // 1. Logs de Picking - Fuente de verdad para tiempos y acciones
     // Traemos logs de las últimas 48h (Ayer + Hoy)
+    // [FIX] Usamos Left Join (sin !inner) para no perder logs huérfanos
     const { data: logs, error: logError } = await supabase
       .from("wc_log_picking")
-      .select("accion, motivo, id_pedido, fecha_registro, device_timestamp, wc_asignaciones_pedidos!inner(id_picker, nombre_picker)")
+      .select("accion, motivo, id_pedido, fecha_registro, device_timestamp, wc_asignaciones_pedidos(id_picker, nombre_picker)")
       .gte("fecha_registro", yesterdayStart.toISOString())
       .order("fecha_registro", { ascending: true }); // Orden cronológico vital para idle calc
     
@@ -27,11 +28,22 @@ exports.getCollectorPerformance = async (req, res) => {
     // 2. Asignaciones (para complementar tasa de pedido perfecto)
     const { data: asignaciones, error: asigError } = await supabase
       .from("wc_asignaciones_pedidos")
-      .select("id_picker, id_pedido, fecha_inicio, estado_asignacion")
+      .select("id_picker, nombre_picker, id_pedido, fecha_inicio, estado_asignacion")
       .gte("fecha_inicio", yesterdayStart.toISOString())
       .eq("estado_asignacion", "completado");
 
     if (asigError) throw asigError;
+
+    // --- MAPEO DE RESCATE (Para logs huérfanos) ---
+    const orderToPickerMap = {};
+    asignaciones.forEach(a => {
+        if(a.id_pedido && a.id_picker) {
+            orderToPickerMap[a.id_pedido] = { 
+                id: a.id_picker, 
+                nombre: a.nombre_picker || `Picker ${a.id_picker}` // Fallback name
+            };
+        }
+    });
 
     // --- ESTRUCTURAS DE DATOS ---
     const pickersObj = {};
@@ -55,8 +67,17 @@ exports.getCollectorPerformance = async (req, res) => {
     // Agrupamos logs primero
     const logsByPicker = {};
     logs.forEach(log => {
-        const pid = log.wc_asignaciones_pedidos.id_picker;
-        const nombre = log.wc_asignaciones_pedidos.nombre_picker;
+        // [FIX] Intentar obtener picker del join, o del mapa de rescate
+        let pid = log.wc_asignaciones_pedidos?.id_picker;
+        let nombre = log.wc_asignaciones_pedidos?.nombre_picker;
+
+        if (!pid && orderToPickerMap[log.id_pedido]) {
+            pid = orderToPickerMap[log.id_pedido].id;
+            nombre = orderToPickerMap[log.id_pedido].nombre;
+        }
+
+        if (!pid) return; // Si sigue huérfano, lo ignoramos (o podríamos asignarlo a "Desconocido")
+
         if(!logsByPicker[pid]) logsByPicker[pid] = { name: nombre, logs: [] };
         logsByPicker[pid].logs.push({
             ...log,
@@ -89,7 +110,7 @@ exports.getCollectorPerformance = async (req, res) => {
            // 2. Sample Logs (Solo Hoy)
            if (currentIsToday) {
                pickersObj[pid].today.logs.push({
-                   hora: currentLog.timeObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}),
+                   hora: currentLog.timeObj.toISOString(), // [FIX] Send ISO string to let frontend handle Timezone
                    accion: currentLog.accion,
                    motivo: currentLog.motivo,
                    sku: "Ver Drilldown" // Idealmente vendría del log si existiera columna
@@ -105,9 +126,10 @@ exports.getCollectorPerformance = async (req, res) => {
                if (diffSeconds > 300) {
                    if (currentIsToday) {
                         pickersObj[pid].today.idle_sec += diffSeconds;
+                        // [FIX] Send ISO strings for gaps too
                         pickersObj[pid].idle_gaps.push({
-                            start: lastTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
-                            end: currentLog.timeObj.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+                            start: lastTime.toISOString(),
+                            end: currentLog.timeObj.toISOString(),
                             duration: Math.round(diffSeconds / 60) + ' min'
                         });
                    }

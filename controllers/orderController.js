@@ -311,7 +311,17 @@ exports.completePicking = async (req, res) => {
         .update(updatePayload)
         .eq("id", asignacion.id);
     } else {
-      // Fallback
+      // Fallback: Intentar recuperar ID si existe, o actualizar ciegamente
+      // [FIX] Recuperamos el ID para no dejar huérfanos los logs
+      const { data: rec } = await supabase
+        .from("wc_asignaciones_pedidos")
+        .select("id")
+        .eq("id_pedido", id_pedido)
+        .limit(1)
+        .maybeSingle();
+
+      if (rec) asignacionId = rec.id;
+
       await supabase
         .from("wc_asignaciones_pedidos")
         .update(updatePayload)
