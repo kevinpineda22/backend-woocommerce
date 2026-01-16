@@ -114,18 +114,22 @@ exports.getProductHeatmap = async (req, res) => {
       }
 
       // 2. Agregación por Pasillos (Nueva lógica usando mapeadorPasillos)
-      const pasillo = obtenerInfoPasillo(name); // Retorna "A", "B", "C1", etc. o "Otros"
+      // obtenerInfoPasillo retorna { pasillo: "6", prioridad: 5 }
+      const { pasillo } = obtenerInfoPasillo(name); 
       
-      if (!aisleMap[pasillo]) {
-        aisleMap[pasillo] = { 
-          pasillo, 
+      // Si el nombre es null o undefined, pasillo será undefined, pero obtenerInfoPasillo maneja defaults
+      const pasilloKey = pasillo || "Otros";
+
+      if (!aisleMap[pasilloKey]) {
+        aisleMap[pasilloKey] = { 
+          pasillo: pasilloKey, 
           total_interacciones: 0, 
           total_fallos: 0 
         };
       }
-      aisleMap[pasillo].total_interacciones += 1;
+      aisleMap[pasilloKey].total_interacciones += 1;
       if (log.accion === "retirado") {
-        aisleMap[pasillo].total_fallos += 1;
+        aisleMap[pasilloKey].total_fallos += 1;
       }
     });
 
