@@ -5,5 +5,6 @@ const analyticsController = require("../controllers/analyticsController");
 router.get("/performance", analyticsController.getCollectorPerformance);
 router.get("/heatmap", analyticsController.getProductHeatmap);
 router.get("/audit", analyticsController.getAuditLogs);
+router.get("/route", analyticsController.getPickerRoute); // [NEW]
 
 module.exports = router;

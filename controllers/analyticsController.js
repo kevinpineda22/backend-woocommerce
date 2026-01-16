@@ -226,3 +226,132 @@ exports.getAuditLogs = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// 4. [NEW] Análisis de Ruta por Pasillos (Mapa de Recorrido del Picker)
+exports.getPickerRoute = async (req, res) => {
+  try {
+    const { id_picker, id_pedido } = req.query;
+
+    if (!id_picker) {
+      return res.status(400).json({ error: "id_picker requerido" });
+    }
+
+    // Query base: logs del picker ordenados cronológicamente
+    let query = supabase
+      .from("wc_log_picking")
+      .select("accion, pasillo, nombre_producto, fecha_registro, device_timestamp, id_pedido")
+      .eq("wc_asignaciones_pedidos.id_picker", id_picker)
+      .order("fecha_registro", { ascending: true });
+
+    // Filtro opcional por pedido específico
+    if (id_pedido) {
+      query = query.eq("id_pedido", id_pedido);
+    }
+
+    const { data: logs, error } = await query.limit(500);
+
+    if (error) throw error;
+
+    // Agrupar por secuencia de pasillos
+    const routeSegments = [];
+    let currentSegment = null;
+
+    logs.forEach(log => {
+      const timestamp = log.device_timestamp ? new Date(log.device_timestamp) : new Date(log.fecha_registro);
+      const pasillo = log.pasillo || "S/N";
+
+      if (!currentSegment || currentSegment.pasillo !== pasillo) {
+        // Nuevo segmento (cambio de pasillo)
+        if (currentSegment) {
+          currentSegment.end_time = timestamp;
+          currentSegment.duration_seconds = Math.round((currentSegment.end_time - currentSegment.start_time) / 1000);
+          routeSegments.push(currentSegment);
+        }
+
+        currentSegment = {
+          pasillo: pasillo,
+          start_time: timestamp,
+          end_time: timestamp,
+          items: 0,
+          products: [],
+          visit_order: routeSegments.length + 1
+        };
+      }
+
+      // Acumular items en el segmento actual
+      currentSegment.items++;
+      currentSegment.products.push({
+        name: log.nombre_producto,
+        accion: log.accion,
+        time: timestamp.toISOString()
+      });
+      currentSegment.end_time = timestamp;
+    });
+
+    // Cerrar el último segmento
+    if (currentSegment) {
+      currentSegment.duration_seconds = Math.round((currentSegment.end_time - currentSegment.start_time) / 1000);
+      routeSegments.push(currentSegment);
+    }
+
+    // Detectar "regresiones" (visitas repetidas al mismo pasillo)
+    const pasilloVisits = {};
+    routeSegments.forEach(seg => {
+      if (!pasilloVisits[seg.pasillo]) pasilloVisits[seg.pasillo] = [];
+      pasilloVisits[seg.pasillo].push(seg.visit_order);
+    });
+
+    const regressions = [];
+    Object.entries(pasilloVisits).forEach(([pasillo, visits]) => {
+      if (visits.length > 1) {
+        regressions.push({
+          pasillo,
+          visits: visits,
+          message: `Regresó ${visits.length - 1} vez(es)`
+        });
+      }
+    });
+
+    // Calcular estadísticas por pasillo (agregadas)
+    const pasilloStats = {};
+    routeSegments.forEach(seg => {
+      if (!pasilloStats[seg.pasillo]) {
+        pasilloStats[seg.pasillo] = {
+          pasillo: seg.pasillo,
+          total_time: 0,
+          total_items: 0,
+          visits: 0
+        };
+      }
+      pasilloStats[seg.pasillo].total_time += seg.duration_seconds;
+      pasilloStats[seg.pasillo].total_items += seg.items;
+      pasilloStats[seg.pasillo].visits++;
+    });
+
+    // Formatear para tabla resumen
+    const summary = Object.values(pasilloStats).map(p => ({
+      ...p,
+      avg_time_per_item: p.total_items > 0 ? Math.round(p.total_time / p.total_items) : 0,
+      total_time_formatted: `${Math.floor(p.total_time / 60)}:${String(p.total_time % 60).padStart(2, '0')}`
+    })).sort((a, b) => b.total_time - a.total_time);
+
+    res.status(200).json({
+      route: routeSegments.map(s => ({
+        ...s,
+        start_time: s.start_time.toISOString(),
+        end_time: s.end_time.toISOString()
+      })),
+      summary,
+      regressions,
+      metrics: {
+        total_pasillos_visitados: Object.keys(pasilloStats).length,
+        total_time: routeSegments.reduce((acc, s) => acc + s.duration_seconds, 0),
+        total_items: logs.length
+      }
+    });
+
+  } catch (error) {
+    console.error("Error en getPickerRoute:", error);
+    res.status(500).json({ error: error.message });
+  }
+};

@@ -343,6 +343,7 @@ exports.completePicking = async (req, res) => {
             nombre_producto: item.name,
             accion: accion,
             motivo: item.reason || null, // <--- GUARDAMOS EL MOTIVO
+            pasillo: item.pasillo || null, // [NEW] Para tracking de ruta
             fecha_registro: new Date(),
             device_timestamp: item.device_timestamp || null, // [NEW]
           });

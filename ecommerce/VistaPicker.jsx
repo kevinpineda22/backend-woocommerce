@@ -617,6 +617,7 @@ const VistaPicker = () => {
         sku: item.sku,
         name: item.name,
         qty: item.quantity,
+        pasillo: item.pasillo, // [NEW] Para análisis de ruta
         reason: removedReasons[item.id] || null,
         device_timestamp: timestampMap[item.id] ? new Date(timestampMap[item.id]).toISOString() : null
       };
