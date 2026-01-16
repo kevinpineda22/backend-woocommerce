@@ -10,20 +10,28 @@ exports.getCollectorPerformance = async (req, res) => {
       .select(
         "id_picker, nombre_picker, tiempo_total_segundos, id_pedido"
       )
-      .eq("estado_asignacion", "completado");
+      .eq("estado_asignacion", "completado")
+      // Filtramos datos muy antiguos o corruptos si es necesario
+      .not("tiempo_total_segundos", "is", null);
 
     if (asigError) throw asigError;
 
-    // 2. Obtenemos Logs para calcular Items por Minuto y Tasa de Error
-    // Nota: Traemos solo lo necesario para agrupar
+    // 2. Obtenemos Logs para calcular Items por Minuto, Tasa de Error y Pedidos Perfectos
     const { data: logs, error: logError } = await supabase
       .from("wc_log_picking")
-      .select("accion, wc_asignaciones_pedidos!inner(id_picker)");
-      // .limit(10000); // Podríamos limitar si crece mucho
+      .select("accion, motivo, id_pedido, wc_asignaciones_pedidos!inner(id_picker)");
 
     if (logError) throw logError;
 
     const stats = {};
+    const pedidosConFallas = new Set(); // Para rastrear pedidos imperfectos
+
+    // Identificar pedidos con fallos
+    logs.forEach(log => {
+        if(log.accion === 'retirado' || log.accion === 'no_encontrado') {
+            pedidosConFallas.add(log.id_pedido);
+        }
+    });
 
     // Inicializar Estructura y sumar tiempos/pedidos
     asignaciones.forEach((a) => {
@@ -33,43 +41,72 @@ exports.getCollectorPerformance = async (req, res) => {
           id,
           nombre: a.nombre_picker,
           total_pedidos: 0,
+          pedidos_perfectos: 0,
           tiempo_total_acumulado: 0,
           total_items_recolectados: 0,
-          total_items_retirados: 0,
+          total_items_reportados: 0,
+          motivos_frecuentes: {}
         };
       }
       stats[id].total_pedidos += 1;
       stats[id].tiempo_total_acumulado += a.tiempo_total_segundos || 0;
+      
+      // Chequear si este pedido fue perfecto
+      if (!pedidosConFallas.has(a.id_pedido)) {
+          stats[id].pedidos_perfectos += 1;
+      }
     });
 
     // Sumar conteo de items (acciones) a cada picker
     logs.forEach((log) => {
-      // log.wc_asignaciones_pedidos es un objeto gracias al join (!inner)
       const id = log.wc_asignaciones_pedidos?.id_picker;
       if (stats[id]) {
-        if (log.accion === "recolectado") stats[id].total_items_recolectados += 1;
-        else if (log.accion === "retirado") stats[id].total_items_retirados += 1;
+        if (log.accion === "recolectado") {
+            stats[id].total_items_recolectados += 1;
+        } else if (log.accion === "retirado" || log.accion === "no_encontrado") {
+            stats[id].total_items_reportados += 1;
+            // Registrar motivo para perfilado del picker
+            const motivo = log.motivo || "Sin motivo";
+            stats[id].motivos_frecuentes[motivo] = (stats[id].motivos_frecuentes[motivo] || 0) + 1;
+        }
       }
     });
 
-    // Calcular Métricas Derivadas
+    // Calcular Métricas Derivadas KPI (Key Performance Indicators)
     const result = Object.values(stats)
       .map((s) => {
-        const minutos_totales = s.tiempo_total_acumulado / 60 || 1; // Evitar div 0
-        const total_intentos = s.total_items_recolectados + s.total_items_retirados;
+        const minutos_totales = s.tiempo_total_acumulado / 60 || 1;
+        const total_acciones = s.total_items_recolectados + s.total_items_reportados;
+        
+        // Segundos por Item (SPI) - Métrica Dorada en Logística
+        // Cuantos segundos le toma procesar 1 item (buscar + escanear)
+        // Se usa total_acciones porque tanto encontrar como no encontrar toma tiempo
+        const segundos_por_item = total_acciones > 0 
+            ? Math.round(s.tiempo_total_acumulado / total_acciones) 
+            : 0;
+
+        // Tasa de Pedido Perfecto
+        const tasa_pedido_perfecto = s.total_pedidos > 0
+            ? Math.round((s.pedidos_perfectos / s.total_pedidos) * 100)
+            : 0;
+            
+        // Motivo más frecuente de fallo
+        const topMotivo = Object.entries(s.motivos_frecuentes)
+            .sort((a,b) => b[1] - a[1])[0];
         
         return {
           ...s,
-          promedio_minutos: Math.round(minutos_totales / s.total_pedidos),
-          // Velocidad: Items recolectados por minuto de trabajo activo
-          velocidad_picking: parseFloat((s.total_items_recolectados / minutos_totales).toFixed(2)),
-          // Precisión: % de items recolectados vs intentos totales
-          tasa_precision: total_intentos > 0 
-            ? Math.round((s.total_items_recolectados / total_intentos) * 100) 
-            : 0
+          promedio_minutos_pedido: Math.round(minutos_totales / s.total_pedidos),
+          segundos_por_item: segundos_por_item, 
+          velocidad_picking: parseFloat((s.total_items_recolectados / minutos_totales).toFixed(2)), // Items/min (Legacy pero útil)
+          tasa_precision: total_acciones > 0 
+            ? Math.round((s.total_items_recolectados / total_acciones) * 100) 
+            : 0,
+          tasa_pedido_perfecto,
+          motivo_comun_fallo: topMotivo ? `${topMotivo[0]} (${topMotivo[1]})` : 'N/A'
         };
       })
-      .sort((a, b) => b.velocidad_picking - a.velocidad_picking); // Ordenar por velocidad (productividad)
+      .sort((a, b) => b.tasa_pedido_perfecto - a.tasa_pedido_perfecto); // Ordenamos por Calidad (Pedidos Perfectos)
 
     res.status(200).json(result);
   } catch (error) {

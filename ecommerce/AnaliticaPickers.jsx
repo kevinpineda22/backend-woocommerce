@@ -110,9 +110,9 @@ const AnaliticaPickers = () => {
                 <tr>
                   <th>#</th>
                   <th>Nombre</th>
-                  <th>Pedidos</th>
-                  <th>Velocidad</th>
-                  <th>Precisión</th>
+                  <th>Eficiencia (SPI)</th>
+                  <th>Precisión Global</th>
+                  <th>Pedidos Perfectos</th>
                 </tr>
               </thead>
               <tbody>
@@ -122,25 +122,12 @@ const AnaliticaPickers = () => {
                     <td>
                       <div style={{ fontWeight: 600 }}>{p.nombre}</div>
                       <div style={{ fontSize: "0.75rem", color: "#7f8c8d" }}>
-                        ~{p.promedio_minutos} min/pedido
+                        {p.total_pedidos} pedidos • {p.motivo_comun_fallo !== 'N/A' ? `Falla: ${p.motivo_comun_fallo}` : 'Sin fallos'}
                       </div>
                     </td>
-                    <td style={{ fontWeight: "bold" }}>{p.total_pedidos}</td>
                     <td>
-                      <span
-                        style={{
-                          background: "#ebf8ff",
-                          color: "#3182ce",
-                          padding: "2px 6px",
-                          borderRadius: 4,
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {p.velocidad_picking}
-                      </span>{" "}
-                      <span style={{ fontSize: "0.7rem", color: "#7f8c8d" }}>
-                        it/min
-                      </span>
+                        <div style={{ fontWeight: "bold", color: "#2d3748" }}>{p.segundos_por_item}s</div>
+                        <div style={{ fontSize: "0.7rem", color: "#7f8c8d" }}>por item</div>
                     </td>
                     <td>
                       <div
@@ -164,7 +151,7 @@ const AnaliticaPickers = () => {
                               width: `${p.tasa_precision}%`,
                               height: "100%",
                               background:
-                                p.tasa_precision >= 95 ? "#48bb78" : "#ed8936",
+                                p.tasa_precision >= 98 ? "#48bb78" : "#ed8936",
                               borderRadius: 2,
                             }}
                           ></div>
@@ -173,13 +160,23 @@ const AnaliticaPickers = () => {
                           style={{
                             fontSize: "0.85rem",
                             color:
-                              p.tasa_precision >= 95 ? "#2f855a" : "#c05621",
+                              p.tasa_precision >= 98 ? "#2f855a" : "#c05621",
                             fontWeight: 600,
                           }}
                         >
                           {p.tasa_precision}%
                         </span>
                       </div>
+                    </td>
+                    <td>
+                        <div style={{display: 'flex', flexDirection: 'column'}}>
+                            <span style={{fontWeight: 'bold', color: p.tasa_pedido_perfecto > 90 ? '#2f855a' : '#2d3748'}}>
+                                {p.tasa_pedido_perfecto}%
+                            </span>
+                            <span style={{ fontSize: "0.65rem", color: "#a0aec0" }}>
+                                ({p.pedidos_perfectos}/{p.total_pedidos})
+                            </span>
+                        </div>
                     </td>
                   </tr>
                 ))}
@@ -195,7 +192,7 @@ const AnaliticaPickers = () => {
           {/* CARD 2: PRODUCTOS MÁS RETIRADOS (OJO DE HALCÓN) */}
           <div className="card-analitica">
             <div className="card-title">
-              <span>⚠️ Alertas de Inventario (Más Retirados)</span>
+              <span>⚠️ Productos No Encontrados / Agotados</span>
               <FaExclamationTriangle color="#e74c3c" />
             </div>
 
@@ -222,7 +219,7 @@ const AnaliticaPickers = () => {
                     >
                       <strong>{p.name}</strong>
                       <span style={{ color: "#e74c3c", fontWeight: "bold" }}>
-                        {p.total_removed} Fallos
+                        {p.total_removed} Reportes
                       </span>
                     </div>
                     <div style={{ fontSize: "0.8rem", color: "#7f8c8d" }}>
@@ -295,7 +292,7 @@ const AnaliticaPickers = () => {
                       borderRadius: 2,
                     }}
                   ></div>{" "}
-                  Alta Tasa de Retiro
+                  Alta Tasa de Reportes
                 </span>
               </div>
             </div>
@@ -371,7 +368,7 @@ const AnaliticaPickers = () => {
                           lineHeight: 1,
                         }}
                       >
-                        {aisle.pasillo === "Otros" ? "?" : aisle.pasillo}
+                        {aisle.pasillo === "Otros" ? "Gral" : aisle.pasillo}
                       </div>
                       <div
                         style={{
@@ -380,7 +377,7 @@ const AnaliticaPickers = () => {
                           fontWeight: 600,
                         }}
                       >
-                        {aisle.total_interacciones} acc
+                        {aisle.total_interacciones} movs
                       </div>
                       {aisle.total_fallos > 0 && (
                         <div
@@ -393,7 +390,7 @@ const AnaliticaPickers = () => {
                               : "#718096",
                           }}
                         >
-                          ({aisle.total_fallos} fallos)
+                          ({aisle.total_fallos} reportes)
                         </div>
                       )}
                     </div>
