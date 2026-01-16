@@ -2,7 +2,7 @@
 
 /**
  * CONFIGURACIÓN DE ORDEN DE RUTA (SERPENTEAR)
- * Este mapa define el ORDEN OFICIAL de recorrido para la recolectora.
+ * Este mapa define el ORDEN OFICIAL de recorrido para el picker.
  * El número indica la posición en la ruta (1 = Primero, 2 = Segundo, etc.)
  */
 const ORDEN_RUTA = {

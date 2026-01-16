@@ -1,14 +1,14 @@
 const { supabase } = require("../services/supabaseClient");
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 
-// 1. Estadísticas de Rendimiento por Recolectora (Mejorado con Velocidad y Precisión) (Mejorado con Velocidad y Precisión)
+// 1. Estadísticas de Rendimiento por Picker (Mejorado con Velocidad y Precisión)
 exports.getCollectorPerformance = async (req, res) => {
   try {
     // 1. Obtenemos asignaciones completadas (Base para Tiempo y Cantidad de Pedidos)
     const { data: asignaciones, error: asigError } = await supabase
       .from("wc_asignaciones_pedidos")
       .select(
-        "id_recolectora, nombre_recolectora, tiempo_total_segundos, id_pedido"
+        "id_picker, nombre_picker, tiempo_total_segundos, id_pedido"
       )
       .eq("estado_asignacion", "completado");
 
@@ -17,8 +17,8 @@ exports.getCollectorPerformance = async (req, res) => {
     // 2. Obtenemos Logs para calcular Items por Minuto y Tasa de Error
     // Nota: Traemos solo lo necesario para agrupar
     const { data: logs, error: logError } = await supabase
-      .from("wc_log_recoleccion")
-      .select("accion, wc_asignaciones_pedidos!inner(id_recolectora)");
+      .from("wc_log_picking")
+      .select("accion, wc_asignaciones_pedidos!inner(id_picker)");
       // .limit(10000); // Podríamos limitar si crece mucho
 
     if (logError) throw logError;
@@ -27,11 +27,11 @@ exports.getCollectorPerformance = async (req, res) => {
 
     // Inicializar Estructura y sumar tiempos/pedidos
     asignaciones.forEach((a) => {
-      const id = a.id_recolectora;
+      const id = a.id_picker;
       if (!stats[id]) {
         stats[id] = {
           id,
-          nombre: a.nombre_recolectora,
+          nombre: a.nombre_picker,
           total_pedidos: 0,
           tiempo_total_acumulado: 0,
           total_items_recolectados: 0,
@@ -42,10 +42,10 @@ exports.getCollectorPerformance = async (req, res) => {
       stats[id].tiempo_total_acumulado += a.tiempo_total_segundos || 0;
     });
 
-    // Sumar conteo de items (acciones) a cada recolectora
+    // Sumar conteo de items (acciones) a cada picker
     logs.forEach((log) => {
       // log.wc_asignaciones_pedidos es un objeto gracias al join (!inner)
-      const id = log.wc_asignaciones_pedidos?.id_recolectora;
+      const id = log.wc_asignaciones_pedidos?.id_picker;
       if (stats[id]) {
         if (log.accion === "recolectado") stats[id].total_items_recolectados += 1;
         else if (log.accion === "retirado") stats[id].total_items_retirados += 1;
@@ -83,7 +83,7 @@ exports.getProductHeatmap = async (req, res) => {
   try {
     // Traemos todo el log (limitado a últimos 5000 registros)
     const { data: logs, error } = await supabase
-      .from("wc_log_recoleccion")
+      .from("wc_log_picking")
       .select("nombre_producto, accion, motivo")
       .order("fecha_registro", { ascending: false })
       .limit(5000);
@@ -98,106 +98,76 @@ exports.getProductHeatmap = async (req, res) => {
       
       // 1. Agregación por Producto
       if (!productMap[name]) {
-        productMap[name] = {
-          name,
-          total_picks: 0,
-          total_removed: 0,
-          motivos: {},
+        productMap[name] = { 
+          name, 
+          total_interacciones: 0, 
+          total_removed: 0, 
+          motivos: {} 
         };
       }
-
-      if (log.accion === "recolectado") {
-        productMap[name].total_picks += 1;
-      } else if (log.accion === "retirado") {
-        productMap[name].total_removed += 1;
-        const motivo = log.motivo || "Sin motivo";
-        productMap[name].motivos[motivo] =
-          (productMap[name].motivos[motivo] || 0) + 1;
-      }
-
-      // 2. Agregación por Pasillo (Heatmap Físico)
-      // Asumimos que no tenemos categorías a mano en el log, usamos solo nombre
-      const { pasillo } = obtenerInfoPasillo(name, []);
-      const pasilloKey = pasillo || "Otros";
-
-      if (!aisleMap[pasilloKey]) {
-        aisleMap[pasilloKey] = {
-          pasillo: pasilloKey,
-          total_interacciones: 0,
-          total_fallos: 0, // Retiros
-        };
-      }
-      aisleMap[pasilloKey].total_interacciones += 1;
+      productMap[name].total_interacciones += 1;
+      
       if (log.accion === "retirado") {
-        aisleMap[pasilloKey].total_fallos += 1;
+        productMap[name].total_removed += 1;
+        const reason = log.motivo || "Sin motivo";
+        productMap[name].motivos[reason] = (productMap[name].motivos[reason] || 0) + 1;
+      }
+
+      // 2. Agregación por Pasillos (Nueva lógica usando mapeadorPasillos)
+      const pasillo = obtenerInfoPasillo(name); // Retorna "A", "B", "C1", etc. o "Otros"
+      
+      if (!aisleMap[pasillo]) {
+        aisleMap[pasillo] = { 
+          pasillo, 
+          total_interacciones: 0, 
+          total_fallos: 0 
+        };
+      }
+      aisleMap[pasillo].total_interacciones += 1;
+      if (log.accion === "retirado") {
+        aisleMap[pasillo].total_fallos += 1;
       }
     });
 
-    // Convertir Maps a Arrays
-    const products = Object.values(productMap)
-      .map((p) => ({
-        ...p,
-        total_interacciones: p.total_picks + p.total_removed,
-        tasa_exito: p.total_picks / (p.total_picks + p.total_removed || 1),
-      }))
-      .sort((a, b) => b.total_interacciones - a.total_interacciones)
-      .slice(0, 50);
-
-    const aisles = Object.values(aisleMap).sort(
-      // Ordenamos numéricamente si es posible, o alfabéticamente
-      (a, b) => {
-          const numA = parseInt(a.pasillo);
-          const numB = parseInt(b.pasillo);
-          if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
-          return a.pasillo.localeCompare(b.pasillo);
-      }
-    );
+    const products = Object.values(productMap).sort((a, b) => b.total_interacciones - a.total_interacciones);
+    
+    // Ordenar pasillos alfabéticamente
+    const aisles = Object.values(aisleMap).sort((a, b) => a.pasillo.localeCompare(b.pasillo));
 
     res.status(200).json({ products, aisles });
+
   } catch (error) {
     console.error("Error en getProductHeatmap:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
-// 3. Auditoría Forense (Logs filtrables)
+// 3. Auditoría Forense (Logs detallados)
 exports.getAuditLogs = async (req, res) => {
-  const { limit = 100, search = "" } = req.query;
   try {
-    let query = supabase
-      .from("wc_log_recoleccion")
-      .select("*, wc_asignaciones_pedidos(nombre_recolectora)") // Acceso a la FK si existe relación en Supabase
+    const { data: logs, error } = await supabase
+      .from("wc_log_picking")
+      .select(
+        `
+        id,
+        accion,
+        fecha_registro,
+        nombre_producto,
+        motivo,
+        id_pedido,
+        wc_asignaciones_pedidos (
+          nombre_picker
+        )
+      `
+      )
       .order("fecha_registro", { ascending: false })
-      .limit(limit);
+      .limit(100);
 
-    if (search) {
-      // Búsqueda simple por nombre de producto
-      query = query.ilike("nombre_producto", `%${search}%`);
-    }
-
-    const { data, error } = await query;
     if (error) throw error;
 
-    // Aplanar respuesta para facilitar frontend
-    const flatData = data.map((d) => ({
-      ...d,
-      recolectora: d.wc_asignaciones_pedidos?.nombre_recolectora || "N/A",
-    }));
-
-    res.status(200).json(flatData);
+    res.status(200).json(logs);
   } catch (error) {
     console.error("Error en getAuditLogs:", error);
-    // Fallback si la relación FK falla (wc_asignaciones_pedidos podría no estar ligada formalmente en schema)
-    // Intentamos query simple
-    try {
-      const { data } = await supabase
-        .from("wc_log_recoleccion")
-        .select("*")
-        .order("fecha_registro", { ascending: false })
-        .limit(limit);
-      res.status(200).json(data);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
+    res.status(500).json({ error: error.message });
   }
 };

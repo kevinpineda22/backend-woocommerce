@@ -4,7 +4,7 @@ const orderController = require("../controllers/orderController");
 
 router.get("/pendientes", orderController.getPendingOrders);
 router.get("/historial", orderController.getHistory); // <--- NUEVA RUTA
-router.get("/recolectoras", orderController.getRecolectoras);
+router.get("/pickers", orderController.getPickers);
 router.post("/asignar", orderController.assignOrder);
 router.post("/cancelar-asignacion", orderController.cancelAssignment); // <--- NUEVA RUTA
 router.post("/finalizar-recoleccion", orderController.completeCollection);

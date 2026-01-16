@@ -13,7 +13,7 @@ exports.getPendingOrders = async (req, res) => {
 
     const { data: activeAssignments } = await supabase
       .from("wc_asignaciones_pedidos")
-      .select("id_pedido, nombre_recolectora, fecha_inicio")
+      .select("id_pedido, nombre_picker, fecha_inicio")
       .eq("estado_asignacion", "en_proceso");
 
     const assignmentMap = {};
@@ -26,7 +26,7 @@ exports.getPendingOrders = async (req, res) => {
       return {
         ...order,
         is_assigned: !!assignment,
-        assigned_to: assignment ? assignment.nombre_recolectora : null,
+        assigned_to: assignment ? assignment.nombre_picker : null,
         started_at: assignment ? assignment.fecha_inicio : null,
       };
     });
@@ -38,12 +38,12 @@ exports.getPendingOrders = async (req, res) => {
   }
 };
 
-// 2. Obtener lista de recolectoras
-exports.getRecolectoras = async (req, res) => {
+// 2. Obtener lista de pickers
+exports.getPickers = async (req, res) => {
   const { email } = req.query;
   try {
     let query = supabase
-      .from("wc_recolectoras")
+      .from("wc_pickers")
       .select("*")
       .order("nombre_completo", { ascending: true });
 
@@ -59,15 +59,15 @@ exports.getRecolectoras = async (req, res) => {
 
 // 3. Asignar pedido
 exports.assignOrder = async (req, res) => {
-  const { id_pedido, id_recolectora, nombre_recolectora } = req.body;
+  const { id_pedido, id_picker, nombre_picker } = req.body;
   try {
     const { data, error } = await supabase
       .from("wc_asignaciones_pedidos")
       .insert([
         {
           id_pedido,
-          id_recolectora,
-          nombre_recolectora,
+          id_picker,
+          nombre_picker,
           estado_asignacion: "en_proceso",
           fecha_inicio: new Date().toISOString(),
         },
@@ -78,12 +78,12 @@ exports.assignOrder = async (req, res) => {
     if (error) throw error;
 
     await supabase
-      .from("wc_recolectoras")
+      .from("wc_pickers")
       .update({
-        estado_recolectora: "recolectando",
+        estado_picker: "picking",
         id_pedido_actual: id_pedido,
       })
-      .eq("id", id_recolectora);
+      .eq("id", id_picker);
 
     res.status(200).json(data);
   } catch (error) {
@@ -115,7 +115,7 @@ exports.getOrderById = async (req, res) => {
     } else {
       // Opción B: No hay snapshot, reconstruimos desde los logs (Retrocompatibilidad)
       const { data: logs } = await supabase
-        .from("wc_log_recoleccion")
+        .from("wc_log_picking")
         .select("*")
         .eq("id_pedido", id);
 
@@ -209,7 +209,7 @@ exports.getOrderById = async (req, res) => {
 
 // 5. Finalizar Recolección (Sistema Híbrido: Snapshot + Logs)
 exports.completeCollection = async (req, res) => {
-  const { id_pedido, id_recolectora, reporte_items } = req.body;
+  const { id_pedido, id_picker, reporte_items } = req.body;
   try {
     const now = new Date();
 
@@ -284,7 +284,7 @@ exports.completeCollection = async (req, res) => {
 
       if (logsToInsert.length > 0) {
         const { error: logError } = await supabase
-          .from("wc_log_recoleccion")
+          .from("wc_log_picking")
           .insert(logsToInsert);
         if (logError)
           console.error("Error guardando logs de auditoría:", logError);
@@ -292,9 +292,9 @@ exports.completeCollection = async (req, res) => {
     }
 
     await supabase
-      .from("wc_recolectoras")
-      .update({ estado_recolectora: "disponible", id_pedido_actual: null })
-      .eq("id", id_recolectora);
+      .from("wc_pickers")
+      .update({ estado_picker: "disponible", id_pedido_actual: null })
+      .eq("id", id_picker);
 
     res.status(200).json({ message: "Orden finalizada correctamente" });
   } catch (error) {
@@ -303,9 +303,9 @@ exports.completeCollection = async (req, res) => {
   }
 };
 
-// 6. Obtener Historial (Filtrado por Recolectora)
+// 6. Obtener Historial (Filtrado por Picker)
 exports.getHistory = async (req, res) => {
-  const { id_recolectora } = req.query;
+  const { id_picker } = req.query;
 
   try {
     let query = supabase
@@ -315,8 +315,8 @@ exports.getHistory = async (req, res) => {
       .order("fecha_fin", { ascending: false });
 
     // Si hay ID, filtramos por esa persona. Si no, traemos los últimos 50 generales.
-    if (id_recolectora) {
-      query = query.eq("id_recolectora", id_recolectora);
+    if (id_picker) {
+      query = query.eq("id_picker", id_picker);
     } else {
       query = query.limit(50);
     }
@@ -364,19 +364,19 @@ exports.getHistory = async (req, res) => {
 
 // 7. Cancelar/Liberar Asignación (Admin)
 exports.cancelAssignment = async (req, res) => {
-  const { id_recolectora } = req.body;
+  const { id_picker } = req.body;
 
   try {
-    // 1. Obtener la recolectora para saber qué pedido tenía
-    const { data: recolectora, error: recError } = await supabase
-      .from("wc_recolectoras")
+    // 1. Obtener la picker para saber qué pedido tenía
+    const { data: picker, error: recError } = await supabase
+      .from("wc_pickers")
       .select("id_pedido_actual")
-      .eq("id", id_recolectora)
+      .eq("id", id_picker)
       .single();
 
     if (recError) throw recError;
 
-    const id_pedido = recolectora.id_pedido_actual;
+    const id_pedido = picker.id_pedido_actual;
 
     if (id_pedido) {
       // 2. Marcar asignación como 'cancelado'
@@ -390,18 +390,16 @@ exports.cancelAssignment = async (req, res) => {
         .eq("estado_asignacion", "en_proceso");
     }
 
-    // 3. Liberar recolectora
+    // 3. Liberar picker
     await supabase
-      .from("wc_recolectoras")
+      .from("wc_pickers")
       .update({
-        estado_recolectora: "disponible",
+        estado_picker: "disponible",
         id_pedido_actual: null,
       })
-      .eq("id", id_recolectora);
+      .eq("id", id_picker);
 
-    res
-      .status(200)
-      .json({ message: "Asignación cancelada y recolectora liberada" });
+    res.status(200).json({ message: "Asignación cancelada y picker liberada" });
   } catch (error) {
     console.error("Error cancelando asignación:", error);
     res.status(500).json({ error: error.message });
