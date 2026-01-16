@@ -16,8 +16,9 @@ import "./AnaliticaPickers.css";
 const AnaliticaPickers = () => {
   const [activeTab, setActiveTab] = useState("dashboard"); // dashboard | logs
   const [performanceData, setPerformanceData] = useState([]);
+  const [globalStats, setGlobalStats] = useState(null);
+  const [hourlyData, setHourlyData] = useState([]);
   const [heatmapData, setHeatmapData] = useState([]);
-  const [aisleData, setAisleData] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -34,15 +35,23 @@ const AnaliticaPickers = () => {
         axios.get(`${BASE_URL}/analytics/audit`),
       ]);
 
-      setPerformanceData(perfRes.data);
-      // Soporte para estructura nueva { products, aisles } o antigua [products]
+      // Nueva Respuesta de Performance: { pickers, hourlyActivity, globalStats }
+      if (perfRes.data.pickers) {
+          setPerformanceData(perfRes.data.pickers);
+          setHourlyData(perfRes.data.hourlyActivity || []);
+          setGlobalStats(perfRes.data.globalStats || null);
+      } else {
+          // Fallback por si la API no se ha desplegado aun
+          setPerformanceData(Array.isArray(perfRes.data) ? perfRes.data : []);
+      }
+
+      // Respuesta Heatmap limpia
       if (heatRes.data.products) {
           setHeatmapData(heatRes.data.products);
-          setAisleData(heatRes.data.aisles || []);
       } else {
-          setHeatmapData(heatRes.data);
-          setAisleData([]);
+          setHeatmapData([]);
       }
+      
       setAuditLogs(auditRes.data);
     } catch (error) {
       console.error("Error fetching analytics:", error);
@@ -99,10 +108,92 @@ const AnaliticaPickers = () => {
         </div>
       ) : activeTab === "dashboard" ? (
         <div className="dashboard-grid">
-          {/* CARD 1: RENDIMIENTO PICKERS */}
-          <div className="card-analitica">
+          {/* SECCIÓN 1: KPIS GLOBALES */}
+          {globalStats && (
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 20, marginBottom: 10 }}>
+                <div className="card-analitica" style={{ flex: 1, padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                        <div style={{ fontSize: '0.9rem', color: '#7f8c8d' }}>Pedidos Totales</div>
+                        <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#2c3e50' }}>{globalStats.total_pedidos}</div>
+                    </div>
+                    <FaShoppingBasket size={32} color="#3498db" opacity={0.2} />
+                </div>
+                <div className="card-analitica" style={{ flex: 1, padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                        <div style={{ fontSize: '0.9rem', color: '#7f8c8d' }}>Eficiencia Global (SPI)</div>
+                        <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#2d3748' }}>{globalStats.spi_promedio}s</div>
+                    </div>
+                    <FaClock size={32} color="#f1c40f" opacity={0.3} />
+                </div>
+                <div className="card-analitica" style={{ flex: 1, padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                        <div style={{ fontSize: '0.9rem', color: '#7f8c8d' }}>Tasa de Éxito Global</div>
+                        <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: globalStats.tasa_exito_global > 95 ? '#27ae60' : '#e67e22' }}>
+                            {globalStats.tasa_exito_global}%
+                        </div>
+                    </div>
+                    <FaChartLine size={32} color="#27ae60" opacity={0.2} />
+                </div>
+            </div>
+          )}
+
+          {/* SECCIÓN 2: GRÁFICAS */}
+          <div className="card-analitica" style={{ gridColumn: "span 1" }}>
+              <div className="card-title">
+                  <span>📊 Ritmo de Trabajo (Pedidos/Hora)</span>
+              </div>
+              <div style={{ height: 180, display: 'flex', alignItems: 'flex-end', gap: 4, paddingTop: 20 }}>
+                  {hourlyData.map((d, i) => {
+                      const max = Math.max(...hourlyData.map(h => h.pedidos), 1);
+                      const height = (d.pedidos / max) * 100;
+                      return (
+                          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+                              <div style={{ 
+                                  width: '100%', 
+                                  height: `${height}%`, 
+                                  background: height > 0 ? '#3498db' : 'transparent',
+                                  borderRadius: '4px 4px 0 0',
+                                  minHeight: height > 0 ? 4 : 0,
+                                  transition: 'height 0.3s ease'
+                              }}></div>
+                              {i % 3 === 0 && <span style={{ fontSize: '0.6rem', color: '#95a5a6' }}>{d.hour}</span>}
+                          </div>
+                      )
+                  })}
+              </div>
+          </div>
+
+          <div className="card-analitica" style={{ gridColumn: "span 1" }}>
+              <div className="card-title">
+                  <span>🚀 Comparativa Velocidad (SPI - Menor es Mejor)</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 15 }}>
+                  {performanceData.slice(0, 5).map(p => (
+                      <div key={p.id}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 4 }}>
+                              <span style={{ fontWeight: 600 }}>{p.nombre}</span>
+                              <span style={{ fontWeight: 'bold', color: '#2c3e50' }}>{p.segundos_por_item} seg/item</span>
+                          </div>
+                          <div style={{ width: '100%', background: '#eee', height: 8, borderRadius: 4 }}>
+                               {/* Barra Invertida visualmente: Mas corto es mejor, pero queremos llenar la barra si es rapido. 
+                                  Digamos que 120s es "lento" (0%) y 30s es "rapido" (100%). */}
+                              <div style={{ 
+                                  width: `${Math.min(100, Math.max(10, (150 - p.segundos_por_item) / 1.5))}%`, 
+                                  background: p.segundos_por_item < 60 ? '#2ecc71' : p.segundos_por_item < 100 ? '#f1c40f' : '#e74c3c',
+                                  height: '100%',
+                                  borderRadius: 4,
+                                  transition: 'width 0.5s ease'
+                              }}></div>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+          </div>
+
+          {/* CARD 3: TABLA DETALLADA (Original mejorada) */}
+          <div className="card-analitica" style={{ gridColumn: '1 / -1' }}>
             <div className="card-title">
-              <span>🏆 Rendimiento y Calidad de Picking</span>
+              <span>🏆 Rendimiento Detallado por Picker</span>
               <FaTrophy color="#f1c40f" />
             </div>
             <table className="rank-table">
@@ -122,7 +213,7 @@ const AnaliticaPickers = () => {
                     <td>
                       <div style={{ fontWeight: 600 }}>{p.nombre}</div>
                       <div style={{ fontSize: "0.75rem", color: "#7f8c8d" }}>
-                        {p.total_pedidos} pedidos • {p.motivo_comun_fallo !== 'N/A' ? `Falla: ${p.motivo_comun_fallo}` : 'Sin fallos'}
+                        {p.total_pedidos} pedidos • {p.motivo_comun_fallo !== 'N/A' ? `Falla freq: ${p.motivo_comun_fallo}` : 'Sin fallos'}
                       </div>
                     </td>
                     <td>
@@ -189,25 +280,21 @@ const AnaliticaPickers = () => {
             </table>
           </div>
 
-          {/* CARD 2: PRODUCTOS MÁS RETIRADOS (OJO DE HALCÓN) */}
-          <div className="card-analitica">
+          {/* CARD 4: PRODUCTOS MÁS RETIRADOS (OJO DE HALCÓN) - MODIFICADO para ocupar fila completa */}
+          <div className="card-analitica" style={{ gridColumn: '1 / -1' }}>
             <div className="card-title">
-              <span>⚠️ Productos No Encontrados / Agotados</span>
+              <span>⚠️ Productos Problemáticos (No Encontrados / Agotados)</span>
               <FaExclamationTriangle color="#e74c3c" />
             </div>
 
-            <div
-              className="heatmap-list"
-              style={{ display: "flex", flexDirection: "column", gap: 10 }}
-            >
+            <div style={{ display: "grid", gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 15 }}>
               {heatmapData
                 .filter((p) => p.total_removed > 0)
-                .sort((a, b) => b.total_removed - a.total_removed)
-                .slice(0, 5)
+                .slice(0, 8)
                 .map((p, idx) => (
                   <div
                     key={idx}
-                    style={{ borderBottom: "1px solid #eee", paddingBottom: 8 }}
+                    style={{ border: "1px solid #eee", padding: 12, borderRadius: 8, background: '#fff' }}
                   >
                     <div
                       style={{
@@ -217,245 +304,20 @@ const AnaliticaPickers = () => {
                         marginBottom: 4,
                       }}
                     >
-                      <strong>{p.name}</strong>
+                      <strong style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }} title={p.name}>{p.name}</strong>
                       <span style={{ color: "#e74c3c", fontWeight: "bold" }}>
-                        {p.total_removed} Reportes
+                        {p.total_removed} Rep.
                       </span>
                     </div>
-                    <div style={{ fontSize: "0.8rem", color: "#7f8c8d" }}>
-                      Motivo principal:{" "}
-                      {Object.entries(p.motivos).sort(
-                        (a, b) => b[1] - a[1]
-                      )[0]?.[0] || "N/A"}
-                    </div>
-                    <div className="progress-bar-bg">
-                      <div
-                        className="progress-bar-fill"
-                        style={{
-                          width: `${
-                            (p.total_removed / p.total_interacciones) * 100
-                          }%`,
-                          background: "#e74c3c",
-                        }}
-                      ></div>
+                    <div style={{ fontSize: "0.75rem", color: "#7f8c8d", marginTop: 4 }}>
+                      Motivo: {Object.entries(p.motivos).sort((a, b) => b[1] - a[1])[0]?.[0]}
                     </div>
                   </div>
                 ))}
-              {heatmapData.length === 0 && (
-                <div>Todo perfecto en inventario</div>
+            </div>
+             {heatmapData.length === 0 && (
+                <div style={{padding: 20, textAlign: 'center', color: '#aaa'}}>Todo perfecto en inventario</div>
               )}
-            </div>
-          </div>
-
-          {/* CARD 3: MAPA DE CALOR DE PASILLOS (VISUAL) */}
-          <div className="card-analitica" style={{ gridColumn: "span 2" }}>
-            <div className="card-title">
-              <span>🗺️ Mapa de Calor del Almacén (Pasillos)</span>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 15,
-                  fontSize: "0.75rem",
-                  fontWeight: "normal",
-                  color: "#64748b",
-                }}
-              >
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div
-                    style={{
-                      width: 10,
-                      height: 10,
-                      background: "#e0f2fe",
-                      borderRadius: 2,
-                    }}
-                  ></div>{" "}
-                  Tráfico Bajo
-                </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div
-                    style={{
-                      width: 10,
-                      height: 10,
-                      background: "#0284c7",
-                      borderRadius: 2,
-                    }}
-                  ></div>{" "}
-                  Tráfico Intenso
-                </span>
-                <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <div
-                    style={{
-                      width: 10,
-                      height: 10,
-                      border: "2px solid #ef4444",
-                      background: "#fef2f2",
-                      borderRadius: 2,
-                    }}
-                  ></div>{" "}
-                  Alta Tasa de Reportes
-                </span>
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
-                gap: 12,
-                marginTop: 10,
-              }}
-            >
-              {aisleData.length > 0 ? (
-                aisleData.map((aisle) => {
-                  // Calcular intensidad del calor (0 a 1)
-                  const maxInteractions = Math.max(
-                    ...aisleData.map((a) => a.total_interacciones)
-                  );
-                  const intensity =
-                    aisle.total_interacciones / (maxInteractions || 1);
-
-                  // Estilos dinámicos
-                  const hasIssues =
-                    aisle.total_fallos > 0 &&
-                    aisle.total_fallos / aisle.total_interacciones > 0.05; // >5% error
-
-                  return (
-                    <div
-                      key={aisle.pasillo}
-                      style={{
-                        position: "relative",
-                        background: hasIssues
-                          ? "#fff5f5"
-                          : `rgba(2, 132, 199, ${0.1 + intensity * 0.9})`,
-                        color:
-                          !hasIssues && intensity > 0.6 ? "white" : "#1e293b",
-                        border: hasIssues
-                          ? "2px solid #fc8181"
-                          : "1px solid transparent",
-                        padding: "12px 8px",
-                        borderRadius: 8,
-                        textAlign: "center",
-                        transition: "all 0.2s ease",
-                        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-                      }}
-                    >
-                      {hasIssues && (
-                        <FaExclamationTriangle
-                          style={{
-                            position: "absolute",
-                            top: 6,
-                            right: 6,
-                            color: "#c53030",
-                            fontSize: "0.7rem",
-                          }}
-                        />
-                      )}
-                      
-                      <div
-                        style={{
-                          fontSize: "0.7rem",
-                          textTransform: "uppercase",
-                          opacity: 0.8,
-                          marginBottom: 2,
-                        }}
-                      >
-                        Pasillo
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "1.4rem",
-                          fontWeight: 800,
-                          lineHeight: 1,
-                        }}
-                      >
-                        {aisle.pasillo === "Otros" ? "Gral" : aisle.pasillo}
-                      </div>
-                      <div
-                        style={{
-                          marginTop: 6,
-                          fontSize: "0.7rem",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {aisle.total_interacciones} movs
-                      </div>
-                      {aisle.total_fallos > 0 && (
-                        <div
-                          style={{
-                            fontSize: "0.65rem",
-                            color: hasIssues
-                              ? "#c53030"
-                              : !hasIssues && intensity > 0.6
-                              ? "#e2e8f0"
-                              : "#718096",
-                          }}
-                        >
-                          ({aisle.total_fallos} reportes)
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <div
-                  style={{
-                    gridColumn: "1/-1",
-                    padding: 20,
-                    textAlign: "center",
-                    color: "#94a3b8",
-                  }}
-                >
-                  No se pudo generar el mapa de pasillos. Faltan datos de
-                  recolección.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* CARD 4: TOP PRODUCTOS */}
-          <div className="card-analitica" style={{ gridColumn: "span 2" }}>
-            <div className="card-title">
-              <span>🔥 Nube de Productos (Top Movimientos)</span>
-              <FaChartLine color="#3498db" />
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              {heatmapData.slice(0, 20).map((p, idx) => {
-                // Top 20
-                // Tamaño basado en popularidad relativa
-                const maxPicks = Math.max(
-                  ...heatmapData.map((h) => h.total_interacciones)
-                );
-                const scale = p.total_interacciones / maxPicks;
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      padding: "8px 12px",
-                      background: `rgba(52, 152, 219, ${0.1 + scale * 0.9})`, // Opacidad dinamica
-                      color: scale > 0.5 ? "white" : "#2c3e50",
-                      borderRadius: 8,
-                      fontSize: "0.85rem",
-                      fontWeight: 600,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                    }}
-                  >
-                    {p.name}
-                    <span
-                      style={{
-                        background: "rgba(0,0,0,0.2)",
-                        padding: "0 4px",
-                        borderRadius: 4,
-                        fontSize: "0.7rem",
-                      }}
-                    >
-                      {p.total_interacciones}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         </div>
       ) : (

@@ -72,15 +72,47 @@ exports.getCollectorPerformance = async (req, res) => {
       }
     });
 
-    // Calcular Métricas Derivadas KPI (Key Performance Indicators)
-    const result = Object.values(stats)
+    // 4. Calcular Métricas por Hora (Ritmo Circadiano - Global)
+    // Usamos fecha_inicio de las asignaciones para ver "cuadros de carga"
+    const hourlyStats = Array(24).fill(0);
+    asignaciones.forEach(a => {
+       if (a.fecha_inicio) {
+          // Asumimos que la fecha viene en UTC o local con offset, getHours() dependerá de la config del servidor
+          // Para mayor precisión en producción, usaríamos librerías como dayjs con timezone
+          const date = new Date(a.fecha_inicio);
+          // Ajuste simple: Restar 5 horas para Colombia/Latam si el server está en UTC, o usar directo si ya viene local
+          // Por simplicidad, usaremos la hora del string ISO
+          const hour = date.getHours(); 
+          if(hour >= 0 && hour < 24) hourlyStats[hour]++;
+       }
+    });
+    
+    // Formatear para gráfica
+    const hourlyActivity = hourlyStats.map((count, hour) => ({
+        hour: `${hour}:00`,
+        pedidos: count
+    }));
+
+    // 5. Calcular Métricas Globales
+    const total_pedidos_global = asignaciones.length;
+    const total_items_global = Object.values(stats).reduce((acc, curr) => acc + curr.total_items_recolectados + curr.total_items_reportados, 0);
+    const tiempo_total_global = Object.values(stats).reduce((acc, curr) => acc + curr.tiempo_total_acumulado, 0);
+    
+    const globalStats = {
+        total_pedidos: total_pedidos_global,
+        spi_promedio: total_items_global > 0 ? Math.round(tiempo_total_global / total_items_global) : 0,
+        tasa_exito_global: total_items_global > 0 
+           ? Math.round((Object.values(stats).reduce((acc, c) => acc + c.total_items_recolectados, 0) / total_items_global) * 100) 
+           : 0
+    };
+
+    // Calcular Métricas Derivadas KPI (Key Performance Indicators) por Picker
+    const resultPickers = Object.values(stats)
       .map((s) => {
         const minutos_totales = s.tiempo_total_acumulado / 60 || 1;
         const total_acciones = s.total_items_recolectados + s.total_items_reportados;
         
-        // Segundos por Item (SPI) - Métrica Dorada en Logística
-        // Cuantos segundos le toma procesar 1 item (buscar + escanear)
-        // Se usa total_acciones porque tanto encontrar como no encontrar toma tiempo
+        // Segundos por Item (SPI)
         const segundos_por_item = total_acciones > 0 
             ? Math.round(s.tiempo_total_acumulado / total_acciones) 
             : 0;
@@ -98,7 +130,7 @@ exports.getCollectorPerformance = async (req, res) => {
           ...s,
           promedio_minutos_pedido: Math.round(minutos_totales / s.total_pedidos),
           segundos_por_item: segundos_por_item, 
-          velocidad_picking: parseFloat((s.total_items_recolectados / minutos_totales).toFixed(2)), // Items/min (Legacy pero útil)
+          velocidad_picking: parseFloat((s.total_items_recolectados / minutos_totales).toFixed(2)),
           tasa_precision: total_acciones > 0 
             ? Math.round((s.total_items_recolectados / total_acciones) * 100) 
             : 0,
@@ -106,76 +138,58 @@ exports.getCollectorPerformance = async (req, res) => {
           motivo_comun_fallo: topMotivo ? `${topMotivo[0]} (${topMotivo[1]})` : 'N/A'
         };
       })
-      .sort((a, b) => b.tasa_pedido_perfecto - a.tasa_pedido_perfecto); // Ordenamos por Calidad (Pedidos Perfectos)
+      .sort((a, b) => b.tasa_pedido_perfecto - a.tasa_pedido_perfecto);
 
-    res.status(200).json(result);
+    // DEVOLVEMOS OBJETO COMPUESTO, NO SOLO ARRAY
+    res.status(200).json({
+        pickers: resultPickers,
+        hourlyActivity,
+        globalStats
+    });
+
   } catch (error) {
     console.error("Error en getCollectorPerformance:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
-// 2. Mapa de Calor de Productos y Pasillos
+// 2. Auditoría de Productos (Top Fallos y Problemas)
 exports.getProductHeatmap = async (req, res) => {
   try {
-    // Traemos todo el log (limitado a últimos 5000 registros)
+    // Solo traemos logs de errores/retiros para optimizar
     const { data: logs, error } = await supabase
       .from("wc_log_picking")
       .select("nombre_producto, accion, motivo")
+      .in("accion", ["retirado", "no_encontrado"])
       .order("fecha_registro", { ascending: false })
-      .limit(5000);
+      .limit(2000);
 
     if (error) throw error;
 
     const productMap = {};
-    const aisleMap = {};
 
     logs.forEach((log) => {
       const name = log.nombre_producto || "Desconocido";
       
-      // 1. Agregación por Producto
       if (!productMap[name]) {
         productMap[name] = { 
           name, 
-          total_interacciones: 0, 
           total_removed: 0, 
           motivos: {} 
         };
       }
-      productMap[name].total_interacciones += 1;
       
-      if (log.accion === "retirado") {
-        productMap[name].total_removed += 1;
-        const reason = log.motivo || "Sin motivo";
-        productMap[name].motivos[reason] = (productMap[name].motivos[reason] || 0) + 1;
-      }
-
-      // 2. Agregación por Pasillos (Nueva lógica usando mapeadorPasillos)
-      // obtenerInfoPasillo retorna { pasillo: "6", prioridad: 5 }
-      const { pasillo } = obtenerInfoPasillo([], name); 
-      
-      // Si el nombre es null o undefined, pasillo será undefined, pero obtenerInfoPasillo maneja defaults
-      const pasilloKey = pasillo || "Otros";
-
-      if (!aisleMap[pasilloKey]) {
-        aisleMap[pasilloKey] = { 
-          pasillo: pasilloKey, 
-          total_interacciones: 0, 
-          total_fallos: 0 
-        };
-      }
-      aisleMap[pasilloKey].total_interacciones += 1;
-      if (log.accion === "retirado") {
-        aisleMap[pasilloKey].total_fallos += 1;
-      }
+      productMap[name].total_removed += 1;
+      const reason = log.motivo || "Sin motivo";
+      productMap[name].motivos[reason] = (productMap[name].motivos[reason] || 0) + 1;
     });
 
-    const products = Object.values(productMap).sort((a, b) => b.total_interacciones - a.total_interacciones);
-    
-    // Ordenar pasillos alfabéticamente
-    const aisles = Object.values(aisleMap).sort((a, b) => a.pasillo.localeCompare(b.pasillo));
+    // Convertir a array y ordenar por num de problemas
+    const products = Object.values(productMap)
+        .sort((a, b) => b.total_removed - a.total_removed)
+        .slice(0, 50); // Top 50 problemas
 
-    res.status(200).json({ products, aisles });
+    res.status(200).json({ products }); // Eliminamos aisles
 
   } catch (error) {
     console.error("Error en getProductHeatmap:", error);
