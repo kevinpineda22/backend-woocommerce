@@ -184,7 +184,7 @@ exports.updateProgress = async (req, res) => {
         nombre_producto: item.name,
         accion: "recolectado",
         fecha_registro: now,
-        pasillo: null, // Opcional si el front lo enviara
+        pasillo: item.pasillo,
       });
     });
 
@@ -198,6 +198,7 @@ exports.updateProgress = async (req, res) => {
         accion: "retirado",
         motivo: item.reason,
         fecha_registro: now,
+        pasillo: item.pasillo,
       });
     });
 

@@ -404,8 +404,19 @@ const VistaPicker = () => {
 
         currentOrder.line_items.forEach((item) => {
           const s = pickedItems[item.id];
-          if (s === "picked") completed.push({ id: item.id });
-          else if (s === "removed") removed.push({ id: item.id });
+          if (s === "picked")
+            completed.push({
+              id: item.id,
+              name: item.name,
+              pasillo: item.pasillo,
+            });
+          else if (s === "removed")
+            removed.push({
+              id: item.id,
+              name: item.name,
+              pasillo: item.pasillo,
+              reason: removedReasons[item.id],
+            });
           else pending.push({ id: item.id });
         });
 
