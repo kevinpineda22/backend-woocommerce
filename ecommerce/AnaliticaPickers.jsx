@@ -10,6 +10,10 @@ import {
   FaShoppingBasket,
   FaExclamationTriangle,
   FaSync,
+  FaArrowUp,
+  FaArrowDown,
+  FaStopwatch,
+  FaTimesCircle
 } from "react-icons/fa";
 import "./AnaliticaPickers.css";
 
@@ -17,10 +21,12 @@ const AnaliticaPickers = () => {
   const [activeTab, setActiveTab] = useState("dashboard"); // dashboard | logs
   const [performanceData, setPerformanceData] = useState([]);
   const [globalStats, setGlobalStats] = useState(null);
+  const [histogramData, setHistogramData] = useState(null); // New
   const [hourlyData, setHourlyData] = useState([]);
   const [heatmapData, setHeatmapData] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPicker, setSelectedPicker] = useState(null); // New
 
   // Carga inicial
   const fetchData = async () => {
@@ -35,11 +41,26 @@ const AnaliticaPickers = () => {
         axios.get(`${BASE_URL}/analytics/audit`),
       ]);
 
-      // Nueva Respuesta de Performance: { pickers, hourlyActivity, globalStats }
+      // Nueva Respuesta de Performance: { pickers, histogram, globalStats }
       if (perfRes.data.pickers) {
           setPerformanceData(perfRes.data.pickers);
+          setHistogramData(perfRes.data.histogram);
           setHourlyData(perfRes.data.hourlyActivity || []);
-          setGlobalStats(perfRes.data.globalStats || null);
+          
+          // Calcular Globals en Frontend
+          const pickers = perfRes.data.pickers;
+          // Validación: si el backend no devolvió stats (versión vieja cacheada), evitar crash
+          const avgPPH = Math.round(pickers.reduce((acc, p) => acc + (p.stats?.pph || 0), 0) / (pickers.length || 1));
+          const avgPerfect = Math.round(pickers.reduce((acc, p) => acc + (p.stats?.perfect_order_rate || 0), 0) / (pickers.length || 1));
+          const totalIdle = pickers.reduce((acc, p) => acc + (p.stats?.idle_minutes || 0), 0);
+
+          setGlobalStats({
+              avg_pph: avgPPH,
+              tasa_exito_global: avgPerfect,
+              total_idle: totalIdle,
+              // Compatibilidad para visualización
+              spi_promedio: pickers.reduce((acc, p) => acc + (p.stats?.spi || 0), 0) / (pickers.length || 1)
+          });
       } else {
           // Fallback por si la API no se ha desplegado aun
           setPerformanceData(Array.isArray(perfRes.data) ? perfRes.data : []);
@@ -62,6 +83,25 @@ const AnaliticaPickers = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Compute Sparkline-ish Trend Arrow
+  const renderTrend = (val) => {
+      if(val === undefined || val === null) return <span style={{color: '#95a5a6'}}>-</span>;
+      const color = val > 0 ? '#27ae60' : val < 0 ? '#c0392b' : '#7f8c8d';
+      const Icon = val > 0 ? FaArrowUp : val < 0 ? FaArrowDown : FaChartLine;
+      return (
+          <div style={{display: 'flex', alignItems: 'center', gap: 4, color: color, fontSize: '0.75rem', fontWeight: 600}}>
+              <Icon size={10} />
+              {Math.abs(val)}%
+          </div>
+      )
+  };
+
+  // Badge Logic
+  const getBadgeColor = (val) => {
+      if (val < 95) return 'alert-badge-red';
+      return 'alert-badge-green';
+  };
 
   return (
     <div className="analitica-container">
@@ -110,69 +150,80 @@ const AnaliticaPickers = () => {
         <div className="dashboard-grid">
           {/* SECCIÓN 1: KPIS GLOBALES */}
           {globalStats && (
-            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 20, marginBottom: 10 }}>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 15, marginBottom: 10 }}>
                 <div className="card-analitica" style={{ flex: 1, padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                        <div style={{ fontSize: '0.9rem', color: '#7f8c8d' }}>Pedidos Totales</div>
-                        <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#2c3e50' }}>{globalStats.total_pedidos}</div>
+                        <div style={{ fontSize: '0.9rem', color: '#7f8c8d', textTransform: 'uppercase' }}>Promedio PPH</div>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: '#2c3e50' }}>{globalStats.avg_pph || 0} <span style={{fontSize: '1rem', color:'#bdc3c7'}}>picks/h</span></div>
                     </div>
-                    <FaShoppingBasket size={32} color="#3498db" opacity={0.2} />
+                    <FaStopwatch size={28} color="#3498db" opacity={0.3} />
                 </div>
                 <div className="card-analitica" style={{ flex: 1, padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                        <div style={{ fontSize: '0.9rem', color: '#7f8c8d' }}>Eficiencia Global (SPI)</div>
-                        <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: '#2d3748' }}>{globalStats.spi_promedio}s</div>
-                    </div>
-                    <FaClock size={32} color="#f1c40f" opacity={0.3} />
-                </div>
-                <div className="card-analitica" style={{ flex: 1, padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                        <div style={{ fontSize: '0.9rem', color: '#7f8c8d' }}>Tasa de Éxito Global</div>
-                        <div style={{ fontSize: '1.8rem', fontWeight: 'bold', color: globalStats.tasa_exito_global > 95 ? '#27ae60' : '#e67e22' }}>
+                        <div style={{ fontSize: '0.9rem', color: '#7f8c8d', textTransform: 'uppercase' }}>Tasa Pedido Perfecto</div>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: globalStats.tasa_exito_global > 90 ? '#27ae60' : '#e67e22' }}>
                             {globalStats.tasa_exito_global}%
                         </div>
                     </div>
-                    <FaChartLine size={32} color="#27ae60" opacity={0.2} />
+                    <FaTrophy size={28} color="#f1c40f" opacity={0.3} />
+                </div>
+                <div className="card-analitica" style={{ flex: 1, padding: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                        <div style={{ fontSize: '0.9rem', color: '#7f8c8d', textTransform: 'uppercase' }}>Tiempo Ocioso Hoy</div>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: '#e74c3c' }}>{globalStats.total_idle} <span style={{fontSize: '1rem'}}>min</span></div>
+                    </div>
+                    <FaExclamationTriangle size={28} color="#e74c3c" opacity={0.3} />
                 </div>
             </div>
           )}
 
           {/* SECCIÓN 2: GRÁFICAS */}
+          {/* HISTOGRAMA DE TIEMPOS */}
           <div className="card-analitica" style={{ gridColumn: "span 1" }}>
-              <div className="card-title">
-                  <span>📊 Ritmo de Trabajo (Pedidos/Hora)</span>
-              </div>
-              <div style={{ height: 180, display: 'flex', alignItems: 'flex-end', gap: 4, paddingTop: 20 }}>
-                  {hourlyData.map((d, i) => {
-                      const max = Math.max(...hourlyData.map(h => h.pedidos), 1);
-                      const height = (d.pedidos / max) * 100;
-                      return (
-                          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                              <div style={{ 
-                                  width: '100%', 
-                                  height: `${height}%`, 
-                                  background: height > 0 ? '#3498db' : 'transparent',
-                                  borderRadius: '4px 4px 0 0',
-                                  minHeight: height > 0 ? 4 : 0,
-                                  transition: 'height 0.3s ease'
-                              }}></div>
-                              {i % 3 === 0 && <span style={{ fontSize: '0.6rem', color: '#95a5a6' }}>{d.hour}</span>}
-                          </div>
-                      )
-                  })}
-              </div>
+              <div className="card-title"><span>⏱️ Distribución de Tiempos de Pick</span></div>
+              {histogramData && histogramData.buckets ? (
+                  <div style={{height: 180, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', paddingTop: 20}}>
+                      {Object.keys(histogramData.buckets).map((key) => {
+                          const val = histogramData.buckets[key];
+                          const max = Math.max(...Object.values(histogramData.buckets)) || 1;
+                          const h = (val / max) * 100;
+                          return (
+                              <div key={key} style={{display:'flex', flexDirection:'column', alignItems:'center', width: '18%'}}>
+                                  <div style={{fontSize:'0.7rem', fontWeight: 'bold', marginBottom: 4}}>{val}</div>
+                                  <div style={{
+                                      width: '100%', 
+                                      height: `${h}%`, 
+                                      background: key.includes('120') ? '#e74c3c' : '#3498db',
+                                      minHeight: 4,
+                                      borderRadius: '4px 4px 0 0'
+                                  }}></div>
+                                  <div style={{fontSize:'0.6rem', marginTop: 4, color: '#7f8c8d'}}>{key}</div>
+                              </div>
+                          )
+                      })}
+                  </div>
+              ) : (
+                  <div style={{padding:20, color:'#bdc3c7'}}>Sin datos suficientes</div>
+              )}
+              {histogramData && (
+                <div style={{marginTop: 15, fontSize: '0.75rem', color: '#7f8c8d', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #eee', paddingTop: 8}}>
+                    <span>P50: <b>{histogramData.percentiles.p50}s</b></span>
+                    <span>P75: <b>{histogramData.percentiles.p75}s</b></span>
+                    <span>P90: <b>{histogramData.percentiles.p90}s</b></span>
+                </div>
+              )}
           </div>
 
           <div className="card-analitica" style={{ gridColumn: "span 1" }}>
               <div className="card-title">
-                  <span>🚀 Comparativa Velocidad (SPI - Menor es Mejor)</span>
+                  <span>🚀 Velocidad (Tiempo por ítem)</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 15 }}>
                   {performanceData.slice(0, 5).map(p => (
                       <div key={p.id}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 4 }}>
                               <span style={{ fontWeight: 600 }}>{p.nombre}</span>
-                              <span style={{ fontWeight: 'bold', color: '#2c3e50' }}>{p.segundos_por_item} seg/item</span>
+                              <span style={{ fontWeight: 'bold', color: '#2c3e50' }}>{p.segundos_por_item > 60 ? `${(p.segundos_por_item/60).toFixed(1)}m` : `${p.segundos_por_item}s`} / item</span>
                           </div>
                           <div style={{ width: '100%', background: '#eee', height: 8, borderRadius: 4 }}>
                                {/* Barra Invertida visualmente: Mas corto es mejor, pero queremos llenar la barra si es rapido. 
@@ -190,94 +241,68 @@ const AnaliticaPickers = () => {
               </div>
           </div>
 
-          {/* CARD 3: TABLA DETALLADA (Original mejorada) */}
+          {/* LISTADO PICKERS CON DRILLDOWN */}
           <div className="card-analitica" style={{ gridColumn: '1 / -1' }}>
-            <div className="card-title">
-              <span>🏆 Rendimiento Detallado por Picker</span>
-              <FaTrophy color="#f1c40f" />
-            </div>
-            <table className="rank-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Nombre</th>
-                  <th>Eficiencia (SPI)</th>
-                  <th>Precisión Global</th>
-                  <th>Pedidos Perfectos</th>
-                </tr>
-              </thead>
-              <tbody>
-                {performanceData.map((p, idx) => (
-                  <tr key={p.id}>
-                    <td className="rank-number">{idx + 1}</td>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{p.nombre}</div>
-                      <div style={{ fontSize: "0.75rem", color: "#7f8c8d" }}>
-                        {p.total_pedidos} pedidos • {p.motivo_comun_fallo !== 'N/A' ? `Falla freq: ${p.motivo_comun_fallo}` : 'Sin fallos'}
-                      </div>
-                    </td>
-                    <td>
-                        <div style={{ fontWeight: "bold", color: "#2d3748" }}>{p.segundos_por_item}s</div>
-                        <div style={{ fontSize: "0.7rem", color: "#7f8c8d" }}>por item</div>
-                    </td>
-                    <td>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 24,
-                            height: 4,
-                            background: "#edf2f7",
-                            borderRadius: 2,
-                            flexShrink: 0,
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: `${p.tasa_precision}%`,
-                              height: "100%",
-                              background:
-                                p.tasa_precision >= 98 ? "#48bb78" : "#ed8936",
-                              borderRadius: 2,
-                            }}
-                          ></div>
-                        </div>
-                        <span
-                          style={{
-                            fontSize: "0.85rem",
-                            color:
-                              p.tasa_precision >= 98 ? "#2f855a" : "#c05621",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {p.tasa_precision}%
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                        <div style={{display: 'flex', flexDirection: 'column'}}>
-                            <span style={{fontWeight: 'bold', color: p.tasa_pedido_perfecto > 90 ? '#2f855a' : '#2d3748'}}>
-                                {p.tasa_pedido_perfecto}%
-                            </span>
-                            <span style={{ fontSize: "0.65rem", color: "#a0aec0" }}>
-                                ({p.pedidos_perfectos}/{p.total_pedidos})
-                            </span>
-                        </div>
-                    </td>
-                  </tr>
-                ))}
-                {performanceData.length === 0 && (
-                  <tr>
-                    <td colSpan="5">Sin datos aún</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+             <div className="card-title"><span>👥 Productividad Individual (Haz click para detalle)</span></div>
+             <div className="table-wrapper" style={{overflowX: 'auto'}}>
+                 <table className="rank-table">
+                     <thead>
+                         <tr>
+                             <th>Picker</th>
+                             <th>PPH</th>
+                             <th>SPI (Velocidad)</th>
+                             <th>Idle (Hoy)</th>
+                             <th>Exactitud</th>
+                             <th>Tendencia</th>
+                         </tr>
+                     </thead>
+                     <tbody>
+                        {performanceData.map(p => (
+                            <tr 
+                                key={p.id} 
+                                onClick={() => setSelectedPicker(p)} 
+                                style={{cursor: 'pointer', background: selectedPicker?.id === p.id ? '#f0f9ff' : 'transparent'}}
+                                className="picker-row-interactive"
+                            >
+                                <td>
+                                    <div style={{fontWeight: 600}}>{p.nombre}</div>
+                                    <div style={{fontSize: '0.65rem', color: '#95a5a6'}}>ID: {p.id.split('-')[0]}</div>
+                                </td>
+                                <td>
+                                    <div style={{fontWeight: 'bold', fontSize: '1.1rem'}}>{p.stats?.pph || 0}</div>
+                                </td>
+                                <td>
+                                    {p.stats?.spi || 0}s
+                                </td>
+                                <td>
+                                    <span style={{
+                                        padding: '2px 6px', 
+                                        borderRadius: 4, 
+                                        background: (p.stats?.idle_minutes || 0) > 15 ? '#ffeaa7' : 'transparent',
+                                        color: (p.stats?.idle_minutes || 0) > 15 ? '#d35400' : 'inherit',
+                                        fontWeight: (p.stats?.idle_minutes || 0) > 15 ? 'bold' : 'normal'
+                                    }}>
+                                        {p.stats?.idle_minutes || 0} min
+                                    </span>
+                                </td>
+                                <td>
+                                    {/* Usamos clase directa aqui porque el helper devuelve string de clase */}
+                                    <span style={{
+                                        padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700,
+                                        background: (p.stats?.accuracy || 100) < 95 ? '#ffebee' : '#e8f5e9',
+                                        color: (p.stats?.accuracy || 100) < 95 ? '#e74c3c' : '#2ecc71'
+                                    }}>
+                                        {p.stats?.accuracy || 100}%
+                                    </span>
+                                </td>
+                                <td>
+                                    {renderTrend(p.stats?.trend_pph)}
+                                </td>
+                            </tr>
+                        ))}
+                     </tbody>
+                 </table>
+             </div>
           </div>
 
           {/* CARD 4: PRODUCTOS MÁS RETIRADOS (OJO DE HALCÓN) - MODIFICADO para ocupar fila completa */}
@@ -374,6 +399,84 @@ const AnaliticaPickers = () => {
           </div>
         </div>
       )}
+      {/* MODAL / DRILLDOWN */}
+      {selectedPicker && (
+          <div className="drilldown-modal-backdrop" onClick={() => setSelectedPicker(null)}>
+              <div className="drilldown-modal" onClick={e => e.stopPropagation()}>
+                  <div className="modal-header">
+                      <h2>📋 Detalle: {selectedPicker.nombre}</h2>
+                      <button className="close-btn" onClick={() => setSelectedPicker(null)}>×</button>
+                  </div>
+                  <div className="modal-body">
+                      <div className="detail-section">
+                          <h3>⏳ Tiempos Muertos (>5 min)</h3>
+                          {selectedPicker.drilldown?.gaps?.length > 0 ? (
+                              <div className="tags-container">
+                                  {selectedPicker.drilldown.gaps.map((g, i) => (
+                                      <span key={i} className="gap-tag">
+                                          {g.start} - {g.end} ({g.duration})
+                                      </span>
+                                  ))}
+                              </div>
+                          ) : <p style={{color:'#27ae60', fontSize:'0.9rem'}}>Sin tiempos muertos significativos hoy.</p>}
+                      </div>
+
+                      <div className="detail-section">
+                          <h3>⚠️ Errores Reportados</h3>
+                          {selectedPicker.drilldown?.errors && Object.keys(selectedPicker.drilldown.errors).length > 0 ? (
+                              <ul className="error-list">
+                                  {Object.entries(selectedPicker.drilldown.errors).map(([k, v]) => (
+                                      <li key={k}><b>{k}:</b> {v} veces</li>
+                                  ))}
+                              </ul>
+                          ) : <p style={{color:'#27ae60'}}>100% Precisión hoy.</p>}
+                      </div>
+
+                      <div className="detail-section">
+                          <h3>📜 Últimos 20 Logs</h3>
+                          <div className="logs-mini-table">
+                              {selectedPicker.drilldown?.recent_logs?.map((L, i) => (
+                                  <div key={i} className="log-row">
+                                      <span className="log-time">{L.hora}</span>
+                                      <span className={`log-badge log-${L.accion}`}>{L.accion}</span>
+                                      {L.motivo && <span className="log-reason">{L.motivo}</span>}
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      <style>{`
+          .kpi-card { flex: 1; padding: 20px; display: flex; align-items: center; justify-content: space-between; }
+          .kpi-label { font-size: 0.85rem; color: #7f8c8d; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+          .kpi-value { font-size: 2rem; fontWeight: 700; color: #2c3e50; }
+          .picker-row-interactive:hover { background: #f8f9fa; }
+          
+          .drilldown-modal-backdrop {
+              position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+              background: rgba(0,0,0,0.5); z-index: 1000;
+              display: flex; justify-content: center; align-items: center;
+          }
+          .drilldown-modal {
+              background: white; width: 600px; max-width: 90%; max-height: 85vh;
+              border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+              overflow-y: auto; overflow-x: hidden;
+          }
+          .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+          .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
+          .modal-body { padding: 20px; }
+          
+          .gap-tag { display: inline-block; background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 4px; margin: 0 4px 4px 0; font-size: 0.8rem; border: 1px solid #ffeeba; }
+          
+          .logs-mini-table { display: flex; flexDirection: column; gap: 4px; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border-radius: 8px; }
+          .log-row { display: grid; grid-template-columns: 60px 100px 1fr; font-size: 0.75rem; padding: 4px 0; border-bottom: 1px solid #eee; }
+          .log-badge { text-align: center; border-radius: 3px; font-weight: 600; font-size: 0.7rem; }
+          .log-recolectado { color: #27ae60; background: #e8f5e9; }
+          .log-no_encontrado { color: #e74c3c; background: #ffebee; }
+      `}</style>
     </div>
   );
 };
