@@ -236,7 +236,7 @@ const PedidosAdmin = () => {
 
   const confirmAssignment = async (picker) => {
     if (picker.estado_picker !== "disponible") {
-      alert("Este picker ya está en una misión.");
+      alert("Este picker ya está en un pedido.");
       return;
     }
     setAssigning(true);
@@ -306,7 +306,10 @@ const PedidosAdmin = () => {
             className={`pedidos-layout-sidebar-button ${
               currentView === "pending" ? "active" : ""
             }`}
-            onClick={() => setCurrentView("pending")}
+            onClick={() => {
+              setOrders([]);
+              setCurrentView("pending");
+            }}
           >
             <FaBox /> <span>Por Asignar</span>{" "}
             <span className="pedidos-badge-count">{stats.pending}</span>
@@ -315,7 +318,10 @@ const PedidosAdmin = () => {
             className={`pedidos-layout-sidebar-button ${
               currentView === "process" ? "active" : ""
             }`}
-            onClick={() => setCurrentView("process")}
+            onClick={() => {
+              setOrders([]);
+              setCurrentView("process");
+            }}
           >
             <FaRunning /> <span>En Proceso</span>{" "}
             <span className="pedidos-badge-count-blue">{stats.process}</span>
@@ -324,7 +330,10 @@ const PedidosAdmin = () => {
             className={`pedidos-layout-sidebar-button ${
               currentView === "completed" ? "active" : ""
             }`}
-            onClick={() => setCurrentView("completed")}
+            onClick={() => {
+              setOrders([]);
+              setCurrentView("completed");
+            }}
           >
             <FaHistory /> <span>Historial</span>
           </button>
@@ -665,8 +674,9 @@ const PedidosAdmin = () => {
               {currentView === "completed" || currentView === "process" ? (
                 (() => {
                   const isProcess = currentView === "process";
-                  const report = selectedOrder.reporte_progress ||
-                    selectedOrder.reporte_items ||
+                  // FIX: Priorizar reporte_items (que viene del detalle fresco) sobre reporte_progress (que viene de la lista y puede estar stale)
+                  const report = selectedOrder.reporte_items ||
+                    selectedOrder.reporte_progress ||
                     selectedOrder.reporte_snapshot || {
                       recolectados: [],
                       retirados: [],

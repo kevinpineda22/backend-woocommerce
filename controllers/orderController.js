@@ -133,16 +133,88 @@ exports.assignOrder = async (req, res) => {
   }
 };
 
-// 3.5 Actualizar Progreso (Ping desde el Picker)
+// 3.5 Actualizar Progreso (Ping desde el Picker) + LOGGING EN TIEMPO REAL
 exports.updateProgress = async (req, res) => {
   const { id_pedido, reporte_items } = req.body;
   try {
-    // Solo actualizamos si está en proceso
+    // 1. Obtener estado actual de la asignación
+    const { data: assignment } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("id, reporte_snapshot")
+      .eq("id_pedido", id_pedido)
+      .eq("estado_asignacion", "en_proceso")
+      .maybeSingle();
+
+    if (!assignment) {
+      return res
+        .status(404)
+        .json({ error: "Asignación no encontrada o inactiva" });
+    }
+
+    // 2. Diff Logic: Detectar cambios para LOGS
+    const oldSnapshot = assignment.reporte_snapshot || {
+      recolectados: [],
+      retirados: [],
+    };
+    const newSnapshot = reporte_items || { recolectados: [], retirados: [] };
+    const logsToInsert = [];
+    const now = new Date(); // Timestamp real del evento
+
+    // Helper: Encuentra items en newList que NO están en oldList (por ID)
+    const getNewItems = (oldList, newList) => {
+      const oldIds = new Set((oldList || []).map((i) => i.id));
+      return (newList || []).filter((i) => !oldIds.has(i.id));
+    };
+
+    const newCollected = getNewItems(
+      oldSnapshot.recolectados,
+      newSnapshot.recolectados
+    );
+    const newRemoved = getNewItems(
+      oldSnapshot.retirados,
+      newSnapshot.retirados
+    );
+
+    // Logs Recolectados
+    newCollected.forEach((item) => {
+      logsToInsert.push({
+        id_asignacion: assignment.id,
+        id_pedido: id_pedido,
+        id_producto: item.id,
+        nombre_producto: item.name,
+        accion: "recolectado",
+        fecha_registro: now,
+        pasillo: null, // Opcional si el front lo enviara
+      });
+    });
+
+    // Logs Retirados
+    newRemoved.forEach((item) => {
+      logsToInsert.push({
+        id_asignacion: assignment.id,
+        id_pedido: id_pedido,
+        id_producto: item.id,
+        nombre_producto: item.name,
+        accion: "retirado",
+        motivo: item.reason,
+        fecha_registro: now,
+      });
+    });
+
+    // 3. Insertar Logs Incrementales
+    if (logsToInsert.length > 0) {
+      const { error: logError } = await supabase
+        .from("wc_log_picking")
+        .insert(logsToInsert);
+
+      if (logError) console.error("Error insertando logs realtime:", logError);
+    }
+
+    // 4. Actualizar Snapshot Global
     const { error } = await supabase
       .from("wc_asignaciones_pedidos")
       .update({ reporte_snapshot: reporte_items }) // Guardamos el estado actual
-      .eq("id_pedido", id_pedido)
-      .eq("estado_asignacion", "en_proceso");
+      .eq("id", assignment.id);
 
     if (error) throw error;
     res.status(200).json({ status: "ok" });
@@ -336,24 +408,37 @@ exports.completePicking = async (req, res) => {
     }
 
     // 2. Estrategia de Auditoría: Guardar LOGS individuales para Analítica
-    if (reporte_items) {
+    if (reporte_items && asignacionId) {
+      // [FIX] Evitar duplicados: Consolidar con logs realtime ya insertados
+      const { data: existingLogs } = await supabase
+        .from("wc_log_picking")
+        .select("id_producto, accion")
+        .eq("id_asignacion", asignacionId);
+
+      const loggedSet = new Set(
+        (existingLogs || []).map((l) => `${l.id_producto}-${l.accion}`)
+      );
+
       const logsToInsert = [];
 
       // Helper para procesar listas
       const procesarLista = (lista, accion) => {
         if (!lista) return;
         lista.forEach((item) => {
-          logsToInsert.push({
-            id_asignacion: asignacionId, // Vinculación FK
-            id_pedido: id_pedido,
-            id_producto: item.id,
-            nombre_producto: item.name,
-            accion: accion,
-            motivo: item.reason || null, // <--- GUARDAMOS EL MOTIVO
-            pasillo: item.pasillo || null, // [NEW] Para tracking de ruta
-            fecha_registro: new Date(),
-            device_timestamp: item.device_timestamp || null, // [NEW]
-          });
+          // Solo insertar si NO existe ya en el log (priorizando fecha real del realtime)
+          if (!loggedSet.has(`${item.id}-${accion}`)) {
+            logsToInsert.push({
+              id_asignacion: asignacionId, // Vinculación FK
+              id_pedido: id_pedido,
+              id_producto: item.id,
+              nombre_producto: item.name,
+              accion: accion,
+              motivo: item.reason || null, // <--- GUARDAMOS EL MOTIVO
+              pasillo: item.pasillo || null, // [NEW] Para tracking de ruta
+              fecha_registro: new Date(),
+              device_timestamp: item.device_timestamp || null, // [NEW]
+            });
+          }
         });
       };
 
