@@ -309,23 +309,25 @@ exports.completePicking = async (req, res) => {
       await supabase
         .from("wc_asignaciones_pedidos")
         .update(updatePayload)
-        .eq("id", asignacion.id);
+        .eq("id", asignacionId);
     } else {
-      // Fallback: Intentar recuperar ID si existe, o actualizar ciegamente
-      // [FIX] Recuperamos el ID para no dejar huérfanos los logs
-      const { data: rec } = await supabase
+      // 5.1 CORRECCIÓN CRÍTICA: NO actualizar ciegamente por id_pedido
+      // Si no existe asignación activa, creamos una nueva cerrada para guardar el registro.
+      // Esto evita sobrescribir historiales antiguos completados.
+      const { data: newAsign } = await supabase
         .from("wc_asignaciones_pedidos")
+        .insert([
+          {
+            id_pedido: id_pedido,
+            id_picker: id_picker || null,
+            fecha_inicio: now, // Dummy start
+            ...updatePayload,
+          },
+        ])
         .select("id")
-        .eq("id_pedido", id_pedido)
-        .limit(1)
-        .maybeSingle();
+        .single();
 
-      if (rec) asignacionId = rec.id;
-
-      await supabase
-        .from("wc_asignaciones_pedidos")
-        .update(updatePayload)
-        .eq("id_pedido", id_pedido);
+      if (newAsign) asignacionId = newAsign.id;
     }
 
     // 2. Estrategia de Auditoría: Guardar LOGS individuales para Analítica
