@@ -219,25 +219,29 @@ const AnaliticaPickers = () => {
                   <span>🚀 Velocidad (Tiempo por ítem)</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 15 }}>
-                  {performanceData.slice(0, 5).map(p => (
+                  {performanceData.slice(0, 5).map(p => {
+                      const spi = p.stats?.spi || 0;
+                      return (
                       <div key={p.id}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 4 }}>
                               <span style={{ fontWeight: 600 }}>{p.nombre}</span>
-                              <span style={{ fontWeight: 'bold', color: '#2c3e50' }}>{p.segundos_por_item > 60 ? `${(p.segundos_por_item/60).toFixed(1)}m` : `${p.segundos_por_item}s`} / item</span>
+                              <span style={{ fontWeight: 'bold', color: '#2c3e50' }}>
+                                  {spi > 60 ? `${(spi/60).toFixed(1)}m` : `${spi}s`} / item
+                              </span>
                           </div>
                           <div style={{ width: '100%', background: '#eee', height: 8, borderRadius: 4 }}>
-                               {/* Barra Invertida visualmente: Mas corto es mejor, pero queremos llenar la barra si es rapido. 
-                                  Digamos que 120s es "lento" (0%) y 30s es "rapido" (100%). */}
+                               {/* Barra Invertida visualmente: Mas corto es mejor. 
+                                  Digamos que 120s es "lento" (0% width) y 30s es "rapido" (100% width). */}
                               <div style={{ 
-                                  width: `${Math.min(100, Math.max(10, (150 - p.segundos_por_item) / 1.5))}%`, 
-                                  background: p.segundos_por_item < 60 ? '#2ecc71' : p.segundos_por_item < 100 ? '#f1c40f' : '#e74c3c',
+                                  width: `${Math.min(100, Math.max(10, (150 - spi) / 1.5))}%`, 
+                                  background: spi < 60 ? '#2ecc71' : spi < 100 ? '#f1c40f' : '#e74c3c',
                                   height: '100%',
                                   borderRadius: 4,
                                   transition: 'width 0.5s ease'
                               }}></div>
                           </div>
                       </div>
-                  ))}
+                  )})}
               </div>
           </div>
 
@@ -401,45 +405,45 @@ const AnaliticaPickers = () => {
       )}
       {/* MODAL / DRILLDOWN */}
       {selectedPicker && (
-          <div className="drilldown-modal-backdrop" onClick={() => setSelectedPicker(null)}>
-              <div className="drilldown-modal" onClick={e => e.stopPropagation()}>
-                  <div className="modal-header">
+          <div className="ap-modal-backdrop" onClick={() => setSelectedPicker(null)}>
+              <div className="ap-modal-container" onClick={e => e.stopPropagation()}>
+                  <div className="ap-modal-header">
                       <h2>📋 Detalle: {selectedPicker.nombre}</h2>
-                      <button className="close-btn" onClick={() => setSelectedPicker(null)}>×</button>
+                      <button className="ap-modal-close-btn" onClick={() => setSelectedPicker(null)}>×</button>
                   </div>
-                  <div className="modal-body">
-                      <div className="detail-section">
-                          <h3>⏳ Tiempos Muertos (>5 min)</h3>
+                  <div className="ap-modal-body">
+                      <div className="ap-modal-section">
+                          <h3>⏳ Tiempos Muertos (&gt;5 min)</h3>
                           {selectedPicker.drilldown?.gaps?.length > 0 ? (
-                              <div className="tags-container">
+                              <div className="ap-tags-container">
                                   {selectedPicker.drilldown.gaps.map((g, i) => (
-                                      <span key={i} className="gap-tag">
+                                      <span key={i} className="ap-gap-tag">
                                           {g.start} - {g.end} ({g.duration})
                                       </span>
                                   ))}
                               </div>
-                          ) : <p style={{color:'#27ae60', fontSize:'0.9rem'}}>Sin tiempos muertos significativos hoy.</p>}
+                          ) : <p className="ap-success-text">Sin tiempos muertos significativos hoy.</p>}
                       </div>
 
-                      <div className="detail-section">
+                      <div className="ap-modal-section">
                           <h3>⚠️ Errores Reportados</h3>
                           {selectedPicker.drilldown?.errors && Object.keys(selectedPicker.drilldown.errors).length > 0 ? (
-                              <ul className="error-list">
+                              <ul className="ap-error-list">
                                   {Object.entries(selectedPicker.drilldown.errors).map(([k, v]) => (
                                       <li key={k}><b>{k}:</b> {v} veces</li>
                                   ))}
                               </ul>
-                          ) : <p style={{color:'#27ae60'}}>100% Precisión hoy.</p>}
+                          ) : <p className="ap-success-text">100% Precisión hoy.</p>}
                       </div>
 
-                      <div className="detail-section">
+                      <div className="ap-modal-section">
                           <h3>📜 Últimos 20 Logs</h3>
-                          <div className="logs-mini-table">
+                          <div className="ap-logs-table">
                               {selectedPicker.drilldown?.recent_logs?.map((L, i) => (
-                                  <div key={i} className="log-row">
-                                      <span className="log-time">{L.hora}</span>
-                                      <span className={`log-badge log-${L.accion}`}>{L.accion}</span>
-                                      {L.motivo && <span className="log-reason">{L.motivo}</span>}
+                                  <div key={i} className="ap-log-row">
+                                      <span className="ap-log-time">{L.hora}</span>
+                                      <span className={`ap-log-badge ap-log-${L.accion}`}>{L.accion}</span>
+                                      {L.motivo && <span className="ap-log-reason">{L.motivo}</span>}
                                   </div>
                               ))}
                           </div>
@@ -449,34 +453,7 @@ const AnaliticaPickers = () => {
           </div>
       )}
 
-      <style>{`
-          .kpi-card { flex: 1; padding: 20px; display: flex; align-items: center; justify-content: space-between; }
-          .kpi-label { font-size: 0.85rem; color: #7f8c8d; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
-          .kpi-value { font-size: 2rem; fontWeight: 700; color: #2c3e50; }
-          .picker-row-interactive:hover { background: #f8f9fa; }
-          
-          .drilldown-modal-backdrop {
-              position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-              background: rgba(0,0,0,0.5); z-index: 1000;
-              display: flex; justify-content: center; align-items: center;
-          }
-          .drilldown-modal {
-              background: white; width: 600px; max-width: 90%; max-height: 85vh;
-              border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-              overflow-y: auto; overflow-x: hidden;
-          }
-          .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
-          .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
-          .modal-body { padding: 20px; }
-          
-          .gap-tag { display: inline-block; background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 4px; margin: 0 4px 4px 0; font-size: 0.8rem; border: 1px solid #ffeeba; }
-          
-          .logs-mini-table { display: flex; flexDirection: column; gap: 4px; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border-radius: 8px; }
-          .log-row { display: grid; grid-template-columns: 60px 100px 1fr; font-size: 0.75rem; padding: 4px 0; border-bottom: 1px solid #eee; }
-          .log-badge { text-align: center; border-radius: 3px; font-weight: 600; font-size: 0.7rem; }
-          .log-recolectado { color: #27ae60; background: #e8f5e9; }
-          .log-no_encontrado { color: #e74c3c; background: #ffebee; }
-      `}</style>
+      {/* Styles moved to AnaliticaPickers.css */}
     </div>
   );
 };
