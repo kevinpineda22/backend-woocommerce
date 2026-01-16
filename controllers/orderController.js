@@ -249,7 +249,7 @@ exports.getOrderById = async (req, res) => {
 };
 
 // 5. Finalizar Recolección (Sistema Híbrido: Snapshot + Logs)
-exports.completeCollection = async (req, res) => {
+exports.completePicking = async (req, res) => {
   const { id_pedido, id_picker, reporte_items } = req.body;
   try {
     const now = new Date();
