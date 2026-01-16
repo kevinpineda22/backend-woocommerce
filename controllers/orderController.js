@@ -13,7 +13,7 @@ exports.getPendingOrders = async (req, res) => {
 
     const { data: activeAssignments } = await supabase
       .from("wc_asignaciones_pedidos")
-      .select("id_pedido, nombre_picker, fecha_inicio")
+      .select("id_pedido, nombre_picker, fecha_inicio, reporte_snapshot")
       .eq("estado_asignacion", "en_proceso");
 
     const assignmentMap = {};
@@ -28,6 +28,7 @@ exports.getPendingOrders = async (req, res) => {
         is_assigned: !!assignment,
         assigned_to: assignment ? assignment.nombre_picker : null,
         started_at: assignment ? assignment.fecha_inicio : null,
+        reporte_progress: assignment ? assignment.reporte_snapshot : null, // Progreso en tiempo real
       };
     });
 
@@ -129,6 +130,25 @@ exports.assignOrder = async (req, res) => {
     res.status(200).json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+// 3.5 Actualizar Progreso (Ping desde el Picker)
+exports.updateProgress = async (req, res) => {
+  const { id_pedido, reporte_items } = req.body;
+  try {
+    // Solo actualizamos si está en proceso
+    const { error } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .update({ reporte_snapshot: reporte_items }) // Guardamos el estado actual
+      .eq("id_pedido", id_pedido)
+      .eq("estado_asignacion", "en_proceso");
+
+    if (error) throw error;
+    res.status(200).json({ status: "ok" });
+  } catch (error) {
+    console.error("Error updating progress:", error);
+    res.status(500).json({ error: "Error updating progress" });
   }
 };
 

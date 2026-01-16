@@ -14,8 +14,42 @@ import {
   FaRunning,
   FaHistory,
   FaChartLine,
+  FaClock,
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
+
+// Componente para el cronómetro en tiempo real
+const LiveTimer = ({ startTime }) => {
+  const [elapsed, setElapsed] = useState("");
+
+  useEffect(() => {
+    if (!startTime) return;
+    const update = () => {
+      const now = Date.now();
+      const start = new Date(startTime).getTime();
+      const diff = Math.max(0, now - start);
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      // const seconds = Math.floor((diff % 60000) / 1000);
+
+      if (hours > 0) {
+        setElapsed(`${hours}h ${minutes}m`);
+      } else {
+        setElapsed(`${minutes} min`);
+      }
+    };
+    update(); // Initial
+    const i = setInterval(update, 60000); // Actualizar cada minuto
+    return () => clearInterval(i);
+  }, [startTime]);
+
+  return (
+    <span style={{ fontWeight: "bold", color: "#2980b9" }}>
+      <FaClock style={{ marginRight: 4 }} />
+      {elapsed || "0 min"}
+    </span>
+  );
+};
 
 const PedidosAdmin = () => {
   const [orders, setOrders] = useState([]);
@@ -55,8 +89,8 @@ const PedidosAdmin = () => {
     }
   };
 
-  const fetchOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       if (currentView === "completed") {
         // En Historial: cargamos historial para la tabla Y estadísticas frescas
@@ -78,12 +112,24 @@ const PedidosAdmin = () => {
     } catch (error) {
       console.error("Error fetching data", error);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchOrders();
+
+    // Auto-refresh cada 10 segundos para ver progreso en tiempo casi real
+    let interval = null;
+    if (currentView === "process") {
+      interval = setInterval(() => fetchOrders(true), 10000);
+    } else if (currentView === "pending") {
+      interval = setInterval(() => fetchOrders(true), 30000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [currentView]);
 
   // --- LÓGICA DE FILTRADO ---
@@ -461,6 +507,75 @@ const PedidosAdmin = () => {
                                   ? `- ${order.billing.neighborhood}`
                                   : ""}
                               </p>
+
+                              {/* [NEW] BARRA DE PROGRESO EN VIVO */}
+                              {currentView === "process" &&
+                                order.reporte_progress && (
+                                  <div style={{ marginTop: "10px" }}>
+                                    <div
+                                      style={{
+                                        fontSize: "0.80rem",
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        marginBottom: "4px",
+                                      }}
+                                    >
+                                      <span style={{ color: "#27ae60" }}>
+                                        ✔{" "}
+                                        {
+                                          order.reporte_progress.recolectados
+                                            ?.length
+                                        }
+                                      </span>
+                                      <span style={{ color: "#e67e22" }}>
+                                        ⚠{" "}
+                                        {
+                                          order.reporte_progress.retirados
+                                            ?.length
+                                        }
+                                      </span>
+                                      <span style={{ color: "#7f8c8d" }}>
+                                        ⏳{" "}
+                                        {
+                                          order.reporte_progress.pendientes
+                                            ?.length
+                                        }
+                                      </span>
+                                    </div>
+                                    <div
+                                      style={{
+                                        height: "6px",
+                                        background: "#ecf0f1",
+                                        borderRadius: "3px",
+                                        overflow: "hidden",
+                                        display: "flex",
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          width: `${
+                                            ((order.reporte_progress
+                                              .recolectados?.length || 0) /
+                                              order.line_items.length) *
+                                            100
+                                          }%`,
+                                          background: "#2ecc71",
+                                        }}
+                                      ></div>
+                                      <div
+                                        style={{
+                                          width: `${
+                                            ((order.reporte_progress.retirados
+                                              ?.length || 0) /
+                                              order.line_items.length) *
+                                            100
+                                          }%`,
+                                          background: "#e67e22",
+                                        }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                )}
                             </>
                           )}
 
@@ -479,8 +594,7 @@ const PedidosAdmin = () => {
                           )}
                           {currentView === "process" && order.started_at && (
                             <div className="pedidos-process-timer">
-                              Iniciado:{" "}
-                              {new Date(order.started_at).toLocaleTimeString()}
+                              <LiveTimer startTime={order.started_at} />
                             </div>
                           )}
                         </div>

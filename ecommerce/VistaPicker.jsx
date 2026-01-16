@@ -296,6 +296,7 @@ const VistaPicker = () => {
   // Estados para Escaner
   const [isScanning, setIsScanning] = useState(false);
   const [itemToScan, setItemToScan] = useState(null);
+  const [scanSuccessMsg, setScanSuccessMsg] = useState(null); // [NEW] Mensaje de éxito
 
   const [activeTab, setActiveTab] = useState("pending");
   const [timer, setTimer] = useState("00:00:00");
@@ -499,6 +500,11 @@ const VistaPicker = () => {
 
       if (isMatch) {
         setPickedItems((prev) => ({ ...prev, [itemToScan.id]: "picked" }));
+
+        // [NEW] Mostrar alerta de éxito
+        setScanSuccessMsg(`¡${itemToScan.name} escaneado!`);
+        setTimeout(() => setScanSuccessMsg(null), 2000);
+
         setItemToScan(null);
       } else {
         alert(
@@ -577,14 +583,68 @@ const VistaPicker = () => {
     });
   };
 
+  // [NEW] Helper para generar reporte actual
+  const generateReport = useCallback(() => {
+    if (!currentOrder) return null;
+    const reporte = {
+      recolectados: [],
+      retirados: [],
+      pendientes: [],
+    };
+
+    currentOrder.line_items.forEach((item) => {
+      const status = pickedItems[item.id];
+      const simpleItem = {
+        id: item.id,
+        sku: item.sku,
+        name: item.name,
+        qty: item.quantity,
+        reason: removedReasons[item.id] || null,
+      };
+
+      if (status === "picked") {
+        reporte.recolectados.push(simpleItem);
+      } else if (status === "removed") {
+        reporte.retirados.push(simpleItem);
+      } else {
+        reporte.pendientes.push(simpleItem);
+      }
+    });
+    return reporte;
+  }, [currentOrder, pickedItems, removedReasons]);
+
+  // [NEW] Efecto para guardar progreso en servidor (Debounce 3s)
+  useEffect(() => {
+    if (!pickerStatus || !pickerStatus.id_pedido_actual || !currentOrder)
+      return;
+
+    const saveData = setTimeout(async () => {
+      const report = generateReport();
+      if (report) {
+        try {
+          await axios.post(
+            "https://backend-woocommerce.vercel.app/api/orders/progreso",
+            {
+              id_pedido: currentOrder.id,
+              reporte_items: report,
+            }
+          );
+          // console.log("Progreso guardado...");
+        } catch (e) {
+          console.error("Error guardando progreso en servidor", e);
+        }
+      }
+    }, 3000);
+
+    return () => clearTimeout(saveData);
+  }, [pickedItems, removedReasons, pickerStatus, currentOrder, generateReport]);
+
   const handleFinish = async () => {
     // 1. Verificar si quedan pendientes (Total procesado vs Total real)
     const processedCount = stats.picked + stats.removed;
     const hasPending = stats.total - processedCount > 0;
 
     if (hasPending) {
-      // En caso de forzar finalización, los pendientes se marcan como retirados/omitted
-      // Podríamos pedir motivo o asumir "No encontrado"
       if (
         !window.confirm(
           `Tienes ${
@@ -599,42 +659,27 @@ const VistaPicker = () => {
     }
 
     try {
-      // 2. Construir Reporte
-      const reporte = {
-        recolectados: [],
-        retirados: [],
+      // 2. Construir Reporte Final (Usando el helper y forzando pendientes)
+      const baseReport = generateReport();
+      // Ajustar pendientes para que sean retirados en el reporte final
+      const reporteFinal = {
+        recolectados: baseReport.recolectados,
+        retirados: [
+          ...baseReport.retirados,
+          ...baseReport.pendientes.map((p) => ({
+            ...p,
+            reason: "No encontrado (Forzado)",
+          })),
+        ],
         pendientes: [],
       };
-
-      currentOrder.line_items.forEach((item) => {
-        const status = pickedItems[item.id];
-        const simpleItem = {
-          id: item.id,
-          sku: item.sku,
-          name: item.name,
-          qty: item.quantity,
-          reason: removedReasons[item.id] || null, // Añadir motivo
-        };
-
-        if (status === "picked") {
-          reporte.recolectados.push(simpleItem);
-        } else if (status === "removed") {
-          reporte.retirados.push(simpleItem);
-        } else {
-          // Pendientes forzados
-          reporte.retirados.push({
-            ...simpleItem,
-            reason: "No encontrado (Forzado)",
-          });
-        }
-      });
 
       await axios.post(
         "https://backend-woocommerce.vercel.app/api/orders/finalizar-picking",
         {
           id_pedido: currentOrder.id,
           id_picker: pickerStatus.id,
-          reporte_items: reporte,
+          reporte_items: reporteFinal,
         }
       );
 
@@ -919,6 +964,23 @@ const VistaPicker = () => {
           </div>
         </div>
       )}
+
+      {/* [NEW] TOAST PROPIO DE ÉXITO */}
+      {scanSuccessMsg &&
+        createPortal(
+          <motion.div
+            className="ec-scan-success-toast"
+            initial={{ opacity: 0, y: -50, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -50, x: "-50%" }}
+          >
+            <div className="ec-scan-success-icon">
+              <FaCheck size={16} />
+            </div>
+            {scanSuccessMsg}
+          </motion.div>,
+          document.body
+        )}
 
       {/* Botón Flotante */}
       {stats.picked + stats.removed === stats.total && stats.total > 0 && (

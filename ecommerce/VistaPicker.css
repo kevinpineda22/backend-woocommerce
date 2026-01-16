@@ -609,3 +609,162 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* --- Toast de Ã‰xito (Escaneo) --- */
+.ec-scan-success-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  /* Transform se maneja con Framer Motion (x: "-50%") */
+  background: var(--ec-success);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 50px;
+  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.4);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 800;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.ec-scan-success-icon {
+  background: white;
+  border-radius: 50%;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ec-success);
+}
+
+/* --- Botones de Acción en Tarjeta --- */
+.ec-card-actions {
+  display: flex;
+  gap: 0;
+}
+
+.ec-btn-undo.recover {
+  color: var(--ec-success);
+}
+
+/* --- Acceso Denegado --- */
+.ec-access-denied-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  background-color: var(--ec-bg-color);
+  color: var(--ec-text-main);
+}
+
+.ec-access-denied-icon {
+  font-size: 4rem;
+  color: #ef4444; /* Rojo error */
+  margin-bottom: 20px;
+}
+
+.ec-access-denied-hint {
+  font-size: 0.9rem;
+  color: var(--ec-text-muted);
+  margin-top: 5px;
+}
+
+.ec-btn-back-home {
+  margin-top: 20px;
+  background: var(--ec-primary);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ec-btn-back-home-transparent {
+  margin-top: 20px;
+  background: transparent;
+  color: var(--ec-text-muted);
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- Modificadores de Tabs --- */
+.ec-tab.middle {
+  border-left: 1px solid var(--ec-border);
+  border-right: 1px solid var(--ec-border);
+}
+
+/* --- Espaciadores --- */
+.ec-spacer-bottom {
+  height: 80px;
+}
+
+.ec-icon-spacer {
+  margin-right: 10px;
+}
+
+/* --- Variantes de Botones Modales --- */
+.ec-modal-option.danger {
+  background: #e74c3c;
+  color: white;
+}
+
+.ec-modal-option.warning {
+  background: #f39c12;
+  color: white;
+}
+
+.ec-modal-option.secondary {
+  background: #7f8c8d;
+  color: white;
+}
+
+/* --- Overlay de Confirmación Manual --- */
+.ec-manual-overlay-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+}
+
+.ec-manual-confirm-btn {
+  background: var(--ec-primary);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 50px;
+  border: none;
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 8px;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+}
+
+.ec-manual-hint {
+  font-size: 0.8rem;
+  color: var(--ec-text-muted);
+  font-weight: 600;
+}

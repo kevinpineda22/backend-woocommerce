@@ -185,3 +185,187 @@
   height: 100%;
   border-radius: 4px;
 }
+
+/* --- Refactor Clases Extra --- */
+
+.analitica-header-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.analitica-loading {
+  text-align: center;
+  padding: 40px;
+}
+
+/* Modificadores de Texto */
+.analitica-font-bold {
+  font-weight: 600;
+}
+.analitica-text-small-muted {
+  font-size: 0.75rem;
+  color: #7f8c8d;
+}
+.analitica-text-danger-bold {
+  color: #e74c3c;
+  font-weight: bold;
+}
+.analitica-text-xs-muted {
+  font-size: 0.7rem;
+  color: #7f8c8d;
+}
+
+/* Badges y Elementos UI */
+.analitica-badge-speed {
+  background: #ebf8ff;
+  color: #3182ce;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+.analitica-precision-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.analitica-bar-bg {
+  width: 24px;
+  height: 4px;
+  background: #edf2f7;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.analitica-precision-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Estilos de Lista Heatmap */
+.analitica-heatmap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.analitica-heatmap-item {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+}
+
+.analitica-heatmap-item-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.analitica-heatmap-reason {
+  font-size: 0.8rem;
+  color: #7f8c8d;
+}
+
+/* Layout Cards */
+.card-analitica.span-two {
+  grid-column: span 2;
+}
+
+/* Legend */
+.analitica-legend {
+  display: flex;
+  gap: 15px;
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: #64748b;
+}
+
+.analitica-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.analitica-legend-box {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.analitica-legend-box.low { background: #e0f2fe; }
+.analitica-legend-box.high { background: #0284c7; }
+.analitica-legend-box.issue { 
+  border: 2px solid #ef4444; 
+  background: #fef2f2; 
+}
+
+/* --- Aisle Grid & Map --- */
+.analitica-aisle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.analitica-aisle-cell {
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  position: relative;
+  transition: transform 0.2s;
+}
+
+.analitica-aisle-cell:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+}
+
+.analitica-aisle-warning-icon {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  color: #c53030;
+  font-size: 0.7rem;
+}
+
+.analitica-aisle-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+
+.analitica-aisle-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.analitica-aisle-stats {
+  margin-top: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.analitica-aisle-error {
+  font-size: 0.65rem;
+}
+
+.analitica-empty-aisle {
+  grid-column: 1 / -1;
+  padding: 20px;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.analitica-tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
