@@ -334,6 +334,7 @@ exports.completePicking = async (req, res) => {
             accion: accion,
             motivo: item.reason || null, // <--- GUARDAMOS EL MOTIVO
             fecha_registro: new Date(),
+            device_timestamp: item.device_timestamp || null, // [NEW]
           });
         });
       };

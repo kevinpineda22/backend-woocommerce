@@ -291,6 +291,7 @@ const VistaPicker = () => {
   const [startTime, setStartTime] = useState(null); // Nuevo estado para el inicio real
   const [pickedItems, setPickedItems] = useState({}); // { [id]: 'picked' | 'removed' | false }
   const [removedReasons, setRemovedReasons] = useState({}); // { [id]: 'motivo' }
+  const [timestampMap, setTimestampMap] = useState({}); // { [id]: timestamp_ms }
   const [pendingRemoval, setPendingRemoval] = useState(null); // { id: 123 } para modal
 
   // Estados para Escaner
@@ -402,9 +403,11 @@ const VistaPicker = () => {
           // [MODIFIED] Check local storage first
           const storageKeyItems = `picker_items_${me.id_pedido_actual}`;
           const storageKeyReasons = `picker_reasons_${me.id_pedido_actual}`;
+          const storageKeyTimestamps = `picker_timestamps_${me.id_pedido_actual}`;
 
           const savedItems = localStorage.getItem(storageKeyItems);
           const savedReasons = localStorage.getItem(storageKeyReasons);
+          const savedTimestamps = localStorage.getItem(storageKeyTimestamps);
 
           if (savedItems) {
             try {
@@ -431,6 +434,14 @@ const VistaPicker = () => {
               setRemovedReasons(JSON.parse(savedReasons));
             } catch (err) {
               console.error("Error parsing saved reasons", err);
+            }
+          }
+
+          if (savedTimestamps) {
+            try {
+              setTimestampMap(JSON.parse(savedTimestamps));
+            } catch (err) {
+              console.error("Error parsing saved timestamps", err);
             }
           }
 
@@ -476,14 +487,16 @@ const VistaPicker = () => {
     if (isSessionLoaded && pickerStatus && pickerStatus.id_pedido_actual) {
       const storageKeyItems = `picker_items_${pickerStatus.id_pedido_actual}`;
       const storageKeyReasons = `picker_reasons_${pickerStatus.id_pedido_actual}`;
+      const storageKeyTimestamps = `picker_timestamps_${pickerStatus.id_pedido_actual}`;
 
       // Note: Timer is saved only on init currently, or we could update it here if needed,
       // but start time usually doesn't change during session.
 
       localStorage.setItem(storageKeyItems, JSON.stringify(pickedItems));
       localStorage.setItem(storageKeyReasons, JSON.stringify(removedReasons));
+      localStorage.setItem(storageKeyTimestamps, JSON.stringify(timestampMap));
     }
-  }, [isSessionLoaded, pickerStatus, pickedItems, removedReasons]);
+  }, [isSessionLoaded, pickerStatus, pickedItems, removedReasons, timestampMap]);
 
   const handleScanMatch = useCallback(
     (decodedText) => {
@@ -500,6 +513,7 @@ const VistaPicker = () => {
 
       if (isMatch) {
         setPickedItems((prev) => ({ ...prev, [itemToScan.id]: "picked" }));
+        setTimestampMap((prev) => ({ ...prev, [itemToScan.id]: Date.now() }));
 
         // [NEW] Mostrar alerta de éxito
         setScanSuccessMsg(`¡${itemToScan.name} escaneado!`);
@@ -526,6 +540,7 @@ const VistaPicker = () => {
       )
     ) {
       setPickedItems((prev) => ({ ...prev, [itemToScan.id]: "picked" }));
+      setTimestampMap((prev) => ({ ...prev, [itemToScan.id]: Date.now() }));
       setItemToScan(null);
       setIsScanning(false);
     }
@@ -549,6 +564,7 @@ const VistaPicker = () => {
           )
         ) {
           setPickedItems((prev) => ({ ...prev, [id]: "picked" }));
+          setTimestampMap((prev) => ({ ...prev, [id]: Date.now() }));
         }
       }
     } else {
@@ -559,6 +575,7 @@ const VistaPicker = () => {
   const confirmRemoval = (reason) => {
     if (pendingRemoval) {
       setRemovedReasons((prev) => ({ ...prev, [pendingRemoval.id]: reason }));
+      setTimestampMap((prev) => ({ ...prev, [pendingRemoval.id]: Date.now() }));
       setPickedItems((prev) => ({ ...prev, [pendingRemoval.id]: "removed" }));
       setPendingRemoval(null); // Close modal
     }
@@ -575,6 +592,7 @@ const VistaPicker = () => {
 
   const handleRecover = (id) => {
     // Mover directamente a Agregados (Picked) y limpiar motivo
+    setTimestampMap((prev) => ({ ...prev, [id]: Date.now() }));
     setPickedItems((prev) => ({ ...prev, [id]: "picked" }));
     setRemovedReasons((prev) => {
       const copy = { ...prev };
@@ -600,6 +618,7 @@ const VistaPicker = () => {
         name: item.name,
         qty: item.quantity,
         reason: removedReasons[item.id] || null,
+        device_timestamp: timestampMap[item.id] ? new Date(timestampMap[item.id]).toISOString() : null
       };
 
       if (status === "picked") {
@@ -687,6 +706,7 @@ const VistaPicker = () => {
       localStorage.removeItem(`picker_items_${currentOrder.id}`);
       localStorage.removeItem(`picker_reasons_${currentOrder.id}`);
       localStorage.removeItem(`picker_timer_${currentOrder.id}`);
+      localStorage.removeItem(`picker_timestamps_${currentOrder.id}`);
 
       alert("¡Pedido Completado! Excelente trabajo.");
       window.location.reload();

@@ -18,7 +18,7 @@ exports.getCollectorPerformance = async (req, res) => {
     // Traemos logs de las últimas 48h (Ayer + Hoy)
     const { data: logs, error: logError } = await supabase
       .from("wc_log_picking")
-      .select("accion, motivo, id_pedido, fecha_registro, wc_asignaciones_pedidos!inner(id_picker, nombre_picker)")
+      .select("accion, motivo, id_pedido, fecha_registro, device_timestamp, wc_asignaciones_pedidos!inner(id_picker, nombre_picker)")
       .gte("fecha_registro", yesterdayStart.toISOString())
       .order("fecha_registro", { ascending: true }); // Orden cronológico vital para idle calc
     
@@ -60,7 +60,7 @@ exports.getCollectorPerformance = async (req, res) => {
         if(!logsByPicker[pid]) logsByPicker[pid] = { name: nombre, logs: [] };
         logsByPicker[pid].logs.push({
             ...log,
-            timeObj: new Date(log.fecha_registro)
+            timeObj: log.device_timestamp ? new Date(log.device_timestamp) : new Date(log.fecha_registro)
         });
     });
 
