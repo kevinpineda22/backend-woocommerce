@@ -159,22 +159,22 @@ exports.getOrderById = async (req, res) => {
     // 1. Obtener pedido de WooCommerce
     const { data: order } = await WooCommerce.get(`orders/${id}`);
 
-    // 2. Intentar obtener el Snapshot de la asiganción completada (Más rápido y preciso)
+    // 2. Intentar obtener el Snapshot de la asiganción MÁS RECIENTE (Activa o Completada)
     const { data: asignacion } = await supabase
       .from("wc_asignaciones_pedidos")
-      .select("reporte_snapshot")
+      .select("reporte_snapshot, estado_asignacion")
       .eq("id_pedido", id)
-      .eq("estado_asignacion", "completado")
+      .in("estado_asignacion", ["completado", "en_proceso"])
+      .order("fecha_inicio", { ascending: false }) // Priorizar el último intento
       .limit(1)
       .maybeSingle();
 
     let reporteFinal = null;
 
     if (asignacion && asignacion.reporte_snapshot) {
-      // Opción A: Tenemos un snapshot guardado (Sistema Nuevo)
       reporteFinal = asignacion.reporte_snapshot;
-    } else {
-      // Opción B: No hay snapshot, reconstruimos desde los logs (Retrocompatibilidad)
+    } else if (!asignacion) {
+      // Opción B: No hay snapshot reciente, buscar logs antiguos (Retrocompatibilidad)
       const { data: logs } = await supabase
         .from("wc_log_picking")
         .select("*")
