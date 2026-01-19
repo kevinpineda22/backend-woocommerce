@@ -176,7 +176,17 @@ exports.completePicking = async (req, res) => {
         if (!lista) return;
         lista.forEach((item) => {
           if (!loggedSet.has(`${item.id}-${accion}`)) {
-            logsToInsert.push({ id_asignacion: asignacionId, id_pedido: id_pedido, id_producto: item.id, nombre_producto: item.name, accion: accion, motivo: item.reason || null, pasillo: item.pasillo || null, fecha_registro: now });
+            logsToInsert.push({ 
+              id_asignacion: asignacionId, 
+              id_pedido: id_pedido, 
+              id_producto: item.id, 
+              nombre_producto: item.name, 
+              accion: accion, 
+              motivo: item.reason || null, 
+              pasillo: item.pasillo || null, 
+              device_timestamp: item.device_timestamp || null,
+              fecha_registro: now 
+            });
           }
         });
       };

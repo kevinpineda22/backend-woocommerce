@@ -189,6 +189,7 @@ const VistaPicker = () => {
   const [startTime, setStartTime] = useState(null); // NULL al inicio, espera primera acción
   const [pickedItems, setPickedItems] = useState({});
   const [removedReasons, setRemovedReasons] = useState({});
+  const [timestampMap, setTimestampMap] = useState({}); // Timestamps de cada acción
   const [pendingRemoval, setPendingRemoval] = useState(null);
 
   const [isScanning, setIsScanning] = useState(false);
@@ -322,6 +323,7 @@ const VistaPicker = () => {
   const handleSuccessScan = (productName) => {
     triggerStartTimer(); // <--- INICIA TIMER
     setPickedItems((prev) => ({ ...prev, [itemToScan.id]: "picked" }));
+    setTimestampMap((prev) => ({ ...prev, [itemToScan.id]: Date.now() }));
     const nameToShow = productName || itemToScan.name;
     setScanSuccessMsg(nameToShow);
     setTimeout(() => setScanSuccessMsg(null), 2500);
@@ -382,6 +384,7 @@ const VistaPicker = () => {
     if (pendingRemoval) {
       setRemovedReasons((p) => ({ ...p, [pendingRemoval.id]: reason }));
       setPickedItems((p) => ({ ...p, [pendingRemoval.id]: "removed" }));
+      setTimestampMap(prev => ({ ...prev, [pendingRemoval.id]: Date.now() })); // Capturar timestamp
       setPendingRemoval(null);
     }
   };
@@ -395,8 +398,20 @@ const VistaPicker = () => {
         // ENVIAMOS EL TIEMPO DE INICIO REAL AL BACKEND
         tiempo_inicio_real: startTime, 
         reporte_items: {
-          recolectados: groupedItems.completed.map((i) => ({ id: i.id, qty: i.quantity, name: i.name, pasillo: i.pasillo })),
-          retirados: groupedItems.removed.map((i) => ({ id: i.id, reason: removedReasons[i.id], name: i.name, pasillo: i.pasillo })),
+          recolectados: groupedItems.completed.map((i) => ({ 
+            id: i.id, 
+            qty: i.quantity, 
+            name: i.name, 
+            pasillo: i.pasillo,
+            device_timestamp: timestampMap[i.id] ? new Date(timestampMap[i.id]).toISOString() : null
+          })),
+          retirados: groupedItems.removed.map((i) => ({ 
+            id: i.id, 
+            reason: removedReasons[i.id], 
+            name: i.name, 
+            pasillo: i.pasillo,
+            device_timestamp: timestampMap[i.id] ? new Date(timestampMap[i.id]).toISOString() : null
+          })),
           pendientes: groupedItems.pending.map((i) => ({ id: i.id, name: i.name })),
         },
       });
