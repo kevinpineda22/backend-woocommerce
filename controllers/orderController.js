@@ -44,7 +44,6 @@ exports.getPickers = async (req, res) => {
   const { email } = req.query;
   try {
     // --- SYNC START: Asegurar que todos los 'picker' de profiles existan en wc_pickers ---
-    // Esto corrige el problema de que al crear un usuario no se cree su registro operativo
     if (!email) {
       const { data: profiles, error: pError } = await supabase
         .from("profiles")
@@ -135,6 +134,10 @@ exports.assignOrder = async (req, res) => {
 
 // 3.5 Actualizar Progreso (Ping desde el Picker) + LOGGING EN TIEMPO REAL
 exports.updateProgress = async (req, res) => {
+  // --- DEBUG LOG START: Confirmación visual de que la ruta funciona ---
+  console.log("--> [BACKEND] Recibiendo ping de progreso...");
+  // -------------------------------------------------------------------
+
   const { id_pedido, reporte_items } = req.body;
   try {
     // 1. Obtener estado actual de la asignación
@@ -146,6 +149,7 @@ exports.updateProgress = async (req, res) => {
       .maybeSingle();
 
     if (!assignment) {
+      console.log("No se encontró asignación activa para pedido:", id_pedido);
       return res
         .status(404)
         .json({ error: "Asignación no encontrada o inactiva" });
@@ -177,6 +181,7 @@ exports.updateProgress = async (req, res) => {
 
     // Logs Recolectados
     newCollected.forEach((item) => {
+      console.log(`   + Nuevo item recolectado: ${item.name}`); // Log consola
       logsToInsert.push({
         id_asignacion: assignment.id,
         id_pedido: id_pedido,
@@ -190,6 +195,7 @@ exports.updateProgress = async (req, res) => {
 
     // Logs Retirados
     newRemoved.forEach((item) => {
+      console.log(`   - Nuevo item retirado: ${item.name} (${item.reason})`); // Log consola
       logsToInsert.push({
         id_asignacion: assignment.id,
         id_pedido: id_pedido,
@@ -209,6 +215,7 @@ exports.updateProgress = async (req, res) => {
         .insert(logsToInsert);
 
       if (logError) console.error("Error insertando logs realtime:", logError);
+      else console.log(`   ✅ ${logsToInsert.length} logs guardados en DB.`);
     }
 
     // 4. Actualizar Snapshot Global
@@ -232,10 +239,10 @@ exports.getOrderById = async (req, res) => {
     // 1. Obtener pedido de WooCommerce
     const { data: order } = await WooCommerce.get(`orders/${id}`);
 
-    // 2. Intentar obtener el Snapshot de la asiganción MÁS RECIENTE (Activa o Completada)
+    // 2. Intentar obtener el Snapshot de la asiganción MÁS RECIENTE
     const { data: asignacion } = await supabase
       .from("wc_asignaciones_pedidos")
-      .select("id, reporte_snapshot, estado_asignacion") // <--- SOLICITAR ID EXPLICITAMENTE
+      .select("id, reporte_snapshot, estado_asignacion")
       .eq("id_pedido", id)
       .in("estado_asignacion", ["completado", "en_proceso"])
       .order("fecha_inicio", { ascending: false }) // Priorizar el último intento
@@ -247,7 +254,7 @@ exports.getOrderById = async (req, res) => {
     if (asignacion && asignacion.reporte_snapshot) {
       reporteFinal = asignacion.reporte_snapshot;
     } else if (!asignacion) {
-      // Opción B: No hay snapshot reciente, buscar logs antiguos (Retrocompatibilidad)
+      // Opción B: No hay snapshot reciente, buscar logs antiguos
       const { data: logs } = await supabase
         .from("wc_log_picking")
         .select("*")
@@ -275,7 +282,7 @@ exports.getOrderById = async (req, res) => {
           );
           const info = obtenerInfoPasillo(prod.categories, prod.name);
 
-          // Filtramos categorías visuales (para que el frontend no muestre "Despensa")
+          // Filtramos categorías visuales
           const categoriasVisuales = prod.categories
             .map((c) => c.name)
             .filter((name) => {
@@ -286,12 +293,10 @@ exports.getOrderById = async (req, res) => {
               return !normalizado.includes("despensa");
             });
 
-          // BUSQUEDA DE CÓDIGO DE BARRAS (EAN/UPC)
-          // Prioridad: global_unique_id (Plugin EAN oficial) > MetaData > Atributos
+          // BUSQUEDA DE CÓDIGO DE BARRAS
           let codigoBarras =
             item.global_unique_id || prod.global_unique_id || null;
 
-          // 1. Meta Data (Comun en otros plugins)
           if (!codigoBarras && prod.meta_data) {
             const meta = prod.meta_data.find((m) =>
               ["barcode", "_barcode", "ean", "_ean", "gtin", "_gtin"].includes(
@@ -300,7 +305,6 @@ exports.getOrderById = async (req, res) => {
             );
             if (meta) codigoBarras = meta.value;
           }
-          // 2. Atributos
           if (!codigoBarras && prod.attributes) {
             const attr = prod.attributes.find((a) =>
               ["ean", "barcode", "codigo de barras"].includes(
@@ -319,8 +323,8 @@ exports.getOrderById = async (req, res) => {
             categorias:
               categoriasVisuales.length > 0
                 ? categoriasVisuales
-                : prod.categories.map((c) => c.name), // Fallback si se queda vacío
-            barcode: codigoBarras || "", // Nuevo campo
+                : prod.categories.map((c) => c.name),
+            barcode: codigoBarras || "",
           };
         } catch (e) {
           return item;
@@ -330,12 +334,11 @@ exports.getOrderById = async (req, res) => {
 
     order.line_items = items.sort((a, b) => a.prioridad - b.prioridad);
 
-    // Inyectamos el reporte encontrado (Snapshot o Logs)
+    // Inyectamos el reporte encontrado
     if (reporteFinal) {
       order.reporte_items = reporteFinal;
     }
 
-    // Inyectamos ID de Asignación para validación de sesión local
     if (asignacion && asignacion.id) {
       order.current_assignment_id = asignacion.id;
     }
@@ -346,7 +349,7 @@ exports.getOrderById = async (req, res) => {
   }
 };
 
-// 5. Finalizar Recolección (Sistema Híbrido: Snapshot + Logs)
+// 5. Finalizar Recolección
 exports.completePicking = async (req, res) => {
   const { id_pedido, id_picker, reporte_items } = req.body;
   try {
@@ -363,16 +366,13 @@ exports.completePicking = async (req, res) => {
     const asignacion =
       asignaciones && asignaciones.length > 0 ? asignaciones[0] : null;
 
-    // Calcular duración real (evitar negativos)
+    // Calcular duración real
     let duration = 0;
     if (asignacion && asignacion.fecha_inicio) {
       const diff = (now - new Date(asignacion.fecha_inicio)) / 1000;
       duration = diff > 0 ? Math.floor(diff) : 0;
     }
 
-    // 1. Estrategia de Actualización: Guardar SNAPSHOT JSON para UI rápida
-    // Agregamos 'reporte_snapshot' al update. Si la columna no existe en BD, esto fallaría.
-    // Por eso TIENES que ejecutar el SQL provisto.
     const updatePayload = {
       estado_asignacion: "completado",
       fecha_fin: now,
@@ -389,16 +389,13 @@ exports.completePicking = async (req, res) => {
         .update(updatePayload)
         .eq("id", asignacionId);
     } else {
-      // 5.1 CORRECCIÓN CRÍTICA: NO actualizar ciegamente por id_pedido
-      // Si no existe asignación activa, creamos una nueva cerrada para guardar el registro.
-      // Esto evita sobrescribir historiales antiguos completados.
       const { data: newAsign } = await supabase
         .from("wc_asignaciones_pedidos")
         .insert([
           {
             id_pedido: id_pedido,
             id_picker: id_picker || null,
-            fecha_inicio: now, // Dummy start
+            fecha_inicio: now,
             ...updatePayload,
           },
         ])
@@ -408,9 +405,8 @@ exports.completePicking = async (req, res) => {
       if (newAsign) asignacionId = newAsign.id;
     }
 
-    // 2. Estrategia de Auditoría: Guardar LOGS individuales para Analítica
+    // 2. Auditoría: Logs finales
     if (reporte_items && asignacionId) {
-      // [FIX] Evitar duplicados: Consolidar con logs realtime ya insertados
       const { data: existingLogs } = await supabase
         .from("wc_log_picking")
         .select("id_producto, accion")
@@ -422,22 +418,20 @@ exports.completePicking = async (req, res) => {
 
       const logsToInsert = [];
 
-      // Helper para procesar listas
       const procesarLista = (lista, accion) => {
         if (!lista) return;
         lista.forEach((item) => {
-          // Solo insertar si NO existe ya en el log (priorizando fecha real del realtime)
           if (!loggedSet.has(`${item.id}-${accion}`)) {
             logsToInsert.push({
-              id_asignacion: asignacionId, // Vinculación FK
+              id_asignacion: asignacionId,
               id_pedido: id_pedido,
               id_producto: item.id,
               nombre_producto: item.name,
               accion: accion,
-              motivo: item.reason || null, // <--- GUARDAMOS EL MOTIVO
-              pasillo: item.pasillo || null, // [NEW] Para tracking de ruta
+              motivo: item.reason || null,
+              pasillo: item.pasillo || null,
               fecha_registro: new Date(),
-              device_timestamp: item.device_timestamp || null, // [NEW]
+              device_timestamp: item.device_timestamp || null,
             });
           }
         });
@@ -445,8 +439,6 @@ exports.completePicking = async (req, res) => {
 
       procesarLista(reporte_items.recolectados, "recolectado");
       procesarLista(reporte_items.retirados, "retirado");
-      // Los pendientes forzados cuentan como retirados/no_encontrados en el log?
-      // Depende de la regla de negocio. Por ahora solo procesamos lo explícito.
 
       if (logsToInsert.length > 0) {
         const { error: logError } = await supabase
@@ -469,7 +461,7 @@ exports.completePicking = async (req, res) => {
   }
 };
 
-// 6. Obtener Historial (Filtrado por Picker)
+// 6. Obtener Historial
 exports.getHistory = async (req, res) => {
   const { id_picker } = req.query;
 
@@ -480,7 +472,6 @@ exports.getHistory = async (req, res) => {
       .eq("estado_asignacion", "completado")
       .order("fecha_fin", { ascending: false });
 
-    // Si hay ID, filtramos por esa persona. Si no, traemos los últimos 50 generales.
     if (id_picker) {
       query = query.eq("id_picker", id_picker);
     } else {
@@ -491,8 +482,6 @@ exports.getHistory = async (req, res) => {
 
     if (error) throw error;
 
-    // Remove duplicates: keep the first occurrence of each id_pedido
-    // Data is ordered by fecha_fin descending, so we keep the latest one.
     const uniqueMap = new Map();
     const uniqueData = [];
 
@@ -503,7 +492,6 @@ exports.getHistory = async (req, res) => {
       }
     }
 
-    // Formatear duración para mostrar en frontend (minutos o horas y minutos)
     const formattedData = uniqueData.map((item) => {
       const seconds = item.tiempo_total_segundos || 0;
       const totalMinutes = Math.floor(seconds / 60);
@@ -512,13 +500,12 @@ exports.getHistory = async (req, res) => {
       if (totalMinutes > 60) {
         const hours = Math.floor(totalMinutes / 60);
         const mins = totalMinutes % 60;
-        // Ej: "1 h 25 min"
         duracionTexto = `${hours} h ${mins} min`;
       }
 
       return {
         ...item,
-        tiempo_formateado: duracionTexto, // Campo extra para el frontend
+        tiempo_formateado: duracionTexto,
       };
     });
 
@@ -528,12 +515,11 @@ exports.getHistory = async (req, res) => {
   }
 };
 
-// 7. Cancelar/Liberar Asignación (Admin)
+// 7. Cancelar/Liberar Asignación
 exports.cancelAssignment = async (req, res) => {
   const { id_picker } = req.body;
 
   try {
-    // 1. Obtener la picker para saber qué pedido tenía
     const { data: picker, error: recError } = await supabase
       .from("wc_pickers")
       .select("id_pedido_actual")
@@ -545,7 +531,6 @@ exports.cancelAssignment = async (req, res) => {
     const id_pedido = picker.id_pedido_actual;
 
     if (id_pedido) {
-      // 2. Marcar asignación como 'cancelado'
       await supabase
         .from("wc_asignaciones_pedidos")
         .update({
@@ -556,7 +541,6 @@ exports.cancelAssignment = async (req, res) => {
         .eq("estado_asignacion", "en_proceso");
     }
 
-    // 3. Liberar picker
     await supabase
       .from("wc_pickers")
       .update({
@@ -565,7 +549,9 @@ exports.cancelAssignment = async (req, res) => {
       })
       .eq("id", id_picker);
 
-    res.status(200).json({ message: "Asignación cancelada y picker liberada" });
+    res
+      .status(200)
+      .json({ message: "Asignación cancelada y picker liberada" });
   } catch (error) {
     console.error("Error cancelando asignación:", error);
     res.status(500).json({ error: error.message });
