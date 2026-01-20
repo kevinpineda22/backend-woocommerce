@@ -386,3 +386,22 @@ exports.getPickerRoute = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// 7. Listado de Rutas Completadas (Historial para Selección)
+exports.getCompletedRoutesList = async (req, res) => {
+  try {
+    const { data: routes, error } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("id, id_pedido, nombre_picker, id_picker, fecha_fin, tiempo_total_segundos")
+      .eq("estado_asignacion", "completado")
+      .order("fecha_fin", { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    res.status(200).json(routes);
+  } catch (error) {
+    console.error("Error en getCompletedRoutesList:", error);
+    res.status(500).json({ error: error.message });
+  }
+};

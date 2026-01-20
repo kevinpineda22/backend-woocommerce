@@ -12,9 +12,84 @@ import {
   FaSync,
   FaRoute,
   FaMapMarkedAlt,
+  FaTimes
 } from "react-icons/fa";
 import "./AnaliticaPickers.css";
-import WarehouseMap from "./WarehouseMap"; // [NEW] Componente de Mapa Interactivo
+import WarehouseMap from "./WarehouseMap"; 
+
+const RouteSelectionView = ({ fetchPickerRoute }) => {
+  const [routesHistory, setRoutesHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const BASE_URL = "https://backend-woocommerce.vercel.app/api";
+        const { data } = await axios.get(`${BASE_URL}/analytics/routes-history`);
+        setRoutesHistory(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchHistory();
+  }, []);
+
+  if (loading) return <div className="card-analitica"><p>Cargando historial de rutas...</p></div>;
+
+  return (
+    <div className="card-analitica">
+      <div className="card-title">
+        <span>🗺️ Historial de Rutas Completadas</span>
+        <FaMapMarkedAlt color="#3498db" />
+      </div>
+      <p style={{fontSize: '0.9rem', color: '#666', marginBottom: 20}}>
+        Selecciona un pedido completado para ver la visualización de la ruta realizada.
+      </p>
+      
+      <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 15}}>
+        {routesHistory.map((route) => (
+          <div 
+            key={route.id} 
+            className="route-card-item"
+            onClick={() => fetchPickerRoute(route.id_picker, route.id_pedido)}
+            style={{
+                border: '1px solid #e2e8f0', 
+                borderRadius: 8, 
+                padding: 15, 
+                cursor: 'pointer',
+                background: 'white',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 5}}>
+                <span style={{fontWeight: 'bold', color: '#2d3748'}}>Pedido #{route.id_pedido}</span>
+                <span style={{fontSize: '0.8rem', color: '#718096'}}>{new Date(route.fecha_fin).toLocaleDateString()}</span>
+            </div>
+            <div style={{display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8}}>
+                <div style={{width: 24, height: 24, borderRadius: '50%', background: '#edf2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem'}}>👷</div>
+                <span style={{fontSize: '0.9rem', fontWeight: 500}}>{route.nombre_picker || 'Picker'}</span>
+            </div>
+            <div style={{fontSize: '0.8rem', color: '#718096', display: 'flex', gap: 15}}>
+                <span>⏱️ {Math.floor(route.tiempo_total_segundos / 60)}m {route.tiempo_total_segundos % 60}s</span>
+                <span style={{color: '#3498db', fontWeight: 'bold'}}>Ver Recorrido →</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {routesHistory.length === 0 && (
+          <div style={{textAlign: 'center', padding: 40, color: '#a0aec0'}}>
+              No hay rutas completadas registradas aún.
+          </div>
+      )}
+    </div>
+  );
+};
 
 const AnaliticaPickers = () => {
   const [activeTab, setActiveTab] = useState("dashboard"); // dashboard | logs
@@ -69,12 +144,14 @@ const AnaliticaPickers = () => {
     fetchData();
   }, []);
 
-  // [NEW] Fetch Route Data
-  const fetchPickerRoute = async (pickerId) => {
+  const fetchPickerRoute = async (pickerId, orderId = null) => {
     setLoadingRoute(true);
     try {
       const BASE_URL = "https://backend-woocommerce.vercel.app/api";
-      const res = await axios.get(`${BASE_URL}/analytics/route?id_picker=${pickerId}`);
+      const query = orderId 
+          ? `?id_picker=${pickerId}&id_pedido=${orderId}`
+          : `?id_picker=${pickerId}`;
+      const res = await axios.get(`${BASE_URL}/analytics/route${query}`);
       setRouteData(res.data);
       setSelectedPickerRoute(pickerId);
     } catch (error) {
@@ -120,8 +197,12 @@ const AnaliticaPickers = () => {
           onClick={() => setActiveTab("logs")}
         >
           <FaListUl /> Auditoría Forense
-        </button>
-      </div>
+        </button>        <button
+          className={`analitica-tab ${activeTab === "routes" ? "active" : ""}`}
+          onClick={() => setActiveTab("routes")}
+        >
+          <FaMapMarkedAlt /> Analizar Rutas
+        </button>      </div>
 
       {loading ? (
         <div style={{ textAlign: "center", padding: 40 }}>
@@ -225,7 +306,7 @@ const AnaliticaPickers = () => {
                   <th>Eficiencia (SPI)</th>
                   <th>Precisión Global</th>
                   <th>Pedidos Perfectos</th>
-                  <th>Ruta</th>
+
                 </tr>
               </thead>
               <tbody>
@@ -290,25 +371,6 @@ const AnaliticaPickers = () => {
                                 ({p.pedidos_perfectos}/{p.total_pedidos})
                             </span>
                         </div>
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => fetchPickerRoute(p.id)}
-                        style={{
-                          padding: "6px 12px",
-                          background: "#3498db",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "6px",
-                          cursor: "pointer",
-                          fontSize: "0.8rem",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "4px",
-                        }}
-                      >
-                        <FaRoute size={12} /> Ver Ruta
-                      </button>
                     </td>
                   </tr>
                 ))}
@@ -414,6 +476,10 @@ const AnaliticaPickers = () => {
             )}
           </div>
         </div>
+      )}
+
+      {activeTab === "routes" && (
+        <RouteSelectionView fetchPickerRoute={fetchPickerRoute} />
       )}
 
       {/* MODAL DE RUTA (Nuevo) */}
