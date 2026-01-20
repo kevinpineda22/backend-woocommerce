@@ -277,7 +277,8 @@ exports.getPickerRoute = async (req, res) => {
         route: [],
         summary: [],
         regressions: [],
-        metrics: { total_pasillos_visitados: 0, total_time: 0, total_items: 0 }
+        metrics: { total_pasillos_visitados: 0, total_time: 0, total_items: 0 },
+        raw_logs: []
       });
     }
 
@@ -372,6 +373,7 @@ exports.getPickerRoute = async (req, res) => {
       })),
       summary,
       regressions,
+      raw_logs: logs,
       metrics: {
         total_pasillos_visitados: Object.keys(pasilloStats).length,
         total_time: routeSegments.reduce((acc, s) => acc + s.duration_seconds, 0),

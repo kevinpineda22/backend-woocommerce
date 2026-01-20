@@ -14,6 +14,7 @@ import {
   FaMapMarkedAlt,
 } from "react-icons/fa";
 import "./AnaliticaPickers.css";
+import WarehouseMap from "./WarehouseMap"; // [NEW] Componente de Mapa Interactivo
 
 const AnaliticaPickers = () => {
   const [activeTab, setActiveTab] = useState("dashboard"); // dashboard | logs
@@ -452,6 +453,11 @@ const AnaliticaPickers = () => {
                   ))}
                 </div>
               )}
+
+              {/* Warehouse Interactive Map */}
+              <div className="ap-modal-section">
+                <WarehouseMap routeData={routeData.raw_logs || []} />
+              </div>
 
               {/* Timeline Visual (Gantt Style) */}
               <div className="ap-modal-section">

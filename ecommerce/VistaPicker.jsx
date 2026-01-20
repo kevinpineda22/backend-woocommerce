@@ -87,6 +87,8 @@ const SwipeCard = ({ item, onSwipe }) => {
           </div>
           <h4 className="ec-name-large">{item.name}</h4>
           <div className="ec-sku-container">
+            {/* Ocultamos el ID visualmente para forzar la verificación ciega si lo deseas, 
+                o lo dejamos solo como referencia. Pero el input manual NO debe autocompletarse */}
             {item.sku && <div className="ec-sku sku-badge"><small>ID:</small> {item.sku}</div>}
             {item.barcode && <div className="ec-sku barcode-badge"><FaBarcode style={{ marginRight: 4 }} /> {item.barcode}</div>}
           </div>
@@ -186,11 +188,11 @@ const VistaPicker = () => {
   const [loading, setLoading] = useState(true);
   const [currentOrder, setCurrentOrder] = useState(null);
   const [pickerStatus, setPickerStatus] = useState(null);
-  const [startTime, setStartTime] = useState(null); // NULL al inicio, espera primera acción
+  const [startTime, setStartTime] = useState(null);
   const [pickedItems, setPickedItems] = useState({});
   const [removedReasons, setRemovedReasons] = useState({});
-  const [timestampMap, setTimestampMap] = useState({}); // Timestamps de cada acción
   const [pendingRemoval, setPendingRemoval] = useState(null);
+  const [timestampMap, setTimestampMap] = useState({});
 
   const [isScanning, setIsScanning] = useState(false);
   const [itemToScan, setItemToScan] = useState(null);
@@ -233,37 +235,25 @@ const VistaPicker = () => {
           const savedAssignmentId = localStorage.getItem(storageAssignmentKey);
           const serverAssignmentId = orderRes.data.current_assignment_id;
 
-          // Si hay cambio de asignación, reseteamos todo
           if (serverAssignmentId && savedAssignmentId !== serverAssignmentId) {
             localStorage.removeItem(storageKeyItems);
             localStorage.removeItem(timerKey);
             localStorage.setItem(storageAssignmentKey, serverAssignmentId);
-            
             const initial = {};
             orderRes.data.line_items.forEach((i) => (initial[i.id] = false));
             setPickedItems(initial);
-            
-            // NO INICIAMOS EL TIMER AQUÍ AÚN. Esperamos primera acción.
-            setStartTime(null); 
-
+            setStartTime(null);
           } else if (savedItems) {
-            // Sesión existente
             setPickedItems(JSON.parse(savedItems));
-            
-            // Recuperar timer si existe
             const savedTime = localStorage.getItem(timerKey);
-            if (savedTime) {
-                setStartTime(parseInt(savedTime));
-            } else {
-                setStartTime(null); // Aún no ha empezado aunque tenga items
-            }
+            if (savedTime) setStartTime(parseInt(savedTime));
+            else setStartTime(null);
           } else {
-            // Primera vez limpia
             if (serverAssignmentId) localStorage.setItem(storageAssignmentKey, serverAssignmentId);
             const initial = {};
             orderRes.data.line_items.forEach((i) => (initial[i.id] = false));
             setPickedItems(initial);
-            setStartTime(null); // Esperar acción
+            setStartTime(null);
           }
           setIsSessionLoaded(true);
         }
@@ -272,7 +262,7 @@ const VistaPicker = () => {
     init();
   }, []);
 
-  // --- LÓGICA DEL TIMER (Solo corre si startTime existe) ---
+  // Timer
   useEffect(() => {
     if (!startTime) {
         setTimer("00:00:00");
@@ -288,17 +278,16 @@ const VistaPicker = () => {
     return () => clearInterval(i);
   }, [startTime]);
 
-  // --- TRIGGER PARA INICIAR EL TIEMPO ---
+  // Trigger Timer
   const triggerStartTimer = useCallback(() => {
     if (!startTime && pickerStatus?.id_pedido_actual) {
         const now = Date.now();
         setStartTime(now);
         localStorage.setItem(`picker_timer_${pickerStatus.id_pedido_actual}`, now);
-        console.log("⏱️ Timer Iniciado en:", new Date(now).toLocaleTimeString());
     }
   }, [startTime, pickerStatus]);
 
-  // Persistencia y Ping
+  // Persistencia
   useEffect(() => {
     if (isSessionLoaded && pickerStatus?.id_pedido_actual && currentOrder) {
       localStorage.setItem(`picker_items_${pickerStatus.id_pedido_actual}`, JSON.stringify(pickedItems));
@@ -319,9 +308,9 @@ const VistaPicker = () => {
     }
   }, [pickedItems, isSessionLoaded, pickerStatus, currentOrder]);
 
-  // VALIDACIÓN Y ACCIONES
+  // VALIDACIÓN
   const handleSuccessScan = (productName) => {
-    triggerStartTimer(); // <--- INICIA TIMER
+    triggerStartTimer();
     setPickedItems((prev) => ({ ...prev, [itemToScan.id]: "picked" }));
     setTimestampMap((prev) => ({ ...prev, [itemToScan.id]: Date.now() }));
     const nameToShow = productName || itemToScan.name;
@@ -352,19 +341,40 @@ const VistaPicker = () => {
     [itemToScan, isValidating, triggerStartTimer]
   );
 
+  // --- VALIDACIÓN MANUAL SEGURA (SIN REVELAR CÓDIGO) ---
   const handleManualVerification = async (manualCode) => {
     if (!itemToScan) return;
     const code = manualCode.toString().trim();
     const expectedSku = (itemToScan.sku || "").toString().trim();
 
-    if (code !== expectedSku) { alert(`❌ Código ${code} no coincide (Esperado: ${expectedSku})`); return; }
+    // 1. Verificar coincidencia CIEGA (Sin revelar el esperado en el alert)
+    if (code !== expectedSku) {
+      alert(`❌ El código ingresado (${code}) NO coincide con el producto solicitado.\n\nPor favor verifica la etiqueta o el código interno.`);
+      return; // Detener aquí, no damos pistas.
+    }
+
+    // 2. Verificar existencia en base de datos
     setIsValidating(true);
     try {
       const { data, error } = await supabase.from("items_siesa").select("f120_descripcion, activo").eq("f120_id", parseInt(code)).single();
-      if (error || !data) { alert("❌ ID no existe en base de datos."); return; }
-      if (!data.activo) { if(!window.confirm(`⚠️ Item "${data.f120_descripcion}" INACTIVO. ¿Continuar?`)) return; }
+      
+      if (error || !data) { 
+        alert("❌ Este ID no existe en la base de datos de items."); 
+        return; 
+      }
+      
+      if (!data.activo) { 
+        if(!window.confirm(`⚠️ El item "${data.f120_descripcion}" aparece INACTIVO en sistema. ¿Estás seguro que es correcto?`)) return; 
+      }
+      
+      // Éxito
       handleSuccessScan(data.f120_descripcion);
-    } catch (err) { console.error(err); alert("Error validando."); } finally { setIsValidating(false); }
+    } catch (err) { 
+      console.error(err); 
+      alert("Error validando el código manual."); 
+    } finally { 
+      setIsValidating(false); 
+    }
   };
 
   const handleSwipe = (id, action) => {
@@ -373,18 +383,15 @@ const VistaPicker = () => {
       const item = currentOrder?.line_items?.find((i) => i.id === id);
       setItemToScan(item);
       setIsScanning(true);
-    } else {
-        // En caso de swipe directo (si lo habilitas en el futuro), también inicia timer
-        // setPickedItems...
-    }
+    } else setPickedItems((prev) => ({ ...prev, [id]: action }));
   };
 
   const confirmRemoval = (reason) => {
-    triggerStartTimer(); // <--- INICIA TIMER TAMBIÉN AL RETIRAR
+    triggerStartTimer();
     if (pendingRemoval) {
       setRemovedReasons((p) => ({ ...p, [pendingRemoval.id]: reason }));
       setPickedItems((p) => ({ ...p, [pendingRemoval.id]: "removed" }));
-      setTimestampMap(prev => ({ ...prev, [pendingRemoval.id]: Date.now() })); // Capturar timestamp
+      setTimestampMap((p) => ({ ...p, [pendingRemoval.id]: Date.now() }));
       setPendingRemoval(null);
     }
   };
@@ -395,8 +402,7 @@ const VistaPicker = () => {
       await axios.post("https://backend-woocommerce.vercel.app/api/orders/finalizar-picking", {
         id_pedido: currentOrder.id,
         id_picker: pickerStatus.id,
-        // ENVIAMOS EL TIEMPO DE INICIO REAL AL BACKEND
-        tiempo_inicio_real: startTime, 
+        tiempo_inicio_real: startTime,
         reporte_items: {
           recolectados: groupedItems.completed.map((i) => ({ 
             id: i.id, 
@@ -475,6 +481,8 @@ const VistaPicker = () => {
       </div>
 
       <EscanerBarras isScanning={isScanning} setIsScanning={setIsScanning} onScan={handleScanMatch} />
+
+      {/* OVERLAY MANUAL (Ahora tiene 2 estados y validación ciega) */}
       <ManualConfirmOverlay isOpen={isScanning && itemToScan} onVerify={handleManualVerification} itemName={itemToScan?.name} isProcessing={isValidating} />
 
       {pendingRemoval && (
