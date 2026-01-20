@@ -236,21 +236,50 @@ exports.getPickerRoute = async (req, res) => {
       return res.status(400).json({ error: "id_picker requerido" });
     }
 
-    // Query base: logs del picker ordenados cronológicamente
-    let query = supabase
-      .from("wc_log_picking")
-      .select("accion, pasillo, nombre_producto, fecha_registro, device_timestamp, id_pedido")
-      .eq("wc_asignaciones_pedidos.id_picker", id_picker)
-      .order("fecha_registro", { ascending: true });
+    // Paso 1: Obtener los pedidos del picker
+    let pedidosQuery = supabase
+      .from("wc_asignaciones_pedidos")
+      .select("id_pedido")
+      .eq("id_picker", id_picker)
+      .eq("estado_asignacion", "completado");
 
-    // Filtro opcional por pedido específico
     if (id_pedido) {
-      query = query.eq("id_pedido", id_pedido);
+      pedidosQuery = pedidosQuery.eq("id_pedido", id_pedido);
     }
 
-    const { data: logs, error } = await query.limit(500);
+    const { data: asignaciones, error: asigError } = await pedidosQuery;
+    
+    if (asigError) throw asigError;
+
+    if (!asignaciones || asignaciones.length === 0) {
+      return res.status(200).json({
+        route: [],
+        summary: [],
+        regressions: [],
+        metrics: { total_pasillos_visitados: 0, total_time: 0, total_items: 0 }
+      });
+    }
+
+    const pedidoIds = asignaciones.map(a => a.id_pedido);
+
+    // Paso 2: Obtener logs de esos pedidos
+    const { data: logs, error } = await supabase
+      .from("wc_log_picking")
+      .select("accion, pasillo, nombre_producto, fecha_registro, device_timestamp, id_pedido")
+      .in("id_pedido", pedidoIds)
+      .order("fecha_registro", { ascending: true })
+      .limit(500);
 
     if (error) throw error;
+
+    if (!logs || logs.length === 0) {
+      return res.status(200).json({
+        route: [],
+        summary: [],
+        regressions: [],
+        metrics: { total_pasillos_visitados: 0, total_time: 0, total_items: 0 }
+      });
+    }
 
     // Agrupar por secuencia de pasillos
     const routeSegments = [];
