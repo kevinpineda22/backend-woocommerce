@@ -423,7 +423,7 @@ const AnaliticaPickers = () => {
               )}
           </div>
         </div>
-      ) : (
+      ) : activeTab === "logs" ? (
         <div className="card-analitica">
           <div className="card-title">
             <span>🕵️ Auditoría Forense Completa</span>
@@ -476,7 +476,7 @@ const AnaliticaPickers = () => {
             )}
           </div>
         </div>
-      )}
+      ) : null}
 
       {activeTab === "routes" && (
         <RouteSelectionView fetchPickerRoute={fetchPickerRoute} />
