@@ -265,7 +265,7 @@ exports.getPickerRoute = async (req, res) => {
     // Paso 2: Obtener logs de esos pedidos
     const { data: logs, error } = await supabase
       .from("wc_log_picking")
-      .select("accion, pasillo, nombre_producto, fecha_registro, device_timestamp, id_pedido")
+      .select("accion, pasillo, nombre_producto, fecha_registro, id_pedido")
       .in("id_pedido", pedidoIds)
       .order("fecha_registro", { ascending: true })
       .limit(500);
@@ -286,7 +286,7 @@ exports.getPickerRoute = async (req, res) => {
     let currentSegment = null;
 
     logs.forEach(log => {
-      const timestamp = log.device_timestamp ? new Date(log.device_timestamp) : new Date(log.fecha_registro);
+      const timestamp = new Date(log.fecha_registro);
       const pasillo = log.pasillo || "S/N";
 
       if (!currentSegment || currentSegment.pasillo !== pasillo) {
