@@ -29,15 +29,39 @@ const calculateDistance = (p1, p2) => {
 // 1. Estadísticas de Rendimiento por Picker (Mejorado con Velocidad y Precisión)
 exports.getCollectorPerformance = async (req, res) => {
   try {
-    // 1. Obtenemos asignaciones completadas (Base para Tiempo y Cantidad de Pedidos)
-    const { data: asignaciones, error: asigError } = await supabase
+    const { range } = req.query; // 'today', '7d', '30d', 'all'
+
+    // Construcción de query base
+    let query = supabase
       .from("wc_asignaciones_pedidos")
       .select(
         "id_picker, nombre_picker, tiempo_total_segundos, id_pedido, fecha_inicio, fecha_fin"
       )
       .eq("estado_asignacion", "completado")
-      // Filtramos datos muy antiguos o corruptos si es necesario
       .not("tiempo_total_segundos", "is", null);
+
+    // Aplicar Filtro de Fecha (Ajustado a Zona Horaria Colombia aprox si usamos UTC server)
+    // Se asume que fecha_inicio está en ISO UTC
+    if (range && range !== 'all') {
+        const now = dayjs(); // Server time
+        let startDate;
+
+        if (range === 'today') {
+            // Inicio del día actual
+            startDate = now.startOf('day'); 
+        } else if (range === '7d') {
+            startDate = now.subtract(7, 'day').startOf('day');
+        } else if (range === '30d') {
+            startDate = now.subtract(30, 'day').startOf('day');
+        }
+
+        if (startDate) {
+            query = query.gte('fecha_inicio', startDate.toISOString());
+        }
+    }
+
+    // 1. Obtenemos asignaciones completadas (Base para Tiempo y Cantidad de Pedidos)
+    const { data: asignaciones, error: asigError } = await query;
 
     if (asigError) throw asigError;
 

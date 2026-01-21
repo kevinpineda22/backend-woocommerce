@@ -12,7 +12,8 @@ import {
   FaSync,
   FaRoute,
   FaMapMarkedAlt,
-  FaTimes
+  FaTimes,
+  FaQuestionCircle // [NEW]
 } from "react-icons/fa";
 import "./AnaliticaPickers.css";
 import WarehouseMap from "./WarehouseMap"; 
@@ -99,6 +100,8 @@ const AnaliticaPickers = () => {
   const [heatmapData, setHeatmapData] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showHelp, setShowHelp] = useState(false); // [NEW] Modal ayuda
+  const [dateRange, setDateRange] = useState("all"); // [NEW] Filtro de fecha
   const [selectedPickerRoute, setSelectedPickerRoute] = useState(null); // [NEW]
   const [routeData, setRouteData] = useState(null); // [NEW]
   const [loadingRoute, setLoadingRoute] = useState(false); // [NEW]
@@ -111,7 +114,7 @@ const AnaliticaPickers = () => {
       const BASE_URL = "https://backend-woocommerce.vercel.app/api";
 
       const [perfRes, heatRes, auditRes] = await Promise.all([
-        axios.get(`${BASE_URL}/analytics/performance`),
+        axios.get(`${BASE_URL}/analytics/performance?range=${dateRange}`),
         axios.get(`${BASE_URL}/analytics/heatmap`),
         axios.get(`${BASE_URL}/analytics/audit`),
       ]);
@@ -142,7 +145,7 @@ const AnaliticaPickers = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [dateRange]); // Recargar cuando cambia el filtro
 
   const fetchPickerRoute = async (pickerId, orderId = null) => {
     setLoadingRoute(true);
@@ -177,9 +180,40 @@ const AnaliticaPickers = () => {
               Métricas de rendimiento y auditoría de picking en tiempo real
             </p>
           </div>
-          <button className="pedidos-admin-refresh-btn" onClick={fetchData}>
-            <FaSync className={loading ? "ec-spin" : ""} /> Actualizar Datos
-          </button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {/* SELECTOR DE RANGO DE FECHA */}
+            <select 
+                value={dateRange} 
+                onChange={(e) => setDateRange(e.target.value)}
+                style={{
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #ddd',
+                    background: 'white',
+                    color: '#2c3e50',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    fontWeight: 500
+                }}
+            >
+                <option value="today">📅 Hoy</option>
+                <option value="7d">🗓️ Últimos 7 días</option>
+                <option value="30d">📆 Último Mes</option>
+                <option value="all">♾️ Todo el Historial</option>
+            </select>
+
+            <button 
+                className="pedidos-admin-refresh-btn" 
+                style={{ background: '#7f8c8d' }} 
+                onClick={() => setShowHelp(true)}
+                title="¿Cómo se calcula esto?"
+            >
+                <FaQuestionCircle />
+            </button>
+            <button className="pedidos-admin-refresh-btn" onClick={fetchData}>
+                <FaSync className={loading ? "ec-spin" : ""} /> Actualizar Datos
+            </button>
+          </div>
         </div>
       </div>
 
@@ -736,6 +770,75 @@ const AnaliticaPickers = () => {
       {loadingRoute && (
         <div style={{position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(0,0,0,0.8)', color: 'white', padding: '20px', borderRadius: '8px', zIndex: 10000}}>
           Cargando ruta...
+        </div>
+      )}
+      {/* MODAL DE AYUDA / GLOSARIO */}
+      {showHelp && (
+        <div style={{
+            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+            background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex',
+            alignItems: 'center', justifyContent: 'center'
+        }}>
+            <div style={{
+                background: 'white', padding: 30, borderRadius: 12, width: '90%', maxWidth: 600,
+                boxShadow: '0 10px 40px rgba(0,0,0,0.2)', position: 'relative',
+                maxHeight: '90vh', overflowY: 'auto'
+            }}>
+                <button 
+                  onClick={() => setShowHelp(false)}
+                  style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#666' }}
+                >
+                    <FaTimes />
+                </button>
+                
+                <h2 style={{color: '#2c3e50', marginBottom: 20, borderBottom: '2px solid #3498db', paddingBottom: 10, display: 'flex', alignItems: 'center', gap: 10}}>
+                   <FaQuestionCircle /> Glosario de Métricas
+                </h2>
+
+                <div style={{display: 'flex', flexDirection: 'column', gap: 20}}>
+                    <div>
+                        <h4 style={{color: '#3498db', marginBottom: 5}}>⏱️ Eficiencia Global (SPI)</h4>
+                        <p style={{fontSize: '0.9rem', color: '#555', lineHeight: 1.5}}>
+                            <strong>Seconds Per Item (Segundos por Item).</strong> Mide la velocidad promedio. 
+                            <br/><em>Fórmula: Tiempo Total Trabajado / Total Items Recolectados.</em>
+                            <br/><span style={{fontSize: '0.8rem', color: '#7f8c8d'}}>Menor es mejor (indica mayor rapidez).</span>
+                        </p>
+                    </div>
+
+                    <div>
+                        <h4 style={{color: '#e67e22', marginBottom: 5}}>👣 Distancia Estimada</h4>
+                        <p style={{fontSize: '0.9rem', color: '#555', lineHeight: 1.5}}>
+                            Cálculo aproximado del recorrido físico del picker basado en los pasillos visitados.
+                            <br/><span style={{fontSize: '0.8rem', color: '#7f8c8d'}}>Útil para saber si un empleado camina innecesariamente más que otros.</span>
+                        </p>
+                    </div>
+
+                    <div>
+                        <h4 style={{color: '#27ae60', marginBottom: 5}}>🎯 Tasa de Éxito & Pedidos Perfectos</h4>
+                        <p style={{fontSize: '0.9rem', color: '#555', lineHeight: 1.5}}>
+                            <strong>Tasa de Éxito:</strong> Porcentaje de items encontrados vs solicitados.
+                            <br/><strong>Ped. Perfectos:</strong> Porcentaje de pedidos completados sin NINGÚN reporte de agotado o no encontrado.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h4 style={{color: '#8e44ad', marginBottom: 5}}>📊 Ritmo de Trabajo (Carga)</h4>
+                        <p style={{fontSize: '0.9rem', color: '#555', lineHeight: 1.5}}>
+                            Muestra la cantidad de pedidos que <strong>iniciaron</strong> en cada hora del día.
+                            <br/><span style={{fontSize: '0.8rem', color: '#7f8c8d'}}>Ayuda a identificar las "Horas Pico" reales de demanda en bodega.</span>
+                        </p>
+                    </div>
+                </div>
+
+                <div style={{marginTop: 30, textAlign: 'center'}}>
+                    <button 
+                        onClick={() => setShowHelp(false)}
+                        style={{background: '#3498db', color: 'white', border: 'none', padding: '10px 25px', borderRadius: 6, cursor: 'pointer', fontWeight: 'bold'}}
+                    >
+                        Entendido
+                    </button>
+                </div>
+            </div>
         </div>
       )}
     </div>
