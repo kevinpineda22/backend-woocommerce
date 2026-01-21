@@ -485,119 +485,147 @@ const AnaliticaPickers = () => {
       {/* MODAL DE RUTA (Nuevo) */}
       {selectedPickerRoute && routeData && (
         <div className="ap-modal-backdrop" onClick={() => { setSelectedPickerRoute(null); setRouteData(null); }}>
-          <div className="ap-modal-container" onClick={e => e.stopPropagation()} style={{maxWidth: '900px'}}>
+          <div className="ap-modal-container" onClick={e => e.stopPropagation()}>
             <div className="ap-modal-header">
-              <h2><FaMapMarkedAlt /> Mapa de Ruta del Picker</h2>
+              <h2><FaMapMarkedAlt /> Análisis de Ruta Detallado</h2>
               <button className="ap-modal-close-btn" onClick={() => { setSelectedPickerRoute(null); setRouteData(null); }}>×</button>
             </div>
+            
             <div className="ap-modal-body">
               
-              {/* Métricas Resumen */}
-              <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 15, marginBottom: 20}}>
-                <div style={{background: '#f8f9fa', padding: 15, borderRadius: 8, textAlign: 'center'}}>
-                  <div style={{fontSize: '0.8rem', color: '#6c757d'}}>Pasillos Visitados</div>
-                  <div style={{fontSize: '1.8rem', fontWeight: 'bold', color: '#495057'}}>{routeData.metrics.total_pasillos_visitados}</div>
+              {/* 1. Kpis Superiores */}
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20}}>
+                <div className="ap-metric-card">
+                  <div style={{fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 5}}>Pasillos Recorridos</div>
+                  <div style={{fontSize: '2.5rem', fontWeight: '800', color: '#334155'}}>{routeData.metrics.total_pasillos_visitados}</div>
                 </div>
-                <div style={{background: '#f8f9fa', padding: 15, borderRadius: 8, textAlign: 'center'}}>
-                  <div style={{fontSize: '0.8rem', color: '#6c757d'}}>Tiempo Total</div>
-                  <div style={{fontSize: '1.8rem', fontWeight: 'bold', color: '#495057'}}>{Math.floor(routeData.metrics.total_time / 60)}:{String(routeData.metrics.total_time % 60).padStart(2, '0')}</div>
+                <div className="ap-metric-card">
+                  <div style={{fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 5}}>Tiempo Total Picking</div>
+                  <div style={{fontSize: '2.5rem', fontWeight: '800', color: '#3b82f6'}}>
+                    {Math.floor(routeData.metrics.total_time / 60)}<span style={{fontSize: '1.5rem'}}>m</span> {String(routeData.metrics.total_time % 60).padStart(2, '0')}<span style={{fontSize: '1.5rem'}}>s</span>
+                  </div>
                 </div>
-                <div style={{background: '#f8f9fa', padding: 15, borderRadius: 8, textAlign: 'center'}}>
-                  <div style={{fontSize: '0.8rem', color: '#6c757d'}}>Items Procesados</div>
-                  <div style={{fontSize: '1.8rem', fontWeight: 'bold', color: '#495057'}}>{routeData.metrics.total_items}</div>
+                <div className="ap-metric-card">
+                  <div style={{fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 5}}>Items Procesados</div>
+                  <div style={{fontSize: '2.5rem', fontWeight: '800', color: '#334155'}}>{routeData.metrics.total_items}</div>
                 </div>
               </div>
 
-              {/* Alertas de Regresiones */}
+              {/* 2. Alertas de Ineficiencia */}
               {routeData.regressions.length > 0 && (
-                <div style={{background: '#fff3cd', padding: 12, borderRadius: 8, marginBottom: 20, border: '1px solid #ffc107'}}>
-                  <h3 style={{fontSize: '0.9rem', color: '#856404', margin: '0 0 8px 0'}}>⚠️ Rutas Ineficientes Detectadas</h3>
-                  {routeData.regressions.map((r, i) => (
-                    <div key={i} style={{fontSize: '0.8rem', color: '#856404'}}>
-                      • <b>{r.pasillo}</b>: {r.message} (Orden: {r.visits.join(' → ')})
-                    </div>
-                  ))}
+                <div className="ap-card-internal" style={{borderLeft: '5px solid #f59e0b', background: '#fffbeb'}}>
+                  <h3 style={{fontSize: '1.1rem', color: '#b45309', margin: '0 0 15px 0', display: 'flex', alignItems: 'center', gap: 10}}>
+                    <FaExclamationTriangle /> Ineficiencias Detectadas
+                  </h3>
+                  <div style={{display: 'grid', gap: 10}}>
+                    {routeData.regressions.map((r, i) => (
+                      <div key={i} style={{fontSize: '0.95rem', color: '#92400e', background: 'white', padding: '10px 15px', borderRadius: 8, border: '1px solid #fcd34d', display: 'flex', alignItems: 'center', gap: 10}}>
+                         <span style={{background: '#fef3c7', padding: '4px 8px', borderRadius: 4, fontWeight: 'bold'}}>Pasillo {r.pasillo}</span>
+                         <span>{r.message}</span>
+                         <span style={{marginLeft: 'auto', fontSize: '0.85rem', color: '#b45309'}}>Secuencia: {r.visits.join(' ➔ ')}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              {/* Warehouse Interactive Map */}
-              <div className="ap-modal-section">
-                <WarehouseMap routeData={routeData.raw_logs || []} />
+              {/* 3. Mapa Interactivo Grande */}
+              <div className="ap-card-internal" style={{padding: 0, overflow: 'hidden'}}>
+                 <div style={{padding: '15px 24px', borderBottom: '1px solid #eee', background: '#f8fafc'}}>
+                    <h3 style={{margin: 0, fontSize: '1rem', color: '#475569'}}>🗺️ Reproducción de Recorrido en Planta</h3>
+                 </div>
+                 <div style={{background: '#1e1e24'}}>
+                    <WarehouseMap routeData={routeData.raw_logs || []} />
+                 </div>
               </div>
 
-              {/* Timeline Visual (Gantt Style) */}
-              <div className="ap-modal-section">
-                <h3>🗺️ Secuencia de Recorrido</h3>
-                <div style={{display: 'flex', flexDirection: 'column', gap: 8}}>
-                  {routeData.route.map((seg, i) => {
-                    const maxDuration = Math.max(...routeData.route.map(s => s.duration_seconds), 1);
-                    const widthPercent = (seg.duration_seconds / maxDuration) * 100;
-                    const isRegression = i > 0 && routeData.route.slice(0, i).some(prev => prev.pasillo === seg.pasillo);
-                    
-                    return (
-                      <div key={i} style={{display: 'flex', alignItems: 'center', gap: 10}}>
-                        <div style={{width: '80px', fontSize: '0.75rem', fontWeight: '600', color: '#495057', flexShrink: 0}}>
-                          {seg.pasillo}
-                        </div>
-                        <div style={{flex: 1, position: 'relative'}}>
-                          <div style={{
-                            width: `${Math.max(widthPercent, 10)}%`,
-                            height: '24px',
-                            background: isRegression ? '#e74c3c' : '#3498db',
-                            borderRadius: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            paddingLeft: '8px',
-                            color: 'white',
-                            fontSize: '0.7rem',
-                            fontWeight: 'bold',
-                            transition: 'width 0.3s ease'
-                          }}>
-                            {seg.items} items • {Math.floor(seg.duration_seconds / 60)}:{String(seg.duration_seconds % 60).padStart(2, '0')}
+              {/* 4. Timeline y Tabla en Grid */}
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24}}>
+                  
+                  {/* Timeline */}
+                  <div className="ap-card-internal">
+                    <h3 style={{marginBottom: 20, color: '#1e293b'}}>⏱️ Línea de Tiempo Secuencial</h3>
+                    <div style={{display: 'flex', flexDirection: 'column', gap: 12, maxHeight: '400px', overflowY: 'auto', paddingRight: 10}}>
+                      {routeData.route.map((seg, i) => {
+                        const maxDuration = Math.max(...routeData.route.map(s => s.duration_seconds), 1);
+                        const widthPercent = (seg.duration_seconds / maxDuration) * 100;
+                        const isRegression = i > 0 && routeData.route.slice(0, i).some(prev => prev.pasillo === seg.pasillo);
+                        
+                        return (
+                          <div key={i} style={{display: 'flex', alignItems: 'center', gap: 12}}>
+                            <div style={{
+                                width: '60px', 
+                                height: '60px', 
+                                background: isRegression ? '#fee2e2' : '#eff6ff', 
+                                color: isRegression ? '#dc2626' : '#2563eb',
+                                borderRadius: 8, 
+                                display: 'flex', 
+                                flexDirection: 'column',
+                                alignItems: 'center', 
+                                justifyContent: 'center',
+                                border: `1px solid ${isRegression ? '#fecaca' : '#bfdbfe'}`,
+                                flexShrink: 0
+                            }}>
+                              <span style={{fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 'bold'}}>Pasillo</span>
+                              <span style={{fontSize: '1.2rem', fontWeight: '800'}}>{seg.pasillo}</span>
+                            </div>
+
+                            <div style={{flex: 1}}>
+                                <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '0.85rem'}}>
+                                    <span style={{color: '#64748b'}}>{new Date(seg.start_time).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</span>
+                                    <span style={{fontWeight: 'bold', color: '#334155'}}>{Math.floor(seg.duration_seconds / 60)}m {seg.duration_seconds % 60}s</span>
+                                </div>
+                                <div style={{width: '100%', background: '#f1f5f9', height: 10, borderRadius: 5, overflow: 'hidden'}}>
+                                    <div style={{
+                                        width: `${Math.max(widthPercent, 5)}%`,
+                                        height: '100%',
+                                        background: isRegression ? '#ef4444' : '#3b82f6',
+                                        borderRadius: 5
+                                    }}></div>
+                                </div>
+                                <div style={{fontSize: '0.75rem', color: '#94a3b8', marginTop: 4}}>{seg.items} items recogidos</div>
+                            </div>
                           </div>
-                        </div>
-                        <div style={{width: '50px', fontSize: '0.7rem', color: '#6c757d', textAlign: 'right'}}>
-                          {new Date(seg.start_time).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+                        );
+                      })}
+                    </div>
+                  </div>
 
-              {/* Tabla de Resumen por Pasillo */}
-              <div className="ap-modal-section">
-                <h3>📊 Análisis por Pasillo</h3>
-                <table style={{width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse'}}>
-                  <thead>
-                    <tr style={{background: '#f8f9fa', textAlign: 'left'}}>
-                      <th style={{padding: '8px'}}>Pasillo</th>
-                      <th style={{padding: '8px'}}>Tiempo Total</th>
-                      <th style={{padding: '8px'}}>Items</th>
-                      <th style={{padding: '8px'}}>Tiempo/Item</th>
-                      <th style={{padding: '8px'}}>Visitas</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {routeData.summary.map((s, i) => (
-                      <tr key={i} style={{borderBottom: '1px solid #dee2e6'}}>
-                        <td style={{padding: '8px', fontWeight: '600'}}>{s.pasillo}</td>
-                        <td style={{padding: '8px'}}>{s.total_time_formatted}</td>
-                        <td style={{padding: '8px'}}>{s.total_items}</td>
-                        <td style={{padding: '8px', color: s.avg_time_per_item > 60 ? '#e74c3c' : '#2ecc71'}}>
-                          {s.avg_time_per_item}s
-                        </td>
-                        <td style={{padding: '8px'}}>
-                          {s.visits > 1 ? (
-                            <span style={{background: '#ffc107', color: '#856404', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem'}}>
-                              {s.visits}x
-                            </span>
-                          ) : s.visits}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  {/* Tabla Resumen */}
+                  <div className="ap-card-internal">
+                    <h3 style={{marginBottom: 20, color: '#1e293b'}}>📊 Métricas por Pasillo</h3>
+                    <div style={{overflowX: 'auto'}}>
+                        <table style={{width: '100%', fontSize: '0.9rem', borderCollapse: 'collapse'}}>
+                        <thead>
+                            <tr style={{background: '#f8fafc', textAlign: 'left', borderBottom: '2px solid #e2e8f0'}}>
+                            <th style={{padding: '12px', color: '#64748b'}}>Pasillo</th>
+                            <th style={{padding: '12px', color: '#64748b'}}>Tiempo</th>
+                            <th style={{padding: '12px', color: '#64748b'}}>Items</th>
+                            <th style={{padding: '12px', color: '#64748b'}}>T/Item</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {routeData.summary.map((s, i) => (
+                            <tr key={i} style={{borderBottom: '1px solid #f1f5f9'}}>
+                                <td style={{padding: '12px', fontWeight: '600', color: '#334155'}}>{s.pasillo} {s.visits > 1 && <span style={{fontSize:'0.7rem', background:'#fef3c7', color:'#b45309', padding:'2px 6px', borderRadius:4, marginLeft:5}}>x{s.visits}</span>}</td>
+                                <td style={{padding: '12px', fontFamily: 'monospace'}}>{s.total_time_formatted}</td>
+                                <td style={{padding: '12px'}}>{s.total_items}</td>
+                                <td style={{padding: '12px'}}>
+                                    <span style={{
+                                        padding: '4px 8px', borderRadius: 4, fontWeight: 'bold', fontSize: '0.8rem',
+                                        background: s.avg_time_per_item > 60 ? '#fee2e2' : '#dcfce7',
+                                        color: s.avg_time_per_item > 60 ? '#ef4444' : '#16a34a'
+                                    }}>
+                                        {s.avg_time_per_item}s
+                                    </span>
+                                </td>
+                            </tr>
+                            ))}
+                        </tbody>
+                        </table>
+                    </div>
+                  </div>
+
               </div>
 
             </div>

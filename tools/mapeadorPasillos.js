@@ -84,6 +84,8 @@ const DEFINICION_PASILLOS = [
       "vela",
       "limpia piso",
       "escobas",
+      "fabuloso",
+      "lavanda",
     ],
   },
 
