@@ -2,6 +2,30 @@ const { supabase } = require("../services/supabaseClient");
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 const dayjs = require("dayjs");
 
+// Coordenadas aproximadas para cálculo de distancias (Basado en WarehouseMap.jsx)
+// Se toman los puntos centrales de cada bloque.
+const AISLE_COORDINATES = {
+  '1': { x: 90, y: 170 }, 
+  '2': { x: 90, y: 340 },
+  '3': { x: 200, y: 170 },
+  '4': { x: 200, y: 340 },
+  '5': { x: 310, y: 170 },
+  '6': { x: 310, y: 340 },
+  '7': { x: 420, y: 170 },
+  '8': { x: 420, y: 340 },
+  '9': { x: 530, y: 170 },
+  '10': { x: 530, y: 340 },
+  '11': { x: 640, y: 170 },
+  '12': { x: 640, y: 340 },
+  '13': { x: 730, y: 275 },
+  '14': { x: 400, y: 520 }, 
+  'default': { x: 40, y: 40 } // Entrada/Oficina (Inicio de turno)
+};
+
+const calculateDistance = (p1, p2) => {
+    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+};
+
 // 1. Estadísticas de Rendimiento por Picker (Mejorado con Velocidad y Precisión)
 exports.getCollectorPerformance = async (req, res) => {
   try {
@@ -20,7 +44,8 @@ exports.getCollectorPerformance = async (req, res) => {
     // 2. Obtenemos Logs para calcular Items por Minuto, Tasa de Error y Pedidos Perfectos
     const { data: logs, error: logError } = await supabase
       .from("wc_log_picking")
-      .select("accion, motivo, id_pedido, wc_asignaciones_pedidos!inner(id_picker)");
+      .select("accion, motivo, id_pedido, pasillo, fecha_registro, wc_asignaciones_pedidos!inner(id_picker)")
+      .order("fecha_registro", { ascending: true }); // Importante: Orden cronologico para distancia
 
     if (logError) throw logError;
 
@@ -46,6 +71,7 @@ exports.getCollectorPerformance = async (req, res) => {
           tiempo_total_acumulado: 0,
           total_items_recolectados: 0,
           total_items_reportados: 0,
+          distancia_recorrida_px: 0, // Nueva Metrica de Esfuerzo Físico
           motivos_frecuentes: {}
         };
       }
@@ -58,10 +84,18 @@ exports.getCollectorPerformance = async (req, res) => {
       }
     });
 
+    // Estructura para calcular distancias: picker -> pedido -> [logs ordenados]
+    const pickerRoutes = {};
+
     // Sumar conteo de items (acciones) a cada picker
     logs.forEach((log) => {
       const id = log.wc_asignaciones_pedidos?.id_picker;
       if (stats[id]) {
+        // Logica Distancia: Agrupar por pedido
+        if (!pickerRoutes[id]) pickerRoutes[id] = {};
+        if (!pickerRoutes[id][log.id_pedido]) pickerRoutes[id][log.id_pedido] = [];
+        pickerRoutes[id][log.id_pedido].push(log);
+
         if (log.accion === "recolectado") {
             stats[id].total_items_recolectados += 1;
         } else if (log.accion === "retirado" || log.accion === "no_encontrado") {
@@ -71,6 +105,36 @@ exports.getCollectorPerformance = async (req, res) => {
             stats[id].motivos_frecuentes[motivo] = (stats[id].motivos_frecuentes[motivo] || 0) + 1;
         }
       }
+    });
+
+    // CÁLCULO DE DISTANCIAS
+    Object.keys(pickerRoutes).forEach(pickerId => {
+        let totalDistancia = 0;
+        const pedidos = pickerRoutes[pickerId];
+
+        Object.values(pedidos).forEach(logsDePedido => {
+            // Ordenamos por seguridad, aunque ya vinieron ordenados
+            // Empezamos en "Entrada" o ultimo punto conocido (Asumimos Entrada por cada pedido nuevo por ahora)
+            let prevPos = AISLE_COORDINATES['default'];
+            
+            logsDePedido.forEach(log => {
+                const pasillo = String(log.pasillo || '').replace('P-', '');
+                const targetPos = AISLE_COORDINATES[pasillo];
+
+                if (targetPos) {
+                    totalDistancia += calculateDistance(prevPos, targetPos);
+                    prevPos = targetPos; // Caminamos aqui
+                }
+            });
+            // Retorno a base (opcional, pero realista)
+            totalDistancia += calculateDistance(prevPos, AISLE_COORDINATES['default']);
+        });
+
+        if (stats[pickerId]) {
+            // Convertimos pixeles (unidades arbitrarias) a Metros Estimados
+            // Factor: 100px aprox = 10 metros en bodegas pequeñas -> 1px = 0.1m
+            stats[pickerId].distancia_recorrida_px = Math.round(totalDistancia * 0.1); 
+        }
     });
 
     // 4. Calcular Métricas por Hora (Ritmo Circadiano - Global)

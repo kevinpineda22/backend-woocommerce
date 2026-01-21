@@ -397,6 +397,7 @@ const AnaliticaPickers = () => {
                   <th>#</th>
                   <th>Nombre</th>
                   <th>Eficiencia (SPI)</th>
+                  <th>Distancia Est.</th>
                   <th>Precisión Global</th>
                   <th>Pedidos Perfectos</th>
 
@@ -415,6 +416,12 @@ const AnaliticaPickers = () => {
                     <td>
                         <div style={{ fontWeight: "bold", color: "#2d3748" }}>{p.segundos_por_item}s</div>
                         <div style={{ fontSize: "0.7rem", color: "#7f8c8d" }}>por item</div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600, color: '#e67e22', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <FaRoute size={12} />
+                        {Math.round(p.distancia_recorrida_px || 0)}m
+                      </div>
                     </td>
                     <td>
                       <div
