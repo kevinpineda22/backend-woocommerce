@@ -79,7 +79,11 @@ exports.getCollectorPerformance = async (req, res) => {
     asignaciones.forEach(a => {
        if (a.fecha_inicio) {
           const date = new Date(a.fecha_inicio);
-          const hour = date.getHours(); 
+          // Ajuste de Zona Horaria: Convertir UTC a Colombia (UTC-5)
+          // El servidor suele estar en UTC (0), así que restamos 5 horas
+          let hour = date.getUTCHours() - 5;
+          if (hour < 0) hour += 24; // Ajuste si la resta da negativo (ej. 2 AM UTC -> 9 PM Ayer)
+
           if(hour >= 0 && hour < 24) {
               hourlyStats[hour].count++;
               if (a.nombre_picker) {
