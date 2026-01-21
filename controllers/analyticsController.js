@@ -1,5 +1,6 @@
 const { supabase } = require("../services/supabaseClient");
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
+const dayjs = require("dayjs");
 
 // 1. Estadísticas de Rendimiento por Picker (Mejorado con Velocidad y Precisión)
 exports.getCollectorPerformance = async (req, res) => {
@@ -8,7 +9,7 @@ exports.getCollectorPerformance = async (req, res) => {
     const { data: asignaciones, error: asigError } = await supabase
       .from("wc_asignaciones_pedidos")
       .select(
-        "id_picker, nombre_picker, tiempo_total_segundos, id_pedido, fecha_inicio"
+        "id_picker, nombre_picker, tiempo_total_segundos, id_pedido, fecha_inicio, fecha_fin"
       )
       .eq("estado_asignacion", "completado")
       // Filtramos datos muy antiguos o corruptos si es necesario
@@ -77,13 +78,14 @@ exports.getCollectorPerformance = async (req, res) => {
     const hourlyStats = Array.from({ length: 24 }, () => ({ count: 0, pickers: new Set() }));
 
     asignaciones.forEach(a => {
-       if (a.fecha_inicio) {
-          const date = new Date(a.fecha_inicio);
-          // Ajuste de Zona Horaria: Convertir UTC a Colombia (UTC-5)
-          // El servidor suele estar en UTC (0), así que restamos 5 horas
-          let hour = date.getUTCHours() - 5;
-          if (hour < 0) hour += 24; // Ajuste si la resta da negativo (ej. 2 AM UTC -> 9 PM Ayer)
-
+       // RECOMENDACIÓN: Usar 'fecha_inicio' para medir la DEMANDA/CARGA de trabajo real (Cuándo llegan los pedidos).
+       // Si un pedido llega a las 11:59, cuenta como carga de las 11h, aunque se termine a las 12h.
+       const fechaRef = a.fecha_inicio; 
+       
+       if (fechaRef) {
+          const date = dayjs(fechaRef).subtract(5, 'hour'); // UTC-5
+          const hour = date.hour(); // 0-23
+          
           if(hour >= 0 && hour < 24) {
               hourlyStats[hour].count++;
               if (a.nombre_picker) {
