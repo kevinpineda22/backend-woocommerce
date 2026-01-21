@@ -241,28 +241,66 @@ const AnaliticaPickers = () => {
 
           {/* SECCIÓN 2: GRÁFICAS */}
           <div className="card-analitica" style={{ gridColumn: "span 1" }}>
-              <div className="card-title">
-                  <span>📊 Ritmo de Trabajo (Pedidos/Hora)</span>
-              </div>
-              <div style={{ height: 180, display: 'flex', alignItems: 'flex-end', gap: 4, paddingTop: 20 }}>
-                  {hourlyData.map((d, i) => {
-                      const max = Math.max(...hourlyData.map(h => h.pedidos), 1);
-                      const height = (d.pedidos / max) * 100;
-                      return (
-                          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-                              <div style={{ 
-                                  width: '100%', 
-                                  height: `${height}%`, 
-                                  background: height > 0 ? '#3498db' : 'transparent',
-                                  borderRadius: '4px 4px 0 0',
-                                  minHeight: height > 0 ? 4 : 0,
-                                  transition: 'height 0.3s ease'
-                              }}></div>
-                              {i % 3 === 0 && <span style={{ fontSize: '0.6rem', color: '#95a5a6' }}>{d.hour}</span>}
-                          </div>
-                      )
-                  })}
-              </div>
+            <div className="card-title">
+              <span>📊 Ritmo de Trabajo (Pedidos/Hora)</span>
+            </div>
+            
+            {hourlyData && hourlyData.length > 0 ? (
+               <div style={{ height: 220, position: 'relative', paddingTop: 30, paddingLeft: 10, paddingBottom: 20 }}>
+                 
+                 {/* Líneas de Guía (Grid Y) */}
+                 <div style={{ position: 'absolute', top: 30, bottom: 25, left: 30, right: 10, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', zIndex: 0 }}>
+                    {[100, 75, 50, 25, 0].map((pct) => (
+                       <div key={pct} style={{ borderBottom: '1px dashed #f0f0f0', width: '100%', height: 0, position: 'relative' }}>
+                          <span style={{ position: 'absolute', left: -25, top: -7, fontSize: '0.65rem', color: '#bdc3c7' }}>
+                             {Math.ceil(Math.max(...hourlyData.map(h=>h.pedidos), 5) * (pct/100))}
+                          </span>
+                       </div>
+                    ))}
+                 </div>
+
+                 {/* Barras */}
+                 <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%', marginLeft: 30, paddingRight: 10, gap: 6, position: 'relative', zIndex: 1 }}>
+                    {hourlyData.map((d, i) => {
+                       const max = Math.max(...hourlyData.map(h => h.pedidos), 5); // Min scale 5
+                       const height = (d.pedidos / max) * 100;
+                       
+                       return (
+                         <div key={i} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', position: 'relative' }} className="bar-group">
+                            {/* Valor flotante (Tooltip simple) */}
+                            {d.pedidos > 0 && (
+                                <div style={{ marginBottom: 4, background: '#2c3e50', color: 'white', borderRadius: 4, padding: '2px 4px', fontSize: '0.6rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                                   {d.pedidos}
+                                </div>
+                            )}
+
+                            {/* Barra */}
+                            <div style={{ 
+                               width: '100%', 
+                               height: `${Math.max(height, d.pedidos > 0 ? 5 : 0)}%`, 
+                               background: d.pedidos > 0 ? 'linear-gradient(180deg, #3498db 0%, #2980b9 100%)' : 'transparent',
+                               borderRadius: '4px 4px 0 0',
+                               transition: 'height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                               opacity: d.pedidos > 0 ? 1 : 0.3
+                            }}></div>
+
+                            {/* Etiqueta X */}
+                            {i % 2 === 0 && (
+                               <span style={{ position: 'absolute', bottom: -20, fontSize: '0.6rem', color: '#7f8c8d' }}>
+                                 {d.hour.split(':')[0]}h
+                               </span>
+                            )}
+                         </div>
+                       )
+                    })}
+                 </div>
+               </div>
+            ) : (
+                <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', color: '#bdc3c7' }}>
+                   <FaChartLine size={30} style={{ marginBottom: 10, opacity: 0.5 }} />
+                   <p>No hay datos de actividad reciente</p>
+                </div>
+            )}
           </div>
 
           <div className="card-analitica" style={{ gridColumn: "span 1" }}>

@@ -227,19 +227,32 @@ const WarehouseMap = ({ routeData = [] }) => {
           animate={walkKeyframes} 
           transition={{ duration: isPlaying ? (2/speed) : 0.5, ease: "linear" }}
         >
-          👷
+          <img src="/icono.ico" alt="Picker" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
           <AnimatePresence mode="wait">
-            {isPlaying && walkingSteps[currentStepIndex] && (
-               <motion.div 
-                 className="picking-alert"
-                 initial={{ opacity: 0, y: 10, scale: 0.8 }}
-                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                 exit={{ opacity: 0, y: -10, scale: 0.8 }}
-                 key={`alert-${currentStepIndex}`}
-               >
-                 📦 <strong>{walkingSteps[currentStepIndex].nombre_producto?.substring(0, 15)}...</strong>
-               </motion.div>
-            )}
+            {isPlaying && walkingSteps[currentStepIndex] && (() => {
+               const step = walkingSteps[currentStepIndex];
+               // Verificación ampliada para soportar estructura de BD (accion: retirado, motivo: Agotado)
+               const isRemoved = 
+                 step.accion === 'retirado' || 
+                 step.motivo === 'Agotado' || 
+                 step.removed || 
+                 step.not_found || 
+                 step.estado === 'no_encontrado' || 
+                 step.estado === 'retirado';
+               
+               return (
+                <motion.div 
+                  className={`picking-alert ${isRemoved ? 'removed' : ''}`}
+                  initial={{ opacity: 0, y: 10, scale: 0.8 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.8 }}
+                  key={`alert-${currentStepIndex}`}
+                >
+                  {isRemoved ? '❌' : '📦'} 
+                  <strong>{step.nombre_producto?.substring(0, 15)}...</strong>
+                </motion.div>
+               );
+            })()}
           </AnimatePresence>
         </motion.div>
       </div>

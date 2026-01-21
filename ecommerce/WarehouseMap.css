@@ -199,3 +199,12 @@
   border-style: solid;
   border-color: #3b82f6 transparent transparent transparent;
 }
+
+.picking-alert.removed {
+  border-color: #ef4444;
+  color: #ffcccc;
+}
+
+.picking-alert.removed::after {
+  border-color: #ef4444 transparent transparent transparent;
+}

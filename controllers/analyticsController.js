@@ -8,7 +8,7 @@ exports.getCollectorPerformance = async (req, res) => {
     const { data: asignaciones, error: asigError } = await supabase
       .from("wc_asignaciones_pedidos")
       .select(
-        "id_picker, nombre_picker, tiempo_total_segundos, id_pedido"
+        "id_picker, nombre_picker, tiempo_total_segundos, id_pedido, fecha_inicio"
       )
       .eq("estado_asignacion", "completado")
       // Filtramos datos muy antiguos o corruptos si es necesario
