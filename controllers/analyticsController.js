@@ -73,24 +73,27 @@ exports.getCollectorPerformance = async (req, res) => {
     });
 
     // 4. Calcular Métricas por Hora (Ritmo Circadiano - Global)
-    // Usamos fecha_inicio de las asignaciones para ver "cuadros de carga"
-    const hourlyStats = Array(24).fill(0);
+    // Inicializamos array de objetos con contador y set de pickers
+    const hourlyStats = Array.from({ length: 24 }, () => ({ count: 0, pickers: new Set() }));
+
     asignaciones.forEach(a => {
        if (a.fecha_inicio) {
-          // Asumimos que la fecha viene en UTC o local con offset, getHours() dependerá de la config del servidor
-          // Para mayor precisión en producción, usaríamos librerías como dayjs con timezone
           const date = new Date(a.fecha_inicio);
-          // Ajuste simple: Restar 5 horas para Colombia/Latam si el server está en UTC, o usar directo si ya viene local
-          // Por simplicidad, usaremos la hora del string ISO
           const hour = date.getHours(); 
-          if(hour >= 0 && hour < 24) hourlyStats[hour]++;
+          if(hour >= 0 && hour < 24) {
+              hourlyStats[hour].count++;
+              if (a.nombre_picker) {
+                  hourlyStats[hour].pickers.add(a.nombre_picker);
+              }
+          }
        }
     });
     
     // Formatear para gráfica
-    const hourlyActivity = hourlyStats.map((count, hour) => ({
+    const hourlyActivity = hourlyStats.map((stat, hour) => ({
         hour: `${hour}:00`,
-        pedidos: count
+        pedidos: stat.count,
+        pickers: Array.from(stat.pickers) // Convertimos Set a Array para el frontend
     }));
 
     // 5. Calcular Métricas Globales

@@ -240,19 +240,19 @@ const AnaliticaPickers = () => {
           )}
 
           {/* SECCIÓN 2: GRÁFICAS */}
-          <div className="card-analitica" style={{ gridColumn: "span 1" }}>
+          <div className="card-analitica" style={{ gridColumn: "1 / -1", overflow: 'visible' }}>
             <div className="card-title">
-              <span>📊 Ritmo de Trabajo (Pedidos/Hora)</span>
+              <span>📊 Ritmo de Trabajo (Pedidos/Hora) - Detalle de Pickers</span>
             </div>
             
             {hourlyData && hourlyData.length > 0 ? (
-               <div style={{ height: 220, position: 'relative', paddingTop: 30, paddingLeft: 10, paddingBottom: 20 }}>
+               <div style={{ height: 350, position: 'relative', paddingTop: 40, paddingLeft: 10, paddingBottom: 20 }}>
                  
                  {/* Líneas de Guía (Grid Y) */}
-                 <div style={{ position: 'absolute', top: 30, bottom: 25, left: 30, right: 10, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', zIndex: 0 }}>
+                 <div style={{ position: 'absolute', top: 40, bottom: 25, left: 30, right: 10, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', zIndex: 0 }}>
                     {[100, 75, 50, 25, 0].map((pct) => (
                        <div key={pct} style={{ borderBottom: '1px dashed #f0f0f0', width: '100%', height: 0, position: 'relative' }}>
-                          <span style={{ position: 'absolute', left: -25, top: -7, fontSize: '0.65rem', color: '#bdc3c7' }}>
+                          <span style={{ position: 'absolute', left: -25, top: -7, fontSize: '0.75rem', color: '#bdc3c7' }}>
                              {Math.ceil(Math.max(...hourlyData.map(h=>h.pedidos), 5) * (pct/100))}
                           </span>
                        </div>
@@ -260,16 +260,70 @@ const AnaliticaPickers = () => {
                  </div>
 
                  {/* Barras */}
-                 <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%', marginLeft: 30, paddingRight: 10, gap: 6, position: 'relative', zIndex: 1 }}>
+                 <div style={{ display: 'flex', alignItems: 'flex-end', height: '100%', marginLeft: 30, paddingRight: 10, gap: 8, position: 'relative', zIndex: 2 }}>
                     {hourlyData.map((d, i) => {
-                       const max = Math.max(...hourlyData.map(h => h.pedidos), 5); // Min scale 5
+                       const max = Math.max(...hourlyData.map(h => h.pedidos), 5); 
                        const height = (d.pedidos / max) * 100;
                        
                        return (
-                         <div key={i} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', position: 'relative' }} className="bar-group">
-                            {/* Valor flotante (Tooltip simple) */}
+                         <div 
+                            key={i} 
+                            style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'center', position: 'relative', cursor: 'pointer' }} 
+                            className="bar-group"
+                            onMouseEnter={(e) => {
+                                // Simple DOM manipulation for tooltip visibility to avoid heavy React state re-renders on hover
+                                const tooltip = document.getElementById(`tooltip-${i}`);
+                                if(tooltip) tooltip.style.opacity = 1;
+                                if(tooltip) tooltip.style.pointerEvents = 'auto';
+                            }}
+                            onMouseLeave={(e) => {
+                                const tooltip = document.getElementById(`tooltip-${i}`);
+                                if(tooltip) tooltip.style.opacity = 0;
+                                if(tooltip) tooltip.style.pointerEvents = 'none';
+                            }}
+                         >
+                            {/* Tooltip FLOTANTE con Lista de Pickers */}
+                            {d.pedidos > 0 && d.pickers && (
+                                <div 
+                                    id={`tooltip-${i}`}
+                                    style={{
+                                        position: 'absolute',
+                                        bottom: '100%',
+                                        marginBottom: 10,
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        background: 'rgba(255, 255, 255, 0.98)',
+                                        border: '1px solid #e2e8f0',
+                                        borderRadius: 8,
+                                        padding: 10,
+                                        width: 'max-content',
+                                        maxWidth: 200,
+                                        boxShadow: '0 4px 15px rgba(0,0,0,0.15)',
+                                        opacity: 0,
+                                        pointerEvents: 'none',
+                                        transition: 'all 0.2s ease',
+                                        zIndex: 100,
+                                        color: '#2d3748',
+                                        textAlign: 'center'
+                                    }}
+                                >
+                                    <div style={{ fontWeight: 'bold', borderBottom: '1px solid #eee', paddingBottom: 5, marginBottom: 5 }}>
+                                        {d.pedidos} Pedidos ({d.hour})
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, maxHeight: 100, overflowY: 'auto' }}>
+                                        {d.pickers.map((picker, idx) => (
+                                            <div key={idx} style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'center' }}>
+                                                <span>👷</span> {picker}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div style={{ position: 'absolute', bottom: -6, left: '50%', marginLeft: -6, width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid white' }}></div>
+                                </div>
+                            )}
+
+                            {/* Valor flotante (Mini Badge) */}
                             {d.pedidos > 0 && (
-                                <div style={{ marginBottom: 4, background: '#2c3e50', color: 'white', borderRadius: 4, padding: '2px 4px', fontSize: '0.6rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+                                <div style={{ marginBottom: 4, background: '#2c3e50', color: 'white', borderRadius: 10, padding: '2px 8px', fontSize: '0.7rem', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                                    {d.pedidos}
                                 </div>
                             )}
@@ -278,15 +332,16 @@ const AnaliticaPickers = () => {
                             <div style={{ 
                                width: '100%', 
                                height: `${Math.max(height, d.pedidos > 0 ? 5 : 0)}%`, 
-                               background: d.pedidos > 0 ? 'linear-gradient(180deg, #3498db 0%, #2980b9 100%)' : 'transparent',
-                               borderRadius: '4px 4px 0 0',
-                               transition: 'height 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                               opacity: d.pedidos > 0 ? 1 : 0.3
+                               background: d.pedidos > 0 ? 'linear-gradient(180deg, #3498db 0%, #2980b9 100%)' : 'rgba(236, 240, 241, 0.5)',
+                               borderRadius: '6px 6px 0 0',
+                               transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                               opacity: d.pedidos > 0 ? 1 : 0.3,
+                               boxShadow: d.pedidos > 0 ? '0 4px 6px rgba(52, 152, 219, 0.3)' : 'none'
                             }}></div>
 
                             {/* Etiqueta X */}
                             {i % 2 === 0 && (
-                               <span style={{ position: 'absolute', bottom: -20, fontSize: '0.6rem', color: '#7f8c8d' }}>
+                               <span style={{ position: 'absolute', bottom: -20, fontSize: '0.75rem', fontWeight: 500, color: '#7f8c8d' }}>
                                  {d.hour.split(':')[0]}h
                                </span>
                             )}
