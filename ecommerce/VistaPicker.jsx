@@ -1,68 +1,102 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  FaCheck, FaBoxOpen, FaArrowRight, FaShoppingBasket, FaBarcode, FaExchangeAlt, FaKeyboard
+  FaCheck, FaBoxOpen, FaArrowRight, FaShoppingBasket, FaBarcode, 
+  FaExchangeAlt, FaKeyboard, FaWifi, FaExclamationTriangle, FaSync
 } from "react-icons/fa";
 import "./VistaPicker.css";
-// REVISA LA RUTA DE TU ESCANER SI ES NECESARIO
+// REVISA LA RUTA DE TU ESCANER
 import EscanerBarras from "../DesarrolloSurtido_API/EscanerBarras"; 
 import { WeightModal, SubstituteModal, ManualEntryModal } from "./Modals";
 
-// --- COMPONENTE TARJETA DE PRODUCTO ---
-const SwipeCard = ({ item, onSwipe, onManualInput }) => {
+// COLORES PARA LOS PEDIDOS
+const ORDER_COLORS = [
+    { code: 'A', color: '#3b82f6', bg: '#eff6ff' },
+    { code: 'B', color: '#f97316', bg: '#fff7ed' },
+    { code: 'C', color: '#8b5cf6', bg: '#f5f3ff' },
+    { code: 'D', color: '#10b981', bg: '#ecfdf5' },
+    { code: 'E', color: '#ec4899', bg: '#fdf2f8' },
+];
+
+const getOrderStyle = (orderIndex) => ORDER_COLORS[orderIndex % ORDER_COLORS.length];
+
+// --- COMPONENTE: TARJETA DE PRODUCTO ---
+const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
+  const scanned = item.qty_scanned || 0;
+  const total = item.quantity_total;
+  const remaining = total - scanned;
+  const isPartial = scanned > 0 && scanned < total;
+
   return (
     <motion.div 
       layout 
       initial={{ opacity: 0, y: 10 }} 
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, x: -100 }}
-      className="ec-product-card"
+      exit={{ opacity: 0, x: -50 }}
+      className={`ec-product-card ${isCompleted ? 'completed' : ''} ${isPartial ? 'partial-scan' : ''}`}
     >
-      <div className="ec-img-large-wrapper">
-        {item.image_src ? <img src={item.image_src} alt={item.name} className="ec-prod-img-large" /> : <div className="ec-no-img"><FaBoxOpen /></div>}
+      <div className="ec-img-wrapper">
+        {item.image_src ? <img src={item.image_src} className="ec-prod-img" alt="" /> : <FaBoxOpen color="#ccc" size={30} />}
+        <span className="ec-qty-badge-img">{total}</span>
       </div>
-      
-      <div className="ec-info">
-        <div className="ec-badges">
-          <span className="ec-badge-pasillo">{item.pasillo === "S/N" || item.pasillo === "Otros" ? "General" : `Pasillo ${item.pasillo}`}</span>
-          {item.categorias?.[0] && <span className="ec-badge-cat">{item.categorias[0].name}</span>}
-        </div>
+
+      <div className="ec-info-col">
+        <span className="ec-pasillo-badge">
+            {item.pasillo === "S/N" || item.pasillo === "Otros" ? "GENERAL" : `PASILLO ${item.pasillo}`}
+        </span>
+        <h4 className="ec-prod-name">{item.name}</h4>
         
-        <h4 className="ec-name-large">{item.name}</h4>
-        
-        {/* DETALLE DEL BATCH: QUIÉN PIDIÓ QUÉ */}
-        <div className="ec-batch-detail">
-            {item.pedidos_involucrados.map((ped, idx) => (
-                <div key={idx} className="ec-batch-row">
-                    <span className="ec-batch-qty">{ped.cantidad}x</span>
-                    <span className="ec-batch-client">{ped.nombre_cliente}</span>
-                </div>
-            ))}
-        </div>
-
-        <div className="ec-sku-container">
-           {item.barcode && <div className="barcode-badge"><FaBarcode /> {item.barcode}</div>}
+        <div className="ec-req-list">
+            {item.pedidos_involucrados.map((ped, idx) => {
+                const orderIdx = orderMap[ped.id_pedido] || 0;
+                const style = getOrderStyle(orderIdx);
+                return (
+                    <div key={idx} className="ec-req-badge" style={{borderLeftColor: style.color}}>
+                        <span className="ec-req-letter" style={{color: style.color}}>{style.code}</span>
+                        <span className="ec-req-qty">{ped.cantidad} un.</span>
+                        <span className="ec-req-name">{ped.nombre_cliente.split(' ')[0]}</span>
+                    </div>
+                )
+            })}
         </div>
       </div>
 
-      <div className="ec-actions-col">
-         {/* BOTÓN PRINCIPAL: ESCANEAR */}
-         <button className="ec-big-btn success" onClick={() => onSwipe(item, "picked")}>
-            <div className="ec-qty-circle-large">{item.quantity_total}</div>
-            <span className="ec-btn-label">ESCANEAR</span>
-         </button>
-         
-         {/* BOTÓN MANUAL (SI FALLA EL ESCANER) */}
-         <button className="ec-small-btn neutral" onClick={() => onManualInput(item)} style={{background: '#f1f5f9', color: '#475569'}}>
-            <FaKeyboard />
-         </button>
-
-         {/* BOTÓN SECUNDARIO: SUSTITUIR */}
-         <button className="ec-small-btn warning" onClick={() => onSwipe(item, "substitute")}>
-            <FaExchangeAlt />
-         </button>
-      </div>
+      {!isCompleted ? (
+          <div className="ec-action-col">
+             <button 
+                className={`ec-scan-btn ${isPartial ? 'active-partial' : ''}`} 
+                onClick={() => onAction(item, "scan")}
+             >
+                {isPartial ? (
+                    <div className="ec-scan-progress">
+                        <span className="ec-scan-prog-nums">{scanned}/{total}</span>
+                        <span className="ec-scan-prog-label">FALTAN {remaining}</span>
+                    </div>
+                ) : (
+                    <>
+                        <FaBarcode />
+                        <span className="ec-scan-label">SCAN</span>
+                    </>
+                )}
+             </button>
+             
+             <div style={{display:'flex', gap:5}}>
+                 <button className="ec-alt-btn" onClick={() => onAction(item, "manual")} title="Teclado">
+                    <FaKeyboard size={14} />
+                 </button>
+                 <button className="ec-alt-btn warning" onClick={() => onAction(item, "substitute")} title="Sustituir">
+                    <FaExchangeAlt size={14} />
+                 </button>
+             </div>
+          </div>
+      ) : (
+          <div className="ec-action-col">
+              <button className="ec-scan-btn done" onClick={() => {}}>
+                  <FaCheck />
+              </button>
+          </div>
+      )}
     </motion.div>
   );
 };
@@ -72,8 +106,13 @@ const VistaPicker = () => {
   const [loading, setLoading] = useState(true);
   const [sessionData, setSessionData] = useState(null); 
   const [pickerInfo, setPickerInfo] = useState(null);
-  
-  // Estados de flujo
+  const [activeZone, setActiveZone] = useState("pendientes"); 
+
+  // OFFLINE & SYNC STATE
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingSync, setPendingSync] = useState(0); // Cantidad de acciones pendientes de subir
+
+  // Flujos de Acción
   const [isScanning, setIsScanning] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
   
@@ -82,269 +121,380 @@ const VistaPicker = () => {
   const [showSubModal, setShowSubModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
 
-  // Inicialización
+  // --- 1. INICIALIZACIÓN Y CACHÉ ---
   useEffect(() => {
     const init = async () => {
       try {
         setLoading(true);
-        // 1. Obtener email del picker (Del LocalStorage)
-        let email = localStorage.getItem("correo_empleado") || localStorage.getItem("picker_email");
+        // Login
+        let email = localStorage.getItem("correo_empleado") || localStorage.getItem("picker_email") || "juan@test.com";
         
-        // 2. Obtener ID del picker
-        const { data: pickers } = await axios.get(`https://backend-woocommerce.vercel.app/api/orders/pickers?email=${email}`);
-        
-        if(!pickers || pickers.length === 0) { 
-            alert("Usuario no encontrado en base de datos de pickers."); 
-            setLoading(false);
-            return; 
+        // Intentar obtener info del picker (Network First)
+        let me = null;
+        try {
+            const { data: pickers } = await axios.get(`https://backend-woocommerce.vercel.app/api/orders/pickers?email=${email}`);
+            if(pickers && pickers.length > 0) {
+                me = pickers[0];
+                localStorage.setItem("picker_info_cache", JSON.stringify(me)); // Guardar en caché
+            }
+        } catch (err) {
+            console.warn("Offline: Usando caché de picker");
+            me = JSON.parse(localStorage.getItem("picker_info_cache"));
         }
-        
-        const me = pickers[0];
+
+        if (!me) {
+            alert("No se pudo identificar al usuario (Requiere internet la primera vez).");
+            setLoading(false);
+            return;
+        }
         setPickerInfo(me);
 
-        // 3. Obtener Sesión Activa
-        const { data: session } = await axios.get(`https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${me.id}`);
-        setSessionData(session); 
+        // Intentar obtener sesión (Network First, Fallback Cache)
+        try {
+            const { data: session } = await axios.get(`https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${me.id}`);
+            setSessionData(session);
+            // Guardamos la sesión fresca en local para backup
+            localStorage.setItem("session_active_cache", JSON.stringify(session));
+        } catch (err) {
+            console.warn("Offline: Usando caché de sesión");
+            const cachedSession = localStorage.getItem("session_active_cache");
+            if (cachedSession) {
+                setSessionData(JSON.parse(cachedSession));
+            }
+        }
 
       } catch (e) {
-        console.error("Error cargando sesión:", e);
-        // 404 es esperado si no tiene sesión asignada
+        console.error("Error crítico:", e);
       } finally {
         setLoading(false);
       }
     };
+
     init();
+
+    // Listeners de Red
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+
+    return () => {
+        window.removeEventListener('online', goOnline);
+        window.removeEventListener('offline', goOffline);
+    };
   }, []);
 
-  // --- LÓGICA DE ACCIONES ---
+  // --- 2. MOTOR DE SINCRONIZACIÓN (LA MAGIA) ---
+  // Este efecto corre cada 5 segundos y trata de vaciar la cola de acciones
+  useEffect(() => {
+      const syncInterval = setInterval(async () => {
+          // Leer cola del disco
+          const queue = JSON.parse(localStorage.getItem("offline_actions_queue") || "[]");
+          setPendingSync(queue.length);
 
-  // 1. Manejador de clics en la tarjeta
-  const handleItemAction = (item, actionType) => {
-      setCurrentItem(item);
-      
-      if (actionType === "substitute") {
-          setShowSubModal(true);
-          return;
-      }
+          if (queue.length === 0 || !navigator.onLine) return;
 
-      // Check de Pesables
-      const nameLower = item.name.toLowerCase();
-      const catsLower = item.categorias?.map(c => c.name.toLowerCase()).join(" ") || "";
-      
-      const isWeighable = nameLower.includes("kg") || 
-                          nameLower.includes("gramos") ||
-                          nameLower.includes("libra") ||
-                          catsLower.includes("fruver") ||
-                          catsLower.includes("carnes");
+          console.log(`Intentando sincronizar ${queue.length} acciones...`);
+          
+          // Tomamos la más vieja (FIFO)
+          const action = queue[0];
 
-      if (isWeighable) {
-          setShowWeightModal(true);
-      } else {
-          setIsScanning(true);
-      }
-  };
-
-  // 2. Handler para abrir ingreso manual
-  const handleManualInputTrigger = (item) => {
-      setCurrentItem(item);
-      setShowManualModal(true);
-  };
-
-  // 3. VALIDACIÓN MANUAL ROBUSTA (CONSULTA A SIESA)
-  const handleManualValidation = async (inputCode) => {
-      if(!currentItem) return;
-
-      const cleanInput = inputCode.trim();
-      const expectedSku = (currentItem.sku || "").toString().trim(); // El SKU de Woo debe ser el f120_id
-
-      if (!expectedSku) {
-          alert("Error: Este producto no tiene ID/SKU para validar.");
-          return;
-      }
-
-      try {
-          // Consultamos al backend si el código pertenece al item
-          const res = await axios.post("https://backend-woocommerce.vercel.app/api/orders/validar-codigo", {
-              input_code: cleanInput,
-              expected_sku: expectedSku
-          });
-
-          if (res.data.valid) {
-              // ÉXITO: Coincide con SIESA
-              setShowManualModal(false);
+          try {
+              await axios.post("https://backend-woocommerce.vercel.app/api/orders/registrar-accion", action);
               
-              // Verificamos si es pesable para mostrar el siguiente paso
-              const nameLower = currentItem.name.toLowerCase();
-              const isWeighable = nameLower.includes("kg") || nameLower.includes("gramos") || nameLower.includes("fruver");
-
-              if (isWeighable) {
-                  setShowWeightModal(true);
-              } else {
-                  confirmPicking();
-              }
-          } else {
-              alert("❌ Código incorrecto.\nNo coincide con la base de datos maestra (SIESA).");
+              // Si tiene éxito, la sacamos de la cola
+              const newQueue = queue.slice(1);
+              localStorage.setItem("offline_actions_queue", JSON.stringify(newQueue));
+              setPendingSync(newQueue.length);
+              
+          } catch (error) {
+              console.error("Fallo al sincronizar acción, reintentará luego", error);
+              // Si es un error 400/500 fatal, quizás deberíamos sacarla para no bloquear, 
+              // pero por seguridad de datos la dejamos para reintento.
           }
-      } catch (error) {
-          console.error(error);
-          alert("Error de conexión validando el código.");
-      }
+
+      }, 5000); // Check cada 5s
+
+      return () => clearInterval(syncInterval);
+  }, []);
+
+  // Helper para añadir a la cola
+  const queueAction = (payload) => {
+      const queue = JSON.parse(localStorage.getItem("offline_actions_queue") || "[]");
+      queue.push(payload);
+      localStorage.setItem("offline_actions_queue", JSON.stringify(queue));
+      setPendingSync(queue.length);
   };
 
-  // 4. Confirmar Picking (Guardar en BD)
+  const orderIndexMap = useMemo(() => {
+      if(!sessionData) return {};
+      const map = {};
+      sessionData.orders_info.forEach((ord, idx) => { map[ord.id] = idx; });
+      return map;
+  }, [sessionData]);
+
+  // --- MANEJADORES ---
+
+  const handleCardAction = (item, type) => {
+      setCurrentItem(item);
+      if (type === "scan") {
+          if (isWeighable(item)) setShowWeightModal(true);
+          else setIsScanning(true);
+      }
+      else if (type === "manual") setShowManualModal(true);
+      else if (type === "substitute") setShowSubModal(true);
+  };
+
+  const isWeighable = (item) => {
+      const txt = (item.name + " " + (item.categorias?.[0]?.name || "")).toLowerCase();
+      return txt.includes("kg") || txt.includes("gramos") || txt.includes("fruver") || txt.includes("carniceria");
+  };
+
   const confirmPicking = async (peso = null) => {
+      if (!currentItem) return;
+
       try {
-          await axios.post("https://backend-woocommerce.vercel.app/api/orders/registrar-accion", {
-              id_sesion: sessionData.session_id,
-              id_producto_original: currentItem.product_id,
-              nombre_producto_original: currentItem.name,
-              accion: "recolectado",
-              peso_real: peso
-          });
-          
-          updateLocalItemStatus(currentItem.product_id, "recolectado");
-          
-          setIsScanning(false);
-          setShowWeightModal(false);
-          setCurrentItem(null);
-          
-          if(navigator.vibrate) navigator.vibrate(200);
-      } catch (error) {
-          alert("Error guardando: " + error.message);
+          const currentScanned = (currentItem.qty_scanned || 0) + 1;
+          const targetQty = currentItem.quantity_total;
+          const isFinished = currentScanned >= targetQty;
+
+          // Si terminamos el item (o es parcial, depende de tu lógica de negocio)
+          // Aquí guardamos LA ACCIÓN en la cola, no llamamos axios directo
+          if (isFinished) {
+              const payload = {
+                  id_sesion: sessionData.session_id,
+                  id_producto_original: currentItem.product_id,
+                  nombre_producto_original: currentItem.name,
+                  accion: "recolectado",
+                  peso_real: peso
+              };
+              
+              // 1. Guardar en Cola (Offline Safe)
+              queueAction(payload);
+
+              // 2. Feedback Inmediato
+              if(navigator.vibrate) navigator.vibrate([100, 50, 100]); 
+              closeAllModals();
+          } else {
+              if(navigator.vibrate) navigator.vibrate(100);
+          }
+
+          // 3. Actualizar UI (Optimistic Update)
+          // Actualizamos también el caché local de la sesión para que si recarga vea el progreso
+          updateLocalSessionState(currentItem.product_id, currentScanned, isFinished ? 'recolectado' : 'pendiente');
+
+          // Lógica de siguiente ciclo
+          if (!isFinished) {
+              setCurrentItem(prev => ({ ...prev, qty_scanned: currentScanned }));
+          } else {
+              setCurrentItem(null);
+          }
+
+      } catch (e) { 
+          alert("Error local: " + e.message); 
+          closeAllModals();
       }
   };
 
-  // 5. Confirmar Sustitución
-  const confirmSubstitution = async (newItem) => {
-      try {
-          await axios.post("https://backend-woocommerce.vercel.app/api/orders/registrar-accion", {
-              id_sesion: sessionData.session_id,
-              id_producto_original: currentItem.product_id,
-              nombre_producto_original: currentItem.name,
-              accion: "sustituido",
-              datos_sustituto: {
-                  id: newItem.id,
-                  name: newItem.name,
-                  price: newItem.price
-              }
-          });
+  const confirmSubstitution = (newItem) => {
+      const payload = {
+          id_sesion: sessionData.session_id,
+          id_producto_original: currentItem.product_id,
+          nombre_producto_original: currentItem.name,
+          accion: "sustituido",
+          datos_sustituto: { id: newItem.id, name: newItem.name, price: newItem.price }
+      };
 
-          updateLocalItemStatus(currentItem.product_id, "sustituido");
-          setShowSubModal(false);
-          setCurrentItem(null);
-          alert("🔄 Sustitución registrada");
-      } catch (error) {
-          alert("Error registrando sustituto: " + error.message);
+      // 1. Cola
+      queueAction(payload);
+      
+      // 2. UI Update
+      updateLocalSessionState(currentItem.product_id, currentItem.quantity_total, 'sustituido');
+      
+      closeAllModals();
+      alert("🔄 Sustitución registrada (Guardada localmente)");
+  };
+
+  // Actualiza el estado en React y en LocalStorage (Backup)
+  const updateLocalSessionState = (prodId, qty, status) => {
+      if(!sessionData) return;
+
+      const newItems = sessionData.items.map(i => {
+          if (i.product_id === prodId) {
+              return { ...i, qty_scanned: qty, status: status };
+          }
+          return i;
+      });
+
+      const newSessionData = { ...sessionData, items: newItems };
+      setSessionData(newSessionData);
+      localStorage.setItem("session_active_cache", JSON.stringify(newSessionData));
+  };
+
+  const handleManualValidation = async (inputCode) => {
+      // Esta validación SÍ requiere internet porque consulta la BD maestra.
+      // Si está offline, podrías permitir un "override" con advertencia.
+      if (!isOnline) {
+          if(window.confirm("⚠️ Estás Offline. No podemos validar contra SIESA. ¿Estás seguro de que el código es correcto?")) {
+              // Aceptamos bajo riesgo
+              setShowManualModal(false);
+              if (isWeighable(currentItem)) setShowWeightModal(true);
+              else confirmPicking();
+              return;
+          }
+          return;
       }
+
+      // ... (Lógica online normal)
+      if(!currentItem) return;
+      try {
+          const res = await axios.post("https://backend-woocommerce.vercel.app/api/orders/validar-codigo", {
+              input_code: inputCode, expected_sku: currentItem.sku
+          });
+          if (res.data.valid) {
+              setShowManualModal(false);
+              if (isWeighable(currentItem)) setShowWeightModal(true);
+              else confirmPicking();
+          } else {
+              alert("❌ Código incorrecto.");
+          }
+      } catch (e) { alert("Error de conexión"); }
   };
 
-  // Helper UI
-  const updateLocalItemStatus = (prodId, status) => {
-      setSessionData(prev => ({
-          ...prev,
-          items: prev.items.map(i => i.product_id === prodId ? { ...i, status: status } : i)
-      }));
-  };
-
-  // Validación de Escáner (Local rápida)
   const handleScanMatch = (code) => {
       if(!currentItem) return;
-      const cleanedCode = code.trim().toUpperCase();
-      const itemSku = (currentItem.sku || "").trim().toUpperCase();
-      const itemEan = (currentItem.barcode || "").trim().toUpperCase();
+      const c = code.trim().toUpperCase();
+      const sku = (currentItem.sku || "").trim().toUpperCase();
+      const ean = (currentItem.barcode || "").trim().toUpperCase();
 
-      if (cleanedCode === itemSku || cleanedCode === itemEan) {
+      if(c === sku || c === ean || (ean && ean.endsWith(c))) {
           confirmPicking();
       } else {
-          // Si falla el escáner local, sugerimos usar el botón manual que valida contra SIESA
-          alert(`Código leído (${cleanedCode}) no coincide con el registro básico. Usa el botón de teclado para validar contra SIESA.`);
+          if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+          alert(`Código ${c} no coincide.`);
       }
   };
 
-  const handleFinishSession = async () => {
-      if(!window.confirm("¿Estás seguro de finalizar la sesión?")) return;
+  const handleFinish = async () => {
+      if(pendingSync > 0) {
+          alert(`⚠️ Tienes ${pendingSync} acciones pendientes de subir. Espera a tener conexión antes de finalizar.`);
+          return;
+      }
+      if(!window.confirm("¿Finalizar sesión completa?")) return;
+      
       try {
           await axios.post("https://backend-woocommerce.vercel.app/api/orders/finalizar-sesion", {
-              id_sesion: sessionData.session_id,
-              id_picker: pickerInfo.id
+              id_sesion: sessionData.session_id, id_picker: pickerInfo.id
           });
-          alert("¡Excelente trabajo! Sesión finalizada.");
-          setSessionData(null); 
+          // Limpiar cachés al finalizar
+          localStorage.removeItem("session_active_cache");
+          localStorage.removeItem("offline_actions_queue");
           window.location.reload();
-      } catch (error) {
-          alert("Error finalizando: " + error.message);
-      }
+      } catch (e) { alert("Error al finalizar: " + e.message); }
+  };
+
+  const closeAllModals = () => {
+      setIsScanning(false); setShowWeightModal(false); setShowManualModal(false); setShowSubModal(false); setCurrentItem(null);
   };
 
   const pendingItems = sessionData?.items.filter(i => i.status === 'pendiente') || [];
-  const completedItems = sessionData?.items.filter(i => i.status !== 'pendiente') || [];
+  const doneItems = sessionData?.items.filter(i => i.status !== 'pendiente') || [];
+  const currentList = activeZone === "pendientes" ? pendingItems : doneItems;
 
-  if (loading) return <div className="ec-picker-centered-view"><div className="ec-picker-spinner"></div><p>Cargando sesión...</p></div>;
+  if (loading) return <div className="ec-picker-centered"><div className="ec-spinner"></div><p>Cargando ruta...</p></div>;
   
   if (!sessionData) return (
-      <div className="ec-picker-centered-view">
-          <FaShoppingBasket size={50} color="#cbd5e1" style={{marginBottom: 20}} />
-          <h3>No tienes una sesión activa</h3>
-          <p>Ve al administrador y asigna pedidos a tu usuario.</p>
-          <button onClick={() => window.location.reload()} className="ec-big-btn success" style={{marginTop: 30, width: 'auto', padding: '10px 30px'}}>
-             <span className="ec-btn-label" style={{fontSize: '1rem'}}>RECARGAR</span>
+      <div className="ec-picker-centered">
+          <FaShoppingBasket size={50} color="#cbd5e1" style={{marginBottom:20}} />
+          <h3>Sin asignación</h3>
+          <button onClick={() => window.location.reload()} className="ec-scan-btn" style={{width:'auto', padding:'10px 30px', flexDirection:'row', gap:10}}>
+             <FaArrowRight/> Recargar
           </button>
       </div>
   );
 
   return (
     <div className="ec-picker-main-layout">
-      {/* HEADER */}
+      {/* BARRA DE ESTADO DE CONEXIÓN */}
+      <div className={`ec-status-bar ${isOnline ? 'online' : 'offline'}`}>
+          {isOnline ? (
+              <span style={{display:'flex', alignItems:'center', gap:5}}>
+                  {pendingSync > 0 ? <><FaSync className="ec-spin"/> Sincronizando ({pendingSync})...</> : <><FaWifi /> En línea</>}
+              </span>
+          ) : (
+              <span style={{display:'flex', alignItems:'center', gap:5}}>
+                  <FaExclamationTriangle /> Modo Offline ({pendingSync} pendientes)
+              </span>
+          )}
+      </div>
+
       <header className="ec-picker-sticky-header">
         <div className="ec-header-top">
             <div className="ec-order-info">
                 <span className="ec-label-sm">Sesión Activa</span>
-                <span className="ec-order-id">#{sessionData.session_id.slice(0,8)}</span>
+                <span className="ec-order-id">#{sessionData.session_id.slice(0,6)}</span>
             </div>
-            <div className="ec-timer-container">
-                <small>{sessionData.orders_info.length} Pedidos</small>
+            <div style={{textAlign:'right'}}>
+                <span className="ec-label-sm">{sessionData.orders_info.length} Pedidos</span>
+                <div style={{fontWeight:'bold'}}>{doneItems.length} / {sessionData.items.length} Items</div>
             </div>
         </div>
-        <div className="ec-progress-container">
-            <div className="ec-progress-bar">
-                <motion.div 
-                    className="ec-progress-fill" 
-                    animate={{ width: `${(completedItems.length / sessionData.items.length) * 100}%` }} 
-                />
+
+        <div className="ec-orders-legend">
+            {sessionData.orders_info.map((ord, idx) => {
+                const style = getOrderStyle(idx);
+                return (
+                    <div key={ord.id} className="ec-legend-item">
+                        <div className="ec-legend-dot" style={{background: style.color}}></div>
+                        <span style={{color: style.color, fontWeight:900}}>{style.code}:</span>
+                        <span>{ord.customer.split(' ')[0]}</span>
+                    </div>
+                )
+            })}
+        </div>
+
+        <div className="ec-zones-tabs">
+            <div className={`ec-zone-tab ${activeZone === 'pendientes' ? 'active' : ''}`} onClick={() => setActiveZone('pendientes')}>
+                Pendientes ({pendingItems.length})
             </div>
-            <div className="ec-progress-text">
-                <span>{completedItems.length} de {sessionData.items.length} items</span>
+            <div className={`ec-zone-tab ${activeZone === 'canasta' ? 'active' : ''}`} onClick={() => setActiveZone('canasta')}>
+                En Canasta ({doneItems.length})
             </div>
         </div>
       </header>
 
-      {/* LISTA DE ITEMS */}
       <div className="ec-picker-scroll-container">
         <AnimatePresence mode="popLayout">
-            {pendingItems.length > 0 ? (
-                pendingItems.map(item => (
-                    <SwipeCard 
-                        key={item.product_id} 
-                        item={item} 
-                        onSwipe={handleItemAction} 
-                        onManualInput={handleManualInputTrigger} 
+            {currentList.length > 0 ? (
+                currentList.map(item => (
+                    <ProductCard 
+                        key={item.product_id}
+                        item={item}
+                        orderMap={orderIndexMap}
+                        isCompleted={activeZone === 'canasta'}
+                        onAction={handleCardAction}
                     />
                 ))
             ) : (
-                <div className="ec-empty-tab">
-                    <FaCheck size={60} color="#22c55e" style={{marginBottom: 20}} />
-                    <h3>¡Todo Recogido!</h3>
-                    <p>Ya puedes finalizar la sesión.</p>
+                <div className="ec-empty-state">
+                    {activeZone === 'pendientes' ? (
+                        <>
+                            <FaCheck size={50} color="#22c55e" style={{marginBottom:15}} />
+                            <h3>¡Todo Listo!</h3>
+                            <p>Has recogido todos los productos.</p>
+                        </>
+                    ) : (
+                        <p>Aún no has recogido nada.</p>
+                    )}
                 </div>
             )}
         </AnimatePresence>
-        <div className="ec-spacer-bottom"></div>
+        <div className="ec-spacer"></div>
       </div>
 
-      {/* BOTÓN FINALIZAR */}
       {pendingItems.length === 0 && (
           <div className="ec-fab-container">
-              <button className="ec-fab-finish" onClick={handleFinishSession}>
+              <button className="ec-fab-finish" onClick={handleFinish}>
                   <div className="ec-fab-content">
                       <FaCheck size={24} />
                       <span>FINALIZAR SESIÓN</span>
@@ -354,32 +504,11 @@ const VistaPicker = () => {
           </div>
       )}
 
-      {/* COMPONENTES FLOTANTES */}
-      <EscanerBarras 
-        isScanning={isScanning} 
-        setIsScanning={setIsScanning} 
-        onScan={handleScanMatch} 
-      />
-
-      <ManualEntryModal 
-        isOpen={showManualModal}
-        onClose={() => setShowManualModal(false)}
-        onConfirm={handleManualValidation}
-      />
-
-      <WeightModal 
-        isOpen={showWeightModal} 
-        item={currentItem} 
-        onClose={() => { setShowWeightModal(false); setCurrentItem(null); }} 
-        onConfirm={confirmPicking} 
-      />
-
-      <SubstituteModal 
-        isOpen={showSubModal}
-        originalItem={currentItem}
-        onClose={() => { setShowSubModal(false); setCurrentItem(null); }}
-        onConfirmSubstitute={confirmSubstitution}
-      />
+      {/* COMPONENTES */}
+      <EscanerBarras isScanning={isScanning} setIsScanning={setIsScanning} onScan={handleScanMatch} />
+      <ManualEntryModal isOpen={showManualModal} onClose={() => setShowManualModal(false)} onConfirm={handleManualValidation} />
+      <WeightModal isOpen={showWeightModal} item={currentItem} onClose={() => {setShowWeightModal(false); setCurrentItem(null)}} onConfirm={confirmPicking} />
+      <SubstituteModal isOpen={showSubModal} originalItem={currentItem} onClose={() => {setShowSubModal(false); setCurrentItem(null)}} onConfirmSubstitute={confirmSubstitution} />
 
     </div>
   );
