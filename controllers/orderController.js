@@ -1,6 +1,6 @@
 const WooCommerce = require("../services/wooService");
 const { supabase } = require("../services/supabaseClient");
-// IMPORTAMOS TU MAPEADOR (Asegúrate que la ruta sea correcta)
+// Mapeador para ordenar la ruta del picker (Serpiente)
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 
 // --- HELPER: Agrupar items de múltiples pedidos (Batch Picking) ---
@@ -9,18 +9,20 @@ const agruparItemsParaPicking = (orders) => {
 
   orders.forEach((order) => {
     order.line_items.forEach((item) => {
+      // Usamos el ID del producto como clave única
       const key = item.product_id;
 
       if (!mapaProductos[key]) {
         mapaProductos[key] = {
-          id: item.id,
+          id: item.id, // ID referencia de línea
           product_id: item.product_id,
           name: item.name,
-          sku: item.sku,
+          sku: item.sku, // Importante: Suele ser el f120_id para validación SIESA
           image_src: item.image?.src || "", 
           quantity_total: 0,
           pedidos_involucrados: [],
           categorias: item.parent_name ? [{name: item.parent_name}] : [],
+          // Intentar extraer EAN de los metadatos si existe
           barcode: item.meta_data?.find(m => 
             ['ean', 'barcode', '_ean', '_barcode'].includes(m.key.toLowerCase())
           )?.value || "",
@@ -41,13 +43,15 @@ const agruparItemsParaPicking = (orders) => {
 };
 
 // ==========================================
-// 1. GESTIÓN DE SESIONES
+// 1. GESTIÓN DE SESIONES (MULTI-ORDEN)
 // ==========================================
 
+// Crear una Sesión de Picking
 exports.createPickingSession = async (req, res) => {
   const { id_picker, ids_pedidos } = req.body; 
 
   try {
+    // 1. Crear la sesión en BD
     const { data: session, error: sessError } = await supabase
       .from("wc_picking_sessions")
       .insert([{ 
@@ -61,11 +65,13 @@ exports.createPickingSession = async (req, res) => {
 
     if (sessError) throw sessError;
 
+    // 2. Actualizar al Picker
     await supabase
       .from("wc_pickers")
       .update({ estado_picker: "picking", id_sesion_actual: session.id })
       .eq("id", id_picker);
 
+    // 3. Crear asignaciones individuales
     const asignaciones = ids_pedidos.map(idPedido => ({
       id_pedido: idPedido,
       id_picker: id_picker,
@@ -88,10 +94,12 @@ exports.createPickingSession = async (req, res) => {
   }
 };
 
+// Obtener Datos de la Sesión Activa
 exports.getSessionActive = async (req, res) => {
   const { id_picker } = req.query;
 
   try {
+    // 1. Buscar si el picker tiene sesión activa
     const { data: picker } = await supabase
       .from("wc_pickers")
       .select("id_sesion_actual")
@@ -104,36 +112,43 @@ exports.getSessionActive = async (req, res) => {
 
     const sessionId = picker.id_sesion_actual;
 
+    // 2. Obtener detalles de la sesión
     const { data: session } = await supabase
       .from("wc_picking_sessions")
       .select("*")
       .eq("id", sessionId)
       .single();
 
+    // 3. Traer los pedidos de WooCommerce
     const pedidosPromesas = session.ids_pedidos.map(id => WooCommerce.get(`orders/${id}`));
     const responses = await Promise.all(pedidosPromesas);
     const orders = responses.map(r => r.data);
 
+    // 4. Agrupar items (Batch Picking)
     const itemsAgrupados = agruparItemsParaPicking(orders);
 
+    // 5. Consultar logs para ver qué ya se recogió
     const { data: logs } = await supabase
          .from("wc_log_picking")
          .select("id_producto, accion, es_sustituto")
          .in("id_producto", itemsAgrupados.map(i => i.product_id));
 
+    // 6. Enriquecer items con ruta y estado
     const itemsConRuta = await Promise.all(itemsAgrupados.map(async (item) => {
-      // USAMOS TU MAPEADOR AQUÍ PARA LA RUTA
+      // Usamos el mapeador de pasillos para dar orden lógico
       const info = obtenerInfoPasillo(item.categorias || [], item.name);
+      
       const logItem = logs?.find(l => l.id_producto === item.product_id && l.accion === 'recolectado');
       
       return {
         ...item,
-        pasillo: info.pasillo, // "1", "6", etc.
+        pasillo: info.pasillo,
         prioridad: info.prioridad,
         status: logItem ? (logItem.es_sustituto ? 'sustituido' : 'recolectado') : 'pendiente'
       };
     }));
 
+    // 7. Ordenar por ruta óptima
     itemsConRuta.sort((a, b) => a.prioridad - b.prioridad);
 
     res.status(200).json({
@@ -153,7 +168,7 @@ exports.getSessionActive = async (req, res) => {
 };
 
 // ==========================================
-// 2. ACCIONES DEL PICKER
+// 2. ACCIONES DEL PICKER (CORE)
 // ==========================================
 
 exports.registerAction = async (req, res) => {
@@ -165,6 +180,7 @@ exports.registerAction = async (req, res) => {
   try {
     const now = new Date();
     
+    // Vincular log a una asignación válida
     const { data: anyAssign } = await supabase
         .from('wc_asignaciones_pedidos')
         .select('id, id_pedido')
@@ -187,11 +203,13 @@ exports.registerAction = async (req, res) => {
       logEntry.nombre_producto = nombre_producto_original;
       logEntry.accion = 'recolectado';
       logEntry.es_sustituto = false;
+      
     } else if (accion === 'sustituido') {
       logEntry.nombre_producto = nombre_producto_original; 
       logEntry.accion = 'recolectado'; 
       logEntry.es_sustituto = true;
       logEntry.motivo = 'Sustitución por falta de stock';
+      
       if (datos_sustituto) {
           logEntry.id_producto_final = datos_sustituto.id;
           logEntry.nombre_sustituto = datos_sustituto.name;
@@ -211,7 +229,7 @@ exports.registerAction = async (req, res) => {
 };
 
 // =========================================================================
-// 3. BÚSQUEDA INTELIGENTE (POTENCIADA POR TU MAPEADOR DE PASILLOS)
+// 3. BÚSQUEDA INTELIGENTE ROBUSTA (CASCADA DE SEGURIDAD)
 // =========================================================================
 
 exports.searchProduct = async (req, res) => {
@@ -220,61 +238,70 @@ exports.searchProduct = async (req, res) => {
     try {
         let products = [];
 
-        // --- CASO A: SUGERENCIA AUTOMÁTICA (Usa tu mapeador) ---
+        // --- MODO SUGERENCIA AUTOMÁTICA ---
         if (original_id && !query) {
-            // 1. Obtener datos del original
+            // 1. Datos del producto original
             const { data: original } = await WooCommerce.get(`products/${original_id}`);
             const price = parseFloat(original.price || 0);
             
-            // 2. Determinar el "ADN" del producto original usando TU lógica
-            // Le pasamos las categorías de Woo y el nombre al mapeador
-            const infoOriginal = obtenerInfoPasillo(original.categories, original.name);
+            // 2. LISTA NEGRA: Evitar categorías basura que contaminan la búsqueda
+            const BLACKLIST = ['despensa', 'mercado', 'supermercado', 'sin categorizar', 'uncategorized', 'ofertas'];
             
-            console.log(`[INTELIGENCIA] Original: ${original.name} -> Pasillo: ${infoOriginal.pasillo}`);
+            const specificCats = original.categories.filter(c => 
+                !BLACKLIST.some(bad => c.name.toLowerCase().includes(bad))
+            );
 
-            // 3. Obtener categorías para buscar en Woo (Quitamos 'Despensa' para limpiar ruido)
-            const catIds = original.categories
-                .filter(c => !c.name.toLowerCase().includes('despensa'))
-                .map(c => c.id).join(',');
+            // Si hay categorías específicas, usamos esas. Si no, usamos las que haya (fallback).
+            const catsToUse = specificCats.length > 0 ? specificCats : original.categories;
+            const catIds = catsToUse.map(c => c.id).join(',');
 
-            // Si no quedan categorías (ej: solo era despensa), usamos todas
-            const searchCatIds = catIds || original.categories.map(c => c.id).join(',');
+            // 3. ESTRATEGIA CASCADA
+            
+            // INTENTO 1: Buscar por Categoría Exacta
+            if (catIds) {
+                const { data: catResults } = await WooCommerce.get("products", {
+                    category: catIds,
+                    per_page: 30,
+                    status: 'publish',
+                    stock_status: 'instock' // Solo lo que hay en inventario
+                });
+                products = catResults;
+            }
 
-            if (searchCatIds) {
-                // 4. Buscar candidatos en WooCommerce
-                const { data: catProducts } = await WooCommerce.get("products", {
-                    category: searchCatIds,
-                    per_page: 50, // Traemos bastantes para filtrar bien
+            // INTENTO 2 (FALLBACK): Si Categoría falló o trajo 0 resultados, buscar por NOMBRE
+            // Usamos las primeras 2 palabras del nombre (ej: "Arroz Diana" -> busca "Arroz Diana")
+            if (products.length === 0) {
+                const nameKeywords = original.name.split(' ').slice(0, 2).join(' ');
+                console.log(`[SUGERENCIA] Falló categoría, intentando nombre: ${nameKeywords}`);
+                
+                const { data: nameResults } = await WooCommerce.get("products", {
+                    search: nameKeywords,
+                    per_page: 30,
                     status: 'publish',
                     stock_status: 'instock'
                 });
-
-                // 5. FILTRADO ULTRA-ESTRICTO (Usando tu lógica)
-                const minPrice = price * 0.6; 
-                const maxPrice = price * 1.4;
-
-                products = catProducts.filter(p => {
-                    const pPrice = parseFloat(p.price || 0);
-                    if (p.id === parseInt(original_id)) return false;
-
-                    // A. Filtro de Precio
-                    if (pPrice > 0 && (pPrice < minPrice || pPrice > maxPrice)) return false;
-
-                    // B. Filtro de "Mismo Pasillo" (LA CLAVE)
-                    // Analizamos el candidato con tu misma función
-                    const infoCandidato = obtenerInfoPasillo(p.categories, p.name);
-                    
-                    // Solo aceptamos si pertenece AL MISMO PASILLO lógico que el original
-                    // Esto evita mezclar "Arroz (Pasillo 1)" con "Jabón (Pasillo 10)" aunque Woo diga que ambos son "Despensa"
-                    if (infoCandidato.pasillo !== infoOriginal.pasillo) {
-                        return false; 
-                    }
-
-                    return true;
-                });
+                products = nameResults;
             }
+
+            // 4. FILTRADO FINAL (Limpieza de resultados)
+            const minPrice = price * 0.5; // 50% margen abajo
+            const maxPrice = price * 1.5; // 50% margen arriba
+
+            products = products.filter(p => {
+                // No sugerir el mismo producto
+                if (p.id === parseInt(original_id)) return false;
+                
+                // Filtro de Precio (Solo si ambos tienen precio válido)
+                const pPrice = parseFloat(p.price || 0);
+                if (price > 0 && pPrice > 0) {
+                    if (pPrice < minPrice || pPrice > maxPrice) return false;
+                }
+
+                return true;
+            });
         } 
-        // --- CASO B: BÚSQUEDA MANUAL ---
+        
+        // --- MODO BÚSQUEDA MANUAL (Usuario escribió) ---
         else if (query) {
             const { data: searchResults } = await WooCommerce.get("products", {
                 search: query,
@@ -284,7 +311,7 @@ exports.searchProduct = async (req, res) => {
             products = searchResults;
         }
 
-        // Mapeo Final
+        // Mapeo Final Limpio
         const results = products.map(p => ({
             id: p.id,
             name: p.name,
@@ -292,13 +319,13 @@ exports.searchProduct = async (req, res) => {
             image: p.images[0]?.src || null,
             stock: p.stock_quantity,
             sku: p.sku
-        })).slice(0, 10); 
+        })).slice(0, 10); // Limitamos a 10 para no saturar la UI
 
         res.status(200).json(results);
 
     } catch (error) {
-        console.error("Error en searchProduct:", error);
-        res.status(500).json({ error: "Error buscando productos" });
+        console.error("Error searchProduct:", error);
+        res.status(500).json({ error: "Error en búsqueda" });
     }
 };
 
@@ -308,30 +335,42 @@ exports.searchProduct = async (req, res) => {
 
 exports.validateManualCode = async (req, res) => {
   const { input_code, expected_sku } = req.body; 
-  if (!input_code || !expected_sku) return res.status(400).json({ valid: false });
+  if (!input_code || !expected_sku) return res.status(400).json({ valid: false, message: "Datos incompletos" });
 
   const cleanInput = input_code.toString().trim();
   const cleanSku = expected_sku.toString().trim();
 
   try {
-    if (cleanInput === cleanSku) return res.status(200).json({ valid: true, type: 'id_directo' });
+    // 1. Validación Directa ID
+    if (cleanInput === cleanSku) {
+       return res.status(200).json({ valid: true, type: 'id_directo' });
+    }
 
-    const { data: barcodeMatch } = await supabase
+    // 2. Validación Código de Barras (Tabla SIESA)
+    const { data: barcodeMatch, error } = await supabase
       .from('siesa_codigos_barras')
       .select('id')
       .eq('codigo_barras', cleanInput)
       .eq('f120_id', cleanSku)
       .maybeSingle();
 
-    if (barcodeMatch) return res.status(200).json({ valid: true, type: 'codigo_barras' });
+    if (error) throw error;
+
+    if (barcodeMatch) {
+      return res.status(200).json({ valid: true, type: 'codigo_barras' });
+    }
 
     return res.status(200).json({ valid: false });
 
   } catch (error) {
     console.error("Error validando SIESA:", error);
-    res.status(500).json({ valid: false });
+    res.status(500).json({ valid: false, error: "Error de servidor" });
   }
 };
+
+// ==========================================
+// 5. MÉTODOS DE APOYO (ADMIN/UTILES)
+// ==========================================
 
 exports.completeSession = async (req, res) => {
     const { id_sesion, id_picker } = req.body;
