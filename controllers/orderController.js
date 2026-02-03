@@ -1,6 +1,6 @@
 const WooCommerce = require("../services/wooService");
 const { supabase } = require("../services/supabaseClient");
-// Usamos el mapeador para ordenar la ruta del picker (Serpiente), aunque no para la búsqueda estricta.
+// Importamos tu mapeador (el Juez para filtrar sugerencias incorrectas)
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 
 // --- HELPER: Agrupar items de múltiples pedidos (Batch Picking) ---
@@ -14,11 +14,13 @@ const agruparItemsParaPicking = (orders) => {
 
       if (!mapaProductos[key]) {
         mapaProductos[key] = {
-          id: item.id, // ID de referencia
+          id: item.id, // ID referencia de línea
           product_id: item.product_id,
           name: item.name,
           sku: item.sku, // Importante para validación SIESA
           image_src: item.image?.src || "", 
+          // NUEVO: Precio para mostrar en la app
+          price: parseFloat(item.price || 0),
           quantity_total: 0,
           pedidos_involucrados: [],
           categorias: item.parent_name ? [{name: item.parent_name}] : [],
@@ -167,7 +169,7 @@ exports.getSessionActive = async (req, res) => {
 };
 
 // ==========================================
-// 2. ACCIONES DEL PICKER
+// 2. ACCIONES DEL PICKER (CORE)
 // ==========================================
 
 exports.registerAction = async (req, res) => {
@@ -179,7 +181,7 @@ exports.registerAction = async (req, res) => {
   try {
     const now = new Date();
     
-    // Buscar asignación válida para referencia FK
+    // Vincular log a una asignación válida
     const { data: anyAssign } = await supabase
         .from('wc_asignaciones_pedidos')
         .select('id, id_pedido')
@@ -228,7 +230,7 @@ exports.registerAction = async (req, res) => {
 };
 
 // =========================================================================
-// 3. BÚSQUEDA INTELIGENTE SEMÁNTICA (NOMBRE + PRECIO)
+// 3. BÚSQUEDA INTELIGENTE CON FILTRO DE PASILLO (SOLUCIÓN ARROZ VS TOSTADA)
 // =========================================================================
 
 exports.searchProduct = async (req, res) => {
@@ -243,72 +245,63 @@ exports.searchProduct = async (req, res) => {
             const { data: original } = await WooCommerce.get(`products/${original_id}`);
             const price = parseFloat(original.price || 0);
             
-            // LOG DE DEPURACIÓN 1
-            console.log(`\n🔍 [BUSQUEDA IA] Original: "${original.name}" | Precio: $${price}`);
+            // 2. DETERMINAR EL "ADN" DEL PRODUCTO (Pasillo)
+            // Esto nos dirá si es "Granos" (Pasillo 1) o "Galletas" (Pasillo 5)
+            const infoOriginal = obtenerInfoPasillo(original.categories, original.name);
+            console.log(`\n🔍 [IA PASILLOS] Original: "${original.name}" -> Pasillo Detectado: ${infoOriginal.pasillo}`);
 
-            // 2. EXTRAER "PALABRA CLAVE MAESTRA" (La primera palabra del nombre)
-            // Limpiamos espacios y quitamos marcas si están al inicio
+            // 3. EXTRAER PALABRA CLAVE
             const cleanName = original.name.trim();
-            let masterKeyword = cleanName.split(' ')[0]; // "Arroz" de "Arroz Diana"
-
-            // Excepción: Si la primera palabra es muy corta (ej: "De", "El"), tomamos la segunda
+            let masterKeyword = cleanName.split(' ')[0]; 
+            // Si la primera palabra es corta (ej: "De"), tomar la segunda
             if (masterKeyword.length <= 2 && cleanName.split(' ').length > 1) {
                 masterKeyword = cleanName.split(' ')[1];
             }
-
-            // Normalizamos (quitamos símbolos raros)
             masterKeyword = masterKeyword.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ]/g, ""); 
 
-            console.log(`   🔑 Palabra Clave Maestra detectada: "${masterKeyword}"`);
-
-            // 3. BUSCAR EN WOOCOMMERCE POR NOMBRE
-            // Ignoramos categorías porque suelen estar sucias en Woo. Confiamos en el nombre.
+            // 4. BUSCAR EN WOOCOMMERCE POR NOMBRE (Amplio)
             const { data: searchResults } = await WooCommerce.get("products", {
                 search: masterKeyword,
-                per_page: 40, // Traemos bastantes para filtrar
+                per_page: 50, // Traemos bastantes para poder filtrar
                 status: 'publish',
                 stock_status: 'instock'
             });
 
-            console.log(`   📦 Resultados brutos encontrados en Woo: ${searchResults.length}`);
-
-            // 4. FILTRADO ESTRICTO EN MEMORIA
-            const minPrice = price * 0.5; // Margen 50%
+            // 5. FILTRADO ESTRICTO DE PASILLO
+            const minPrice = price * 0.5; 
             const maxPrice = price * 1.5; 
 
             products = searchResults.filter(p => {
-                const pPrice = parseFloat(p.price || 0);
-                
                 // A. No ser el mismo
                 if (p.id === parseInt(original_id)) return false;
 
-                // B. VALIDACIÓN DE NOMBRE (EL FILTRO ANTI-SUAVIZANTE)
-                // El producto candidato DEBE contener la palabra clave en su nombre.
-                // Ej: Si busco "Arroz", "Suavizante" no tiene "Arroz" en el nombre -> Eliminado.
-                const candidateName = p.name.toLowerCase();
-                const keywordLower = masterKeyword.toLowerCase();
+                // B. Filtro de Precio
+                const pPrice = parseFloat(p.price || 0);
+                if (price > 0 && pPrice > 0) {
+                    if (pPrice < minPrice || pPrice > maxPrice) return false;
+                }
+
+                // C. Filtro de Nombre Básico
+                if (!p.name.toLowerCase().includes(masterKeyword.toLowerCase())) return false;
+
+                // D. EL FILTRO DE ORO: Validar Pasillo
+                // Clasificamos al candidato usando la misma lógica que al original
+                const infoCandidato = obtenerInfoPasillo(p.categories, p.name);
                 
-                if (!candidateName.includes(keywordLower)) {
-                    // console.log(`      ❌ Descartado por nombre: ${p.name}`);
+                // Si el original es Pasillo 1 (Arroz) y el candidato es Pasillo 6 (Tostadas), ADIÓS.
+                // Nota: "Otros" se permite como comodín si el original es "Otros".
+                if (infoOriginal.pasillo !== "Otros" && infoOriginal.pasillo !== infoCandidato.pasillo) {
+                    // console.log(`   ❌ Descartado: ${p.name} (Es Pasillo ${infoCandidato.pasillo}, buscamos Pasillo ${infoOriginal.pasillo})`);
                     return false;
                 }
 
-                // C. Validación de Precio (Evita sugerir Arroz Premium de 50k por uno de 2k)
-                if (price > 0 && pPrice > 0) {
-                    if (pPrice < minPrice || pPrice > maxPrice) {
-                        // console.log(`      ❌ Descartado por precio: ${p.name} ($${pPrice})`);
-                        return false;
-                    }
-                }
-
-                // console.log(`      ✅ Candidato válido: ${p.name}`);
                 return true;
             });
-
-            console.log(`   ✨ Resultados finales filtrados: ${products.length}`);
+            
+            console.log(`   ✨ Sugerencias válidas encontradas: ${products.length}`);
         } 
         
-        // --- MODO MANUAL (Picker escribe en la barra) ---
+        // --- MODO MANUAL (Picker escribe) ---
         else if (query) {
             console.log(`\n🔍 [BUSQUEDA MANUAL] Query: "${query}"`);
             const { data: searchResults } = await WooCommerce.get("products", {
@@ -319,7 +312,7 @@ exports.searchProduct = async (req, res) => {
             products = searchResults;
         }
 
-        // Mapeo Final Limpio para el Frontend
+        // Mapeo Final Limpio
         const results = products.map(p => ({
             id: p.id,
             name: p.name,
@@ -355,7 +348,7 @@ exports.validateManualCode = async (req, res) => {
     }
 
     // 2. Validación Código de Barras (Tabla SIESA)
-    const { data: barcodeMatch, error } = await supabase
+    const { data: barcodeMatch } = await supabase
       .from('siesa_codigos_barras')
       .select('id')
       .eq('codigo_barras', cleanInput)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -28,6 +28,9 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
   const remaining = total - scanned;
   const isPartial = scanned > 0 && scanned < total;
 
+  // Formateador de moneda para Colombia
+  const formatPrice = (p) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(p);
+
   return (
     <motion.div 
       layout 
@@ -46,6 +49,11 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
             {item.pasillo === "S/N" || item.pasillo === "Otros" ? "GENERAL" : `PASILLO ${item.pasillo}`}
         </span>
         <h4 className="ec-prod-name">{item.name}</h4>
+        
+        {/* NUEVO: Mostrar Precio */}
+        <div style={{color: '#059669', fontWeight: '800', fontSize: '0.9rem', marginTop: '2px'}}>
+             {item.price > 0 ? formatPrice(item.price) : ""}
+        </div>
         
         <div className="ec-req-list">
             {item.pedidos_involucrados.map((ped, idx) => {
@@ -110,7 +118,7 @@ const VistaPicker = () => {
 
   // OFFLINE & SYNC STATE
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [pendingSync, setPendingSync] = useState(0); // Cantidad de acciones pendientes de subir
+  const [pendingSync, setPendingSync] = useState(0); 
 
   // Flujos de Acción
   const [isScanning, setIsScanning] = useState(false);
@@ -135,7 +143,7 @@ const VistaPicker = () => {
             const { data: pickers } = await axios.get(`https://backend-woocommerce.vercel.app/api/orders/pickers?email=${email}`);
             if(pickers && pickers.length > 0) {
                 me = pickers[0];
-                localStorage.setItem("picker_info_cache", JSON.stringify(me)); // Guardar en caché
+                localStorage.setItem("picker_info_cache", JSON.stringify(me)); 
             }
         } catch (err) {
             console.warn("Offline: Usando caché de picker");
@@ -153,7 +161,6 @@ const VistaPicker = () => {
         try {
             const { data: session } = await axios.get(`https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${me.id}`);
             setSessionData(session);
-            // Guardamos la sesión fresca en local para backup
             localStorage.setItem("session_active_cache", JSON.stringify(session));
         } catch (err) {
             console.warn("Offline: Usando caché de sesión");
@@ -172,7 +179,6 @@ const VistaPicker = () => {
 
     init();
 
-    // Listeners de Red
     const goOnline = () => setIsOnline(true);
     const goOffline = () => setIsOnline(false);
     window.addEventListener('online', goOnline);
@@ -184,41 +190,28 @@ const VistaPicker = () => {
     };
   }, []);
 
-  // --- 2. MOTOR DE SINCRONIZACIÓN (LA MAGIA) ---
-  // Este efecto corre cada 5 segundos y trata de vaciar la cola de acciones
+  // --- 2. MOTOR DE SINCRONIZACIÓN ---
   useEffect(() => {
       const syncInterval = setInterval(async () => {
-          // Leer cola del disco
           const queue = JSON.parse(localStorage.getItem("offline_actions_queue") || "[]");
           setPendingSync(queue.length);
 
           if (queue.length === 0 || !navigator.onLine) return;
 
-          console.log(`Intentando sincronizar ${queue.length} acciones...`);
-          
-          // Tomamos la más vieja (FIFO)
           const action = queue[0];
-
           try {
               await axios.post("https://backend-woocommerce.vercel.app/api/orders/registrar-accion", action);
-              
-              // Si tiene éxito, la sacamos de la cola
               const newQueue = queue.slice(1);
               localStorage.setItem("offline_actions_queue", JSON.stringify(newQueue));
               setPendingSync(newQueue.length);
-              
           } catch (error) {
               console.error("Fallo al sincronizar acción, reintentará luego", error);
-              // Si es un error 400/500 fatal, quizás deberíamos sacarla para no bloquear, 
-              // pero por seguridad de datos la dejamos para reintento.
           }
-
-      }, 5000); // Check cada 5s
+      }, 5000); 
 
       return () => clearInterval(syncInterval);
   }, []);
 
-  // Helper para añadir a la cola
   const queueAction = (payload) => {
       const queue = JSON.parse(localStorage.getItem("offline_actions_queue") || "[]");
       queue.push(payload);
@@ -258,8 +251,6 @@ const VistaPicker = () => {
           const targetQty = currentItem.quantity_total;
           const isFinished = currentScanned >= targetQty;
 
-          // Si terminamos el item (o es parcial, depende de tu lógica de negocio)
-          // Aquí guardamos LA ACCIÓN en la cola, no llamamos axios directo
           if (isFinished) {
               const payload = {
                   id_sesion: sessionData.session_id,
@@ -269,21 +260,16 @@ const VistaPicker = () => {
                   peso_real: peso
               };
               
-              // 1. Guardar en Cola (Offline Safe)
               queueAction(payload);
 
-              // 2. Feedback Inmediato
               if(navigator.vibrate) navigator.vibrate([100, 50, 100]); 
               closeAllModals();
           } else {
               if(navigator.vibrate) navigator.vibrate(100);
           }
 
-          // 3. Actualizar UI (Optimistic Update)
-          // Actualizamos también el caché local de la sesión para que si recarga vea el progreso
           updateLocalSessionState(currentItem.product_id, currentScanned, isFinished ? 'recolectado' : 'pendiente');
 
-          // Lógica de siguiente ciclo
           if (!isFinished) {
               setCurrentItem(prev => ({ ...prev, qty_scanned: currentScanned }));
           } else {
@@ -305,17 +291,14 @@ const VistaPicker = () => {
           datos_sustituto: { id: newItem.id, name: newItem.name, price: newItem.price }
       };
 
-      // 1. Cola
       queueAction(payload);
       
-      // 2. UI Update
       updateLocalSessionState(currentItem.product_id, currentItem.quantity_total, 'sustituido');
       
       closeAllModals();
       alert("🔄 Sustitución registrada (Guardada localmente)");
   };
 
-  // Actualiza el estado en React y en LocalStorage (Backup)
   const updateLocalSessionState = (prodId, qty, status) => {
       if(!sessionData) return;
 
@@ -332,11 +315,8 @@ const VistaPicker = () => {
   };
 
   const handleManualValidation = async (inputCode) => {
-      // Esta validación SÍ requiere internet porque consulta la BD maestra.
-      // Si está offline, podrías permitir un "override" con advertencia.
       if (!isOnline) {
           if(window.confirm("⚠️ Estás Offline. No podemos validar contra SIESA. ¿Estás seguro de que el código es correcto?")) {
-              // Aceptamos bajo riesgo
               setShowManualModal(false);
               if (isWeighable(currentItem)) setShowWeightModal(true);
               else confirmPicking();
@@ -345,7 +325,6 @@ const VistaPicker = () => {
           return;
       }
 
-      // ... (Lógica online normal)
       if(!currentItem) return;
       try {
           const res = await axios.post("https://backend-woocommerce.vercel.app/api/orders/validar-codigo", {
@@ -386,7 +365,6 @@ const VistaPicker = () => {
           await axios.post("https://backend-woocommerce.vercel.app/api/orders/finalizar-sesion", {
               id_sesion: sessionData.session_id, id_picker: pickerInfo.id
           });
-          // Limpiar cachés al finalizar
           localStorage.removeItem("session_active_cache");
           localStorage.removeItem("offline_actions_queue");
           window.location.reload();
@@ -504,7 +482,6 @@ const VistaPicker = () => {
           </div>
       )}
 
-      {/* COMPONENTES */}
       <EscanerBarras isScanning={isScanning} setIsScanning={setIsScanning} onScan={handleScanMatch} />
       <ManualEntryModal isOpen={showManualModal} onClose={() => setShowManualModal(false)} onConfirm={handleManualValidation} />
       <WeightModal isOpen={showWeightModal} item={currentItem} onClose={() => {setShowWeightModal(false); setCurrentItem(null)}} onConfirm={confirmPicking} />
