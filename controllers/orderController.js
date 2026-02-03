@@ -229,7 +229,7 @@ exports.registerAction = async (req, res) => {
 };
 
 // =========================================================================
-// 3. BÚSQUEDA INTELIGENTE ROBUSTA (CASCADA DE SEGURIDAD)
+// 3. BÚSQUEDA INTELIGENTE ROBUSTA (CASCADA DE 2 NIVELES - SIN DESPENSA)
 // =========================================================================
 
 exports.searchProduct = async (req, res) => {
@@ -245,19 +245,22 @@ exports.searchProduct = async (req, res) => {
             const price = parseFloat(original.price || 0);
             
             // 2. LISTA NEGRA: Evitar categorías basura que contaminan la búsqueda
+            // Si el producto tiene 'Despensa', la IGNORAMOS por completo.
             const BLACKLIST = ['despensa', 'mercado', 'supermercado', 'sin categorizar', 'uncategorized', 'ofertas'];
             
             const specificCats = original.categories.filter(c => 
                 !BLACKLIST.some(bad => c.name.toLowerCase().includes(bad))
             );
 
-            // Si hay categorías específicas, usamos esas. Si no, usamos las que haya (fallback).
-            const catsToUse = specificCats.length > 0 ? specificCats : original.categories;
-            const catIds = catsToUse.map(c => c.id).join(',');
-
-            // 3. ESTRATEGIA CASCADA
+            // IMPORTANTE: Si NO hay categorías específicas (ej: solo tenía "Despensa"),
+            // specificCats estará vacío. En ese caso NO usamos fallback a general.
+            // Pasamos directo al Intento 2 (Nombre).
+            const catIds = specificCats.map(c => c.id).join(',');
             
-            // INTENTO 1: Buscar por Categoría Exacta
+            // Guardamos IDs para verificación estricta posterior (solo de las específicas)
+            const validCatIdsSet = new Set(specificCats.map(c => c.id));
+
+            // INTENTO 1: Buscar por Categoría Exacta (Solo si existen categorías específicas)
             if (catIds) {
                 const { data: catResults } = await WooCommerce.get("products", {
                     category: catIds,
@@ -268,11 +271,11 @@ exports.searchProduct = async (req, res) => {
                 products = catResults;
             }
 
-            // INTENTO 2 (FALLBACK): Si Categoría falló o trajo 0 resultados, buscar por NOMBRE
+            // INTENTO 2: Si Categoría falló o trajo 0 resultados, buscar por NOMBRE
             // Usamos las primeras 2 palabras del nombre (ej: "Arroz Diana" -> busca "Arroz Diana")
             if (products.length === 0) {
                 const nameKeywords = original.name.split(' ').slice(0, 2).join(' ');
-                console.log(`[SUGERENCIA] Falló categoría, intentando nombre: ${nameKeywords}`);
+                console.log(`[SUGERENCIA] Falló categoría específica, intentando nombre: ${nameKeywords}`);
                 
                 const { data: nameResults } = await WooCommerce.get("products", {
                     search: nameKeywords,
@@ -283,7 +286,7 @@ exports.searchProduct = async (req, res) => {
                 products = nameResults;
             }
 
-            // 4. FILTRADO FINAL (Limpieza de resultados)
+            // 4. FILTRADO FINAL (Precio y Limpieza)
             const minPrice = price * 0.5; // 50% margen abajo
             const maxPrice = price * 1.5; // 50% margen arriba
 
@@ -295,6 +298,14 @@ exports.searchProduct = async (req, res) => {
                 const pPrice = parseFloat(p.price || 0);
                 if (price > 0 && pPrice > 0) {
                     if (pPrice < minPrice || pPrice > maxPrice) return false;
+                }
+
+                // VALIDACIÓN CRUZADA DE CATEGORÍA (Solo si buscamos por categoría)
+                // Si la búsqueda vino por nombre (Intento 2), somos más flexibles,
+                // pero si vino por categoría (Intento 1), exigimos que coincida.
+                if (catIds && products.length > 0) {
+                     const comparteCategoria = p.categories.some(c => validCatIdsSet.has(c.id));
+                     if (!comparteCategoria) return false;
                 }
 
                 return true;
