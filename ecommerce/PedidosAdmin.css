@@ -1,4 +1,4 @@
-/* PedidosAdmin.css */
+/* PedidosAdmin.css - Versión Multi-Orden */
 
 :root {
   --pa-primary-dark: #210d65;
@@ -133,6 +133,7 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  position: relative; /* Para posicionar la barra flotante */
 }
 
 .pedidos-layout-header {
@@ -152,6 +153,7 @@
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
+  padding-bottom: 100px; /* Espacio para barra flotante */
 }
 
 /* Filters */
@@ -197,7 +199,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 25px;
-  align-items: stretch; /* Clave para altura uniforme */
+  align-items: stretch;
   padding-bottom: 40px;
 }
 
@@ -205,10 +207,10 @@
   background: var(--pa-card-bg);
   border-radius: var(--pa-radius);
   box-shadow: var(--pa-shadow);
-  border: 1px solid var(--pa-border);
+  border: 2px solid transparent; /* Para selección */
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -217,13 +219,13 @@
 
 .pedidos-admin-order-card:hover {
   transform: translateY(-4px);
-  border-color: var(--pa-primary-medium);
   box-shadow: 0 12px 28px rgba(18, 38, 63, 0.12);
 }
 
-.pedidos-admin-order-card::before {
-  content: ""; height: 4px; width: 100%;
-  background: var(--pa-accent-blue); display: block;
+/* ESTADO SELECCIONADO */
+.pedidos-admin-order-card.selected {
+  border-color: var(--pa-primary-medium);
+  background-color: #f3f0ff;
 }
 
 .pedidos-admin-card-header {
@@ -233,11 +235,19 @@
   flex-shrink: 0;
   background: #fdfdfd;
 }
+
+/* CHECKBOX PERSONALIZADO */
+.pedidos-card-checkbox {
+  width: 20px; height: 20px; cursor: pointer;
+  accent-color: var(--pa-primary-medium);
+  transform: scale(1.2);
+}
+
 .pedidos-admin-order-id { font-weight: 800; color: var(--pa-primary-dark); font-size: 1.1rem; }
 
 .pedidos-admin-card-body {
   padding: 20px;
-  flex: 1; /* Ocupa el espacio restante para empujar el footer */
+  flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -252,46 +262,50 @@
 .pedidos-badge-busy { background: #fff3cd; color: #856404; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 0.75rem; }
 .pedidos-badge-busy.warning { background: #f8d7da; color: #721c24; }
 
-/* Progress Bar & Timer */
-.pedidos-progress-wrapper { margin-top: 15px; }
-.pedidos-progress-stats { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 5px; }
-.text-success { color: var(--pa-accent-green); }
-.text-warning { color: var(--pa-accent-orange); }
-.text-muted { color: #bdc3c7; }
-
-.pedidos-progress-track { height: 6px; background: #ecf0f1; border-radius: 3px; display: flex; overflow: hidden; }
-.pedidos-progress-fill.success { background: var(--pa-accent-green); transition: width 0.5s; }
-.pedidos-progress-fill.warning { background: var(--pa-accent-orange); transition: width 0.5s; }
-
-.pedidos-process-timer { margin-top: 10px; font-size: 0.85rem; background: #f8f9fa; padding: 5px; border-radius: 4px; text-align: center; }
-.pedidos-live-timer { font-weight: 700; color: var(--pa-primary-light); display: flex; align-items: center; justify-content: center; gap: 5px; }
-
-.pedidos-btn-assign-mini { width: 100%; margin-top: 15px; font-size: 0.85rem; justify-content: center; }
-
-/* --- Loading States --- */
-.pedidos-main-loading {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 60px 0; color: var(--pa-text-muted); width: 100%; grid-column: 1 / -1;
+/* BARRA FLOTANTE DE ASIGNACIÓN (BATCH) */
+.batch-action-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--pa-primary-dark);
+  color: white;
+  padding: 15px 30px;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  z-index: 1000;
+  animation: slideUp 0.3s ease-out;
 }
 
-.pedidos-modal-loading-overlay {
-  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(255, 255, 255, 0.9);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  z-index: 50; border-radius: 16px;
+.batch-info {
+  font-weight: bold;
+  font-size: 1.1rem;
 }
 
-.pedidos-spinner-large {
-  width: 50px; height: 50px;
-  border: 5px solid #e2e8f0; border-top: 5px solid var(--pa-primary-medium);
-  border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;
+.batch-btn {
+  background: var(--pa-accent-green);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.2s;
+}
+.batch-btn:hover { transform: scale(1.05); }
+
+@keyframes slideUp {
+  from { transform: translate(-50%, 100px); opacity: 0; }
+  to { transform: translate(-50%, 0); opacity: 1; }
 }
 
-.pedidos-spinner-text { font-weight: 600; font-size: 0.95rem; color: var(--pa-primary-dark); }
-
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-/* --- Modals --- */
+/* Modals y Utils se mantienen igual que antes... */
 .pedidos-modal-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px);
@@ -302,70 +316,35 @@
 .pedidos-modal-content {
   background: #f8f9fa; width: 90%; max-width: 1000px; height: 85vh;
   border-radius: 16px; overflow: hidden; display: flex; flex-direction: column;
-  animation: slideUp 0.3s ease-out; position: relative;
+  animation: slideUpModal 0.3s ease-out; position: relative;
 }
 .pedidos-modal-content.assign-modal { max-width: 500px; height: auto; max-height: 80vh; }
 
-@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slideUpModal { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 .pedidos-modal-header { background: var(--pa-primary-dark); padding: 20px; color: white; display: flex; justify-content: space-between; align-items: center; }
 .pedidos-modal-close-btn { background: rgba(255,255,255,0.2); border: none; width: 36px; height: 36px; border-radius: 50%; color: white; cursor: pointer; font-size: 1.2rem; }
-
 .pedidos-modal-body { flex: 1; padding: 30px; overflow-y: auto; }
 
-/* Modal Details */
-.pedidos-detail-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px; }
-.pedidos-detail-section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-.pedidos-detail-section h4 { color: var(--pa-primary-light); margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
-.pedidos-detail-section p { margin: 8px 0; color: var(--pa-text-dark); font-size: 0.95rem; }
-
-.pedidos-detail-section.report-success { border-left: 5px solid var(--pa-accent-green); }
-.pedidos-report-stats-row { display: flex; gap: 20px; margin-top: 15px; }
-.pedidos-stat-success { color: var(--pa-accent-green); font-weight: 800; }
-.pedidos-stat-danger { color: var(--pa-accent-red); font-weight: 800; }
-
-.pedidos-products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
-.pedidos-product-card { background: white; border-radius: 12px; overflow: hidden; border: 1px solid #eee; }
-.pedidos-product-img-wrapper { height: 180px; display: flex; align-items: center; justify-content: center; background: white; position: relative; border-bottom: 1px solid #f5f5f5; }
-.pedidos-product-img { max-width: 80%; max-height: 80%; object-fit: contain; }
-.pedidos-product-qty-tag { position: absolute; top: 10px; right: 10px; background: var(--pa-accent-green); color: white; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; }
-.pedidos-product-details { padding: 15px; }
-.pedidos-product-name { font-size: 0.9rem; font-weight: 600; margin-bottom: 5px; color: var(--pa-text-dark); }
-.pedidos-product-price { color: var(--pa-primary-dark); font-weight: 800; }
-
-/* Asignar Modal List */
+/* Pickers List */
 .pedidos-pickers-list { display: flex; flex-direction: column; gap: 10px; }
 .pedidos-picker-card { padding: 15px; border: 1px solid #eee; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
 .pedidos-picker-card:hover { background: #f9f9f9; }
 .pedidos-picker-card.disponible { border-left: 4px solid var(--pa-accent-green); }
 .pedidos-picker-card.picking { opacity: 0.6; cursor: not-allowed; border-left: 4px solid var(--pa-accent-orange); }
 
-/* Utils */
-.pedidos-loading-container, .pedidos-empty-list-container { grid-column: 1 / -1; text-align: center; padding: 50px; color: var(--pa-text-muted); }
+/* Progress Bar & Timer Utils */
+.pedidos-progress-wrapper { margin-top: 15px; }
+.pedidos-progress-stats { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 5px; }
+.pedidos-progress-track { height: 6px; background: #ecf0f1; border-radius: 3px; display: flex; overflow: hidden; }
+.pedidos-progress-fill.success { background: var(--pa-accent-green); }
+.pedidos-progress-fill.warning { background: var(--pa-accent-orange); }
+.pedidos-process-timer { margin-top: 10px; font-size: 0.85rem; background: #f8f9fa; padding: 5px; border-radius: 4px; text-align: center; }
+.pedidos-live-timer { font-weight: 700; color: var(--pa-primary-light); display: flex; align-items: center; justify-content: center; gap: 5px; }
+.text-success { color: var(--pa-accent-green); }
+.text-warning { color: var(--pa-accent-orange); }
+.text-muted { color: #bdc3c7; }
 .pedidos-icon-red { color: var(--pa-accent-red); margin-right: 5px; }
-.center-flex { display: flex; align-items: center; justify-content: center; height: 100%; }
-.pedidos-customer-note { background: #fff3e0; padding: 10px; border-radius: 6px; font-style: italic; color: #d35400; margin-top: 10px; font-size: 0.9rem; }
-
-/* --- ESTILOS DE HISTORIAL DETALLADO --- */
-.pedidos-history-report-container { display: flex; flex-direction: column; gap: 30px; }
-
-.history-section-title { font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #eee; display: flex; align-items: center; gap: 10px; }
-.history-section-title.danger { color: var(--pa-accent-red); border-bottom-color: var(--pa-accent-red); }
-.history-section-title.success { color: var(--pa-accent-green); border-bottom-color: var(--pa-accent-green); }
-
-/* Tarjeta Retirado */
-.pedidos-product-card.history-removed { border: 1px solid #fed7d7; background-color: #fff5f5; }
-.pedidos-product-img.grayscale { filter: grayscale(100%); opacity: 0.6; }
-
-.history-reason-box { background: #fed7d7; color: #9b2c2c; padding: 8px; border-radius: 6px; margin: 8px 0; font-size: 0.85rem; border: 1px solid #feb2b2; }
-.reason-label { display: block; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; margin-bottom: 2px; }
-.reason-text { font-weight: 600; }
-.strikethrough { text-decoration: line-through; color: var(--pa-text-muted); font-size: 0.8rem; }
-
-/* Tarjeta Recolectado */
-.pedidos-product-card.history-picked { border: 1px solid #c6f6d5; background-color: #f0fff4; }
-.history-check-label { margin-top: 5px; font-size: 0.8rem; color: var(--pa-accent-green); font-weight: 700; }
-
-/* Badges */
-.history-qty-badge { position: absolute; top: 10px; right: 10px; background: var(--pa-text-muted); color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.8rem; }
-.history-qty-badge.success { background: var(--pa-accent-green); }
+.pedidos-loading-container, .pedidos-empty-list-container { grid-column: 1 / -1; text-align: center; padding: 50px; color: var(--pa-text-muted); }
+.pedidos-spinner-large { width: 50px; height: 50px; border: 5px solid #e2e8f0; border-top: 5px solid var(--pa-primary-medium); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }

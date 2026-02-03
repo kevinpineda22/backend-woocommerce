@@ -1,5 +1,3 @@
-// tools/mapeadorPasillos.js
-
 /**
  * CONFIGURACIÓN DE ORDEN DE RUTA (SERPENTEAR)
  * Este mapa define el ORDEN OFICIAL de recorrido para el picker.
@@ -25,261 +23,82 @@ const ORDEN_RUTA = {
 
 /**
  * CONFIGURACIÓN DE PASILLOS Y SUS CATEGORÍAS (REGLAS DE MATCHING)
- * El orden aquí es para PRIORIDAD DE DETECCIÓN (qué palabra gana sobre otra).
- * NO afecta el orden de la ruta en la app, eso lo controla ORDEN_RUTA.
  */
 const DEFINICION_PASILLOS = [
   // --- PRIORIDAD ALTA: Productos Específicos que pueden confundirse ---
-
-  // Pasillo 6: Café (Antes que Granos para capturar "Cafe Granulado")
   {
     pasillo: "6",
     nombre: "Café y Panadería",
-    categorias: [
-      "cafe",
-      "chocolate",
-      "pan",
-      "tostada",
-      "cafe molido",
-      "cafe premium",
-      "cafe soluble",
-    ],
+    categorias: ["cafe", "chocolate", "pan", "tostada", "cafe molido", "cafe premium", "cafe soluble"],
   },
-
-  // Pasillo 8: Cuidado Personal (Antes que Aseo Hogar para capturar "Aseo Personal")
   {
     pasillo: "8",
     nombre: "Cuidado Personal",
-    categorias: [
-      "cuidado personal",
-      "aseo personal",
-      "higiene",
-      "oral",
-      "capilar",
-      "corporal",
-      "femenina",
-      "bebe",
-      "desodorante",
-      "shampoo",
-      "jabon de baño",
-      "crema dental",
-      "cremas corporales",
-      "higiene capilar",
-      "cremas detales",
-      
-    ],
+    categorias: ["cuidado personal", "aseo personal", "higiene", "oral", "capilar", "corporal", "femenina", "bebe", "desodorante", "shampoo", "jabon de baño", "crema dental", "cremas corporales", "higiene capilar", "cremas detales"],
   },
-
-  // Pasillo 9: Aseo Hogar
   {
     pasillo: "9",
     nombre: "Aseo Hogar",
-    categorias: [
-      "aseo hogar",
-      "limpieza hogar",
-      "papel higienico",
-      "escoba",
-      "traperas",
-      "bolsa basura",
-      "vela",
-      "limpia piso",
-      "escobas",
-      "fabuloso",
-      "lavanda",
-    ],
+    categorias: ["aseo hogar", "limpieza hogar", "papel higienico", "escoba", "traperas", "bolsa basura", "vela", "limpia piso", "escobas", "fabuloso", "lavanda"],
   },
-
-  // Pasillo 10: Ropa
   {
     pasillo: "10",
     nombre: "Aseo Ropa",
-    categorias: [
-      "detergente",
-      "suavizante",
-      "ropa",
-      "blanqueador",
-      "jabon barra",
-      "insecticidas",
-      "detergente liquido",
-      "detergente en polvo",
-      "blanqueadores",
-    ],
+    categorias: ["detergente", "suavizante", "ropa", "blanqueador", "jabon barra", "insecticidas", "detergente liquido", "detergente en polvo", "blanqueadores"],
   },
 
   // --- PRIORIDAD MEDIA: Alimentos ---
-
   {
     pasillo: "2",
     nombre: "Despensa Básica",
-    categorias: [
-      "huevo",
-      "atun",
-      "enlatado",
-      "pasta",
-      "spaghetti",
-      "harina precocida",
-      "huevos",
-      "atunes",
-      "enlatados",
-      "pastas",
-    ],
+    categorias: ["huevo", "atun", "enlatado", "pasta", "spaghetti", "harina precocida", "huevos", "atunes", "enlatados", "pastas"],
   },
   {
     pasillo: "1",
     nombre: "Granos y Condimentos",
-    categorias: [
-      "arroz",
-      "azucar",
-      "grano",
-      "sal",
-      "salsa",
-      "aderezo",
-      "vinagre",
-      "vinagretas",
-      "sazonador",
-      "panela",
-      "panelas",
-    ],
+    categorias: ["arroz", "azucar", "grano", "sal", "salsa", "aderezo", "vinagre", "vinagretas", "sazonador", "panela", "panelas"],
   },
   {
     pasillo: "3",
     nombre: "Aceites y Harinas",
-    categorias: [
-      "harinas",
-      "margarinas",
-      "sopas",
-      "aceite vegetal",
-      "aceite soya",
-      "aceite oliva",
-      "aceite",
-      "harina de trigo",
-      "mantequilla",
-      "crema",
-    ],
+    categorias: ["harinas", "margarinas", "sopas", "aceite vegetal", "aceite soya", "aceite oliva", "aceite", "harina de trigo", "mantequilla", "crema"],
   },
   {
     pasillo: "4",
     nombre: "Polvos y Repostería",
-    categorias: [
-      "gelatina",
-      "flan",
-      "pudin",
-      "reposteria",
-      "leche larga vida",
-      "refrescos en polvo",
-      "arequipe",
-    ],
+    categorias: ["gelatina", "flan", "pudin", "reposteria", "leche larga vida", "refrescos en polvo", "arequipe"],
   },
   {
     pasillo: "5",
     nombre: "Galletas y Dulces",
-    categorias: [
-      "galleta",
-      "dulce",
-      "snack dulce",
-      "avena",
-      "pan dulce",
-      "avenas",
-      "galleta salada",
-      "galleta saludable",
-      "galletas",
-      "modificadores"
-    ],
+    categorias: ["galleta", "dulce", "snack dulce", "avena", "pan dulce", "avenas", "galleta salada", "galleta saludable", "galletas", "modificadores"],
   },
 
   // --- OTROS ---
   {
     pasillo: "7",
     nombre: "Bebé y Adulto",
-    categorias: [
-      "adulto",
-      "incontinencia",
-      "pañal adulto",
-      "pañitos humedos",
-      "pañales",
-      "cereales",
-      "granola",
-      "leche en polvo",
-      "bebe",
-      "pañal"
-    ],
+    categorias: ["adulto", "incontinencia", "pañal adulto", "pañitos humedos", "pañales", "cereales", "granola", "leche en polvo", "bebe", "pañal"],
   },
   {
     pasillo: "11",
     nombre: "Mascotas y Cocina",
-    categorias: [
-      "mascota",
-      "perro",
-      "gato",
-      "cocina",
-      "esponja",
-      "guante",
-      "mascotas",
-      "esponjas",
-      "guantes",
-      "lavaplatos",
-      "desengrasante",
-    ],
+    categorias: ["mascota", "perro", "gato", "cocina", "esponja", "guante", "mascotas", "esponjas", "guantes", "lavaplatos", "desengrasante"],
   },
   {
     pasillo: "12",
     nombre: "Bebidas y Desechables",
-    categorias: [
-      "jugo",
-      "desechable",
-      "vaso",
-      "plato",
-      "lonchera",
-      "loncheras",
-      "servilletas",
-      "papel cocina",
-      "desechables",
-    ],
+    categorias: ["jugo", "desechable", "vaso", "plato", "lonchera", "loncheras", "servilletas", "papel cocina", "desechables"],
   },
   {
     pasillo: "13",
     nombre: "Refrigerados y Carnes",
-    categorias: [
-      "refrigerado",
-      "congelado",
-      "carne",
-      "pollo",
-      "pescado",
-      "jamon",
-      "queso",
-      "yogurt",
-      "lacteos derivados",
-      "lacteos",
-      "cervezas",
-      "mani",
-      "golosinas",
-      "nueces",
-      "mexicano",
-      "saludable",
-      "carnes frias",
-      "carniceria",
-      "embutidos",
-      "licores",
-    ],
+    categorias: ["refrigerado", "congelado", "carne", "pollo", "pescado", "jamon", "queso", "yogurt", "lacteos derivados", "lacteos", "cervezas", "mani", "golosinas", "nueces", "mexicano", "saludable", "carnes frias", "carniceria", "embutidos", "licores"],
   },
   {
     pasillo: "14",
     nombre: "Fruver",
-    categorias: [
-      "gaseosa",
-      "agua",
-      "bebida",
-      "fruta",
-      "verdura",
-      "tomate",
-      "cebolla",
-      "papa",
-      "gaseosas",
-      "fruver",
-      "pasabocas",
-      "snacks",
-      "medicamentos",
-    ],
+    categorias: ["gaseosa", "agua", "bebida", "fruta", "verdura", "tomate", "cebolla", "papa", "gaseosas", "fruver", "pasabocas", "snacks", "medicamentos"],
   },
 ];
 
@@ -288,12 +107,11 @@ const removeAccents = (str) => {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 };
 
-// Generamos las reglas automáticamente basadas en la definición del usuario.
-// Usamos la misma definición tanto para categorías como para nombres.
+// Generamos las reglas automáticamente
 const REGLAS_PASILLOS = DEFINICION_PASILLOS.map((def) => ({
   keys: def.categorias,
   pasillo: def.pasillo,
-  // La prioridad de ruta se define en ORDEN_RUTA, no en el índice del array de definición
+  nombre: def.nombre,
   prioridad: ORDEN_RUTA[def.pasillo] || 99,
 }));
 
@@ -308,9 +126,7 @@ const matchesKey = (text, key) => {
   }
 
   // Si es una sola palabra, usamos Regex con word boundaries
-  // Permitimos plurales simples (s, es)
   try {
-    // \b matches word boundaries. Example: \bgrano(s|es)?\b matches "grano", "granos" but NOT "granulado"
     const regex = new RegExp(`\\b${normalizedKey}(s|es)?\\b`, "i");
     return regex.test(normalizedText);
   } catch (e) {
@@ -324,67 +140,34 @@ const matchesKey = (text, key) => {
  * @param {String} nombreProducto - (Opcional) El nombre del producto para búsqueda de respaldo
  */
 const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
-  // DEBUG LOGGING
-  if (nombreProducto) {
-    console.log(`\n--- Procesando: "${nombreProducto}" ---`);
-    if (categoriasWC) {
-      console.log(
-        "Categorias RAW:",
-        categoriasWC.map((c) => c.name)
-      );
-    }
-  }
-
   // 1. Estrategia Principal: Búsqueda por NOMBRE DE CATEGORÍA
   if (categoriasWC && categoriasWC.length > 0) {
-    // FILTRO: Ignoramos la categoría genérica "Despensa" para obligar a usar la específica
-    // El usuario indica que "Despensa" es basura y quiere usar la segunda categoría.
+    // FILTRO: Ignoramos la categoría genérica "Despensa"
     const categoriasValidas = categoriasWC.filter((c) => {
       if (!c.name) return false;
       const nombreNormalizado = removeAccents(c.name).toLowerCase().trim();
-      // Filtramos cualquier variante de "despensa"
       return !nombreNormalizado.includes("despensa");
     });
 
-    // LOG DE CONTROL: Mostrar qué categorías sobrevivieron al filtro
-    if (nombreProducto && categoriasWC) {
-      console.log(
-        "Categorias FILTRADAS:",
-        categoriasValidas.map((c) => c.name)
-      );
-    }
-
-    const nombresCategorias = categoriasValidas
-      .map((c) => c.name || "")
-      .join(" ");
+    const nombresCategorias = categoriasValidas.map((c) => c.name || "").join(" ");
 
     for (const regla of REGLAS_PASILLOS) {
       if (regla.keys.some((key) => matchesKey(nombresCategorias, key))) {
-        if (nombreProducto)
-          console.log(
-            `✓ ASIGNADO (por Categ): Pasillo ${regla.pasillo} (${regla.nombre})`
-          );
         return { pasillo: regla.pasillo, prioridad: regla.prioridad };
       }
     }
   }
 
-  // 2. Estrategia Fallback: Búsqueda por PALABRAS CLAVE en el NOMBRE DEL PRODUCTO
-  // Reutilizamos las mismas reglas de pasillo para buscar en el nombre del producto
+  // 2. Estrategia Fallback: Búsqueda por NOMBRE DEL PRODUCTO
   const nombreParaBusqueda = nombreProducto || "";
 
   for (const regla of REGLAS_PASILLOS) {
     if (regla.keys.some((key) => matchesKey(nombreParaBusqueda, key))) {
-      if (nombreProducto)
-        console.log(
-          `✓ ASIGNADO (por Nombre): Pasillo ${regla.pasillo} (${regla.nombre})`
-        );
       return { pasillo: regla.pasillo, prioridad: regla.prioridad };
     }
   }
 
   // 3. Default
-  // Si no se encuentra regla, se asigna a "Otros" con prioridad 99
   return { pasillo: "Otros", prioridad: ORDEN_RUTA["Otros"] };
 };
 

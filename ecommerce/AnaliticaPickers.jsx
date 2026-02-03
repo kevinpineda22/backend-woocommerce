@@ -18,15 +18,17 @@ import {
 import "./AnaliticaPickers.css";
 import WarehouseMap from "./WarehouseMap"; 
 
-const RouteSelectionView = ({ fetchPickerRoute }) => {
+const RouteSelectionView = ({ fetchPickerRoute, dateRange }) => { // [MOD]: Recibe dateRange
   const [routesHistory, setRoutesHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchHistory = async () => {
+        setLoading(true);
       try {
         const BASE_URL = "https://backend-woocommerce.vercel.app/api";
-        const { data } = await axios.get(`${BASE_URL}/analytics/routes-history`);
+        // Pasamos el filtro de rango al backend tambien
+        const { data } = await axios.get(`${BASE_URL}/analytics/routes-history?range=${dateRange}`);
         setRoutesHistory(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
@@ -35,7 +37,7 @@ const RouteSelectionView = ({ fetchPickerRoute }) => {
       }
     };
     fetchHistory();
-  }, []);
+  }, [dateRange]); // [MOD]: Recargar si cambia el rango
 
   if (loading) return <div className="card-analitica"><p>Cargando historial de rutas...</p></div>;
 
@@ -613,7 +615,7 @@ const AnaliticaPickers = () => {
       ) : null}
 
       {activeTab === "routes" && (
-        <RouteSelectionView fetchPickerRoute={fetchPickerRoute} />
+        <RouteSelectionView fetchPickerRoute={fetchPickerRoute} dateRange={dateRange} />
       )}
 
       {/* MODAL DE RUTA (Nuevo) */}

@@ -2,237 +2,355 @@ const WooCommerce = require("../services/wooService");
 const { supabase } = require("../services/supabaseClient");
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 
-// 1. Obtener pedidos pendientes
-exports.getPendingOrders = async (req, res) => {
-  try {
-    const { data: wcOrders } = await WooCommerce.get("orders", { status: "processing", per_page: 50, order: "asc" });
-    const { data: activeAssignments } = await supabase.from("wc_asignaciones_pedidos").select("id_pedido, nombre_picker, fecha_inicio, reporte_snapshot").eq("estado_asignacion", "en_proceso");
-    const assignmentMap = {};
-    activeAssignments.forEach((a) => { assignmentMap[a.id_pedido] = a; });
-    const mergedOrders = wcOrders.map((order) => {
-      const assignment = assignmentMap[order.id];
-      return { ...order, is_assigned: !!assignment, assigned_to: assignment ? assignment.nombre_picker : null, started_at: assignment ? assignment.fecha_inicio : null, reporte_progress: assignment ? assignment.reporte_snapshot : null };
-    });
-    res.status(200).json(mergedOrders);
-  } catch (error) { console.error(error); res.status(500).json({ error: "Error al obtener pedidos cruzados" }); }
-};
+// --- HELPER: Agrupar items de múltiples pedidos (Batch Picking) ---
+const agruparItemsParaPicking = (orders) => {
+  const mapaProductos = {};
 
-// 2. Obtener pickers
-exports.getPickers = async (req, res) => {
-  const { email } = req.query;
-  try {
-    if (!email) {
-      const { data: profiles, error: pError } = await supabase.from("profiles").select("correo, nombre").eq("role", "picker");
-      if (!pError && profiles) {
-        const { data: existingPickers } = await supabase.from("wc_pickers").select("email");
-        const existingEmails = new Set(existingPickers?.map((p) => p.email) || []);
-        const missingProfiles = profiles.filter((p) => !existingEmails.has(p.correo));
-        if (missingProfiles.length > 0) {
-          const newPickers = missingProfiles.map((p) => ({ nombre_completo: p.nombre || "Nuevo Picker", email: p.correo, estado_picker: "disponible" }));
-          await supabase.from("wc_pickers").insert(newPickers);
-        }
+  orders.forEach((order) => {
+    order.line_items.forEach((item) => {
+      // Usamos el ID del producto como clave única
+      const key = item.product_id;
+
+      if (!mapaProductos[key]) {
+        mapaProductos[key] = {
+          id: item.id, // ID referencia
+          product_id: item.product_id,
+          name: item.name,
+          sku: item.sku, // Este suele ser el f120_id en integraciones SIESA
+          image_src: item.image?.src || "", 
+          quantity_total: 0,
+          pedidos_involucrados: [],
+          categorias: item.parent_name ? [{name: item.parent_name}] : [],
+          barcode: item.meta_data?.find(m => 
+            ['ean', 'barcode', '_ean', '_barcode'].includes(m.key.toLowerCase())
+          )?.value || "",
+        };
       }
-    }
-    let query = supabase.from("wc_pickers").select("*").order("nombre_completo", { ascending: true });
-    if (email) query = query.eq("email", email);
-    const { data, error } = await query;
-    if (error) throw error;
-    res.status(200).json(data);
-  } catch (error) { res.status(500).json({ error: error.message }); }
-};
 
-// 3. Asignar
-exports.assignOrder = async (req, res) => {
-  const { id_pedido, id_picker, nombre_picker } = req.body;
-  try {
-    const { data, error } = await supabase.from("wc_asignaciones_pedidos").insert([{ id_pedido, id_picker, nombre_picker, estado_asignacion: "en_proceso", fecha_inicio: new Date().toISOString() }]).select().single();
-    if (error) throw error;
-    await supabase.from("wc_pickers").update({ estado_picker: "picking", id_pedido_actual: id_pedido }).eq("id", id_picker);
-    res.status(200).json(data);
-  } catch (error) { res.status(500).json({ error: error.message }); }
-};
-
-// 3.5 Progreso
-exports.updateProgress = async (req, res) => {
-  console.log("--> [BACKEND] Recibiendo ping de progreso...");
-  const { id_pedido, reporte_items } = req.body;
-  try {
-    const { data: assignment } = await supabase.from("wc_asignaciones_pedidos").select("id, reporte_snapshot").eq("id_pedido", id_pedido).eq("estado_asignacion", "en_proceso").maybeSingle();
-    if (!assignment) return res.status(404).json({ error: "Asignación no encontrada" });
-
-    const oldSnapshot = assignment.reporte_snapshot || { recolectados: [], retirados: [] };
-    const newSnapshot = reporte_items || { recolectados: [], retirados: [] };
-    const logsToInsert = [];
-    const now = new Date();
-
-    const getNewItems = (oldList, newList) => {
-      const oldIds = new Set((oldList || []).map((i) => i.id));
-      return (newList || []).filter((i) => !oldIds.has(i.id));
-    };
-
-    const newCollected = getNewItems(oldSnapshot.recolectados, newSnapshot.recolectados);
-    const newRemoved = getNewItems(oldSnapshot.retirados, newSnapshot.retirados);
-
-    newCollected.forEach((item) => {
-      console.log(`   + Recolectado: ${item.name}`);
-      logsToInsert.push({ id_asignacion: assignment.id, id_pedido: id_pedido, id_producto: item.id, nombre_producto: item.name, accion: "recolectado", fecha_registro: now, pasillo: item.pasillo });
+      mapaProductos[key].quantity_total += item.quantity;
+      
+      mapaProductos[key].pedidos_involucrados.push({
+        id_pedido: order.id,
+        nombre_cliente: `${order.billing.first_name} ${order.billing.last_name}`,
+        cantidad: item.quantity
+      });
     });
+  });
 
-    newRemoved.forEach((item) => {
-      console.log(`   - Retirado: ${item.name}`);
-      logsToInsert.push({ id_asignacion: assignment.id, id_pedido: id_pedido, id_producto: item.id, nombre_producto: item.name, accion: "retirado", motivo: item.reason, fecha_registro: now, pasillo: item.pasillo });
-    });
-
-    if (logsToInsert.length > 0) await supabase.from("wc_log_picking").insert(logsToInsert);
-    await supabase.from("wc_asignaciones_pedidos").update({ reporte_snapshot: reporte_items }).eq("id", assignment.id);
-    res.status(200).json({ status: "ok" });
-  } catch (error) { console.error(error); res.status(500).json({ error: "Error updating progress" }); }
+  return Object.values(mapaProductos);
 };
 
-// 4. Detalle
-exports.getOrderById = async (req, res) => {
-  const { id } = req.params;
+// ==========================================
+// 1. GESTIÓN DE SESIONES (MULTI-ORDEN)
+// ==========================================
+
+exports.createPickingSession = async (req, res) => {
+  const { id_picker, ids_pedidos } = req.body;
+
   try {
-    const { data: order } = await WooCommerce.get(`orders/${id}`);
-    const { data: asignacion } = await supabase.from("wc_asignaciones_pedidos").select("id, reporte_snapshot, estado_asignacion").eq("id_pedido", id).in("estado_asignacion", ["completado", "en_proceso"]).order("fecha_inicio", { ascending: false }).limit(1).maybeSingle();
+    const { data: session, error: sessError } = await supabase
+      .from("wc_picking_sessions")
+      .insert([{ 
+        id_picker, 
+        ids_pedidos, 
+        estado: 'en_proceso',
+        fecha_inicio: new Date().toISOString()
+      }])
+      .select()
+      .single();
 
-    let reporteFinal = null;
-    if (asignacion && asignacion.reporte_snapshot) reporteFinal = asignacion.reporte_snapshot;
-    else if (!asignacion) {
-      const { data: logs } = await supabase.from("wc_log_picking").select("*").eq("id_pedido", id);
-      if (logs && logs.length > 0) {
-        reporteFinal = { recolectados: [], retirados: [] };
-        logs.forEach((log) => {
-          const item = { id: log.id_producto, name: log.nombre_producto };
-          if (log.accion === "recolectado") reporteFinal.recolectados.push(item);
-          if (log.accion === "retirado") reporteFinal.retirados.push({ ...item, reason: log.motivo });
-        });
-      }
-    }
+    if (sessError) throw sessError;
 
-    const items = await Promise.all(order.line_items.map(async (item) => {
-      if (!item.product_id) return { ...item, pasillo: "N/A", priority: 99 };
-      try {
-        const { data: prod } = await WooCommerce.get(`products/${item.product_id}`);
-        const info = obtenerInfoPasillo(prod.categories, prod.name);
-        const categoriasVisuales = prod.categories.map((c) => c.name).filter((name) => !name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes("despensa"));
-        let codigoBarras = item.global_unique_id || prod.global_unique_id || null;
-        if (!codigoBarras && prod.meta_data) { const meta = prod.meta_data.find((m) => ["barcode", "_barcode", "ean", "_ean", "gtin", "_gtin"].includes(m.key.toLowerCase())); if (meta) codigoBarras = meta.value; }
-        if (!codigoBarras && prod.attributes) { const attr = prod.attributes.find((a) => ["ean", "barcode", "codigo de barras"].includes(a.name.toLowerCase())); if (attr && attr.options && attr.options.length > 0) codigoBarras = attr.options[0]; }
-        return { ...item, image_src: prod.images[0]?.src, pasillo: info.pasillo, prioridad: info.prioridad, categorias: categoriasVisuales.length > 0 ? categoriasVisuales : prod.categories.map((c) => c.name), barcode: codigoBarras || "" };
-      } catch (e) { return item; }
+    await supabase
+      .from("wc_pickers")
+      .update({ estado_picker: "picking", id_sesion_actual: session.id })
+      .eq("id", id_picker);
+
+    const asignaciones = ids_pedidos.map(idPedido => ({
+      id_pedido: idPedido,
+      id_picker: id_picker,
+      id_sesion: session.id,
+      estado_asignacion: 'en_proceso',
+      fecha_inicio: new Date().toISOString()
     }));
 
-    order.line_items = items.sort((a, b) => a.prioridad - b.prioridad);
-    if (reporteFinal) order.reporte_items = reporteFinal;
-    if (asignacion && asignacion.id) order.current_assignment_id = asignacion.id;
-    res.status(200).json(order);
-  } catch (error) { res.status(500).json({ error: "Error obteniendo detalle" }); }
+    const { error: assignError } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .insert(asignaciones);
+
+    if (assignError) throw assignError;
+
+    res.status(200).json({ message: "Sesión creada exitosamente", session_id: session.id });
+
+  } catch (error) {
+    console.error("Error creando sesión:", error);
+    res.status(500).json({ error: error.message });
+  }
 };
 
-// 5. Finalizar Picking (LÓGICA ACTUALIZADA TIEMPO REAL)
-exports.completePicking = async (req, res) => {
-  const { id_pedido, id_picker, reporte_items, tiempo_inicio_real } = req.body;
+exports.getSessionActive = async (req, res) => {
+  const { id_picker } = req.query;
+
+  try {
+    const { data: picker } = await supabase
+      .from("wc_pickers")
+      .select("id_sesion_actual")
+      .eq("id", id_picker)
+      .single();
+
+    if (!picker || !picker.id_sesion_actual) {
+      return res.status(404).json({ message: "No tienes una sesión activa." });
+    }
+
+    const sessionId = picker.id_sesion_actual;
+
+    const { data: session } = await supabase
+      .from("wc_picking_sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .single();
+
+    const pedidosPromesas = session.ids_pedidos.map(id => WooCommerce.get(`orders/${id}`));
+    const responses = await Promise.all(pedidosPromesas);
+    const orders = responses.map(r => r.data);
+
+    const itemsAgrupados = agruparItemsParaPicking(orders);
+
+    const { data: logs } = await supabase
+         .from("wc_log_picking")
+         .select("id_producto, accion, es_sustituto")
+         .in("id_producto", itemsAgrupados.map(i => i.product_id)); // Filtro básico
+
+    const itemsConRuta = await Promise.all(itemsAgrupados.map(async (item) => {
+      const info = obtenerInfoPasillo(item.categorias || [], item.name);
+      
+      // Verificamos si en esta sesión específica (aprox) ya se recolectó
+      // Nota: Idealmente wc_log_picking debería tener id_sesion para ser exactos
+      const logItem = logs?.find(l => l.id_producto === item.product_id && l.accion === 'recolectado');
+      
+      return {
+        ...item,
+        pasillo: info.pasillo,
+        prioridad: info.prioridad,
+        status: logItem ? (logItem.es_sustituto ? 'sustituido' : 'recolectado') : 'pendiente'
+      };
+    }));
+
+    itemsConRuta.sort((a, b) => a.prioridad - b.prioridad);
+
+    res.status(200).json({
+      session_id: session.id,
+      orders_info: orders.map(o => ({ 
+          id: o.id, 
+          customer: `${o.billing.first_name} ${o.billing.last_name}`,
+          total: o.total
+      })),
+      items: itemsConRuta
+    });
+
+  } catch (error) {
+    console.error("Error obteniendo sesión:", error);
+    res.status(500).json({ error: "Error al cargar la sesión de picking" });
+  }
+};
+
+// ==========================================
+// 2. ACCIONES DEL PICKER
+// ==========================================
+
+exports.registerAction = async (req, res) => {
+  const { 
+    id_sesion, 
+    id_producto_original, 
+    nombre_producto_original, 
+    accion, 
+    peso_real, 
+    datos_sustituto 
+  } = req.body;
+
   try {
     const now = new Date();
-    const { data: asignaciones } = await supabase.from("wc_asignaciones_pedidos").select("id, fecha_inicio").eq("id_pedido", id_pedido).eq("estado_asignacion", "en_proceso").limit(1);
-    const asignacion = asignaciones && asignaciones.length > 0 ? asignaciones[0] : null;
-
-    // CÁLCULO DE DURACIÓN REAL
-    // Si el frontend envía 'tiempo_inicio_real', usamos ese. Si no, usamos el de la DB.
-    let fechaInicioCalc = asignacion?.fecha_inicio ? new Date(asignacion.fecha_inicio) : now;
     
-    if (tiempo_inicio_real) {
-        fechaInicioCalc = new Date(tiempo_inicio_real);
-    }
+    // Referencia auxiliar para mantener compatibilidad FK
+    const { data: anyAssign } = await supabase
+        .from('wc_asignaciones_pedidos')
+        .select('id, id_pedido')
+        .eq('id_sesion', id_sesion)
+        .limit(1)
+        .single();
+        
+    const idAsignacionRef = anyAssign ? anyAssign.id : null;
+    const idPedidoRef = anyAssign ? anyAssign.id_pedido : 0; 
 
-    const diff = (now - fechaInicioCalc) / 1000;
-    const duration = diff > 0 ? Math.floor(diff) : 0;
-
-    const updatePayload = {
-      estado_asignacion: "completado",
-      fecha_fin: now,
-      tiempo_total_segundos: duration,
-      reporte_snapshot: reporte_items || null,
-      // Actualizamos la fecha de inicio real en la DB para consistencia histórica
-      ...(tiempo_inicio_real ? { fecha_inicio: new Date(tiempo_inicio_real) } : {})
+    const logEntry = {
+         id_asignacion: idAsignacionRef,
+         id_pedido: idPedidoRef, 
+         id_producto: id_producto_original,
+         fecha_registro: now,
+         peso_real: peso_real || null,
     };
 
-    let asignacionId = null;
-    if (asignacion) {
-      asignacionId = asignacion.id;
-      await supabase.from("wc_asignaciones_pedidos").update(updatePayload).eq("id", asignacionId);
-    } else {
-      const { data: newAsign } = await supabase.from("wc_asignaciones_pedidos").insert([{ id_pedido: id_pedido, id_picker: id_picker || null, fecha_inicio: fechaInicioCalc, ...updatePayload }]).select("id").single();
-      if (newAsign) asignacionId = newAsign.id;
+    if (accion === 'recolectado') {
+      logEntry.nombre_producto = nombre_producto_original;
+      logEntry.accion = 'recolectado';
+      logEntry.es_sustituto = false;
+      
+    } else if (accion === 'sustituido') {
+      logEntry.nombre_producto = nombre_producto_original; 
+      logEntry.accion = 'recolectado'; 
+      logEntry.es_sustituto = true;
+      logEntry.motivo = 'Sustitución por falta de stock';
+      
+      if (datos_sustituto) {
+          logEntry.id_producto_final = datos_sustituto.id;
+          logEntry.nombre_sustituto = datos_sustituto.name;
+          logEntry.precio_nuevo = datos_sustituto.price;
+      }
     }
 
-    // Insertar Logs finales si faltan (Auditoría)
-    if (reporte_items && asignacionId) {
-      const { data: existingLogs } = await supabase.from("wc_log_picking").select("id_producto, accion").eq("id_asignacion", asignacionId);
-      const loggedSet = new Set((existingLogs || []).map((l) => `${l.id_producto}-${l.accion}`));
-      const logsToInsert = [];
-      const procesarLista = (lista, accion) => {
-        if (!lista) return;
-        lista.forEach((item) => {
-          if (!loggedSet.has(`${item.id}-${accion}`)) {
-            logsToInsert.push({ 
-              id_asignacion: asignacionId, 
-              id_pedido: id_pedido, 
-              id_producto: item.id, 
-              nombre_producto: item.name, 
-              accion: accion, 
-              motivo: item.reason || null, 
-              pasillo: item.pasillo || null, 
-              device_timestamp: item.device_timestamp || null,
-              fecha_registro: now 
-            });
-          }
-        });
-      };
-      procesarLista(reporte_items.recolectados, "recolectado");
-      procesarLista(reporte_items.retirados, "retirado");
-      if (logsToInsert.length > 0) await supabase.from("wc_log_picking").insert(logsToInsert);
-    }
-
-    await supabase.from("wc_pickers").update({ estado_picker: "disponible", id_pedido_actual: null }).eq("id", id_picker);
-    res.status(200).json({ message: "Orden finalizada correctamente" });
-  } catch (error) { console.error("Error finalizando orden:", error); res.status(500).json({ error: error.message }); }
-};
-
-// 6. Historial
-exports.getHistory = async (req, res) => {
-  const { id_picker } = req.query;
-  try {
-    let query = supabase.from("wc_asignaciones_pedidos").select("*").eq("estado_asignacion", "completado").order("fecha_fin", { ascending: false });
-    if (id_picker) query = query.eq("id_picker", id_picker); else query = query.limit(50);
-    const { data, error } = await query;
+    const { error } = await supabase.from("wc_log_picking").insert([logEntry]);
     if (error) throw error;
-    const uniqueMap = new Map();
-    const uniqueData = [];
-    for (const item of data) { if (!uniqueMap.has(item.id_pedido)) { uniqueMap.set(item.id_pedido, true); uniqueData.push(item); } }
-    const formattedData = uniqueData.map((item) => {
-      const seconds = item.tiempo_total_segundos || 0;
-      const totalMinutes = Math.floor(seconds / 60);
-      let duracionTexto = `${totalMinutes} min`;
-      if (totalMinutes > 60) { const hours = Math.floor(totalMinutes / 60); const mins = totalMinutes % 60; duracionTexto = `${hours} h ${mins} min`; }
-      return { ...item, tiempo_formateado: duracionTexto };
-    });
-    res.status(200).json(formattedData);
-  } catch (error) { res.status(500).json({ error: error.message }); }
+
+    res.status(200).json({ status: "ok", message: "Acción registrada" });
+
+  } catch (error) {
+    console.error("Error registrando acción:", error);
+    res.status(500).json({ error: error.message });
+  }
 };
 
-// 7. Cancelar Asignación
-exports.cancelAssignment = async (req, res) => {
-  const { id_picker } = req.body;
-  try {
-    const { data: picker, error: recError } = await supabase.from("wc_pickers").select("id_pedido_actual").eq("id", id_picker).single();
-    if (recError) throw recError;
-    const id_pedido = picker.id_pedido_actual;
-    if (id_pedido) {
-      await supabase.from("wc_asignaciones_pedidos").update({ estado_asignacion: "cancelado", fecha_fin: new Date() }).eq("id_pedido", id_pedido).eq("estado_asignacion", "en_proceso");
+exports.searchProduct = async (req, res) => {
+    const { query } = req.query; 
+    if (!query) return res.status(400).json({ error: "Query requerido" });
+
+    try {
+        const { data: products } = await WooCommerce.get("products", {
+            search: query,
+            per_page: 20
+        });
+
+        const results = products.map(p => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            image: p.images[0]?.src || null,
+            stock: p.stock_quantity,
+            sku: p.sku
+        }));
+
+        res.status(200).json(results);
+    } catch (error) {
+        res.status(500).json({ error: "Error conectando con WooCommerce" });
     }
-    await supabase.from("wc_pickers").update({ estado_picker: "disponible", id_pedido_actual: null }).eq("id", id_picker);
-    res.status(200).json({ message: "Asignación cancelada y picker liberada" });
-  } catch (error) { console.error("Error cancelando asignación:", error); res.status(500).json({ error: error.message }); }
+};
+
+exports.completeSession = async (req, res) => {
+    const { id_sesion, id_picker } = req.body;
+    
+    try {
+        const now = new Date();
+        
+        await supabase
+            .from("wc_picking_sessions")
+            .update({ estado: 'completado', fecha_fin: now })
+            .eq("id", id_sesion);
+
+        await supabase
+            .from("wc_pickers")
+            .update({ estado_picker: 'disponible', id_sesion_actual: null })
+            .eq("id", id_picker);
+
+        await supabase
+            .from("wc_asignaciones_pedidos")
+            .update({ estado_asignacion: 'completado', fecha_fin: now })
+            .eq("id_sesion", id_sesion);
+
+        res.status(200).json({ message: "Sesión finalizada." });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// ==========================================
+// 3. VALIDACIÓN MANUAL ROBUSTA (SIESA)
+// ==========================================
+
+exports.validateManualCode = async (req, res) => {
+  // expected_sku: Debe ser el f120_id que viene en el pedido
+  const { input_code, expected_sku } = req.body; 
+
+  if (!input_code || !expected_sku) {
+    return res.status(400).json({ valid: false, message: "Datos incompletos" });
+  }
+
+  const cleanInput = input_code.toString().trim();
+  const cleanSku = expected_sku.toString().trim();
+
+  try {
+    // CASO A: El picker ingresó directamente el ID del Item (f120_id)
+    if (cleanInput === cleanSku) {
+       return res.status(200).json({ valid: true, type: 'id_directo' });
+    }
+
+    // CASO B: El picker ingresó un Código de Barras
+    // Buscamos en la tabla de barras si existe ese código Y si pertenece al item esperado
+    const { data: barcodeMatch, error } = await supabase
+      .from('siesa_codigos_barras')
+      .select('id')
+      .eq('codigo_barras', cleanInput)
+      .eq('f120_id', cleanSku) // ¡Debe coincidir con el producto esperado!
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (barcodeMatch) {
+      return res.status(200).json({ valid: true, type: 'codigo_barras' });
+    }
+
+    // Si no coincidió con nada
+    return res.status(200).json({ valid: false });
+
+  } catch (error) {
+    console.error("Error validando código SIESA:", error);
+    // En caso de error técnico, mejor denegar por seguridad
+    res.status(500).json({ valid: false, error: "Error de servidor" });
+  }
+};
+
+// ==========================================
+// 4. MÉTODOS DE APOYO (ADMIN)
+// ==========================================
+
+exports.getPendingOrders = async (req, res) => {
+    try {
+        const { data: wcOrders } = await WooCommerce.get("orders", { status: "processing", per_page: 50 });
+        
+        const { data: activeAssignments } = await supabase
+            .from("wc_asignaciones_pedidos")
+            .select("id_pedido")
+            .eq("estado_asignacion", "en_proceso");
+            
+        const assignedIds = new Set(activeAssignments.map(a => a.id_pedido));
+        
+        const cleanOrders = wcOrders.map(order => ({
+            ...order,
+            is_assigned: assignedIds.has(order.id)
+        }));
+        
+        res.status(200).json(cleanOrders);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+exports.getPickers = async (req, res) => {
+    const { email } = req.query;
+    let query = supabase.from("wc_pickers").select("*").order("nombre_completo", { ascending: true });
+    
+    if (email) query = query.eq("email", email);
+    
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    
+    res.status(200).json(data);
 };
