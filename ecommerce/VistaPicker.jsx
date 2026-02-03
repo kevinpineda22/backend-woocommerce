@@ -87,8 +87,8 @@ const VistaPicker = () => {
     const init = async () => {
       try {
         setLoading(true);
-        // 1. Obtener email del picker (Del Auth o LocalStorage)
-        let email = localStorage.getItem("picker_email"); 
+        // 1. Obtener email del picker (Del LocalStorage)
+        let email = localStorage.getItem("correo_empleado") || localStorage.getItem("picker_email");
         
         // 2. Obtener ID del picker
         const { data: pickers } = await axios.get(`https://backend-woocommerce.vercel.app/api/orders/pickers?email=${email}`);

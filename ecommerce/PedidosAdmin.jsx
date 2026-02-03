@@ -12,11 +12,12 @@ import {
   FaMapMarkerAlt,
   FaUserTag,
   FaRunning,
-  FaHistory,
   FaChartLine,
   FaClock,
   FaCheckDouble, // Icono para batch
-  FaTimes
+  FaTimes,
+  FaPhone,
+  FaEnvelope
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
 
@@ -44,7 +45,7 @@ const PedidosAdmin = () => {
   const [assigning, setAssigning] = useState(false);
 
   // --- MULTI-SELECCIÓN (NUEVO) ---
-  const [selectedIds, setSelectedIds] = useState(new Set()); // IDs seleccionados para batch
+  const [selectedIds, setSelectedIds] = useState(new Set()); 
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -371,7 +372,7 @@ const PedidosAdmin = () => {
         </div>
       )}
 
-      {/* MODAL DETALLE SIMPLE (Solo lectura) */}
+      {/* MODAL DETALLE COMPLETO (RESTAURADO) */}
       {selectedOrder && !showAssignModal && (
         <div className="pedidos-modal-overlay" onClick={() => setSelectedOrder(null)}>
             <div className="pedidos-modal-content" onClick={e => e.stopPropagation()}>
@@ -379,14 +380,60 @@ const PedidosAdmin = () => {
                     <h2>Pedido #{selectedOrder.id}</h2>
                     <button className="pedidos-modal-close-btn" onClick={() => setSelectedOrder(null)}>&times;</button>
                 </div>
+                
                 <div className="pedidos-modal-body">
-                    {/* Reutilizar estructura de detalle si se desea, por ahora simple lista */}
-                    <h3>Productos</h3>
-                    <ul>
-                        {selectedOrder.line_items.map(item => (
-                            <li key={item.id}>{item.name} x {item.quantity}</li>
+                    {/* SECCIÓN 1: DATOS DEL CLIENTE */}
+                    <div className="pedidos-detail-row">
+                        <div className="pedidos-detail-section">
+                            <h4>👤 Cliente</h4>
+                            <p><strong>Nombre:</strong> {selectedOrder.billing?.first_name} {selectedOrder.billing?.last_name}</p>
+                            <p><FaEnvelope style={{marginRight:5}}/> {selectedOrder.billing?.email}</p>
+                            <p><FaPhone style={{marginRight:5}}/> {selectedOrder.billing?.phone}</p>
+                            <p><strong>Método Pago:</strong> {selectedOrder.payment_method_title}</p>
+                        </div>
+                        
+                        <div className="pedidos-detail-section">
+                            <h4>📍 Envío</h4>
+                            <p><strong>Dirección:</strong> {selectedOrder.shipping?.address_1 || selectedOrder.billing?.address_1}</p>
+                            <p><strong>Ciudad:</strong> {selectedOrder.shipping?.city || selectedOrder.billing?.city}</p>
+                            {selectedOrder.customer_note && (
+                                <div className="pedidos-customer-note">
+                                    📝 "{selectedOrder.customer_note}"
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* SECCIÓN 2: PRODUCTOS CON IMÁGENES */}
+                    <h3 style={{margin: '20px 0 10px', color: '#1f2933'}}>
+                        🛒 Productos Solicitados ({selectedOrder.line_items.length})
+                    </h3>
+                    
+                    <div className="pedidos-products-grid">
+                        {selectedOrder.line_items.map((item) => (
+                            <div key={item.id} className="pedidos-product-card">
+                                <div className="pedidos-product-img-wrapper">
+                                    {/* Muestra la cantidad */}
+                                    <span className="pedidos-product-qty-tag">{item.quantity}</span>
+                                    
+                                    {/* Intenta mostrar imagen (soporta estructura woo v3) */}
+                                    {item.image?.src || item.image_src ? (
+                                        <img 
+                                            src={item.image?.src || item.image_src} 
+                                            className="pedidos-product-img" 
+                                            alt={item.name} 
+                                        />
+                                    ) : (
+                                        <FaBox size={30} color="#ccc"/>
+                                    )}
+                                </div>
+                                <div className="pedidos-product-details">
+                                    <div className="pedidos-product-name">{item.name}</div>
+                                    <div className="pedidos-product-price">{formatPrice(item.total)}</div>
+                                </div>
+                            </div>
                         ))}
-                    </ul>
+                    </div>
                 </div>
             </div>
         </div>

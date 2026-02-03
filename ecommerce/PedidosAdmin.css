@@ -1,4 +1,4 @@
-/* PedidosAdmin.css - Versión Multi-Orden */
+/* PedidosAdmin.css - Versión Completa con Modal Rico */
 
 :root {
   --pa-primary-dark: #210d65;
@@ -18,7 +18,7 @@
   --pa-font: "Poppins", "Segoe UI", sans-serif;
 }
 
-/* --- Layout --- */
+/* --- Layout Principal --- */
 .pedidos-layout-main-container {
   display: flex;
   min-height: 100vh;
@@ -34,7 +34,11 @@
 /* Sidebar */
 .pedidos-layout-sidebar {
   width: 260px;
-  background: linear-gradient(180deg, var(--pa-primary-dark) 0%, var(--pa-primary-medium) 100%);
+  background: linear-gradient(
+    180deg,
+    var(--pa-primary-dark) 0%,
+    var(--pa-primary-medium) 100%
+  );
   color: white;
   display: flex;
   flex-direction: column;
@@ -60,7 +64,9 @@
   opacity: 0.7;
   transition: opacity 0.2s;
 }
-.pedidos-back-button:hover { opacity: 1; }
+.pedidos-back-button:hover {
+  opacity: 1;
+}
 
 .pedidos-layout-logo {
   width: 50px;
@@ -75,9 +81,17 @@
   font-size: 1.2rem;
 }
 
-.pedidos-layout-sidebar-title { font-size: 1rem; opacity: 0.9; margin: 0; }
+.pedidos-layout-sidebar-title {
+  font-size: 1rem;
+  opacity: 0.9;
+  margin: 0;
+}
 
-.pedidos-layout-sidebar-nav { flex: 1; padding: 20px 0; overflow-y: auto; }
+.pedidos-layout-sidebar-nav {
+  flex: 1;
+  padding: 20px 0;
+  overflow-y: auto;
+}
 
 .pedidos-nav-label {
   padding: 0 20px;
@@ -87,7 +101,9 @@
   font-weight: 700;
   margin-bottom: 5px;
 }
-.pedidos-nav-label.spacer { margin-top: 25px; }
+.pedidos-nav-label.spacer {
+  margin-top: 25px;
+}
 
 .pedidos-layout-sidebar-button {
   width: 100%;
@@ -104,21 +120,29 @@
   transition: all 0.2s;
 }
 
-.pedidos-layout-sidebar-button:hover, .pedidos-layout-sidebar-button.active {
+.pedidos-layout-sidebar-button:hover,
+.pedidos-layout-sidebar-button.active {
   background: rgba(255, 255, 255, 0.1);
   color: white;
   border-left-color: var(--pa-accent-green);
 }
 
-.pedidos-badge-count, .pedidos-badge-count-blue {
+.pedidos-badge-count,
+.pedidos-badge-count-blue {
   margin-left: auto;
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 0.7rem;
   font-weight: 700;
 }
-.pedidos-badge-count { background: var(--pa-accent-red); color: white; }
-.pedidos-badge-count-blue { background: var(--pa-accent-blue); color: white; }
+.pedidos-badge-count {
+  background: var(--pa-accent-red);
+  color: white;
+}
+.pedidos-badge-count-blue {
+  background: var(--pa-accent-blue);
+  color: white;
+}
 
 .pedidos-layout-sidebar-footer {
   padding: 20px;
@@ -127,13 +151,13 @@
   opacity: 0.5;
 }
 
-/* Content */
+/* Content Area */
 .pedidos-layout-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  position: relative; /* Para posicionar la barra flotante */
+  position: relative;
 }
 
 .pedidos-layout-header {
@@ -145,7 +169,11 @@
   border-bottom: 1px solid var(--pa-border);
 }
 
-.pedidos-layout-header h1 { font-size: 1.4rem; color: var(--pa-primary-dark); margin: 0; }
+.pedidos-layout-header h1 {
+  font-size: 1.4rem;
+  color: var(--pa-primary-dark);
+  margin: 0;
+}
 
 .pedidos-layout-body {
   padding: 30px;
@@ -156,7 +184,7 @@
   padding-bottom: 100px; /* Espacio para barra flotante */
 }
 
-/* Filters */
+/* Filtros */
 .pedidos-admin-filters-container {
   background: var(--pa-card-bg);
   padding: 20px;
@@ -169,8 +197,19 @@
   margin-bottom: 30px;
 }
 
-.pedidos-admin-filter-group { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px; }
-.pedidos-admin-filter-group label { font-size: 0.85rem; font-weight: 600; color: var(--pa-text-muted); text-transform: uppercase; }
+.pedidos-admin-filter-group {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pedidos-admin-filter-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--pa-text-muted);
+  text-transform: uppercase;
+}
 .pedidos-admin-filter-input {
   padding: 10px;
   border: 2px solid #eef2f6;
@@ -178,23 +217,45 @@
   outline: none;
   transition: border 0.2s;
 }
-.pedidos-admin-filter-input:focus { border-color: var(--pa-primary-medium); }
+.pedidos-admin-filter-input:focus {
+  border-color: var(--pa-primary-medium);
+}
 
-.pedidos-filter-actions { flex: 0 0 auto; }
+.pedidos-filter-actions {
+  flex: 0 0 auto;
+}
 .pedidos-btn-clear {
-  background: #95a5a6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer;
+  background: #95a5a6;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
 }
 
 .pedidos-admin-refresh-btn {
-  background: linear-gradient(135deg, var(--pa-primary-light), var(--pa-primary-medium));
-  color: white; border: none; padding: 10px 20px; border-radius: 50px;
-  font-weight: 600; display: flex; align-items: center; gap: 8px; cursor: pointer;
+  background: linear-gradient(
+    135deg,
+    var(--pa-primary-light),
+    var(--pa-primary-medium)
+  );
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 50px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
   box-shadow: 0 4px 10px rgba(59, 26, 154, 0.2);
   transition: transform 0.2s;
 }
-.pedidos-admin-refresh-btn:hover { transform: translateY(-2px); }
+.pedidos-admin-refresh-btn:hover {
+  transform: translateY(-2px);
+}
 
-/* --- Grid Uniforme (Stretch) --- */
+/* --- Grid de Pedidos (Tarjetas) --- */
 .pedidos-admin-orders-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -207,10 +268,13 @@
   background: var(--pa-card-bg);
   border-radius: var(--pa-radius);
   box-shadow: var(--pa-shadow);
-  border: 2px solid transparent; /* Para selección */
+  border: 2px solid transparent;
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s,
+    border-color 0.2s;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -222,7 +286,6 @@
   box-shadow: 0 12px 28px rgba(18, 38, 63, 0.12);
 }
 
-/* ESTADO SELECCIONADO */
 .pedidos-admin-order-card.selected {
   border-color: var(--pa-primary-medium);
   background-color: #f3f0ff;
@@ -231,19 +294,26 @@
 .pedidos-admin-card-header {
   padding: 15px 20px;
   border-bottom: 1px solid #f0f0f0;
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   flex-shrink: 0;
   background: #fdfdfd;
 }
 
-/* CHECKBOX PERSONALIZADO */
 .pedidos-card-checkbox {
-  width: 20px; height: 20px; cursor: pointer;
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
   accent-color: var(--pa-primary-medium);
   transform: scale(1.2);
 }
 
-.pedidos-admin-order-id { font-weight: 800; color: var(--pa-primary-dark); font-size: 1.1rem; }
+.pedidos-admin-order-id {
+  font-weight: 800;
+  color: var(--pa-primary-dark);
+  font-size: 1.1rem;
+}
 
 .pedidos-admin-card-body {
   padding: 20px;
@@ -253,16 +323,43 @@
   justify-content: space-between;
 }
 
-/* Card Content Area */
-.pedidos-card-info h3 { margin: 0 0 10px; font-size: 1.1rem; color: var(--pa-text-dark); }
-.pedidos-card-info p { margin: 5px 0; font-size: 0.9rem; color: var(--pa-text-muted); display: flex; align-items: center; gap: 8px; }
+.pedidos-card-info h3 {
+  margin: 0 0 10px;
+  font-size: 1.1rem;
+  color: var(--pa-text-dark);
+}
+.pedidos-card-info p {
+  margin: 5px 0;
+  font-size: 0.9rem;
+  color: var(--pa-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 /* Status Badges */
-.pedidos-badge-ok { background: #d4edda; color: #155724; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 0.75rem; }
-.pedidos-badge-busy { background: #fff3cd; color: #856404; padding: 4px 10px; border-radius: 20px; font-weight: 700; font-size: 0.75rem; }
-.pedidos-badge-busy.warning { background: #f8d7da; color: #721c24; }
+.pedidos-badge-ok {
+  background: #d4edda;
+  color: #155724;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+.pedidos-badge-busy {
+  background: #fff3cd;
+  color: #856404;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+.pedidos-badge-busy.warning {
+  background: #f8d7da;
+  color: #721c24;
+}
 
-/* BARRA FLOTANTE DE ASIGNACIÓN (BATCH) */
+/* --- Barra Flotante Batch --- */
 .batch-action-bar {
   position: fixed;
   bottom: 20px;
@@ -275,7 +372,7 @@
   display: flex;
   align-items: center;
   gap: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   z-index: 1000;
   animation: slideUp 0.3s ease-out;
 }
@@ -298,53 +395,273 @@
   gap: 8px;
   transition: transform 0.2s;
 }
-.batch-btn:hover { transform: scale(1.05); }
+.batch-btn:hover {
+  transform: scale(1.05);
+}
 
 @keyframes slideUp {
-  from { transform: translate(-50%, 100px); opacity: 0; }
-  to { transform: translate(-50%, 0); opacity: 1; }
+  from {
+    transform: translate(-50%, 100px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
 }
 
-/* Modals y Utils se mantienen igual que antes... */
+/* --- MODALES --- */
 .pedidos-modal-overlay {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px);
-  display: flex; justify-content: center; align-items: center; z-index: 2000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
 }
-.pedidos-modal-overlay.high-z { z-index: 3000; }
+.pedidos-modal-overlay.high-z {
+  z-index: 3000;
+}
 
 .pedidos-modal-content {
-  background: #f8f9fa; width: 90%; max-width: 1000px; height: 85vh;
-  border-radius: 16px; overflow: hidden; display: flex; flex-direction: column;
-  animation: slideUpModal 0.3s ease-out; position: relative;
+  background: #f8f9fa;
+  width: 90%;
+  max-width: 1000px;
+  height: 85vh;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideUpModal 0.3s ease-out;
+  position: relative;
 }
-.pedidos-modal-content.assign-modal { max-width: 500px; height: auto; max-height: 80vh; }
+.pedidos-modal-content.assign-modal {
+  max-width: 500px;
+  height: auto;
+  max-height: 80vh;
+}
 
-@keyframes slideUpModal { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slideUpModal {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
 
-.pedidos-modal-header { background: var(--pa-primary-dark); padding: 20px; color: white; display: flex; justify-content: space-between; align-items: center; }
-.pedidos-modal-close-btn { background: rgba(255,255,255,0.2); border: none; width: 36px; height: 36px; border-radius: 50%; color: white; cursor: pointer; font-size: 1.2rem; }
-.pedidos-modal-body { flex: 1; padding: 30px; overflow-y: auto; }
+.pedidos-modal-header {
+  background: var(--pa-primary-dark);
+  padding: 20px 30px;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.pedidos-modal-close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+.pedidos-modal-body {
+  flex: 1;
+  padding: 30px;
+  overflow-y: auto;
+}
 
-/* Pickers List */
-.pedidos-pickers-list { display: flex; flex-direction: column; gap: 10px; }
-.pedidos-picker-card { padding: 15px; border: 1px solid #eee; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: background 0.2s; }
-.pedidos-picker-card:hover { background: #f9f9f9; }
-.pedidos-picker-card.disponible { border-left: 4px solid var(--pa-accent-green); }
-.pedidos-picker-card.picking { opacity: 0.6; cursor: not-allowed; border-left: 4px solid var(--pa-accent-orange); }
+/* --- ESTILOS INTERNOS DEL MODAL DE DETALLE (VISUAL RICO) --- */
 
-/* Progress Bar & Timer Utils */
-.pedidos-progress-wrapper { margin-top: 15px; }
-.pedidos-progress-stats { display: flex; justify-content: space-between; font-size: 0.8rem; font-weight: 700; margin-bottom: 5px; }
-.pedidos-progress-track { height: 6px; background: #ecf0f1; border-radius: 3px; display: flex; overflow: hidden; }
-.pedidos-progress-fill.success { background: var(--pa-accent-green); }
-.pedidos-progress-fill.warning { background: var(--pa-accent-orange); }
-.pedidos-process-timer { margin-top: 10px; font-size: 0.85rem; background: #f8f9fa; padding: 5px; border-radius: 4px; text-align: center; }
-.pedidos-live-timer { font-weight: 700; color: var(--pa-primary-light); display: flex; align-items: center; justify-content: center; gap: 5px; }
-.text-success { color: var(--pa-accent-green); }
-.text-warning { color: var(--pa-accent-orange); }
-.text-muted { color: #bdc3c7; }
-.pedidos-icon-red { color: var(--pa-accent-red); margin-right: 5px; }
-.pedidos-loading-container, .pedidos-empty-list-container { grid-column: 1 / -1; text-align: center; padding: 50px; color: var(--pa-text-muted); }
-.pedidos-spinner-large { width: 50px; height: 50px; border: 5px solid #e2e8f0; border-top: 5px solid var(--pa-primary-medium); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.pedidos-detail-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.pedidos-detail-section {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.pedidos-detail-section h4 {
+  color: var(--pa-primary-light);
+  margin-top: 0;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+}
+
+.pedidos-detail-section p {
+  margin: 8px 0;
+  color: var(--pa-text-dark);
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+}
+
+.pedidos-customer-note {
+  background: #fff3e0;
+  padding: 12px;
+  border-radius: 8px;
+  font-style: italic;
+  color: #d35400;
+  margin-top: 15px;
+  font-size: 0.9rem;
+  border-left: 4px solid #f39c12;
+}
+
+/* Grilla de Productos en el Modal */
+.pedidos-products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.pedidos-product-card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #eee;
+  transition: transform 0.2s;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.pedidos-product-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.pedidos-product-img-wrapper {
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  position: relative;
+  border-bottom: 1px solid #f5f5f5;
+  padding: 10px;
+}
+
+.pedidos-product-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Badge de Cantidad en la foto */
+.pedidos-product-qty-tag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--pa-accent-green);
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.pedidos-product-details {
+  padding: 15px;
+}
+
+.pedidos-product-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: var(--pa-text-dark);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pedidos-product-price {
+  color: var(--pa-primary-medium);
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+/* Pickers List en Modal de Asignación */
+.pedidos-pickers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pedidos-picker-card {
+  padding: 15px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.2s;
+}
+.pedidos-picker-card:hover {
+  background: #f9f9f9;
+}
+.pedidos-picker-card.disponible {
+  border-left: 4px solid var(--pa-accent-green);
+}
+.pedidos-picker-card.picking {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-left: 4px solid var(--pa-accent-orange);
+}
+
+/* Utils */
+.pedidos-loading-container,
+.pedidos-empty-list-container {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 50px;
+  color: var(--pa-text-muted);
+}
+.pedidos-spinner-large {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #e2e8f0;
+  border-top: 5px solid var(--pa-primary-medium);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 15px;
+}
+.pedidos-icon-red {
+  color: var(--pa-accent-red);
+  margin-right: 5px;
+}
+.pedidos-icon-spacer {
+  margin-right: 6px;
+}
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

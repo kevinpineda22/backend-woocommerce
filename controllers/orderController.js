@@ -8,15 +8,14 @@ const agruparItemsParaPicking = (orders) => {
 
   orders.forEach((order) => {
     order.line_items.forEach((item) => {
-      // Usamos el ID del producto como clave única
       const key = item.product_id;
 
       if (!mapaProductos[key]) {
         mapaProductos[key] = {
-          id: item.id, // ID referencia
+          id: item.id,
           product_id: item.product_id,
           name: item.name,
-          sku: item.sku, // Este suele ser el f120_id en integraciones SIESA
+          sku: item.sku,
           image_src: item.image?.src || "", 
           quantity_total: 0,
           pedidos_involucrados: [],
@@ -41,7 +40,7 @@ const agruparItemsParaPicking = (orders) => {
 };
 
 // ==========================================
-// 1. GESTIÓN DE SESIONES (MULTI-ORDEN)
+// 1. GESTIÓN DE SESIONES
 // ==========================================
 
 exports.createPickingSession = async (req, res) => {
@@ -119,13 +118,10 @@ exports.getSessionActive = async (req, res) => {
     const { data: logs } = await supabase
          .from("wc_log_picking")
          .select("id_producto, accion, es_sustituto")
-         .in("id_producto", itemsAgrupados.map(i => i.product_id)); // Filtro básico
+         .in("id_producto", itemsAgrupados.map(i => i.product_id));
 
     const itemsConRuta = await Promise.all(itemsAgrupados.map(async (item) => {
       const info = obtenerInfoPasillo(item.categorias || [], item.name);
-      
-      // Verificamos si en esta sesión específica (aprox) ya se recolectó
-      // Nota: Idealmente wc_log_picking debería tener id_sesion para ser exactos
       const logItem = logs?.find(l => l.id_producto === item.product_id && l.accion === 'recolectado');
       
       return {
@@ -155,29 +151,20 @@ exports.getSessionActive = async (req, res) => {
 };
 
 // ==========================================
-// 2. ACCIONES DEL PICKER
+// 2. ACCIONES Y BÚSQUEDA INTELIGENTE
 // ==========================================
 
 exports.registerAction = async (req, res) => {
   const { 
-    id_sesion, 
-    id_producto_original, 
-    nombre_producto_original, 
-    accion, 
-    peso_real, 
-    datos_sustituto 
+    id_sesion, id_producto_original, nombre_producto_original, 
+    accion, peso_real, datos_sustituto 
   } = req.body;
 
   try {
     const now = new Date();
-    
-    // Referencia auxiliar para mantener compatibilidad FK
     const { data: anyAssign } = await supabase
         .from('wc_asignaciones_pedidos')
-        .select('id, id_pedido')
-        .eq('id_sesion', id_sesion)
-        .limit(1)
-        .single();
+        .select('id, id_pedido').eq('id_sesion', id_sesion).limit(1).single();
         
     const idAsignacionRef = anyAssign ? anyAssign.id : null;
     const idPedidoRef = anyAssign ? anyAssign.id_pedido : 0; 
@@ -194,13 +181,11 @@ exports.registerAction = async (req, res) => {
       logEntry.nombre_producto = nombre_producto_original;
       logEntry.accion = 'recolectado';
       logEntry.es_sustituto = false;
-      
     } else if (accion === 'sustituido') {
       logEntry.nombre_producto = nombre_producto_original; 
       logEntry.accion = 'recolectado'; 
       logEntry.es_sustituto = true;
       logEntry.motivo = 'Sustitución por falta de stock';
-      
       if (datos_sustituto) {
           logEntry.id_producto_final = datos_sustituto.id;
           logEntry.nombre_sustituto = datos_sustituto.name;
@@ -212,23 +197,64 @@ exports.registerAction = async (req, res) => {
     if (error) throw error;
 
     res.status(200).json({ status: "ok", message: "Acción registrada" });
-
   } catch (error) {
-    console.error("Error registrando acción:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
+// --- BÚSQUEDA INTELIGENTE (SUGERENCIAS + MANUAL) ---
 exports.searchProduct = async (req, res) => {
-    const { query } = req.query; 
-    if (!query) return res.status(400).json({ error: "Query requerido" });
+    const { query, original_id } = req.query; // Recibimos ID original para sugerencias
 
     try {
-        const { data: products } = await WooCommerce.get("products", {
-            search: query,
-            per_page: 20
-        });
+        let products = [];
 
+        // CASO 1: SUGERENCIA AUTOMÁTICA (Si hay ID original y no hay texto de búsqueda)
+        if (original_id && !query) {
+            // 1. Obtenemos datos del producto original para saber su categoría
+            const { data: original } = await WooCommerce.get(`products/${original_id}`);
+            const price = parseFloat(original.price || 0);
+            
+            // Obtenemos IDs de categorías
+            const catIds = original.categories.map(c => c.id).join(',');
+
+            if (catIds) {
+                // 2. Buscamos productos de la misma categoría que estén en stock
+                const { data: catProducts } = await WooCommerce.get("products", {
+                    category: catIds,
+                    per_page: 20,
+                    status: 'publish',
+                    stock_status: 'instock' // Solo sugerir lo que hay
+                });
+
+                // 3. Filtramos por Rango de Precio (+/- 30%)
+                const minPrice = price * 0.7;
+                const maxPrice = price * 1.3;
+
+                products = catProducts.filter(p => {
+                    const pPrice = parseFloat(p.price || 0);
+                    // Excluir el mismo producto y filtrar precio
+                    return p.id !== parseInt(original_id) && pPrice >= minPrice && pPrice <= maxPrice;
+                });
+
+                // Fallback: Si el filtro de precio es muy estricto y no devuelve nada,
+                // devolvemos items de la categoría (sin filtro de precio) para dar opciones.
+                if (products.length === 0) {
+                    products = catProducts.filter(p => p.id !== parseInt(original_id));
+                }
+            }
+        } 
+        // CASO 2: BÚSQUEDA MANUAL (Si el usuario escribió algo)
+        else if (query) {
+            const { data: searchResults } = await WooCommerce.get("products", {
+                search: query,
+                per_page: 20,
+                status: 'publish'
+            });
+            products = searchResults;
+        }
+
+        // Mapeo final limpio
         const results = products.map(p => ({
             id: p.id,
             name: p.name,
@@ -236,35 +262,23 @@ exports.searchProduct = async (req, res) => {
             image: p.images[0]?.src || null,
             stock: p.stock_quantity,
             sku: p.sku
-        }));
+        })).slice(0, 10); // Top 10 sugerencias
 
         res.status(200).json(results);
+
     } catch (error) {
-        res.status(500).json({ error: "Error conectando con WooCommerce" });
+        console.error(error);
+        res.status(500).json({ error: "Error en búsqueda inteligente" });
     }
 };
 
 exports.completeSession = async (req, res) => {
     const { id_sesion, id_picker } = req.body;
-    
     try {
         const now = new Date();
-        
-        await supabase
-            .from("wc_picking_sessions")
-            .update({ estado: 'completado', fecha_fin: now })
-            .eq("id", id_sesion);
-
-        await supabase
-            .from("wc_pickers")
-            .update({ estado_picker: 'disponible', id_sesion_actual: null })
-            .eq("id", id_picker);
-
-        await supabase
-            .from("wc_asignaciones_pedidos")
-            .update({ estado_asignacion: 'completado', fecha_fin: now })
-            .eq("id_sesion", id_sesion);
-
+        await supabase.from("wc_picking_sessions").update({ estado: 'completado', fecha_fin: now }).eq("id", id_sesion);
+        await supabase.from("wc_pickers").update({ estado_picker: 'disponible', id_sesion_actual: null }).eq("id", id_picker);
+        await supabase.from("wc_asignaciones_pedidos").update({ estado_asignacion: 'completado', fecha_fin: now }).eq("id_sesion", id_sesion);
         res.status(200).json({ message: "Sesión finalizada." });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -272,71 +286,41 @@ exports.completeSession = async (req, res) => {
 };
 
 // ==========================================
-// 3. VALIDACIÓN MANUAL ROBUSTA (SIESA)
+// 3. VALIDACIÓN MANUAL SIESA & ADMIN
 // ==========================================
 
 exports.validateManualCode = async (req, res) => {
-  // expected_sku: Debe ser el f120_id que viene en el pedido
   const { input_code, expected_sku } = req.body; 
-
-  if (!input_code || !expected_sku) {
-    return res.status(400).json({ valid: false, message: "Datos incompletos" });
-  }
+  if (!input_code || !expected_sku) return res.status(400).json({ valid: false });
 
   const cleanInput = input_code.toString().trim();
   const cleanSku = expected_sku.toString().trim();
 
   try {
-    // CASO A: El picker ingresó directamente el ID del Item (f120_id)
-    if (cleanInput === cleanSku) {
-       return res.status(200).json({ valid: true, type: 'id_directo' });
-    }
+    if (cleanInput === cleanSku) return res.status(200).json({ valid: true });
 
-    // CASO B: El picker ingresó un Código de Barras
-    // Buscamos en la tabla de barras si existe ese código Y si pertenece al item esperado
-    const { data: barcodeMatch, error } = await supabase
+    const { data: barcodeMatch } = await supabase
       .from('siesa_codigos_barras')
       .select('id')
       .eq('codigo_barras', cleanInput)
-      .eq('f120_id', cleanSku) // ¡Debe coincidir con el producto esperado!
+      .eq('f120_id', cleanSku)
       .maybeSingle();
 
-    if (error) throw error;
-
-    if (barcodeMatch) {
-      return res.status(200).json({ valid: true, type: 'codigo_barras' });
-    }
-
-    // Si no coincidió con nada
+    if (barcodeMatch) return res.status(200).json({ valid: true });
     return res.status(200).json({ valid: false });
-
   } catch (error) {
-    console.error("Error validando código SIESA:", error);
-    // En caso de error técnico, mejor denegar por seguridad
-    res.status(500).json({ valid: false, error: "Error de servidor" });
+    res.status(500).json({ valid: false });
   }
 };
-
-// ==========================================
-// 4. MÉTODOS DE APOYO (ADMIN)
-// ==========================================
 
 exports.getPendingOrders = async (req, res) => {
     try {
         const { data: wcOrders } = await WooCommerce.get("orders", { status: "processing", per_page: 50 });
-        
         const { data: activeAssignments } = await supabase
-            .from("wc_asignaciones_pedidos")
-            .select("id_pedido")
-            .eq("estado_asignacion", "en_proceso");
-            
+            .from("wc_asignaciones_pedidos").select("id_pedido").eq("estado_asignacion", "en_proceso");
         const assignedIds = new Set(activeAssignments.map(a => a.id_pedido));
         
-        const cleanOrders = wcOrders.map(order => ({
-            ...order,
-            is_assigned: assignedIds.has(order.id)
-        }));
-        
+        const cleanOrders = wcOrders.map(order => ({ ...order, is_assigned: assignedIds.has(order.id) }));
         res.status(200).json(cleanOrders);
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -346,11 +330,8 @@ exports.getPendingOrders = async (req, res) => {
 exports.getPickers = async (req, res) => {
     const { email } = req.query;
     let query = supabase.from("wc_pickers").select("*").order("nombre_completo", { ascending: true });
-    
     if (email) query = query.eq("email", email);
-    
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
-    
     res.status(200).json(data);
 };
