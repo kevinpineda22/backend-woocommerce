@@ -1,6 +1,6 @@
 const WooCommerce = require("../services/wooService");
 const { supabase } = require("../services/supabaseClient");
-// Mapeador para ordenar la ruta del picker (Serpiente)
+// Usamos el mapeador para ordenar la ruta del picker (Serpiente), aunque no para la búsqueda estricta.
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 
 // --- HELPER: Agrupar items de múltiples pedidos (Batch Picking) ---
@@ -14,15 +14,15 @@ const agruparItemsParaPicking = (orders) => {
 
       if (!mapaProductos[key]) {
         mapaProductos[key] = {
-          id: item.id, // ID referencia de línea
+          id: item.id, // ID de referencia
           product_id: item.product_id,
           name: item.name,
-          sku: item.sku, // Importante: Suele ser el f120_id para validación SIESA
+          sku: item.sku, // Importante para validación SIESA
           image_src: item.image?.src || "", 
           quantity_total: 0,
           pedidos_involucrados: [],
           categorias: item.parent_name ? [{name: item.parent_name}] : [],
-          // Intentar extraer EAN de los metadatos si existe
+          // Intentar extraer EAN de metadatos si existe
           barcode: item.meta_data?.find(m => 
             ['ean', 'barcode', '_ean', '_barcode'].includes(m.key.toLowerCase())
           )?.value || "",
@@ -135,9 +135,8 @@ exports.getSessionActive = async (req, res) => {
 
     // 6. Enriquecer items con ruta y estado
     const itemsConRuta = await Promise.all(itemsAgrupados.map(async (item) => {
-      // Usamos el mapeador de pasillos para dar orden lógico
+      // Usamos el mapeador para el orden lógico de pasillos
       const info = obtenerInfoPasillo(item.categorias || [], item.name);
-      
       const logItem = logs?.find(l => l.id_producto === item.product_id && l.accion === 'recolectado');
       
       return {
@@ -168,7 +167,7 @@ exports.getSessionActive = async (req, res) => {
 };
 
 // ==========================================
-// 2. ACCIONES DEL PICKER (CORE)
+// 2. ACCIONES DEL PICKER
 // ==========================================
 
 exports.registerAction = async (req, res) => {
@@ -180,7 +179,7 @@ exports.registerAction = async (req, res) => {
   try {
     const now = new Date();
     
-    // Vincular log a una asignación válida
+    // Buscar asignación válida para referencia FK
     const { data: anyAssign } = await supabase
         .from('wc_asignaciones_pedidos')
         .select('id, id_pedido')
@@ -229,7 +228,7 @@ exports.registerAction = async (req, res) => {
 };
 
 // =========================================================================
-// 3. BÚSQUEDA INTELIGENTE ROBUSTA (CASCADA DE 2 NIVELES - SIN DESPENSA)
+// 3. BÚSQUEDA INTELIGENTE SEMÁNTICA (NOMBRE + PRECIO)
 // =========================================================================
 
 exports.searchProduct = async (req, res) => {
@@ -238,82 +237,80 @@ exports.searchProduct = async (req, res) => {
     try {
         let products = [];
 
-        // --- MODO SUGERENCIA AUTOMÁTICA ---
+        // --- MODO SUGERENCIA INTELIGENTE ---
         if (original_id && !query) {
-            // 1. Datos del producto original
+            // 1. Obtener el producto original
             const { data: original } = await WooCommerce.get(`products/${original_id}`);
             const price = parseFloat(original.price || 0);
             
-            // 2. LISTA NEGRA: Evitar categorías basura que contaminan la búsqueda
-            // Si el producto tiene 'Despensa', la IGNORAMOS por completo.
-            const BLACKLIST = ['despensa', 'mercado', 'supermercado', 'sin categorizar', 'uncategorized', 'ofertas'];
-            
-            const specificCats = original.categories.filter(c => 
-                !BLACKLIST.some(bad => c.name.toLowerCase().includes(bad))
-            );
+            // LOG DE DEPURACIÓN 1
+            console.log(`\n🔍 [BUSQUEDA IA] Original: "${original.name}" | Precio: $${price}`);
 
-            // IMPORTANTE: Si NO hay categorías específicas (ej: solo tenía "Despensa"),
-            // specificCats estará vacío. En ese caso NO usamos fallback a general.
-            // Pasamos directo al Intento 2 (Nombre).
-            const catIds = specificCats.map(c => c.id).join(',');
-            
-            // Guardamos IDs para verificación estricta posterior (solo de las específicas)
-            const validCatIdsSet = new Set(specificCats.map(c => c.id));
+            // 2. EXTRAER "PALABRA CLAVE MAESTRA" (La primera palabra del nombre)
+            // Limpiamos espacios y quitamos marcas si están al inicio
+            const cleanName = original.name.trim();
+            let masterKeyword = cleanName.split(' ')[0]; // "Arroz" de "Arroz Diana"
 
-            // INTENTO 1: Buscar por Categoría Exacta (Solo si existen categorías específicas)
-            if (catIds) {
-                const { data: catResults } = await WooCommerce.get("products", {
-                    category: catIds,
-                    per_page: 30,
-                    status: 'publish',
-                    stock_status: 'instock' // Solo lo que hay en inventario
-                });
-                products = catResults;
+            // Excepción: Si la primera palabra es muy corta (ej: "De", "El"), tomamos la segunda
+            if (masterKeyword.length <= 2 && cleanName.split(' ').length > 1) {
+                masterKeyword = cleanName.split(' ')[1];
             }
 
-            // INTENTO 2: Si Categoría falló o trajo 0 resultados, buscar por NOMBRE
-            // Usamos las primeras 2 palabras del nombre (ej: "Arroz Diana" -> busca "Arroz Diana")
-            if (products.length === 0) {
-                const nameKeywords = original.name.split(' ').slice(0, 2).join(' ');
-                console.log(`[SUGERENCIA] Falló categoría específica, intentando nombre: ${nameKeywords}`);
-                
-                const { data: nameResults } = await WooCommerce.get("products", {
-                    search: nameKeywords,
-                    per_page: 30,
-                    status: 'publish',
-                    stock_status: 'instock'
-                });
-                products = nameResults;
-            }
+            // Normalizamos (quitamos símbolos raros)
+            masterKeyword = masterKeyword.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ]/g, ""); 
 
-            // 4. FILTRADO FINAL (Precio y Limpieza)
-            const minPrice = price * 0.5; // 50% margen abajo
-            const maxPrice = price * 1.5; // 50% margen arriba
+            console.log(`   🔑 Palabra Clave Maestra detectada: "${masterKeyword}"`);
 
-            products = products.filter(p => {
-                // No sugerir el mismo producto
-                if (p.id === parseInt(original_id)) return false;
-                
-                // Filtro de Precio (Solo si ambos tienen precio válido)
+            // 3. BUSCAR EN WOOCOMMERCE POR NOMBRE
+            // Ignoramos categorías porque suelen estar sucias en Woo. Confiamos en el nombre.
+            const { data: searchResults } = await WooCommerce.get("products", {
+                search: masterKeyword,
+                per_page: 40, // Traemos bastantes para filtrar
+                status: 'publish',
+                stock_status: 'instock'
+            });
+
+            console.log(`   📦 Resultados brutos encontrados en Woo: ${searchResults.length}`);
+
+            // 4. FILTRADO ESTRICTO EN MEMORIA
+            const minPrice = price * 0.5; // Margen 50%
+            const maxPrice = price * 1.5; 
+
+            products = searchResults.filter(p => {
                 const pPrice = parseFloat(p.price || 0);
+                
+                // A. No ser el mismo
+                if (p.id === parseInt(original_id)) return false;
+
+                // B. VALIDACIÓN DE NOMBRE (EL FILTRO ANTI-SUAVIZANTE)
+                // El producto candidato DEBE contener la palabra clave en su nombre.
+                // Ej: Si busco "Arroz", "Suavizante" no tiene "Arroz" en el nombre -> Eliminado.
+                const candidateName = p.name.toLowerCase();
+                const keywordLower = masterKeyword.toLowerCase();
+                
+                if (!candidateName.includes(keywordLower)) {
+                    // console.log(`      ❌ Descartado por nombre: ${p.name}`);
+                    return false;
+                }
+
+                // C. Validación de Precio (Evita sugerir Arroz Premium de 50k por uno de 2k)
                 if (price > 0 && pPrice > 0) {
-                    if (pPrice < minPrice || pPrice > maxPrice) return false;
+                    if (pPrice < minPrice || pPrice > maxPrice) {
+                        // console.log(`      ❌ Descartado por precio: ${p.name} ($${pPrice})`);
+                        return false;
+                    }
                 }
 
-                // VALIDACIÓN CRUZADA DE CATEGORÍA (Solo si buscamos por categoría)
-                // Si la búsqueda vino por nombre (Intento 2), somos más flexibles,
-                // pero si vino por categoría (Intento 1), exigimos que coincida.
-                if (catIds && products.length > 0) {
-                     const comparteCategoria = p.categories.some(c => validCatIdsSet.has(c.id));
-                     if (!comparteCategoria) return false;
-                }
-
+                // console.log(`      ✅ Candidato válido: ${p.name}`);
                 return true;
             });
+
+            console.log(`   ✨ Resultados finales filtrados: ${products.length}`);
         } 
         
-        // --- MODO BÚSQUEDA MANUAL (Usuario escribió) ---
+        // --- MODO MANUAL (Picker escribe en la barra) ---
         else if (query) {
+            console.log(`\n🔍 [BUSQUEDA MANUAL] Query: "${query}"`);
             const { data: searchResults } = await WooCommerce.get("products", {
                 search: query,
                 per_page: 20,
@@ -322,7 +319,7 @@ exports.searchProduct = async (req, res) => {
             products = searchResults;
         }
 
-        // Mapeo Final Limpio
+        // Mapeo Final Limpio para el Frontend
         const results = products.map(p => ({
             id: p.id,
             name: p.name,
@@ -330,7 +327,7 @@ exports.searchProduct = async (req, res) => {
             image: p.images[0]?.src || null,
             stock: p.stock_quantity,
             sku: p.sku
-        })).slice(0, 10); // Limitamos a 10 para no saturar la UI
+        })).slice(0, 10); // Top 10
 
         res.status(200).json(results);
 
@@ -380,7 +377,7 @@ exports.validateManualCode = async (req, res) => {
 };
 
 // ==========================================
-// 5. MÉTODOS DE APOYO (ADMIN/UTILES)
+// 5. MÉTODOS DE APOYO (ADMIN)
 // ==========================================
 
 exports.completeSession = async (req, res) => {
