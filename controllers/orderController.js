@@ -16,14 +16,12 @@ const agruparItemsParaPicking = (orders) => {
           id: item.id, // ID referencia de línea
           product_id: item.product_id,
           name: item.name,
-          sku: item.sku, // Importante para validación SIESA
+          sku: item.sku, 
           image_src: item.image?.src || "", 
-          // PRECIO: Se captura para enviar al front
           price: parseFloat(item.price || 0),
           quantity_total: 0,
           pedidos_involucrados: [],
           categorias: item.parent_name ? [{name: item.parent_name}] : [],
-          // Intentar extraer EAN
           barcode: item.meta_data?.find(m => 
             ['ean', 'barcode', '_ean', '_barcode'].includes(m.key.toLowerCase())
           )?.value || "",
@@ -107,7 +105,6 @@ exports.getSessionActive = async (req, res) => {
 
     const itemsAgrupados = agruparItemsParaPicking(orders);
 
-    // Traemos datos extra del log (nombre y precio del sustituto)
     const { data: logs } = await supabase
          .from("wc_log_picking")
          .select("id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo")
@@ -115,7 +112,6 @@ exports.getSessionActive = async (req, res) => {
 
     const itemsConRuta = await Promise.all(itemsAgrupados.map(async (item) => {
       const info = obtenerInfoPasillo(item.categorias || [], item.name);
-      // Buscamos logs recientes (recolectado o sustituido)
       const logItem = logs?.find(l => l.id_producto === item.product_id && (l.accion === 'recolectado' || l.accion === 'sustituido'));
       
       return {
@@ -123,7 +119,6 @@ exports.getSessionActive = async (req, res) => {
         pasillo: info.pasillo,
         prioridad: info.prioridad,
         status: logItem ? (logItem.es_sustituto ? 'sustituido' : 'recolectado') : 'pendiente',
-        // Adjuntamos info del sustituto para el frontend
         sustituto: logItem && logItem.es_sustituto ? {
             name: logItem.nombre_sustituto,
             price: logItem.precio_nuevo
@@ -135,7 +130,13 @@ exports.getSessionActive = async (req, res) => {
 
     res.status(200).json({
       session_id: session.id,
-      orders_info: orders.map(o => ({ id: o.id, customer: `${o.billing.first_name} ${o.billing.last_name}`, total: o.total })),
+      fecha_inicio: session.fecha_inicio, // IMPORTANTE: Enviamos fecha inicio para el cronómetro
+      orders_info: orders.map(o => ({ 
+          id: o.id, 
+          customer: `${o.billing.first_name} ${o.billing.last_name}`, 
+          phone: o.billing.phone, // <--- CAMBIO CRÍTICO: Agregamos el teléfono
+          total: o.total 
+      })),
       items: itemsConRuta
     });
 
@@ -158,7 +159,6 @@ exports.registerAction = async (req, res) => {
   try {
     const now = new Date();
     
-    // --- LÓGICA DE RESET / DESHACER ---
     if (accion === 'reset') {
         const { data: assigns } = await supabase
             .from('wc_asignaciones_pedidos')
@@ -175,7 +175,6 @@ exports.registerAction = async (req, res) => {
         return res.status(200).json({ status: "ok", message: "Producto devuelto a pendientes" });
     }
 
-    // --- LÓGICA NORMAL ---
     const { data: anyAssign } = await supabase
         .from('wc_asignaciones_pedidos')
         .select('id, id_pedido')
@@ -214,10 +213,7 @@ exports.registerAction = async (req, res) => {
 
     const { error } = await supabase.from("wc_log_picking").insert([logEntry]);
     
-    if (error) {
-        console.error("Error Supabase Insert:", error); 
-        throw error;
-    }
+    if (error) { console.error("Error Supabase Insert:", error); throw error; }
 
     res.status(200).json({ status: "ok", message: "Acción registrada" });
 
@@ -237,16 +233,13 @@ exports.searchProduct = async (req, res) => {
     try {
         let products = [];
 
-        // --- MODO SUGERENCIA INTELIGENTE ---
         if (original_id && !query) {
             const { data: original } = await WooCommerce.get(`products/${original_id}`);
             const price = parseFloat(original.price || 0);
             
-            // Detectar Pasillo Original
             const infoOriginal = obtenerInfoPasillo(original.categories, original.name);
             console.log(`\n🔍 [IA PASILLOS] Original: "${original.name}" -> Pasillo: ${infoOriginal.pasillo}`);
 
-            // Extraer Palabra Clave
             const cleanName = original.name.trim();
             let masterKeyword = cleanName.split(' ')[0]; 
             if (masterKeyword.length <= 2 && cleanName.split(' ').length > 1) {
@@ -254,7 +247,6 @@ exports.searchProduct = async (req, res) => {
             }
             masterKeyword = masterKeyword.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ]/g, ""); 
 
-            // Buscar en Woo
             const { data: searchResults } = await WooCommerce.get("products", {
                 search: masterKeyword,
                 per_page: 50,
@@ -262,7 +254,6 @@ exports.searchProduct = async (req, res) => {
                 stock_status: 'instock'
             });
 
-            // Filtrado Estricto
             const minPrice = price * 0.5; 
             const maxPrice = price * 1.5; 
 
@@ -278,14 +269,12 @@ exports.searchProduct = async (req, res) => {
 
                 const infoCandidato = obtenerInfoPasillo(p.categories, p.name);
                 
-                // Filtro de Pasillo
                 if (infoOriginal.pasillo !== "Otros" && infoOriginal.pasillo !== infoCandidato.pasillo) {
                     return false;
                 }
                 return true;
             });
         } 
-        // --- MODO MANUAL ---
         else if (query) {
             const { data: searchResults } = await WooCommerce.get("products", {
                 search: query,
@@ -319,28 +308,14 @@ exports.searchProduct = async (req, res) => {
 exports.validateManualCode = async (req, res) => {
   const { input_code, expected_sku } = req.body; 
   if (!input_code || !expected_sku) return res.status(400).json({ valid: false });
-
   const cleanInput = input_code.toString().trim();
   const cleanSku = expected_sku.toString().trim();
-
   try {
     if (cleanInput === cleanSku) return res.status(200).json({ valid: true, type: 'id_directo' });
-
-    const { data: barcodeMatch } = await supabase
-      .from('siesa_codigos_barras')
-      .select('id')
-      .eq('codigo_barras', cleanInput)
-      .eq('f120_id', cleanSku)
-      .maybeSingle();
-
+    const { data: barcodeMatch } = await supabase.from('siesa_codigos_barras').select('id').eq('codigo_barras', cleanInput).eq('f120_id', cleanSku).maybeSingle();
     if (barcodeMatch) return res.status(200).json({ valid: true, type: 'codigo_barras' });
-
     return res.status(200).json({ valid: false });
-
-  } catch (error) {
-    console.error("Error validando SIESA:", error);
-    res.status(500).json({ valid: false, error: "Error de servidor" });
-  }
+  } catch (error) { res.status(500).json({ valid: false }); }
 };
 
 exports.completeSession = async (req, res) => {
@@ -360,11 +335,7 @@ exports.getPendingOrders = async (req, res) => {
         const { data: activeAssignments } = await supabase.from("wc_asignaciones_pedidos").select("id_pedido").eq("estado_asignacion", "en_proceso");
         const assignedIds = new Set(activeAssignments.map(a => a.id_pedido));
         
-        const cleanOrders = wcOrders.map(order => ({
-            ...order,
-            is_assigned: assignedIds.has(order.id)
-        }));
-        
+        const cleanOrders = wcOrders.map(order => ({ ...order, is_assigned: assignedIds.has(order.id) }));
         res.status(200).json(cleanOrders);
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
@@ -379,12 +350,13 @@ exports.getPickers = async (req, res) => {
 };
 
 // ==========================================
-// 6. DASHBOARD ANALÍTICO (ACTUALIZADO)
+// 6. DASHBOARD ANALÍTICO (EN VIVO)
 // ==========================================
 
 exports.getActiveSessionsDashboard = async (req, res) => {
     try {
-        // CORRECCIÓN: Relación explícita Y agregamos 'id_picker' al select
+        // CORRECCIÓN: Relación explícita para evitar error PGRST201
+        // Usamos !wc_picking_sessions_picker_fkey para indicar que unimos por el picker dueño de la sesión
         const { data: sessions, error } = await supabase
             .from("wc_picking_sessions")
             .select(`
@@ -433,7 +405,7 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 
             return {
                 session_id: sess.id,
-                picker_id: sess.id_picker, // <-- DATO NUEVO CLAVE PARA EL DETALLE EN VIVO
+                picker_id: sess.id_picker, 
                 picker_name: sess.wc_pickers?.nombre_completo || "Desconocido",
                 start_time: sess.fecha_inicio,
                 total_items: totalItems,
@@ -460,6 +432,7 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 
 exports.getHistorySessions = async (req, res) => {
     try {
+        // CORRECCIÓN: Relación explícita igual que arriba
         const { data: sessions, error } = await supabase
             .from("wc_picking_sessions")
             .select(`

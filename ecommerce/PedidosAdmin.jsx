@@ -7,7 +7,7 @@ import {
   FaBox, FaArrowLeft, FaSync, FaSearch, FaCalendarAlt, FaMapMarkerAlt,
   FaUserTag, FaRunning, FaChartLine, FaCheckDouble, FaTimes, 
   FaPhone, FaEnvelope, FaClock, FaCheckCircle, FaExclamationTriangle,
-  FaHistory, FaFileAlt, FaEye, FaListUl
+  FaHistory, FaFileAlt, FaEye, FaListUl, FaHourglassHalf
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
 
@@ -49,15 +49,13 @@ const SessionTimer = ({ startTime }) => {
 
 // --- COMPONENTE PRINCIPAL ---
 const PedidosAdmin = () => {
-  const [orders, setOrders] = useState([]); // Pendientes
-  const [activeSessions, setActiveSessions] = useState([]); // Dashboard En Proceso
+  const [orders, setOrders] = useState([]); 
+  const [activeSessions, setActiveSessions] = useState([]); 
   
-  // ESTADOS NUEVOS PARA HISTORIAL
   const [historyOrders, setHistoryOrders] = useState([]); 
   const [historyDetail, setHistoryDetail] = useState(null); 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
-  // ESTADOS NUEVOS PARA DETALLE EN VIVO
   const [liveSessionDetail, setLiveSessionDetail] = useState(null);
   const [showLiveModal, setShowLiveModal] = useState(false);
 
@@ -65,18 +63,16 @@ const PedidosAdmin = () => {
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState("pending");
 
-  // Estados Modal y Asignación
   const [selectedOrder, setSelectedOrder] = useState(null); 
   const [pickers, setPickers] = useState([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set()); 
 
-  // Filtros Pendientes
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDate, setFilterDate] = useState("");
   const [filterZone, setFilterZone] = useState("");
 
-  // --- 1. DATA FETCHING ---
+  // --- DATA FETCHING ---
   const fetchData = useCallback(async (isBackground = false) => {
       if (!isBackground) setLoading(true);
       try {
@@ -123,27 +119,25 @@ const PedidosAdmin = () => {
       } catch (e) { alert("Error cargando detalles"); }
   };
 
-  // --- DETALLE EN VIVO (NUEVO) ---
+  // --- DETALLE EN VIVO ---
   const handleViewLiveDetail = async (session) => {
       try {
-          // Usamos el ID del picker que ahora viene en el dashboard
           const res = await axios.get(`https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}`);
           setLiveSessionDetail({ sessionInfo: session, routeData: res.data });
           setShowLiveModal(true);
       } catch (e) {
           console.error(e);
-          alert("No se pudo conectar con la sesión del picker.");
+          alert("No se pudo conectar con la sesión. Puede que haya finalizado.");
       }
   };
 
-  // --- 2. FILTRADO PENDIENTES ---
+  // --- FILTROS Y HANDLERS ---
   const displayedPending = useMemo(() => {
     return orders.filter((order) => {
       const sLower = searchTerm.toLowerCase();
       const idReal = (order.id || "").toString();
       let fullName = order.billing ? `${order.billing.first_name} ${order.billing.last_name}` : "";
       fullName = fullName.toLowerCase();
-
       const matchText = idReal.includes(sLower) || fullName.includes(sLower);
       
       let matchDate = true;
@@ -151,7 +145,6 @@ const PedidosAdmin = () => {
         const dRaw = order.date_created;
         if (dRaw) matchDate = new Date(dRaw).toISOString().split("T")[0] === filterDate;
       }
-
       let matchZone = true;
       if (filterZone && order.billing) {
         const zLower = filterZone.toLowerCase();
@@ -159,16 +152,13 @@ const PedidosAdmin = () => {
         const city = (order.billing.city || "").toLowerCase();
         matchZone = address.includes(zLower) || city.includes(zLower);
       }
-
       return matchText && matchDate && matchZone;
     });
   }, [orders, searchTerm, filterDate, filterZone]);
 
-  // --- HANDLERS ---
   const toggleSelection = (orderId) => {
     const newSet = new Set(selectedIds);
-    if (newSet.has(orderId)) newSet.delete(orderId);
-    else newSet.add(orderId);
+    if (newSet.has(orderId)) newSet.delete(orderId); else newSet.add(orderId);
     setSelectedIds(newSet);
   };
 
@@ -182,21 +172,18 @@ const PedidosAdmin = () => {
   };
 
   const confirmAssignment = async (picker) => {
-    if (picker.estado_picker !== "disponible") { alert("Este picker ya tiene una misión activa."); return; }
+    if (picker.estado_picker !== "disponible") { alert("Picker ocupado."); return; }
     try {
       await axios.post("https://backend-woocommerce.vercel.app/api/orders/crear-sesion", {
         id_picker: picker.id, ids_pedidos: Array.from(selectedIds)
       });
       alert(`Misión asignada a ${picker.nombre_completo}`);
-      setShowAssignModal(false);
-      setSelectedIds(new Set());
-      fetchData();
+      setShowAssignModal(false); setSelectedIds(new Set()); fetchData();
     } catch (error) { alert("Error al asignar: " + error.message); }
   };
 
   return (
     <div className="pedidos-layout-main-container">
-      {/* SIDEBAR */}
       <aside className="pedidos-layout-sidebar">
         <div className="pedidos-layout-sidebar-header">
           <Link to="/acceso" className="pedidos-back-button"><FaArrowLeft /></Link>
@@ -211,12 +198,10 @@ const PedidosAdmin = () => {
           <button className={`pedidos-layout-sidebar-button ${currentView === "process" ? "active" : ""}`} onClick={() => setCurrentView("process")}>
             <FaRunning /> <span>En Proceso</span> <span className="pedidos-badge-count-blue">{stats.process}</span>
           </button>
-          
           <div className="pedidos-nav-label spacer">AUDITORÍA</div>
           <button className={`pedidos-layout-sidebar-button ${currentView === "history" ? "active" : ""}`} onClick={() => { setCurrentView("history"); fetchHistory(); }}>
             <FaHistory /> <span>Historial</span>
           </button>
-
           <div className="pedidos-nav-label spacer">ADMINISTRACIÓN</div>
           <button className={`pedidos-layout-sidebar-button ${currentView === "analitica" ? "active" : ""}`} onClick={() => setCurrentView("analitica")}>
             <FaChartLine /> <span>Inteligencia</span>
@@ -227,12 +212,10 @@ const PedidosAdmin = () => {
         </nav>
       </aside>
 
-      {/* MAIN */}
       <main className="pedidos-layout-content">
         {currentView === "pickers" ? <GestionPickers /> : 
          currentView === "analitica" ? <AnaliticaPickers /> : 
          currentView === "history" ? (
-             // --- VISTA HISTORIAL ---
              <>
                 <header className="pedidos-layout-header">
                     <h1>📜 Historial de Sesiones Completadas</h1>
@@ -242,30 +225,17 @@ const PedidosAdmin = () => {
                     <div className="history-table-container">
                         <table className="pickers-table"> 
                             <thead>
-                                <tr>
-                                    <th>Fecha/Hora</th>
-                                    <th>Picker</th>
-                                    <th>Pedidos</th>
-                                    <th>Duración</th>
-                                    <th>Acción</th>
-                                </tr>
+                                <tr><th>Fecha/Hora</th><th>Picker</th><th>Pedidos</th><th>Duración</th><th>Acción</th></tr>
                             </thead>
                             <tbody>
                                 {historyOrders.length === 0 ? <tr><td colSpan="5" style={{textAlign:'center', padding:20}}>No hay historial reciente.</td></tr> :
                                 historyOrders.map(sess => (
                                     <tr key={sess.id}>
-                                        <td>
-                                            <div style={{fontWeight:'bold', color:'#1e293b'}}>{sess.fecha}</div>
-                                            <small style={{color:'#64748b'}}>{sess.hora_fin}</small>
-                                        </td>
+                                        <td><div style={{fontWeight:'bold', color:'#1e293b'}}>{sess.fecha}</div><small>{sess.hora_fin}</small></td>
                                         <td>{sess.picker}</td>
                                         <td>{sess.pedidos.join(", ")}</td>
                                         <td><span className="pedidos-badge-ok" style={{background:'#e0f2fe', color:'#0284c7'}}>{sess.duracion}</span></td>
-                                        <td>
-                                            <button className="gp-btn-icon warning" onClick={() => handleViewHistoryDetail(sess)} title="Ver Auditoría">
-                                                <FaFileAlt />
-                                            </button>
-                                        </td>
+                                        <td><button className="gp-btn-icon warning" onClick={() => handleViewHistoryDetail(sess)}><FaFileAlt /></button></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -276,10 +246,8 @@ const PedidosAdmin = () => {
          ) : (
           <>
             <header className="pedidos-layout-header">
-              <h1>{currentView === "pending" ? "📦 Pedidos Pendientes" : "🚀 Centro de Comando (En Vivo)"}</h1>
-              <button onClick={() => fetchData()} className="pedidos-admin-refresh-btn">
-                <FaSync className={loading ? "fa-spin" : ""} /> Actualizar
-              </button>
+              <h1>{currentView === "pending" ? "📦 Pedidos Pendientes" : "🚀 Centro de Comando"}</h1>
+              <button onClick={() => fetchData()} className="pedidos-admin-refresh-btn"><FaSync className={loading ? "fa-spin" : ""} /> Actualizar</button>
             </header>
 
             <div className="pedidos-layout-body">
@@ -321,13 +289,10 @@ const PedidosAdmin = () => {
                   )}
                 </>
               ) : (
-                // --- VISTA EN PROCESO (SUPER DASHBOARD) ---
+                // --- VISTA EN PROCESO (DASHBOARD MEJORADO) ---
                 <div className="pa-dashboard-grid">
                     {activeSessions.length === 0 ? (
-                        <div className="pedidos-empty-list-container">
-                            <FaRunning size={50} color="#cbd5e1" style={{marginBottom:20}}/>
-                            <h3>Todo tranquilo. No hay pickers en ruta.</h3>
-                        </div>
+                        <div className="pedidos-empty-list-container"><FaRunning size={50} color="#cbd5e1" style={{marginBottom:20}}/><h3>Todo tranquilo. No hay pickers en ruta.</h3></div>
                     ) : (
                         activeSessions.map(session => (
                             <div key={session.session_id} className="pa-dashboard-card">
@@ -343,39 +308,29 @@ const PedidosAdmin = () => {
                                 </div>
 
                                 <div className="pa-progress-section">
-                                    <div className="pa-progress-labels">
-                                        <span>Progreso</span>
-                                        <span>{session.progress}%</span>
-                                    </div>
-                                    <div className="pa-progress-bar-bg">
-                                        <div className="pa-progress-bar-fill" style={{width: `${session.progress}%`, background: session.progress === 100 ? '#22c55e' : '#3b82f6'}}></div>
-                                    </div>
+                                    <div className="pa-progress-labels"><span>Progreso</span><span>{session.progress}%</span></div>
+                                    <div className="pa-progress-bar-bg"><div className="pa-progress-bar-fill" style={{width: `${session.progress}%`, background: session.progress === 100 ? '#22c55e' : '#3b82f6'}}></div></div>
                                 </div>
 
+                                {/* ESTADÍSTICAS CLARAS CON TEXTO COMPLETO */}
                                 <div className="pa-stats-grid">
                                     <div className="pa-stat-box">
                                         <span className="pa-stat-num">{session.completed_items - session.substituted_items}</span>
-                                        <span className="pa-stat-label">OK</span>
+                                        <span className="pa-stat-label">✅ Listos</span>
                                     </div>
                                     <div className="pa-stat-box warning">
                                         <span className="pa-stat-num">{session.substituted_items}</span>
-                                        <span className="pa-stat-label">Subs</span>
+                                        <span className="pa-stat-label">🔄 Cambios</span>
                                     </div>
                                     <div className="pa-stat-box pending">
                                         <span className="pa-stat-num">{session.total_items - session.completed_items}</span>
-                                        <span className="pa-stat-label">Pend</span>
+                                        <span className="pa-stat-label">⏳ Faltan</span>
                                     </div>
                                 </div>
 
-                                <div className="pa-location-badge">
-                                    <FaMapMarkerAlt /> {session.current_location}
-                                </div>
-
-                                <div className="pa-orders-list">
-                                    <small><strong>Pedidos:</strong> {session.order_ids.join(", ")}</small>
-                                </div>
-
-                                {/* BOTÓN DE ZOOM (VER PRODUCTOS EN VIVO) */}
+                                <div className="pa-location-badge"><FaMapMarkerAlt /> {session.current_location}</div>
+                                <div className="pa-orders-list"><small>Pedidos: {session.order_ids.join(", ")}</small></div>
+                                
                                 <button className="pa-view-detail-btn" onClick={() => handleViewLiveDetail(session)}>
                                     <FaEye /> Ver Productos
                                 </button>
@@ -408,7 +363,7 @@ const PedidosAdmin = () => {
         </div>
       )}
 
-      {/* --- NUEVO MODAL: DETALLE EN VIVO --- */}
+      {/* --- MODAL DETALLE EN VIVO (MEJORADO) --- */}
       {showLiveModal && liveSessionDetail && (
           <div className="pedidos-modal-overlay high-z" onClick={() => setShowLiveModal(false)}>
               <div className="pedidos-modal-content" onClick={e => e.stopPropagation()}>
@@ -433,22 +388,29 @@ const PedidosAdmin = () => {
                                   <div className="live-item-info">
                                       <div className="live-item-name">{item.name}</div>
                                       <div className="live-item-meta">
-                                          <span className="live-badge-pasillo">{item.pasillo === 'Otros' ? 'Gen' : `P-${item.pasillo}`}</span>
+                                          <span className="live-badge-pasillo">{item.pasillo === 'Otros' ? 'General' : `Pasillo ${item.pasillo}`}</span>
                                           <span style={{fontWeight:'bold'}}>{item.quantity_total} un.</span>
                                           {item.price > 0 && <span style={{color:'#059669'}}>{formatPrice(item.price)}</span>}
                                       </div>
                                       
-                                      {/* Si es sustituto, mostrar por qué cambió */}
                                       {item.status === 'sustituido' && item.sustituto && (
                                           <div className="live-sub-info">
-                                              🔄 Llevó: <strong>{item.sustituto.name}</strong> ({formatPrice(item.sustituto.price)})
+                                              🔄 <strong>Sustituto:</strong> {item.sustituto.name} ({formatPrice(item.sustituto.price)})
                                           </div>
                                       )}
                                   </div>
-                                  <div className="live-item-status">
-                                      {item.status === 'pendiente' && <span className="status-dot pending"></span>}
-                                      {item.status === 'recolectado' && <FaCheckCircle color="#22c55e" size={20}/>}
-                                      {item.status === 'sustituido' && <FaExclamationTriangle color="#f59e0b" size={18}/>}
+                                  
+                                  {/* ETIQUETA DE ESTADO EXPLÍCITA */}
+                                  <div className="live-item-status-badge">
+                                      {item.status === 'pendiente' && (
+                                          <span className="pa-status-pill pending"><FaHourglassHalf/> PENDIENTE</span>
+                                      )}
+                                      {item.status === 'recolectado' && (
+                                          <span className="pa-status-pill success"><FaCheckCircle/> EN CANASTA</span>
+                                      )}
+                                      {item.status === 'sustituido' && (
+                                          <span className="pa-status-pill warning"><FaExclamationTriangle/> SUSTITUIDO</span>
+                                      )}
                                   </div>
                               </div>
                           ))}
@@ -458,7 +420,7 @@ const PedidosAdmin = () => {
           </div>
       )}
 
-      {/* MODAL AUDITORÍA FORENSE */}
+      {/* MODAL AUDITORÍA */}
       {showHistoryModal && historyDetail && (
           <div className="pedidos-modal-overlay high-z" onClick={() => setShowHistoryModal(false)}>
               <div className="pedidos-modal-content" onClick={e => e.stopPropagation()}>

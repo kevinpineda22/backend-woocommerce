@@ -9,7 +9,9 @@ import {
   FaKeyboard,
   FaMagic,
   FaBarcode,
-  FaCheckCircle
+  FaPhone,
+  FaWhatsapp,
+  FaUser
 } from "react-icons/fa";
 
 // --- MODAL DE INGRESO MANUAL ---
@@ -34,7 +36,7 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
         <div className="ec-input-wrapper">
           <input
             ref={inputRef}
-            type="text" // Cambiado a text para soportar alfanuméricos
+            type="text"
             className="ec-manual-input"
             placeholder="Ej: 770..."
             value={code}
@@ -100,6 +102,63 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
   );
 };
 
+// --- NUEVO: MODAL DE CLIENTES (CONTACTO) ---
+export const ClientsModal = ({ isOpen, orders, onClose }) => {
+    if (!isOpen || !orders) return null;
+
+    return (
+        <div className="ec-modal-overlay high-z">
+            <div className="ec-modal-content">
+                <div className="ec-modal-header" style={{background: '#1e293b'}}>
+                    <div style={{display:'flex', gap:10, alignItems:'center', color:'white'}}>
+                        <FaUser size={20} />
+                        <h3 style={{margin:0, fontSize:'1.1rem'}}>Directorio de Clientes</h3>
+                    </div>
+                    <button onClick={onClose} style={{background:'none', border:'none', color:'white', fontSize:'1.2rem'}}><FaTimes/></button>
+                </div>
+                <div className="ec-modal-body" style={{padding: '20px 0', overflowY: 'auto', maxHeight: '60vh'}}>
+                    {orders.map(order => (
+                        <div key={order.id} style={{
+                            padding: '15px 20px', 
+                            borderBottom: '1px solid #eee',
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center'
+                        }}>
+                            <div style={{textAlign:'left'}}>
+                                <div style={{fontWeight: 'bold', color: '#1e293b'}}>{order.customer}</div>
+                                <div style={{fontSize: '0.8rem', color: '#64748b'}}>Pedido #{order.id}</div>
+                            </div>
+                            <div style={{display: 'flex', gap: 10}}>
+                                {order.phone ? (
+                                    <>
+                                        <a href={`tel:${order.phone}`} className="ec-contact-btn phone">
+                                            <FaPhone />
+                                        </a>
+                                        <a 
+                                            href={`https://wa.me/57${order.phone.replace(/\D/g,'')}`} 
+                                            target="_blank" 
+                                            rel="noreferrer"
+                                            className="ec-contact-btn whatsapp"
+                                        >
+                                            <FaWhatsapp />
+                                        </a>
+                                    </>
+                                ) : (
+                                    <span style={{fontSize:'0.7rem', color:'#999'}}>Sin tel.</span>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div style={{padding:20}}>
+                    <button className="ec-modal-cancel" style={{width:'100%'}} onClick={onClose}>Cerrar</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- MODAL DE SUSTITUCIÓN CON SEGURIDAD (SCAN CHECK) ---
 export const SubstituteModal = ({
   isOpen,
@@ -113,7 +172,7 @@ export const SubstituteModal = ({
   const [isManualSearch, setIsManualSearch] = useState(false);
   
   // ESTADOS DE VERIFICACIÓN
-  const [pendingSub, setPendingSub] = useState(null); // Producto elegido esperando scan
+  const [pendingSub, setPendingSub] = useState(null); 
   const [verifyCode, setVerifyCode] = useState(""); 
   const verifyInputRef = useRef(null);
 
@@ -152,25 +211,20 @@ export const SubstituteModal = ({
     finally { setLoading(false); }
   };
 
-  // PASO 1: Seleccionar candidato
   const handleSelect = (prod) => {
       setPendingSub(prod);
       setVerifyCode("");
       setTimeout(() => verifyInputRef.current?.focus(), 200);
   };
 
-  // PASO 2: Verificar Scan
   const handleVerify = () => {
       if (!pendingSub) return;
-      
       const cleanInput = verifyCode.trim().toUpperCase();
       const sku = (pendingSub.sku || "").toUpperCase();
       
-      // Lógica de validación: SKU exacto O backdoor "OK" O "CONFIRMAR"
       if (cleanInput === sku || cleanInput.includes(sku) || sku.includes(cleanInput) || cleanInput === "OK" || cleanInput === "CONFIRMAR") {
           onConfirmSubstitute(pendingSub);
       } else {
-          // Vibración de error
           if(navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
           alert(`❌ Código incorrecto.\nEscaneado: ${cleanInput}\nEsperado SKU: ${sku}`);
           setVerifyCode("");
@@ -180,7 +234,6 @@ export const SubstituteModal = ({
 
   if (!isOpen || !originalItem) return null;
 
-  // --- VISTA B: VERIFICACIÓN DE SEGURIDAD ---
   if (pendingSub) {
       return (
         <div className="ec-modal-overlay high-z">
@@ -219,7 +272,6 @@ export const SubstituteModal = ({
       );
   }
 
-  // --- VISTA A: LISTA DE SUGERENCIAS ---
   return (
     <div className="ec-modal-overlay">
       <div className="ec-modal-content large">

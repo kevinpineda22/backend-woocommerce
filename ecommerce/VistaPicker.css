@@ -1,4 +1,4 @@
-/* VistaPicker.css - Estilos Completos PRO */
+/* VistaPicker.css - Versión Final */
 
 :root {
   --ec-bg: #f1f5f9;
@@ -40,6 +40,29 @@
 .ec-order-info { display: flex; flex-direction: column; }
 .ec-label-sm { font-size: 0.7rem; opacity: 0.8; letter-spacing: 1px; text-transform: uppercase; }
 .ec-order-id { font-size: 1.2rem; font-weight: 700; color: #60a5fa; }
+
+/* NUEVO: CRONÓMETRO */
+.ec-timer-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 12px;
+    font-size: 0.8rem; font-weight: 700; color: #4ade80; font-family: monospace;
+}
+
+/* NUEVO: BOTÓN DE CONTACTOS */
+.ec-contacts-btn {
+    background: #3b82f6; color: white; border: none; padding: 6px 12px;
+    border-radius: 20px; font-weight: 600; font-size: 0.75rem;
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* BOTONES DE CONTACTO EN MODAL */
+.ec-contact-btn {
+    width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: white; text-decoration: none; font-size: 1.2rem;
+}
+.ec-contact-btn.phone { background: #3b82f6; }
+.ec-contact-btn.whatsapp { background: #25D366; }
 
 /* LEYENDA */
 .ec-orders-legend {
