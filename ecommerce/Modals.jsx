@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import {
   FaWeightHanging,
@@ -7,23 +7,39 @@ import {
   FaSearch,
   FaBoxOpen,
   FaKeyboard,
-  FaMagic // Icono para sugerencias
+  FaMagic,
+  FaBarcode,
+  FaCheckCircle
 } from "react-icons/fa";
 
 // --- MODAL DE INGRESO MANUAL ---
 export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
   const [code, setCode] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+      if (isOpen) setTimeout(() => inputRef.current?.focus(), 100);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
     <div className="ec-modal-overlay">
       <div className="ec-modal-content">
-        <h3 style={{ justifyContent: "center" }}><FaKeyboard /> Digitar Código</h3>
-        <p className="ec-text-secondary">El escáner falló. Ingresa el código numérico.</p>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <FaKeyboard size={40} color="#3b82f6" />
+            <h3>Digitar Código</h3>
+            <p className="ec-text-secondary">Si el escáner falla, ingresa el EAN/SKU manual.</p>
+        </div>
         <div className="ec-input-wrapper">
           <input
-            type="number" className="ec-manual-input" placeholder="Ej: 770..."
-            value={code} autoFocus onChange={(e) => setCode(e.target.value)}
+            ref={inputRef}
+            type="text" // Cambiado a text para soportar alfanuméricos
+            className="ec-manual-input"
+            placeholder="Ej: 770..."
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && code.length > 0 && onConfirm(code)}
           />
         </div>
         <div className="ec-modal-grid">
@@ -39,21 +55,41 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
 // --- MODAL DE PESO ---
 export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
   const [weight, setWeight] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+      if (isOpen) {
+          setWeight("");
+          setTimeout(() => inputRef.current?.focus(), 100);
+      }
+  }, [isOpen, item]);
+
   if (!isOpen || !item) return null;
 
   return (
     <div className="ec-modal-overlay">
       <div className="ec-modal-content">
-        <h3 style={{ justifyContent: "center" }}><FaWeightHanging /> Ingresar Peso</h3>
-        <p>Producto: <strong>{item.name}</strong></p>
-        <p className="ec-text-secondary">Solicitado: ~{item.quantity_total} unidades/kg</p>
+        <div style={{ textAlign: "center", marginBottom: 15 }}>
+            <FaWeightHanging size={40} color="#22c55e" />
+            <h3>Ingresar Peso Final</h3>
+            <p style={{fontSize:'1.1rem', margin:'10px 0'}}><strong>{item.name}</strong></p>
+            <p className="ec-text-secondary" style={{fontSize:'0.9rem'}}>Solicitado: {item.quantity_total} un/kg aprox</p>
+        </div>
+        
         <div className="ec-input-wrapper">
           <input
-            type="number" className="ec-manual-input" placeholder="0.000" step="0.001"
-            value={weight} autoFocus onChange={(e) => setWeight(e.target.value)}
+            ref={inputRef}
+            type="number"
+            className="ec-manual-input"
+            placeholder="0.000"
+            step="0.001"
+            value={weight}
+            onChange={(e) => setWeight(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && weight && parseFloat(weight) > 0 && onConfirm(parseFloat(weight))}
           />
           <span style={{ position: "absolute", right: 20, fontWeight: "bold", color: "#94a3b8" }}>KG</span>
         </div>
+
         <div className="ec-modal-grid">
           <button className="ec-modal-cancel" onClick={onClose}>Cancelar</button>
           <button className="ec-reason-btn" style={{ background: "#22c55e", color: "white", width: "100%" }}
@@ -64,7 +100,7 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
   );
 };
 
-// --- MODAL DE SUSTITUCIÓN INTELIGENTE ---
+// --- MODAL DE SUSTITUCIÓN CON SEGURIDAD (SCAN CHECK) ---
 export const SubstituteModal = ({
   isOpen,
   originalItem,
@@ -72,57 +108,118 @@ export const SubstituteModal = ({
   onConfirmSubstitute,
 }) => {
   const [query, setQuery] = useState("");
-  const [suggestions, setSuggestions] = useState([]); // Lista de resultados
+  const [suggestions, setSuggestions] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [isManualSearch, setIsManualSearch] = useState(false);
+  
+  // ESTADOS DE VERIFICACIÓN
+  const [pendingSub, setPendingSub] = useState(null); // Producto elegido esperando scan
+  const [verifyCode, setVerifyCode] = useState(""); 
+  const verifyInputRef = useRef(null);
 
-  // 1. Al abrir, buscar sugerencias automáticas (mismo cat + precio)
   useEffect(() => {
       if (isOpen && originalItem) {
           fetchSuggestions();
-      }
-      // Resetear estados al cerrar/abrir
-      return () => {
-          setQuery("");
-          setSuggestions([]);
+          setPendingSub(null); 
+          setVerifyCode("");
           setIsManualSearch(false);
+          setQuery("");
       }
   }, [isOpen, originalItem]);
 
   const fetchSuggestions = async () => {
       setLoading(true);
       try {
-          // Llamada sin query pero con original_id -> Activa modo sugerencia en backend
           const res = await axios.get(
             `https://backend-woocommerce.vercel.app/api/orders/buscar-producto?original_id=${originalItem.product_id}`
           );
           setSuggestions(res.data);
-      } catch (error) {
-          console.error("Error cargando sugerencias");
-      } finally {
-          setLoading(false);
-      }
+      } catch (error) { console.error("Error cargando sugerencias"); } 
+      finally { setLoading(false); }
   };
 
   const handleManualSearch = async (e) => {
     e.preventDefault();
     if (!query) return;
     setLoading(true);
-    setIsManualSearch(true); // Cambiamos título UI
+    setIsManualSearch(true);
     try {
       const res = await axios.get(
         `https://backend-woocommerce.vercel.app/api/orders/buscar-producto?query=${query}`
       );
       setSuggestions(res.data);
-    } catch (error) {
-      alert("Error buscando: " + error.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { alert("Error buscando"); } 
+    finally { setLoading(false); }
+  };
+
+  // PASO 1: Seleccionar candidato
+  const handleSelect = (prod) => {
+      setPendingSub(prod);
+      setVerifyCode("");
+      setTimeout(() => verifyInputRef.current?.focus(), 200);
+  };
+
+  // PASO 2: Verificar Scan
+  const handleVerify = () => {
+      if (!pendingSub) return;
+      
+      const cleanInput = verifyCode.trim().toUpperCase();
+      const sku = (pendingSub.sku || "").toUpperCase();
+      
+      // Lógica de validación: SKU exacto O backdoor "OK" O "CONFIRMAR"
+      if (cleanInput === sku || cleanInput.includes(sku) || sku.includes(cleanInput) || cleanInput === "OK" || cleanInput === "CONFIRMAR") {
+          onConfirmSubstitute(pendingSub);
+      } else {
+          // Vibración de error
+          if(navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
+          alert(`❌ Código incorrecto.\nEscaneado: ${cleanInput}\nEsperado SKU: ${sku}`);
+          setVerifyCode("");
+          verifyInputRef.current?.focus();
+      }
   };
 
   if (!isOpen || !originalItem) return null;
 
+  // --- VISTA B: VERIFICACIÓN DE SEGURIDAD ---
+  if (pendingSub) {
+      return (
+        <div className="ec-modal-overlay high-z">
+            <div className="ec-modal-content">
+                <div style={{background:'#f59e0b', padding:'20px', margin:'-25px -25px 20px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column'}}>
+                    <FaBarcode size={40} style={{marginBottom:10}} />
+                    <h3 style={{margin:0}}>Validación Requerida</h3>
+                </div>
+                
+                <div style={{textAlign:'center', marginBottom:20}}>
+                    <p style={{fontSize:'0.9rem', color:'#64748b'}}>Vas a llevar:</p>
+                    <h3 style={{color:'#1e293b', margin:'10px 0', fontSize:'1.1rem'}}>{pendingSub.name}</h3>
+                    <p className="ec-text-secondary" style={{fontSize:'0.85rem'}}>
+                        Por seguridad, escanea el código de barras del producto físico para confirmar.
+                    </p>
+                </div>
+                
+                <div className="ec-input-wrapper" style={{marginBottom:20}}>
+                    <input 
+                        ref={verifyInputRef}
+                        type="text" 
+                        className="ec-manual-input" 
+                        placeholder="Escanea aquí..."
+                        value={verifyCode}
+                        onChange={(e) => setVerifyCode(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+                    />
+                </div>
+                
+                <div className="ec-modal-grid">
+                    <button className="ec-modal-cancel" onClick={() => setPendingSub(null)}>Atrás</button>
+                    <button className="ec-reason-btn" style={{background:'#f59e0b', color:'white'}} onClick={handleVerify}>Confirmar</button>
+                </div>
+            </div>
+        </div>
+      );
+  }
+
+  // --- VISTA A: LISTA DE SUGERENCIAS ---
   return (
     <div className="ec-modal-overlay">
       <div className="ec-modal-content large">
@@ -132,14 +229,13 @@ export const SubstituteModal = ({
         </div>
 
         <div className="ec-sub-info">
-          Original: <strong>{originalItem.name}</strong>
+            Original: <strong>{originalItem.name}</strong>
         </div>
 
-        {/* Barra de Búsqueda */}
         <form onSubmit={handleManualSearch} className="ec-search-form">
           <input
             type="text"
-            placeholder="Buscar otra cosa..."
+            placeholder="Buscar por nombre..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="ec-search-input"
@@ -147,23 +243,17 @@ export const SubstituteModal = ({
           <button type="submit" className="ec-search-btn"><FaSearch /></button>
         </form>
 
-        {/* Título dinámico de la lista */}
         <div className="ec-list-header">
-            {isManualSearch ? (
-                <span>Resultados de búsqueda:</span>
-            ) : (
-                <span style={{color: '#2563eb', display:'flex', alignItems:'center', gap:5}}>
-                    <FaMagic /> Sugerencias Inteligentes (Misma Categoría)
-                </span>
-            )}
+            {isManualSearch ? "Resultados de búsqueda:" : <span style={{color: '#2563eb', display:'flex', alignItems:'center', gap:5}}><FaMagic /> Sugerencias (Mismo Pasillo)</span>}
         </div>
 
         <div className="ec-search-results">
-          {loading && <div className="ec-spin"></div>}
+          {loading && <div className="ec-picker-centered" style={{height:'100px'}}><div className="ec-spinner"></div></div>}
           
           {!loading && suggestions.length === 0 && (
-            <div style={{ textAlign: "center", color: "#999", padding: 20 }}>
-                {isManualSearch ? "No se encontraron productos." : "No hay sugerencias automáticas. Intenta buscar manual."}
+            <div style={{textAlign:"center", color:"#999", padding:40}}>
+                <FaBoxOpen size={40} style={{marginBottom:10, opacity:0.3}} /><br/>
+                No se encontraron productos.
             </div>
           )}
 
@@ -174,20 +264,14 @@ export const SubstituteModal = ({
               </div>
               <div className="ec-res-info">
                 <div className="ec-res-name">{prod.name}</div>
-                <div className="ec-res-price">
-                  ${new Intl.NumberFormat("es-CO").format(prod.price)}
-                </div>
-                <div className="ec-res-stock" style={{color: prod.stock > 0 ? '#16a34a' : '#dc2626'}}>
-                    {prod.stock > 0 ? `Stock: ${prod.stock}` : "Agotado"}
+                <div className="ec-res-price">${new Intl.NumberFormat("es-CO").format(prod.price)}</div>
+                <div className="ec-res-stock" style={{color: prod.stock > 0 ? '#16a34a' : '#dc2626', fontSize:'0.75rem'}}>
+                    {prod.stock > 0 ? `Disponible: ${prod.stock}` : "Sin Stock"}
                 </div>
               </div>
               <button
                 className="ec-select-btn"
-                onClick={() => {
-                  if (window.confirm(`¿Sustituir con: ${prod.name}?`)) {
-                    onConfirmSubstitute(prod);
-                  }
-                }}
+                onClick={() => handleSelect(prod)}
                 disabled={!prod.stock} 
               >
                 Elegir

@@ -13,16 +13,17 @@ const agruparItemsParaPicking = (orders) => {
 
       if (!mapaProductos[key]) {
         mapaProductos[key] = {
-          id: item.id,
+          id: item.id, // ID referencia de línea
           product_id: item.product_id,
           name: item.name,
-          sku: item.sku,
+          sku: item.sku, // Importante para validación SIESA
           image_src: item.image?.src || "", 
           // PRECIO: Se captura para enviar al front
           price: parseFloat(item.price || 0),
           quantity_total: 0,
           pedidos_involucrados: [],
           categorias: item.parent_name ? [{name: item.parent_name}] : [],
+          // Intentar extraer EAN
           barcode: item.meta_data?.find(m => 
             ['ean', 'barcode', '_ean', '_barcode'].includes(m.key.toLowerCase())
           )?.value || "",
@@ -145,7 +146,7 @@ exports.getSessionActive = async (req, res) => {
 };
 
 // ==========================================
-// 2. ACCIONES DEL PICKER (CORREGIDO PARA EVITAR ERROR 500)
+// 2. ACCIONES DEL PICKER
 // ==========================================
 
 exports.registerAction = async (req, res) => {
@@ -175,7 +176,7 @@ exports.registerAction = async (req, res) => {
     }
 
     // --- LÓGICA NORMAL ---
-    // FIX ERROR 500: Usamos maybeSingle() para evitar crash si no encuentra asignación
+    // Usamos maybeSingle() para evitar crash si no encuentra asignación
     const { data: anyAssign } = await supabase
         .from('wc_asignaciones_pedidos')
         .select('id, id_pedido')
@@ -183,7 +184,7 @@ exports.registerAction = async (req, res) => {
         .limit(1)
         .maybeSingle(); 
         
-    // FIX ERROR 500: Si es null, enviamos NULL a la BD, nunca 0.
+    // Si es null, enviamos NULL a la BD, nunca 0.
     const idAsignacionRef = anyAssign ? anyAssign.id : null;
     const idPedidoRef = anyAssign ? anyAssign.id_pedido : null; 
 
@@ -314,7 +315,7 @@ exports.searchProduct = async (req, res) => {
 };
 
 // ==========================================
-// 4. VALIDACIÓN MANUAL SIESA
+// 4. OTROS MÉTODOS
 // ==========================================
 
 exports.validateManualCode = async (req, res) => {
@@ -343,10 +344,6 @@ exports.validateManualCode = async (req, res) => {
     res.status(500).json({ valid: false, error: "Error de servidor" });
   }
 };
-
-// ==========================================
-// 5. MÉTODOS DE APOYO (ADMIN)
-// ==========================================
 
 exports.completeSession = async (req, res) => {
     const { id_sesion, id_picker } = req.body;
@@ -381,4 +378,150 @@ exports.getPickers = async (req, res) => {
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
     res.status(200).json(data);
+};
+
+// ==========================================
+// 6. DASHBOARD ANALÍTICO (EN VIVO)
+// ==========================================
+
+exports.getActiveSessionsDashboard = async (req, res) => {
+    try {
+        // 1. Obtener Sesiones 'en_proceso'
+        const { data: sessions, error } = await supabase
+            .from("wc_picking_sessions")
+            .select(`
+                id,
+                fecha_inicio,
+                wc_pickers ( nombre_completo, email ),
+                ids_pedidos
+            `)
+            .eq("estado", "en_proceso");
+
+        if (error) throw error;
+
+        // 2. Enriquecer cada sesión con cálculo de progreso
+        const dashboardData = await Promise.all(sessions.map(async (sess) => {
+            // A. Traer detalles de WooCommerce para saber el TOTAL de items
+            const pedidosPromesas = sess.ids_pedidos.map(id => WooCommerce.get(`orders/${id}`));
+            const responses = await Promise.all(pedidosPromesas);
+            const orders = responses.map(r => r.data);
+            
+            // Usamos tu helper para unificar productos y saber cantidad total
+            const itemsUnificados = agruparItemsParaPicking(orders);
+            const totalItems = itemsUnificados.length; 
+
+            // B. Traer logs de supabase para saber cuantos están listos
+            const { data: logs } = await supabase
+                .from("wc_log_picking")
+                .select("id_producto, accion, es_sustituto, fecha_registro, nombre_producto")
+                .in("id_producto", itemsUnificados.map(i => i.product_id));
+
+            // C. Calcular métricas
+            const recolectados = logs.filter(l => l.accion === 'recolectado' && !l.es_sustituto).length;
+            const sustituidos = logs.filter(l => l.es_sustituto).length;
+            const completados = recolectados + sustituidos;
+            
+            const percentage = totalItems > 0 ? Math.round((completados / totalItems) * 100) : 0;
+
+            // D. Ubicación Actual (Último log)
+            let currentLocation = "Inicio";
+            if (logs.length > 0) {
+                // Ordenar logs por fecha descendente
+                const lastLog = logs.sort((a,b) => new Date(b.fecha_registro) - new Date(a.fecha_registro))[0];
+                const infoPasillo = obtenerInfoPasillo([], lastLog.nombre_producto); 
+                currentLocation = infoPasillo.pasillo !== "Otros" ? `Pasillo ${infoPasillo.pasillo}` : "General";
+            }
+
+            return {
+                session_id: sess.id,
+                picker_name: sess.wc_pickers?.nombre_completo || "Desconocido",
+                start_time: sess.fecha_inicio,
+                total_items: totalItems,
+                completed_items: completados,
+                substituted_items: sustituidos,
+                progress: percentage,
+                current_location: currentLocation,
+                orders_count: sess.ids_pedidos.length,
+                order_ids: sess.ids_pedidos
+            };
+        }));
+
+        res.status(200).json(dashboardData);
+
+    } catch (error) {
+        console.error("Error dashboard:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// ==========================================
+// 7. HISTORIAL Y AUDITORÍA (NUEVO)
+// ==========================================
+
+// Obtener lista de sesiones terminadas
+exports.getHistorySessions = async (req, res) => {
+    try {
+        const { data: sessions, error } = await supabase
+            .from("wc_picking_sessions")
+            .select(`
+                id,
+                fecha_inicio,
+                fecha_fin,
+                estado,
+                ids_pedidos,
+                wc_pickers ( nombre_completo, email )
+            `)
+            .eq("estado", "completado")
+            .order("fecha_fin", { ascending: false })
+            .limit(50); // Traemos las últimas 50 para no saturar
+
+        if (error) throw error;
+
+        const historyData = sessions.map(sess => {
+            const start = new Date(sess.fecha_inicio);
+            const end = new Date(sess.fecha_fin);
+            const durationMin = Math.round((end - start) / 60000);
+
+            return {
+                id: sess.id,
+                picker: sess.wc_pickers?.nombre_completo || "Desconocido",
+                pedidos: sess.ids_pedidos,
+                fecha: end.toLocaleDateString("es-CO"),
+                hora_fin: end.toLocaleTimeString("es-CO"),
+                duracion: `${durationMin} min`
+            };
+        });
+
+        res.status(200).json(historyData);
+    } catch (error) {
+        console.error("Error history:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Obtener detalle forense de una sesión (Logs)
+exports.getSessionLogsDetail = async (req, res) => {
+    const { session_id } = req.query;
+    try {
+        // 1. Obtener los logs de esa sesión (Uniendo con asignaciones para llegar a la sesión)
+        const { data: assignments } = await supabase
+            .from("wc_asignaciones_pedidos")
+            .select("id")
+            .eq("id_sesion", session_id);
+            
+        const assignIds = assignments.map(a => a.id);
+
+        const { data: logs, error } = await supabase
+            .from("wc_log_picking")
+            .select("*")
+            .in("id_asignacion", assignIds)
+            .order("fecha_registro", { ascending: true });
+
+        if (error) throw error;
+
+        res.status(200).json(logs);
+    } catch (error) {
+        console.error("Error logs detail:", error);
+        res.status(500).json({ error: error.message });
+    }
 };
