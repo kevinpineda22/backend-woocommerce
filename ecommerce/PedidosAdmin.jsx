@@ -7,7 +7,7 @@ import {
   FaBox, FaArrowLeft, FaSync, FaSearch, FaCalendarAlt, FaMapMarkerAlt,
   FaUserTag, FaRunning, FaChartLine, FaCheckDouble, FaTimes, 
   FaPhone, FaEnvelope, FaClock, FaCheckCircle, FaExclamationTriangle,
-  FaHistory, FaFileAlt // Iconos nuevos para historial
+  FaHistory, FaFileAlt, FaEye, FaListUl
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
 
@@ -57,6 +57,10 @@ const PedidosAdmin = () => {
   const [historyDetail, setHistoryDetail] = useState(null); 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
+  // ESTADOS NUEVOS PARA DETALLE EN VIVO
+  const [liveSessionDetail, setLiveSessionDetail] = useState(null);
+  const [showLiveModal, setShowLiveModal] = useState(false);
+
   const [stats, setStats] = useState({ pending: 0, process: 0 });
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState("pending");
@@ -101,7 +105,7 @@ const PedidosAdmin = () => {
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  // --- NUEVA FUNCIÓN: CARGAR HISTORIAL ---
+  // --- HISTORIAL ---
   const fetchHistory = async () => {
       setLoading(true);
       try {
@@ -117,6 +121,19 @@ const PedidosAdmin = () => {
           setHistoryDetail({ session, logs: res.data });
           setShowHistoryModal(true);
       } catch (e) { alert("Error cargando detalles"); }
+  };
+
+  // --- DETALLE EN VIVO (NUEVO) ---
+  const handleViewLiveDetail = async (session) => {
+      try {
+          // Usamos el ID del picker que ahora viene en el dashboard
+          const res = await axios.get(`https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}`);
+          setLiveSessionDetail({ sessionInfo: session, routeData: res.data });
+          setShowLiveModal(true);
+      } catch (e) {
+          console.error(e);
+          alert("No se pudo conectar con la sesión del picker.");
+      }
   };
 
   // --- 2. FILTRADO PENDIENTES ---
@@ -357,6 +374,11 @@ const PedidosAdmin = () => {
                                 <div className="pa-orders-list">
                                     <small><strong>Pedidos:</strong> {session.order_ids.join(", ")}</small>
                                 </div>
+
+                                {/* BOTÓN DE ZOOM (VER PRODUCTOS EN VIVO) */}
+                                <button className="pa-view-detail-btn" onClick={() => handleViewLiveDetail(session)}>
+                                    <FaEye /> Ver Productos
+                                </button>
                             </div>
                         ))
                     )}
@@ -385,8 +407,58 @@ const PedidosAdmin = () => {
           </div>
         </div>
       )}
-      
-      {/* MODAL AUDITORÍA FORENSE (NUEVO) */}
+
+      {/* --- NUEVO MODAL: DETALLE EN VIVO --- */}
+      {showLiveModal && liveSessionDetail && (
+          <div className="pedidos-modal-overlay high-z" onClick={() => setShowLiveModal(false)}>
+              <div className="pedidos-modal-content" onClick={e => e.stopPropagation()}>
+                  <div className="pedidos-modal-header" style={{background:'#1e293b'}}>
+                      <div style={{display:'flex', gap:15, alignItems:'center'}}>
+                          <FaListUl size={24} />
+                          <div>
+                              <h2 style={{fontSize:'1.2rem', margin:0}}>Ruta de {liveSessionDetail.sessionInfo.picker_name}</h2>
+                              <span style={{fontSize:'0.8rem', opacity:0.8, fontWeight:'normal'}}>En Vivo - {liveSessionDetail.routeData.items.length} Items</span>
+                          </div>
+                      </div>
+                      <button className="pedidos-modal-close-btn" onClick={() => setShowLiveModal(false)}>&times;</button>
+                  </div>
+                  
+                  <div className="pedidos-modal-body" style={{background:'#f1f5f9'}}>
+                      <div className="live-detail-grid">
+                          {liveSessionDetail.routeData.items.map((item, idx) => (
+                              <div key={idx} className={`live-item-row ${item.status}`}>
+                                  <div className="live-item-img">
+                                      {item.image_src ? <img src={item.image_src} alt=""/> : <FaBox size={20} color="#ccc"/>}
+                                  </div>
+                                  <div className="live-item-info">
+                                      <div className="live-item-name">{item.name}</div>
+                                      <div className="live-item-meta">
+                                          <span className="live-badge-pasillo">{item.pasillo === 'Otros' ? 'Gen' : `P-${item.pasillo}`}</span>
+                                          <span style={{fontWeight:'bold'}}>{item.quantity_total} un.</span>
+                                          {item.price > 0 && <span style={{color:'#059669'}}>{formatPrice(item.price)}</span>}
+                                      </div>
+                                      
+                                      {/* Si es sustituto, mostrar por qué cambió */}
+                                      {item.status === 'sustituido' && item.sustituto && (
+                                          <div className="live-sub-info">
+                                              🔄 Llevó: <strong>{item.sustituto.name}</strong> ({formatPrice(item.sustituto.price)})
+                                          </div>
+                                      )}
+                                  </div>
+                                  <div className="live-item-status">
+                                      {item.status === 'pendiente' && <span className="status-dot pending"></span>}
+                                      {item.status === 'recolectado' && <FaCheckCircle color="#22c55e" size={20}/>}
+                                      {item.status === 'sustituido' && <FaExclamationTriangle color="#f59e0b" size={18}/>}
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* MODAL AUDITORÍA FORENSE */}
       {showHistoryModal && historyDetail && (
           <div className="pedidos-modal-overlay high-z" onClick={() => setShowHistoryModal(false)}>
               <div className="pedidos-modal-content" onClick={e => e.stopPropagation()}>
@@ -423,8 +495,8 @@ const PedidosAdmin = () => {
           </div>
       )}
 
-      {/* MODAL DETALLE PEDIDO (PENDIENTE) */}
-      {selectedOrder && !showAssignModal && !showHistoryModal && (
+      {/* MODAL DETALLE PEDIDO PENDIENTE */}
+      {selectedOrder && !showAssignModal && !showHistoryModal && !showLiveModal && (
           <div className="pedidos-modal-overlay" onClick={() => setSelectedOrder(null)}>
               <div className="pedidos-modal-content" onClick={e => e.stopPropagation()}>
                   <div className="pedidos-modal-header"><h2>Pedido #{selectedOrder.id}</h2><button className="pedidos-modal-close-btn" onClick={()=>setSelectedOrder(null)}>&times;</button></div>
