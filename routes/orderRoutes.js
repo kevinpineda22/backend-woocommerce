@@ -15,9 +15,13 @@ router.get("/pickers", orderController.getPickers);
 // Obtener datos para el Super Dashboard en Tiempo Real
 router.get("/dashboard-activo", orderController.getActiveSessionsDashboard);
 
-// --- NUEVO: AUDITORÍA Y HISTORIAL ---
+// --- AUDITORÍA Y HISTORIAL ---
 router.get("/historial", orderController.getHistorySessions);
 router.get("/historial-detalle", orderController.getSessionLogsDetail);
+
+// --- GESTIÓN DE PICKERS ---
+// Cancelar asignación actual de un picker (Emergencia)
+router.post("/cancelar-asignacion", orderController.cancelAssignment);
 
 // ==========================================
 // RUTAS DE SESIÓN (BATCH PICKING)

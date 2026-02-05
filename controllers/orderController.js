@@ -176,7 +176,6 @@ exports.registerAction = async (req, res) => {
     }
 
     // --- LÓGICA NORMAL ---
-    // Usamos maybeSingle() para evitar crash si no encuentra asignación
     const { data: anyAssign } = await supabase
         .from('wc_asignaciones_pedidos')
         .select('id, id_pedido')
@@ -184,7 +183,6 @@ exports.registerAction = async (req, res) => {
         .limit(1)
         .maybeSingle(); 
         
-    // Si es null, enviamos NULL a la BD, nunca 0.
     const idAsignacionRef = anyAssign ? anyAssign.id : null;
     const idPedidoRef = anyAssign ? anyAssign.id_pedido : null; 
 
@@ -381,18 +379,19 @@ exports.getPickers = async (req, res) => {
 };
 
 // ==========================================
-// 6. DASHBOARD ANALÍTICO (EN VIVO)
+// 6. DASHBOARD ANALÍTICO (CORREGIDO ERROR 500)
 // ==========================================
 
 exports.getActiveSessionsDashboard = async (req, res) => {
     try {
-        // 1. Obtener Sesiones 'en_proceso'
+        // CORRECCIÓN: Relación explícita para evitar error PGRST201
+        // Usamos !wc_picking_sessions_picker_fkey para indicar que unimos por el picker dueño de la sesión
         const { data: sessions, error } = await supabase
             .from("wc_picking_sessions")
             .select(`
                 id,
                 fecha_inicio,
-                wc_pickers ( nombre_completo, email ),
+                wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ),
                 ids_pedidos
             `)
             .eq("estado", "en_proceso");
@@ -455,12 +454,12 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 };
 
 // ==========================================
-// 7. HISTORIAL Y AUDITORÍA (NUEVO)
+// 7. HISTORIAL Y AUDITORÍA (CORREGIDO ERROR 500)
 // ==========================================
 
-// Obtener lista de sesiones terminadas
 exports.getHistorySessions = async (req, res) => {
     try {
+        // CORRECCIÓN: Relación explícita igual que arriba
         const { data: sessions, error } = await supabase
             .from("wc_picking_sessions")
             .select(`
@@ -469,11 +468,11 @@ exports.getHistorySessions = async (req, res) => {
                 fecha_fin,
                 estado,
                 ids_pedidos,
-                wc_pickers ( nombre_completo, email )
+                wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )
             `)
             .eq("estado", "completado")
             .order("fecha_fin", { ascending: false })
-            .limit(50); // Traemos las últimas 50 para no saturar
+            .limit(50); 
 
         if (error) throw error;
 
@@ -499,11 +498,10 @@ exports.getHistorySessions = async (req, res) => {
     }
 };
 
-// Obtener detalle forense de una sesión (Logs)
 exports.getSessionLogsDetail = async (req, res) => {
     const { session_id } = req.query;
     try {
-        // 1. Obtener los logs de esa sesión (Uniendo con asignaciones para llegar a la sesión)
+        // 1. Obtener asignaciones para saber los logs
         const { data: assignments } = await supabase
             .from("wc_asignaciones_pedidos")
             .select("id")
@@ -522,6 +520,55 @@ exports.getSessionLogsDetail = async (req, res) => {
         res.status(200).json(logs);
     } catch (error) {
         console.error("Error logs detail:", error);
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// ==========================================
+// 8. CANCELACIÓN (CORRECCIÓN ERROR 404)
+// ==========================================
+
+exports.cancelAssignment = async (req, res) => {
+    const { id_picker } = req.body; // Este es el ID en tabla wc_pickers
+
+    try {
+        // 1. Verificar si el picker tiene una sesión activa
+        const { data: pickerData } = await supabase
+            .from("wc_pickers")
+            .select("id_sesion_actual")
+            .eq("id", id_picker)
+            .single();
+
+        if (!pickerData || !pickerData.id_sesion_actual) {
+            return res.status(400).json({ message: "Este picker no tiene sesión activa." });
+        }
+
+        const idSesion = pickerData.id_sesion_actual;
+
+        // 2. Marcar la sesión como 'cancelada'
+        await supabase
+            .from("wc_picking_sessions")
+            .update({ estado: "cancelado", fecha_fin: new Date().toISOString() })
+            .eq("id", idSesion);
+
+        // 3. Marcar las asignaciones de pedidos como 'cancelado' 
+        // Esto permite que el sistema de "pendientes" los vea de nuevo (si tu filtro de pendientes busca !is_assigned, 
+        // necesitaríamos que en 'asignaciones_pedidos' el estado ya no sea 'en_proceso')
+        await supabase
+            .from("wc_asignaciones_pedidos")
+            .update({ estado_asignacion: "cancelado", fecha_fin: new Date().toISOString() })
+            .eq("id_sesion", idSesion);
+
+        // 4. Liberar al picker
+        await supabase
+            .from("wc_pickers")
+            .update({ estado_picker: "disponible", id_sesion_actual: null })
+            .eq("id", id_picker);
+
+        res.status(200).json({ message: "Asignación cancelada correctamente." });
+
+    } catch (error) {
+        console.error("Error cancelando asignación:", error);
         res.status(500).json({ error: error.message });
     }
 };
