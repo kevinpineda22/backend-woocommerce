@@ -178,6 +178,9 @@ exports.getSessionActive = async (req, res) => {
           ...item,
           pasillo: info.pasillo,
           prioridad: info.prioridad,
+          categorias_reales: realCategories
+            .map((c) => c.name)
+            .filter((n) => n !== "Uncategorized"),
           status: logItem
             ? logItem.es_sustituto
               ? "sustituido"
