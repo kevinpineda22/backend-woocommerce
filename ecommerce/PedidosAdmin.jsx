@@ -9,19 +9,14 @@ import {
   FaUserTag,
   FaRunning,
   FaHistory,
-  FaListUl,
-  FaLayerGroup,
-  FaUserFriends,
-  FaCheckCircle,
-  FaExclamationTriangle,
   FaFileAlt,
-  FaBoxOpen,
 } from "react-icons/fa";
 
 // --- COMPONENTES MODULARES ---
 import PendingOrdersView from "./PendingOrdersView";
 import ActiveSessionsView from "./ActiveSessionsView";
 import AssignPickerModal from "./AssignPickerModal";
+import { LiveSessionModal } from "./LiveSessionModal"; // ✅ Importación del módulo nuevo
 import { GestionPickers } from "./GestionPickers";
 import AnaliticaPickers from "./AnaliticaPickers";
 
@@ -33,8 +28,6 @@ const formatPrice = (amount) =>
     currency: "COP",
     maximumFractionDigits: 0,
   }).format(amount);
-
-const ORDER_COLORS = ["#3b82f6", "#f97316", "#8b5cf6", "#10b981", "#ec4899"];
 
 const PedidosAdmin = () => {
   // --- ESTADOS GLOBALES ---
@@ -48,15 +41,13 @@ const PedidosAdmin = () => {
   const [historyOrders, setHistoryOrders] = useState([]);
   const [pickers, setPickers] = useState([]);
 
-  // Modales
+  // Modales de Gestión
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null); // (Opcional, manejado internamente en PendingOrdersView pero bueno tenerlo en contexto)
-
-  // Estados Vistas Complejas
+  
+  // Modales de Detalle
   const [liveSessionDetail, setLiveSessionDetail] = useState(null);
   const [showLiveModal, setShowLiveModal] = useState(false);
-  const [liveViewMode, setLiveViewMode] = useState("batch");
   const [historyDetail, setHistoryDetail] = useState(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
@@ -69,12 +60,14 @@ const PedidosAdmin = () => {
   const fetchData = useCallback(async (isBackground = false) => {
     if (!isBackground) setLoading(true);
     try {
+      // 1. Pedidos Pendientes
       const resPending = await axios.get(
         `https://backend-woocommerce.vercel.app/api/orders/pendientes?t=${Date.now()}`
       );
       const listPending = resPending.data.filter((o) => !o.is_assigned);
       setOrders(listPending);
 
+      // 2. Sesiones Activas
       const resActive = await axios.get(
         `https://backend-woocommerce.vercel.app/api/orders/dashboard-activo?t=${Date.now()}`
       );
@@ -82,19 +75,22 @@ const PedidosAdmin = () => {
 
       setStats({ pending: listPending.length, process: resActive.data.length });
     } catch (error) {
-      console.error("Error data", error);
+      console.error("Error fetching data:", error);
     } finally {
       if (!isBackground) setLoading(false);
     }
   }, []);
 
+  // Refresco automático cada 10 segundos
   useEffect(() => {
     fetchData();
     const interval = setInterval(() => fetchData(true), 10000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
-  // --- HANDLERS ---
+  // --- HANDLERS: ASIGNACIÓN DE PICKERS ---
+  
+  // Abrir modal para asignar lotes (varios seleccionados)
   const handleOpenAssignModal = async () => {
     if (selectedIds.size === 0) return;
     try {
@@ -104,16 +100,13 @@ const PedidosAdmin = () => {
       setPickers(res.data);
       setShowAssignModal(true);
     } catch (e) {
-      alert("Error cargando pickers");
+      alert("Error cargando lista de pickers.");
     }
   };
 
-  // NUEVA FUNCIÓN: Asignación directa desde el modal de detalle
+  // Asignar un solo pedido directamente (sin seleccionarlo primero)
   const handleAssignSingleOrder = async (order) => {
-    // 1. Limpiamos selección anterior y seleccionamos solo este
     setSelectedIds(new Set([order.id]));
-    
-    // 2. Cargamos pickers y abrimos modal
     try {
       const res = await axios.get(
         "https://backend-woocommerce.vercel.app/api/orders/pickers"
@@ -121,10 +114,11 @@ const PedidosAdmin = () => {
       setPickers(res.data);
       setShowAssignModal(true);
     } catch (e) {
-      alert("Error cargando pickers");
+      alert("Error cargando lista de pickers.");
     }
   };
 
+  // Confirmar la asignación en el servidor
   const handleConfirmAssignment = async (picker) => {
     try {
       await axios.post(
@@ -137,11 +131,13 @@ const PedidosAdmin = () => {
       alert(`✅ Misión asignada a ${picker.nombre_completo}`);
       setShowAssignModal(false);
       setSelectedIds(new Set());
-      fetchData();
+      fetchData(); // Recargar datos
     } catch (error) {
-      alert("Error al asignar: " + error.message);
+      alert("Error al asignar: " + (error.response?.data?.error || error.message));
     }
   };
+
+  // --- HANDLERS: HISTORIAL Y DETALLES ---
 
   const fetchHistory = async () => {
     setLoading(true);
@@ -157,19 +153,21 @@ const PedidosAdmin = () => {
     }
   };
 
+  // Ver detalle de una sesión activa (Live Dashboard)
   const handleViewLiveDetail = async (session) => {
     try {
       const res = await axios.get(
         `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}`
       );
       setLiveSessionDetail({ sessionInfo: session, routeData: res.data });
-      setLiveViewMode("batch");
       setShowLiveModal(true);
     } catch (e) {
-      alert("No se pudo cargar detalles. Sesión finalizada.");
+      alert("No se pudo cargar detalles. Es posible que la sesión haya finalizado.");
+      fetchData(); // Refrescar por si acaso
     }
   };
 
+  // Ver detalle de auditoría (Historial pasado)
   const handleViewHistoryDetail = async (session) => {
     try {
       const res = await axios.get(
@@ -178,49 +176,13 @@ const PedidosAdmin = () => {
       setHistoryDetail({ session, logs: res.data });
       setShowHistoryModal(true);
     } catch (e) {
-      alert("Error detalles");
+      alert("Error cargando detalles del historial.");
     }
-  };
-
-  const getItemsByOrder = () => {
-    if (!liveSessionDetail) return {};
-    const ordersMap = {};
-    liveSessionDetail.routeData.orders_info.forEach((o, idx) => {
-      ordersMap[o.id] = {
-        customer: o.customer,
-        total_order_value: o.total,
-        color: ORDER_COLORS[idx % ORDER_COLORS.length],
-        code_letter: String.fromCharCode(65 + idx),
-        items: [],
-        stats: { total: 0, done: 0 },
-      };
-    });
-    liveSessionDetail.routeData.items.forEach((item) => {
-      item.pedidos_involucrados.forEach((ped) => {
-        if (ordersMap[ped.id_pedido]) {
-          ordersMap[ped.id_pedido].items.push({
-            ...item,
-            qty_needed: ped.cantidad,
-          });
-          ordersMap[ped.id_pedido].stats.total += 1;
-          if (item.status === "recolectado" || item.status === "sustituido") {
-            ordersMap[ped.id_pedido].stats.done += 1;
-          }
-        }
-      });
-    });
-    return ordersMap;
-  };
-
-  const getOrderIndex = (orderId) => {
-    if (!liveSessionDetail) return 0;
-    return liveSessionDetail.routeData.orders_info.findIndex(
-      (o) => o.id === orderId
-    );
   };
 
   return (
     <div className="pedidos-layout-main-container">
+      {/* SIDEBAR DE NAVEGACIÓN */}
       <aside className="pedidos-layout-sidebar">
         <div className="pedidos-layout-sidebar-header">
           <Link to="/acceso" className="pedidos-back-button">
@@ -281,12 +243,15 @@ const PedidosAdmin = () => {
         </nav>
       </aside>
 
+      {/* CONTENIDO PRINCIPAL */}
       <main className="pedidos-layout-content">
+        {/* VISTAS DE ADMINISTRACIÓN */}
         {currentView === "pickers" ? (
           <GestionPickers />
         ) : currentView === "analitica" ? (
           <AnaliticaPickers />
         ) : currentView === "history" ? (
+          /* VISTA DE HISTORIAL */
           <>
             <header className="pedidos-layout-header">
               <h1>📜 Historial de Sesiones</h1>
@@ -347,6 +312,7 @@ const PedidosAdmin = () => {
             </div>
           </>
         ) : (
+          /* VISTAS OPERATIVAS (PENDIENTES Y PROCESO) */
           <>
             <header className="pedidos-layout-header">
               <h1>
@@ -389,7 +355,8 @@ const PedidosAdmin = () => {
         )}
       </main>
 
-      {/* --- MODAL DE ASIGNACIÓN --- */}
+      {/* --- MODALES COMPARTIDOS --- */}
+      
       <AssignPickerModal
         isOpen={showAssignModal}
         pickers={pickers}
@@ -397,250 +364,15 @@ const PedidosAdmin = () => {
         onConfirm={handleConfirmAssignment}
       />
 
-      {/* --- MODAL DETALLE EN VIVO (Live Dashboard) --- */}
+      {/* ✅ USO DEL NUEVO COMPONENTE MODULARIZADO */}
       {showLiveModal && liveSessionDetail && (
-        <div
-          className="pedidos-modal-overlay high-z"
-          onClick={() => setShowLiveModal(false)}
-        >
-          <div
-            className="pedidos-modal-content"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className="pedidos-modal-header"
-              style={{ background: "#1e293b" }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  gap: 15,
-                  alignItems: "center",
-                  flex: 1,
-                }}
-              >
-                <FaListUl size={24} />
-                <div>
-                  <h2 style={{ fontSize: "1.2rem", margin: 0 }}>
-                    Ruta: {liveSessionDetail.sessionInfo.picker_name}
-                  </h2>
-                  <span style={{ fontSize: "0.8rem", opacity: 0.8 }}>
-                    Operación en Vivo
-                  </span>
-                </div>
-              </div>
-              <div className="pa-view-toggle">
-                <button
-                  className={liveViewMode === "batch" ? "active" : ""}
-                  onClick={() => setLiveViewMode("batch")}
-                >
-                  <FaLayerGroup /> Batch
-                </button>
-                <button
-                  className={liveViewMode === "orders" ? "active" : ""}
-                  onClick={() => setLiveViewMode("orders")}
-                >
-                  <FaUserFriends /> Pedidos
-                </button>
-              </div>
-              <button
-                className="pedidos-modal-close-btn"
-                onClick={() => setShowLiveModal(false)}
-              >
-                &times;
-              </button>
-            </div>
-
-            <div
-              className="pedidos-modal-body"
-              style={{ background: "#f1f5f9" }}
-            >
-              {liveViewMode === "batch" && (
-                <div className="live-detail-grid">
-                  {liveSessionDetail.routeData.items.map((item, idx) => (
-                    <div key={idx} className={`live-item-row ${item.status}`}>
-                      <div className="live-item-img">
-                        {item.image_src ? (
-                          <img src={item.image_src} alt="" />
-                        ) : (
-                          <FaBox size={20} color="#ccc" />
-                        )}
-                      </div>
-                      <div className="live-item-info">
-                        <div className="live-item-name">{item.name}</div>
-                        <div className="live-item-meta">
-                          <span className="live-badge-pasillo">
-                            {item.pasillo === "Otros"
-                              ? "Gen"
-                              : `P-${item.pasillo}`}
-                          </span>
-                          <span style={{ fontWeight: "bold" }}>
-                            {item.quantity_total} un.
-                          </span>
-                        </div>
-                        <div className="live-who-wants">
-                          {item.pedidos_involucrados.map((p, i) => {
-                            const oIdx = getOrderIndex(p.id_pedido);
-                            const color =
-                              ORDER_COLORS[oIdx % ORDER_COLORS.length];
-                            const letter = String.fromCharCode(65 + oIdx);
-                            return (
-                              <span
-                                key={i}
-                                className="live-order-dot"
-                                style={{ background: color }}
-                                title={`Pedido #${p.id_pedido}`}
-                              >
-                                {letter}
-                              </span>
-                            );
-                          })}
-                        </div>
-                        {item.status === "sustituido" && item.sustituto && (
-                          <div className="live-sub-info">
-                            🔄 {item.sustituto.name}
-                          </div>
-                        )}
-                      </div>
-                      <div className="live-item-status-badge">
-                        {item.status === "recolectado" ? (
-                          <span className="pa-status-pill success">LISTO</span>
-                        ) : item.status === "sustituido" ? (
-                          <span className="pa-status-pill warning">CAMBIO</span>
-                        ) : (
-                          <span className="pa-status-pill pending">
-                            PENDIENTE
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {liveViewMode === "orders" && (
-                <div className="live-orders-container">
-                  {Object.entries(getItemsByOrder()).map(([orderId, data]) => {
-                    const percentage =
-                      data.items.length > 0
-                        ? Math.round(
-                            (data.stats.done / data.items.length) * 100
-                          )
-                        : 0;
-                    return (
-                      <div key={orderId} className="live-order-group">
-                        <div className="live-order-header-card">
-                          <div className="live-oh-left">
-                            <div
-                              className="live-oh-letter"
-                              style={{ background: data.color }}
-                            >
-                              {data.code_letter}
-                            </div>
-                            <div>
-                              <h3 className="live-oh-customer">
-                                {data.customer}
-                              </h3>
-                              <span className="live-oh-id">
-                                Pedido #{orderId}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="live-oh-right">
-                            <div className="live-oh-price">
-                              {formatPrice(data.total_order_value)}
-                            </div>
-                            <div className="live-oh-progress-wrap">
-                              <div className="live-oh-progress-text">
-                                {data.stats.done}/{data.items.length} Items (
-                                {percentage}%)
-                              </div>
-                              <div className="live-oh-progress-bar">
-                                <div
-                                  className="live-oh-progress-fill"
-                                  style={{
-                                    width: `${percentage}%`,
-                                    background: data.color,
-                                  }}
-                                ></div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="live-detail-grid">
-                          {data.items.map((item, idx) => (
-                            <div
-                              key={idx}
-                              className={`live-item-row compact ${item.status}`}
-                            >
-                              <div className="live-item-img-sm">
-                                {item.image_src ? (
-                                  <img src={item.image_src} alt="" />
-                                ) : (
-                                  <FaBox size={15} color="#ccc" />
-                                )}
-                              </div>
-                              <div
-                                className="live-item-info"
-                                style={{ flex: 1 }}
-                              >
-                                <div
-                                  className="live-item-name"
-                                  style={{ fontSize: "0.85rem" }}
-                                >
-                                  {item.name}
-                                </div>
-                                <div className="live-item-meta">
-                                  <span>{item.qty_needed} un.</span>
-                                  <span
-                                    style={{
-                                      fontSize: "0.75rem",
-                                      color: "#64748b",
-                                    }}
-                                  >
-                                    {" "}
-                                    • {formatPrice(item.price)}
-                                  </span>
-                                </div>
-                                {item.status === "sustituido" &&
-                                  item.sustituto && (
-                                    <span
-                                      style={{
-                                        color: "#e67e22",
-                                        fontSize: "0.75rem",
-                                      }}
-                                    >
-                                      {" "}
-                                      ➔ {item.sustituto.name} (
-                                      {formatPrice(item.sustituto.price)})
-                                    </span>
-                                  )}
-                              </div>
-                              <div
-                                className="live-item-status-badge"
-                                style={{ width: "auto" }}
-                              >
-                                {item.status === "recolectado" ? (
-                                  <FaCheckCircle color="#22c55e" />
-                                ) : item.status === "sustituido" ? (
-                                  <FaExclamationTriangle color="#f59e0b" />
-                                ) : (
-                                  <span className="status-dot pending"></span>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <LiveSessionModal 
+            sessionDetail={liveSessionDetail}
+            onClose={() => setShowLiveModal(false)}
+        />
       )}
 
-      {/* --- MODAL DETALLE HISTORIAL --- */}
+      {/* MODAL DETALLE HISTORIAL (Aún integrado aquí por simplicidad) */}
       {showHistoryModal && historyDetail && (
         <div
           className="pedidos-modal-overlay high-z"

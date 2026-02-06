@@ -295,7 +295,7 @@ exports.registerAction = async (req, res) => {
 };
 
 // =========================================================================
-// 3. BÚSQUEDA INTELIGENTE
+// 3. BÚSQUEDA INTELIGENTE (MEJORADA: CATEGORÍA + PRECIO + ORDEN)
 // =========================================================================
 
 exports.searchProduct = async (req, res) => {
@@ -304,64 +304,89 @@ exports.searchProduct = async (req, res) => {
   try {
     let products = [];
 
+    // --- ESCENARIO 1: RECOMENDACIÓN INTELIGENTE ---
     if (original_id && !query) {
+      // 1. Obtener detalles del producto original
       const { data: original } = await WooCommerce.get(
         `products/${original_id}`,
       );
-      const price = parseFloat(original.price || 0);
+      const originalPrice = parseFloat(original.price || 0);
 
-      const infoOriginal = obtenerInfoPasillo(
-        original.categories,
-        original.name,
+      // 2. Extraer el ID de la Categoría Principal
+      // Filtramos 'Uncategorized' para no ensuciar la búsqueda
+      const validCategories = (original.categories || []).filter(
+        (c) => c.name !== "Uncategorized" && c.slug !== "sin-categoria"
       );
+      
+      const categoryIds = validCategories.map(c => c.id).join(",");
 
+      // 3. Preparar palabra clave maestra
       const cleanName = original.name.trim();
       let masterKeyword = cleanName.split(" ")[0];
-      if (masterKeyword.length <= 2 && cleanName.split(" ").length > 1) {
-        masterKeyword = cleanName.split(" ")[1];
+      if (masterKeyword.length <= 3 && cleanName.split(" ").length > 1) {
+        masterKeyword += " " + cleanName.split(" ")[1];
       }
-      masterKeyword = masterKeyword.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ]/g, "");
+      masterKeyword = masterKeyword.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s]/g, "");
 
-      const { data: searchResults } = await WooCommerce.get("products", {
+      // 4. Configurar parámetros de búsqueda
+      const searchParams = {
         search: masterKeyword,
         per_page: 50,
         status: "publish",
         stock_status: "instock",
-      });
+      };
 
-      const minPrice = price * 0.5;
-      const maxPrice = price * 1.5;
+      // Filtro de Categoría (Crucial)
+      if (categoryIds) {
+        searchParams.category = categoryIds;
+      }
+
+      console.log(`🔍 [Smart Search] "${masterKeyword}" en cat: [${categoryIds}]`);
+
+      const { data: searchResults } = await WooCommerce.get("products", searchParams);
+
+      // 5. Filtrado Estricto de Precios (Rango Similar)
+      const minPrice = originalPrice * 0.6;
+      const maxPrice = originalPrice * 1.4;
 
       products = searchResults.filter((p) => {
         if (p.id === parseInt(original_id)) return false;
 
         const pPrice = parseFloat(p.price || 0);
-        if (price > 0 && pPrice > 0) {
+        
+        if (originalPrice > 0 && pPrice > 0) {
           if (pPrice < minPrice || pPrice > maxPrice) return false;
         }
 
         if (!p.name.toLowerCase().includes(masterKeyword.toLowerCase()))
           return false;
 
-        const infoCandidato = obtenerInfoPasillo(p.categories, p.name);
-
-        if (
-          infoOriginal.pasillo !== "Otros" &&
-          infoOriginal.pasillo !== infoCandidato.pasillo
-        ) {
-          return false;
-        }
         return true;
       });
-    } else if (query) {
+
+      // 6. ✅ NUEVO: ORDENAMIENTO POR PROXIMIDAD DE PRECIO
+      // El que tenga menor diferencia absoluta con el precio original va primero
+      products.sort((a, b) => {
+        const priceA = parseFloat(a.price || 0);
+        const priceB = parseFloat(b.price || 0);
+        const diffA = Math.abs(priceA - originalPrice);
+        const diffB = Math.abs(priceB - originalPrice);
+        return diffA - diffB; // Orden ascendente de diferencia
+      });
+
+    } 
+    // --- ESCENARIO 2: BÚSQUEDA MANUAL ---
+    else if (query) {
       const { data: searchResults } = await WooCommerce.get("products", {
         search: query,
         per_page: 20,
         status: "publish",
+        stock_status: "instock"
       });
       products = searchResults;
     }
 
+    // Mapeo final
     const results = products
       .map((p) => ({
         id: p.id,
@@ -370,13 +395,14 @@ exports.searchProduct = async (req, res) => {
         image: p.images[0]?.src || null,
         stock: p.stock_quantity,
         sku: p.sku,
+        categories: p.categories
       }))
-      .slice(0, 10);
+      .slice(0, 10); // Top 10 resultados
 
     res.status(200).json(results);
   } catch (error) {
     console.error("Error searchProduct:", error);
-    res.status(500).json({ error: "Error en búsqueda" });
+    res.status(500).json({ error: "Error en búsqueda inteligente" });
   }
 };
 
@@ -628,14 +654,12 @@ exports.cancelAssignment = async (req, res) => {
   const { id_picker } = req.body;
 
   try {
-    // 1. Obtener datos del picker y su sesión actual
     const { data: pickerData } = await supabase
       .from("wc_pickers")
       .select("id_sesion_actual")
       .eq("id", id_picker)
       .single();
 
-    // Si el picker ya estaba libre en BD (desincronización), lo limpiamos y retornamos OK
     if (!pickerData || !pickerData.id_sesion_actual) {
       await supabase
         .from("wc_pickers")
@@ -649,7 +673,6 @@ exports.cancelAssignment = async (req, res) => {
     const idSesion = pickerData.id_sesion_actual;
     const now = new Date().toISOString();
 
-    // 2. Cancelar la SESIÓN (La cabeza del proceso)
     const { error: sessionError } = await supabase
       .from("wc_picking_sessions")
       .update({ estado: "cancelado", fecha_fin: now })
@@ -657,8 +680,6 @@ exports.cancelAssignment = async (req, res) => {
 
     if (sessionError) throw sessionError;
 
-    // 3. Cancelar TODAS las ASIGNACIONES individuales (Los pedidos dentro de la sesión)
-    // CRÍTICO: Usamos 'id_sesion' para afectar a TODOS los pedidos del batch
     const { error: assignError } = await supabase
       .from("wc_asignaciones_pedidos")
       .update({
@@ -669,7 +690,6 @@ exports.cancelAssignment = async (req, res) => {
 
     if (assignError) throw assignError;
 
-    // 4. Liberar al PICKER
     const { error: pickerError } = await supabase
       .from("wc_pickers")
       .update({ estado_picker: "disponible", id_sesion_actual: null })

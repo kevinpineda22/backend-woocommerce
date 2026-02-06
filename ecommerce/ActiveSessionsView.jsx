@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { FaRunning, FaMapMarkerAlt, FaEye, FaClock } from "react-icons/fa";
+import { FaRunning, FaMapMarkerAlt, FaEye, FaClock, FaLayerGroup } from "react-icons/fa";
 import "./PedidosAdmin.css";
 
-// --- COMPONENTE CRONÓMETRO (Movido aquí para encapsular lógica) ---
+// --- COMPONENTE CRONÓMETRO INTERNO ---
 const SessionTimer = ({ startTime }) => {
     const [elapsed, setElapsed] = useState("00:00:00");
     const [isLong, setIsLong] = useState(false);
@@ -36,16 +36,16 @@ const SessionTimer = ({ startTime }) => {
     );
 };
 
-// --- COMPONENTE PRINCIPAL DE LA VISTA ---
+// --- COMPONENTE PRINCIPAL ---
 const ActiveSessionsView = ({ sessions, onViewDetail }) => {
   
   // 1. ESTADO VACÍO
   if (!sessions || sessions.length === 0) {
     return (
       <div className="pedidos-empty-list-container">
-        <FaRunning size={50} color="#cbd5e1" style={{ marginBottom: 20 }} />
-        <h3>Todo tranquilo.</h3>
-        <p style={{ color: '#94a3b8' }}>No hay pickers en ruta en este momento.</p>
+        <FaRunning size={50} style={{ marginBottom: 20, opacity: 0.5 }} />
+        <h3>Todo tranquilo por aquí.</h3>
+        <p>No hay pickers en ruta en este momento.</p>
       </div>
     );
   }
@@ -56,11 +56,11 @@ const ActiveSessionsView = ({ sessions, onViewDetail }) => {
       {sessions.map((session) => (
         <div key={session.session_id} className="pa-dashboard-card">
           
-          {/* ENCABEZADO DE TARJETA (Picker + Timer) */}
+          {/* HEADER (Picker + Timer) */}
           <div className="pa-card-header">
             <div className="pa-picker-info">
               <div className="pa-avatar">
-                {session.picker_name.charAt(0).toUpperCase()}
+                {session.picker_name ? session.picker_name.charAt(0).toUpperCase() : "?"}
               </div>
               <div>
                 <h4>{session.picker_name}</h4>
@@ -73,7 +73,7 @@ const ActiveSessionsView = ({ sessions, onViewDetail }) => {
           {/* BARRA DE PROGRESO */}
           <div className="pa-progress-section">
             <div className="pa-progress-labels">
-              <span>Progreso</span>
+              <span>Progreso Global</span>
               <span>{session.progress}%</span>
             </div>
             <div className="pa-progress-bar-bg">
@@ -87,7 +87,22 @@ const ActiveSessionsView = ({ sessions, onViewDetail }) => {
             </div>
           </div>
 
-          {/* ESTADÍSTICAS RÁPIDAS */}
+          {/* --- NUEVA SECCIÓN: TRAZABILIDAD DE PEDIDOS --- */}
+          <div className="pa-batch-summary">
+             <div className="pa-bs-header">
+                <FaLayerGroup size={12} color="#64748b"/>
+                <span>Batch de {session.orders_count} pedidos:</span>
+             </div>
+             <div className="pa-bs-list">
+                {session.order_ids && session.order_ids.map(id => (
+                    <span key={id} className="pa-bs-chip">
+                        #{id}
+                    </span>
+                ))}
+             </div>
+          </div>
+
+          {/* ESTADÍSTICAS RÁPIDAS (Grid 3 cols) */}
           <div className="pa-stats-grid">
             <div className="pa-stat-box">
               <span className="pa-stat-num">
@@ -117,7 +132,7 @@ const ActiveSessionsView = ({ sessions, onViewDetail }) => {
             className="pa-view-detail-btn"
             onClick={() => onViewDetail(session)}
           >
-            <FaEye /> Ver Detalle
+            <FaEye /> Ver Detalle en Vivo
           </button>
         </div>
       ))}

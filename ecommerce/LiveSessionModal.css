@@ -1,0 +1,187 @@
+/* LiveSessionModal.css - Estilos aislados para el Monitor en Vivo */
+
+/* Variables locales para consistencia */
+:root {
+  --lsm-bg: #f8fafc;
+  --lsm-border: #e2e8f0;
+  --lsm-primary: #1e293b;
+  --lsm-accent: #3b82f6;
+}
+
+/* OVERLAY (Hereda z-index alto) */
+.lsm-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.85); /* Fondo más oscuro para enfoque */
+  backdrop-filter: blur(4px);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 3000; /* Superior a todo */
+}
+
+/* CONTENEDOR PRINCIPAL DEL MODAL */
+.lsm-content {
+  background: white;
+  width: 95%; max-width: 1100px; /* Más ancho para ver el batch */
+  height: 90vh; /* Alto fijo */
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  animation: lsm-slide-up 0.3s ease-out;
+}
+
+@keyframes lsm-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- HEADER --- */
+.lsm-header {
+  background: var(--lsm-primary);
+  padding: 20px 30px;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 4px solid var(--lsm-accent);
+  color: white; flex-shrink: 0;
+}
+
+.lsm-header-info {
+  display: flex; align-items: center; gap: 15px;
+}
+
+.lsm-icon-box {
+  width: 48px; height: 48px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem;
+}
+
+.lsm-title h2 { margin: 0; font-size: 1.3rem; font-weight: 700; color: white; }
+.lsm-title span { font-size: 0.85rem; opacity: 0.8; }
+
+/* TOGGLE SWITCH (Batch vs Orders) */
+.lsm-view-toggle {
+  background: rgba(0,0,0,0.3);
+  padding: 4px; border-radius: 8px;
+  display: flex; gap: 5px;
+}
+
+.lsm-toggle-btn {
+  background: transparent; border: none; color: #94a3b8;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer;
+  font-weight: 600; display: flex; align-items: center; gap: 8px;
+  transition: all 0.2s;
+}
+
+.lsm-toggle-btn.active {
+  background: var(--lsm-accent); color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.lsm-close-btn {
+  background: transparent; border: none; color: white;
+  font-size: 2rem; cursor: pointer; line-height: 1;
+  opacity: 0.7; transition: opacity 0.2s; margin-left: 20px;
+}
+.lsm-close-btn:hover { opacity: 1; }
+
+/* --- CUERPO (Scrollable) --- */
+.lsm-body {
+  background: var(--lsm-bg);
+  flex: 1; /* Ocupa el resto del espacio */
+  overflow-y: auto; /* SCROLL AQUÍ */
+  padding: 25px;
+  display: flex; flex-direction: column; gap: 15px;
+}
+
+/* --- GRID ITEMS (VISTA BATCH) --- */
+.lsm-item-card {
+  background: white;
+  border: 1px solid var(--lsm-border);
+  border-radius: 12px;
+  padding: 15px;
+  display: flex; align-items: center; gap: 20px;
+  transition: transform 0.2s;
+}
+
+/* Estados Visuales */
+.lsm-item-card.pendiente { border-left: 5px solid #cbd5e1; }
+.lsm-item-card.recolectado { border-left: 5px solid #10b981; background: #f0fdf4; }
+.lsm-item-card.sustituido { border-left: 5px solid #f59e0b; background: #fffbeb; }
+
+.lsm-item-img {
+  width: 60px; height: 60px;
+  background: white; border: 1px solid #eee; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.lsm-item-img img { max-width: 90%; max-height: 90%; object-fit: contain; }
+
+.lsm-item-content { flex: 1; min-width: 0; }
+
+.lsm-item-name {
+  font-size: 1rem; font-weight: 700; color: #0f172a;
+  margin-bottom: 5px; white-space: normal;
+}
+
+.lsm-item-meta {
+  display: flex; align-items: center; gap: 12px; font-size: 0.85rem; color: #64748b;
+}
+
+.lsm-pasillo-badge {
+  background: #e2e8f0; color: #475569;
+  padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;
+}
+
+/* BOLITAS DE PEDIDOS */
+.lsm-orders-dots {
+  display: flex; gap: -8px; margin-left: auto;
+}
+.lsm-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  color: white; font-weight: 700; font-size: 0.75rem;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* STATUS BADGE */
+.lsm-status-badge {
+  font-size: 0.75rem; font-weight: 800; padding: 5px 12px;
+  border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.lsm-status-badge.ok { background: #dcfce7; color: #166534; }
+.lsm-status-badge.change { background: #fef3c7; color: #92400e; }
+.lsm-status-badge.wait { background: #f1f5f9; color: #64748b; }
+
+/* --- VISTA ORDENES (GROUP) --- */
+.lsm-order-group {
+  background: white; border-radius: 12px; border: 1px solid var(--lsm-border);
+  overflow: hidden; margin-bottom: 20px;
+}
+
+.lsm-og-header {
+  padding: 15px 20px; border-bottom: 1px solid #f1f5f9;
+  display: flex; justify-content: space-between; align-items: center;
+  background: #fff;
+}
+
+.lsm-og-user { display: flex; align-items: center; gap: 15px; }
+.lsm-og-avatar {
+  width: 40px; height: 40px; border-radius: 10px; color: white;
+  display: flex; align-items: center; justify-content: center; font-weight: 800;
+}
+
+.lsm-og-progress {
+  width: 150px; text-align: right;
+}
+.lsm-prog-bar {
+  height: 6px; background: #e2e8f0; border-radius: 3px; margin-top: 5px; overflow: hidden;
+}
+.lsm-prog-fill { height: 100%; transition: width 0.3s; }
+
+/* Sub-lista en vista ordenes */
+.lsm-sub-list { padding: 10px; }
+.lsm-sub-item {
+  display: flex; align-items: center; gap: 15px; padding: 8px 10px;
+  border-bottom: 1px dashed #f1f5f9;
+}
+.lsm-sub-item:last-child { border-bottom: none; }
