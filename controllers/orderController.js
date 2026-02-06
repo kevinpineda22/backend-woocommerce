@@ -123,16 +123,11 @@ exports.getSessionActive = async (req, res) => {
     const itemsAgrupados = agruparItemsParaPicking(orders);
 
     // --- FIX: Obtener categorías reales desde WooCommerce ---
-    // Los items de ordenes no tienen categorías, por lo que el mapeador falla.
-    // Buscamos los detalles de los productos para tener las categorías correctas.
     const productIds = itemsAgrupados.map((i) => i.product_id);
     const mapaCategoriasReales = {};
 
     if (productIds.length > 0) {
       try {
-        // Traemos productos en lotes (WooCommerce limita per_page, por seguridad traemos hasta 100)
-        // Nota: Si son variaciones, WooCommerce suele devolver la info de la variación.
-        // Si necesitas categorías de una variación, asegúrate que tu ID sea el del padre o que Woo las devuelva.
         const { data: productsData } = await WooCommerce.get("products", {
           include: productIds.join(","),
           per_page: 100,
@@ -146,7 +141,6 @@ exports.getSessionActive = async (req, res) => {
           "Error obteniendo detalles de productos para categorías:",
           err.message,
         );
-        // Si falla, seguimos sin categorías (usará fallback de nombre)
       }
     }
     // -------------------------------------------------------
@@ -163,7 +157,6 @@ exports.getSessionActive = async (req, res) => {
 
     const itemsConRuta = await Promise.all(
       itemsAgrupados.map(async (item) => {
-        // Usamos las categorías reales si las pudimos descargar, si no, lo que teníamos
         const realCategories =
           mapaCategoriasReales[item.product_id] || item.categorias || [];
 
@@ -201,11 +194,11 @@ exports.getSessionActive = async (req, res) => {
 
     res.status(200).json({
       session_id: session.id,
-      fecha_inicio: session.fecha_inicio, // IMPORTANTE: Enviamos fecha inicio para el cronómetro
+      fecha_inicio: session.fecha_inicio,
       orders_info: orders.map((o) => ({
         id: o.id,
         customer: `${o.billing.first_name} ${o.billing.last_name}`,
-        phone: o.billing.phone, // <--- CAMBIO CRÍTICO: Agregamos el teléfono
+        phone: o.billing.phone,
         total: o.total,
       })),
       items: itemsConRuta,
@@ -320,9 +313,6 @@ exports.searchProduct = async (req, res) => {
       const infoOriginal = obtenerInfoPasillo(
         original.categories,
         original.name,
-      );
-      console.log(
-        `\n🔍 [IA PASILLOS] Original: "${original.name}" -> Pasillo: ${infoOriginal.pasillo}`,
       );
 
       const cleanName = original.name.trim();
@@ -479,8 +469,6 @@ exports.getPickers = async (req, res) => {
 
 exports.getActiveSessionsDashboard = async (req, res) => {
   try {
-    // CORRECCIÓN: Relación explícita para evitar error PGRST201
-    // Usamos !wc_picking_sessions_picker_fkey para indicar que unimos por el picker dueño de la sesión
     const { data: sessions, error } = await supabase
       .from("wc_picking_sessions")
       .select(
@@ -496,21 +484,17 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 
     if (error) throw error;
 
-    // 2. Enriquecer cada sesión con cálculo de progreso
     const dashboardData = await Promise.all(
       sessions.map(async (sess) => {
-        // A. Traer detalles de WooCommerce para saber el TOTAL de items
         const pedidosPromesas = sess.ids_pedidos.map((id) =>
           WooCommerce.get(`orders/${id}`),
         );
         const responses = await Promise.all(pedidosPromesas);
         const orders = responses.map((r) => r.data);
 
-        // Usamos tu helper para unificar productos y saber cantidad total
         const itemsUnificados = agruparItemsParaPicking(orders);
         const totalItems = itemsUnificados.length;
 
-        // B. Traer logs de supabase para saber cuantos están listos
         const { data: logs } = await supabase
           .from("wc_log_picking")
           .select(
@@ -521,7 +505,6 @@ exports.getActiveSessionsDashboard = async (req, res) => {
             itemsUnificados.map((i) => i.product_id),
           );
 
-        // C. Calcular métricas
         const recolectados = logs.filter(
           (l) => l.accion === "recolectado" && !l.es_sustituto,
         ).length;
@@ -531,10 +514,8 @@ exports.getActiveSessionsDashboard = async (req, res) => {
         const percentage =
           totalItems > 0 ? Math.round((completados / totalItems) * 100) : 0;
 
-        // D. Ubicación Actual (Último log)
         let currentLocation = "Inicio";
         if (logs.length > 0) {
-          // Ordenar logs por fecha descendente
           const lastLog = logs.sort(
             (a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro),
           )[0];
@@ -574,7 +555,6 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 
 exports.getHistorySessions = async (req, res) => {
   try {
-    // CORRECCIÓN: Relación explícita igual que arriba
     const { data: sessions, error } = await supabase
       .from("wc_picking_sessions")
       .select(
@@ -641,46 +621,65 @@ exports.getSessionLogsDetail = async (req, res) => {
 };
 
 // ==========================================
-// 8. CANCELACIÓN
+// 8. CANCELACIÓN ROBUSTA (MULTI-PEDIDO)
 // ==========================================
 
 exports.cancelAssignment = async (req, res) => {
   const { id_picker } = req.body;
 
   try {
+    // 1. Obtener datos del picker y su sesión actual
     const { data: pickerData } = await supabase
       .from("wc_pickers")
       .select("id_sesion_actual")
       .eq("id", id_picker)
       .single();
 
+    // Si el picker ya estaba libre en BD (desincronización), lo limpiamos y retornamos OK
     if (!pickerData || !pickerData.id_sesion_actual) {
+      await supabase
+        .from("wc_pickers")
+        .update({ estado_picker: "disponible", id_sesion_actual: null })
+        .eq("id", id_picker);
       return res
-        .status(400)
-        .json({ message: "Este picker no tiene sesión activa." });
+        .status(200)
+        .json({ message: "Picker liberado (no tenía sesión activa)." });
     }
 
     const idSesion = pickerData.id_sesion_actual;
+    const now = new Date().toISOString();
 
-    await supabase
+    // 2. Cancelar la SESIÓN (La cabeza del proceso)
+    const { error: sessionError } = await supabase
       .from("wc_picking_sessions")
-      .update({ estado: "cancelado", fecha_fin: new Date().toISOString() })
+      .update({ estado: "cancelado", fecha_fin: now })
       .eq("id", idSesion);
 
-    await supabase
+    if (sessionError) throw sessionError;
+
+    // 3. Cancelar TODAS las ASIGNACIONES individuales (Los pedidos dentro de la sesión)
+    // CRÍTICO: Usamos 'id_sesion' para afectar a TODOS los pedidos del batch
+    const { error: assignError } = await supabase
       .from("wc_asignaciones_pedidos")
       .update({
         estado_asignacion: "cancelado",
-        fecha_fin: new Date().toISOString(),
+        fecha_fin: now,
       })
       .eq("id_sesion", idSesion);
 
-    await supabase
+    if (assignError) throw assignError;
+
+    // 4. Liberar al PICKER
+    const { error: pickerError } = await supabase
       .from("wc_pickers")
       .update({ estado_picker: "disponible", id_sesion_actual: null })
       .eq("id", id_picker);
 
-    res.status(200).json({ message: "Asignación cancelada correctamente." });
+    if (pickerError) throw pickerError;
+
+    res
+      .status(200)
+      .json({ message: "Sesión y todos sus pedidos cancelados correctamente." });
   } catch (error) {
     console.error("Error cancelando asignación:", error);
     res.status(500).json({ error: error.message });

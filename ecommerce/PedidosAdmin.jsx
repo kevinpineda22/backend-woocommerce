@@ -15,12 +15,12 @@ import {
   FaCheckCircle,
   FaExclamationTriangle,
   FaFileAlt,
-  FaPhone,
+  FaBoxOpen,
 } from "react-icons/fa";
 
 // --- COMPONENTES MODULARES ---
 import PendingOrdersView from "./PendingOrdersView";
-import ActiveSessionsView from "./ActiveSessionsView"; // <--- NUEVO
+import ActiveSessionsView from "./ActiveSessionsView";
 import AssignPickerModal from "./AssignPickerModal";
 import { GestionPickers } from "./GestionPickers";
 import AnaliticaPickers from "./AnaliticaPickers";
@@ -33,6 +33,7 @@ const formatPrice = (amount) =>
     currency: "COP",
     maximumFractionDigits: 0,
   }).format(amount);
+
 const ORDER_COLORS = ["#3b82f6", "#f97316", "#8b5cf6", "#10b981", "#ec4899"];
 
 const PedidosAdmin = () => {
@@ -50,7 +51,7 @@ const PedidosAdmin = () => {
   // Modales
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState(null); // (Opcional, manejado internamente en PendingOrdersView pero bueno tenerlo en contexto)
 
   // Estados Vistas Complejas
   const [liveSessionDetail, setLiveSessionDetail] = useState(null);
@@ -69,13 +70,13 @@ const PedidosAdmin = () => {
     if (!isBackground) setLoading(true);
     try {
       const resPending = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/pendientes?t=${Date.now()}`,
+        `https://backend-woocommerce.vercel.app/api/orders/pendientes?t=${Date.now()}`
       );
       const listPending = resPending.data.filter((o) => !o.is_assigned);
       setOrders(listPending);
 
       const resActive = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/dashboard-activo?t=${Date.now()}`,
+        `https://backend-woocommerce.vercel.app/api/orders/dashboard-activo?t=${Date.now()}`
       );
       setActiveSessions(resActive.data);
 
@@ -98,7 +99,24 @@ const PedidosAdmin = () => {
     if (selectedIds.size === 0) return;
     try {
       const res = await axios.get(
-        "https://backend-woocommerce.vercel.app/api/orders/pickers",
+        "https://backend-woocommerce.vercel.app/api/orders/pickers"
+      );
+      setPickers(res.data);
+      setShowAssignModal(true);
+    } catch (e) {
+      alert("Error cargando pickers");
+    }
+  };
+
+  // NUEVA FUNCIÓN: Asignación directa desde el modal de detalle
+  const handleAssignSingleOrder = async (order) => {
+    // 1. Limpiamos selección anterior y seleccionamos solo este
+    setSelectedIds(new Set([order.id]));
+    
+    // 2. Cargamos pickers y abrimos modal
+    try {
+      const res = await axios.get(
+        "https://backend-woocommerce.vercel.app/api/orders/pickers"
       );
       setPickers(res.data);
       setShowAssignModal(true);
@@ -114,7 +132,7 @@ const PedidosAdmin = () => {
         {
           id_picker: picker.id,
           ids_pedidos: Array.from(selectedIds),
-        },
+        }
       );
       alert(`✅ Misión asignada a ${picker.nombre_completo}`);
       setShowAssignModal(false);
@@ -129,7 +147,7 @@ const PedidosAdmin = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        "https://backend-woocommerce.vercel.app/api/orders/historial",
+        "https://backend-woocommerce.vercel.app/api/orders/historial"
       );
       setHistoryOrders(res.data);
     } catch (e) {
@@ -142,7 +160,7 @@ const PedidosAdmin = () => {
   const handleViewLiveDetail = async (session) => {
     try {
       const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}`,
+        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}`
       );
       setLiveSessionDetail({ sessionInfo: session, routeData: res.data });
       setLiveViewMode("batch");
@@ -155,7 +173,7 @@ const PedidosAdmin = () => {
   const handleViewHistoryDetail = async (session) => {
     try {
       const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}`,
+        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}`
       );
       setHistoryDetail({ session, logs: res.data });
       setShowHistoryModal(true);
@@ -164,7 +182,6 @@ const PedidosAdmin = () => {
     }
   };
 
-  // Helper Agrupación Vista Vivo
   const getItemsByOrder = () => {
     if (!liveSessionDetail) return {};
     const ordersMap = {};
@@ -198,7 +215,7 @@ const PedidosAdmin = () => {
   const getOrderIndex = (orderId) => {
     if (!liveSessionDetail) return 0;
     return liveSessionDetail.routeData.orders_info.findIndex(
-      (o) => o.id === orderId,
+      (o) => o.id === orderId
     );
   };
 
@@ -215,14 +232,18 @@ const PedidosAdmin = () => {
         <nav className="pedidos-layout-sidebar-nav">
           <div className="pedidos-nav-label">OPERACIÓN</div>
           <button
-            className={`pedidos-layout-sidebar-button ${currentView === "pending" ? "active" : ""}`}
+            className={`pedidos-layout-sidebar-button ${
+              currentView === "pending" ? "active" : ""
+            }`}
             onClick={() => setCurrentView("pending")}
           >
             <FaBox /> <span>Por Asignar</span>{" "}
             <span className="pedidos-badge-count">{stats.pending}</span>
           </button>
           <button
-            className={`pedidos-layout-sidebar-button ${currentView === "process" ? "active" : ""}`}
+            className={`pedidos-layout-sidebar-button ${
+              currentView === "process" ? "active" : ""
+            }`}
             onClick={() => setCurrentView("process")}
           >
             <FaRunning /> <span>En Proceso</span>{" "}
@@ -230,7 +251,9 @@ const PedidosAdmin = () => {
           </button>
           <div className="pedidos-nav-label spacer">AUDITORÍA</div>
           <button
-            className={`pedidos-layout-sidebar-button ${currentView === "history" ? "active" : ""}`}
+            className={`pedidos-layout-sidebar-button ${
+              currentView === "history" ? "active" : ""
+            }`}
             onClick={() => {
               setCurrentView("history");
               fetchHistory();
@@ -240,13 +263,17 @@ const PedidosAdmin = () => {
           </button>
           <div className="pedidos-nav-label spacer">ADMINISTRACIÓN</div>
           <button
-            className={`pedidos-layout-sidebar-button ${currentView === "analitica" ? "active" : ""}`}
+            className={`pedidos-layout-sidebar-button ${
+              currentView === "analitica" ? "active" : ""
+            }`}
             onClick={() => setCurrentView("analitica")}
           >
             <FaChartLine /> <span>Inteligencia</span>
           </button>
           <button
-            className={`pedidos-layout-sidebar-button ${currentView === "pickers" ? "active" : ""}`}
+            className={`pedidos-layout-sidebar-button ${
+              currentView === "pickers" ? "active" : ""
+            }`}
             onClick={() => setCurrentView("pickers")}
           >
             <FaUserTag /> <span>Pickers</span>
@@ -296,7 +323,10 @@ const PedidosAdmin = () => {
                         <td>
                           <span
                             className="pedidos-badge-ok"
-                            style={{ background: "#e0f2fe", color: "#0284c7" }}
+                            style={{
+                              background: "#e0f2fe",
+                              color: "#0284c7",
+                            }}
                           >
                             {sess.duracion}
                           </span>
@@ -334,7 +364,6 @@ const PedidosAdmin = () => {
 
             <div className="pedidos-layout-body">
               {currentView === "pending" ? (
-                // COMPONENTE: PENDIENTES
                 <PendingOrdersView
                   orders={orders}
                   loading={loading}
@@ -347,10 +376,9 @@ const PedidosAdmin = () => {
                   selectedIds={selectedIds}
                   setSelectedIds={setSelectedIds}
                   onAssignClick={handleOpenAssignModal}
-                  onOrderClick={setSelectedOrder}
+                  onAssignSingleDirect={handleAssignSingleOrder}
                 />
               ) : (
-                // COMPONENTE: EN PROCESO
                 <ActiveSessionsView
                   sessions={activeSessions}
                   onViewDetail={handleViewLiveDetail}
@@ -361,7 +389,7 @@ const PedidosAdmin = () => {
         )}
       </main>
 
-      {/* --- MODALES --- */}
+      {/* --- MODAL DE ASIGNACIÓN --- */}
       <AssignPickerModal
         isOpen={showAssignModal}
         pickers={pickers}
@@ -369,7 +397,7 @@ const PedidosAdmin = () => {
         onConfirm={handleConfirmAssignment}
       />
 
-      {/* MODAL DETALLE EN VIVO (Aún es complejo, se mantiene aquí por la lógica de datos en vivo) */}
+      {/* --- MODAL DETALLE EN VIVO (Live Dashboard) --- */}
       {showLiveModal && liveSessionDetail && (
         <div
           className="pedidos-modal-overlay high-z"
@@ -495,7 +523,7 @@ const PedidosAdmin = () => {
                     const percentage =
                       data.items.length > 0
                         ? Math.round(
-                            (data.stats.done / data.items.length) * 100,
+                            (data.stats.done / data.items.length) * 100
                           )
                         : 0;
                     return (
@@ -612,151 +640,7 @@ const PedidosAdmin = () => {
         </div>
       )}
 
-      {selectedOrder &&
-        !showAssignModal &&
-        !showHistoryModal &&
-        !showLiveModal && (
-          <div
-            className="pedidos-modal-overlay"
-            onClick={() => setSelectedOrder(null)}
-          >
-            <div
-              className="pedidos-modal-content large"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="pa-modal-header-custom">
-                <div className="pa-modal-header-left">
-                  <FaBoxOpen size={24} color="#60a5fa" />
-                  <div>
-                    <h2 className="pa-modal-id">Pedido #{selectedOrder.id}</h2>
-                    <span className="pa-modal-date">
-                      <FaClock size={12} />{" "}
-                      {new Date(selectedOrder.date_created).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-                <div className="pa-modal-header-right">
-                  <h3 className="pa-modal-total">
-                    {formatPrice(selectedOrder.total)}
-                  </h3>
-                  <span
-                    className="pa-status-pill pending"
-                    style={{ fontSize: "0.7rem" }}
-                  >
-                    Pendiente de Asignación
-                  </span>
-                </div>
-                <button
-                  className="pa-close-btn-white"
-                  onClick={() => setSelectedOrder(null)}
-                >
-                  &times;
-                </button>
-              </div>
-
-              <div className="pa-modal-body-custom">
-                {/* SECCIÓN INFORMACIÓN SUPERIOR */}
-                <div className="pa-detail-info-grid">
-                  {/* COLUMNA CLIENTE */}
-                  <div className="pa-detail-col">
-                    <h4 className="pa-section-title">
-                      <FaUserTag /> Datos del Cliente
-                    </h4>
-                    <div className="pa-info-row">
-                      <strong>Nombre:</strong>{" "}
-                      {selectedOrder.billing?.first_name}{" "}
-                      {selectedOrder.billing?.last_name}
-                    </div>
-                    <div className="pa-info-row">
-                      <strong>Email:</strong> {selectedOrder.billing?.email}
-                    </div>
-                    <div
-                      className="pa-info-row"
-                      style={{ display: "flex", alignItems: "center", gap: 6 }}
-                    >
-                      <strong>Teléfono:</strong>{" "}
-                      <span className="pa-phone-badge">
-                        {selectedOrder.billing?.phone}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* COLUMNA UBICACIÓN */}
-                  <div className="pa-detail-col">
-                    <h4 className="pa-section-title">
-                      <FaMapMarkerAlt /> Ubicación de Entrega
-                    </h4>
-                    <div className="pa-info-row">
-                      <strong>Dirección:</strong>{" "}
-                      {selectedOrder.billing?.address_1}{" "}
-                      {selectedOrder.billing?.address_2}
-                    </div>
-                    <div className="pa-info-row">
-                      <strong>Ciudad:</strong> {selectedOrder.billing?.city},{" "}
-                      {selectedOrder.billing?.state}
-                    </div>
-                    <div className="pa-info-row">
-                      <strong>Nota del Cliente:</strong>{" "}
-                      <em className="pa-note-text">
-                        {selectedOrder.customer_note || "Ninguna"}
-                      </em>
-                    </div>
-                  </div>
-                </div>
-
-                {/* SECCIÓN PRODUCTOS CON SCROLL */}
-                <div className="pa-products-container">
-                  <h4 className="pa-products-title">
-                    <FaBox /> Productos Solicitados (
-                    {selectedOrder.line_items.length})
-                  </h4>
-                  <div className="pa-products-grid-custom">
-                    {selectedOrder.line_items.map((item) => (
-                      <div key={item.id} className="pa-product-card-row">
-                        <div className="pa-prod-img-box">
-                          <span className="pa-prod-qty-badge">
-                            {item.quantity}
-                          </span>
-                          {item.image?.src ? (
-                            <img
-                              src={item.image.src}
-                              className="pedidos-product-img"
-                              alt=""
-                            />
-                          ) : (
-                            <FaBox size={24} color="#ccc" />
-                          )}
-                        </div>
-                        <div className="pa-prod-info">
-                          <div className="pa-prod-name">{item.name}</div>
-                          <div className="pa-prod-meta">
-                            <span className="pa-prod-sku">
-                              SKU: {item.sku || "N/A"}
-                            </span>
-                            <span className="pa-prod-price">
-                              {formatPrice(item.total)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* FOOTER MODAL */}
-                <div className="pa-modal-footer-custom">
-                  <button
-                    className="batch-btn cancel"
-                    onClick={() => setSelectedOrder(null)}
-                  >
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
+      {/* --- MODAL DETALLE HISTORIAL --- */}
       {showHistoryModal && historyDetail && (
         <div
           className="pedidos-modal-overlay high-z"

@@ -89,9 +89,39 @@
   color: #155724;
 }
 
-.gp-order-active {
-  font-weight: bold;
-  color: #e67e22;
+/* --- ESTILOS NUEVOS: CARGA DE TRABAJO --- */
+.gp-avatar-small {
+    width: 32px; height: 32px;
+    background: #e2e8f0; color: #64748b;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.8rem;
+}
+
+.gp-load-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.gp-load-badge {
+    background: #e0f2fe;
+    color: #0284c7;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex; align-items: center; gap: 5px;
+}
+
+.gp-load-ids {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .gp-text-muted {
