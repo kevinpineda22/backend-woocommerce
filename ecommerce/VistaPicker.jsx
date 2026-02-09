@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
+import { supabase } from "../../supabaseClient"; // ✅ IMPORTANTE: Importar Supabase
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaCheck,
@@ -275,12 +276,11 @@ const VistaPicker = () => {
     console.log("🧹 Ejecutando limpieza profunda de sesión...");
     setSessionData(null);
     localStorage.removeItem("session_active_cache");
-    // Importante: También limpiamos la cola de acciones para evitar "fantasmas"
-    // Solo si estamos seguros de que la sesión murió.
     localStorage.removeItem("offline_actions_queue");
     setPendingSync(0);
   };
 
+  // --- INICIALIZACIÓN ---
   useEffect(() => {
     const init = async () => {
       try {
@@ -311,15 +311,15 @@ const VistaPicker = () => {
         setPickerInfo(me);
 
         try {
+          // Intentamos cargar sesión activa (que ahora viene del Snapshot Backend)
           const { data: session } = await axios.get(
             `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${me.id}`,
           );
           setSessionData(session);
           localStorage.setItem("session_active_cache", JSON.stringify(session));
         } catch (err) {
-          // DETECCIÓN DE CANCELACIÓN (404)
           if (err.response && err.response.status === 404) {
-            resetSesionLocal(); // <--- LIMPIEZA PROFUNDA
+            resetSesionLocal(); 
           } else {
             console.warn("Usando caché por error de red:", err);
             const cachedSession = localStorage.getItem("session_active_cache");
@@ -344,27 +344,38 @@ const VistaPicker = () => {
     };
   }, []);
 
-  // --- HEARTBEAT: VERIFICAR ESTADO CADA 15s ---
+  // --- 🛡️ REALTIME SECURITY KILL SWITCH (NUEVO) ---
+  // Si el admin cancela, esto saca al picker inmediatamente.
   useEffect(() => {
-    if (!sessionData || !pickerInfo || !isOnline) return;
+    if (!sessionData || !pickerInfo) return;
 
-    const checkStatusInterval = setInterval(async () => {
-      try {
-        // Hacemos una petición ligera solo para ver si responde 200 o 404
-        await axios.get(
-          `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${pickerInfo.id}`,
-        );
-      } catch (error) {
-        if (error.response && error.response.status === 404) {
-          alert("⚠️ La sesión ha sido cancelada por el administrador.");
-          resetSesionLocal();
-          window.location.reload(); // Recarga forzada para limpiar UI
-        }
-      }
-    }, 15000); // Cada 15 segundos
+    console.log("🛡️ Activando Kill Switch Realtime para sesión:", sessionData.session_id);
 
-    return () => clearInterval(checkStatusInterval);
-  }, [sessionData, pickerInfo, isOnline]);
+    const channel = supabase.channel(`security-session-${sessionData.session_id}`)
+        .on(
+            'postgres_changes', 
+            { 
+                event: 'UPDATE', 
+                schema: 'public', 
+                table: 'wc_picking_sessions',
+                filter: `id=eq.${sessionData.session_id}` // Escuchamos solo ESTA sesión
+            }, 
+            (payload) => {
+                if (payload.new.estado === 'cancelado') {
+                    // 🚨 KILL SWITCH ACTIVADO
+                    if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
+                    alert("⛔ ATENCIÓN: El administrador ha CANCELADO esta ruta.");
+                    resetSesionLocal();
+                    window.location.reload();
+                }
+            }
+        )
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  }, [sessionData, pickerInfo]);
 
   // --- SINCRONIZACIÓN DE ACCIONES ---
   useEffect(() => {
@@ -375,7 +386,6 @@ const VistaPicker = () => {
       setPendingSync(queue.length);
       if (queue.length === 0 || !navigator.onLine) return;
 
-      // Si no hay sesión activa (sessionData es null), no deberíamos intentar sincronizar acciones viejas
       if (!sessionData && queue.length > 0) {
         console.warn("Acciones huérfanas detectadas. Limpiando.");
         localStorage.removeItem("offline_actions_queue");
@@ -393,7 +403,6 @@ const VistaPicker = () => {
         localStorage.setItem("offline_actions_queue", JSON.stringify(newQueue));
         setPendingSync(newQueue.length);
       } catch (error) {
-        // Si el backend dice que la sesión de la acción no existe (404/500), descartamos esa acción
         if (
           error.response &&
           (error.response.status === 404 || error.response.status === 500)
@@ -410,9 +419,9 @@ const VistaPicker = () => {
           setPendingSync(newQueue.length);
         }
       }
-    }, 5000);
+    }, 3000); // Sincroniza cada 3s (más rápido)
     return () => clearInterval(syncInterval);
-  }, [sessionData]); // Dependencia agregada para saber si hay sesión
+  }, [sessionData]);
 
   const queueAction = (payload) => {
     const queue = JSON.parse(
@@ -477,22 +486,14 @@ const VistaPicker = () => {
           return i;
         }),
       }));
+      // Update local cache
       const cached = JSON.parse(localStorage.getItem("session_active_cache"));
       if (cached) {
         const newItems = cached.items.map((i) => {
-          if (i.product_id === item.product_id)
-            return {
-              ...i,
-              qty_scanned: 0,
-              status: "pendiente",
-              sustituto: null,
-            };
-          return i;
+            if (i.product_id === item.product_id) return { ...i, qty_scanned: 0, status: "pendiente", sustituto: null };
+            return i;
         });
-        localStorage.setItem(
-          "session_active_cache",
-          JSON.stringify({ ...cached, items: newItems }),
-        );
+        localStorage.setItem("session_active_cache", JSON.stringify({ ...cached, items: newItems }));
       }
     } catch (e) {
       alert("Error al deshacer");
@@ -505,25 +506,32 @@ const VistaPicker = () => {
       const currentScanned = (currentItem.qty_scanned || 0) + 1;
       const targetQty = currentItem.quantity_total;
       const isFinished = currentScanned >= targetQty;
+      
+      const payload = {
+        id_sesion: sessionData.session_id,
+        id_producto_original: currentItem.product_id,
+        nombre_producto_original: currentItem.name,
+        accion: "recolectado",
+        peso_real: peso,
+      };
+      
+      // Siempre encolamos la acción, incluso si es parcial
+      // Nota: El backend de logs soporta múltiples entradas por producto
+      if(isFinished) queueAction(payload); 
+
       if (isFinished) {
-        const payload = {
-          id_sesion: sessionData.session_id,
-          id_producto_original: currentItem.product_id,
-          nombre_producto_original: currentItem.name,
-          accion: "recolectado",
-          peso_real: peso,
-        };
-        queueAction(payload);
         if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         closeAllModals();
       } else {
         if (navigator.vibrate) navigator.vibrate(100);
       }
+      
       updateLocalSessionState(
         currentItem.product_id,
         currentScanned,
         isFinished ? "recolectado" : "pendiente",
       );
+      
       if (!isFinished)
         setCurrentItem((prev) => ({ ...prev, qty_scanned: currentScanned }));
       else setCurrentItem(null);
@@ -546,20 +554,27 @@ const VistaPicker = () => {
       },
     };
     queueAction(payload);
-    setSessionData((prev) => ({
-      ...prev,
-      items: prev.items.map((i) => {
-        if (i.product_id === currentItem.product_id) {
-          return {
-            ...i,
-            qty_scanned: currentItem.quantity_total,
-            status: "sustituido",
-            sustituto: { name: newItem.name, price: newItem.price },
-          };
-        }
-        return i;
-      }),
-    }));
+    
+    // Actualización optimista del estado local
+    setSessionData((prev) => {
+        const newData = {
+            ...prev,
+            items: prev.items.map((i) => {
+                if (i.product_id === currentItem.product_id) {
+                return {
+                    ...i,
+                    qty_scanned: currentItem.quantity_total, // Asumimos total completado al sustituir
+                    status: "sustituido",
+                    sustituto: { name: newItem.name, price: newItem.price },
+                };
+                }
+                return i;
+            }),
+        };
+        localStorage.setItem("session_active_cache", JSON.stringify(newData));
+        return newData;
+    });
+
     closeAllModals();
     alert("🔄 Sustitución registrada");
   };
@@ -581,11 +596,7 @@ const VistaPicker = () => {
 
   const handleManualValidation = async (inputCode) => {
     if (!isOnline) {
-      if (
-        window.confirm(
-          "⚠️ Estás Offline. No podemos validar contra SIESA. ¿Estás seguro?",
-        )
-      ) {
+      if (window.confirm("⚠️ Estás Offline. Validación local deshabilitada. ¿Forzar recolección?")) {
         setShowManualModal(false);
         if (isWeighable(currentItem)) setShowWeightModal(true);
         else confirmPicking();
@@ -625,7 +636,7 @@ const VistaPicker = () => {
 
   const handleFinish = async () => {
     if (pendingSync > 0) {
-      alert(`⚠️ Tienes ${pendingSync} acciones pendientes de subir.`);
+      alert(`⚠️ Tienes ${pendingSync} acciones pendientes de subir. Espera un momento.`);
       return;
     }
     if (!window.confirm("¿Finalizar sesión completa?")) return;
@@ -637,7 +648,7 @@ const VistaPicker = () => {
       resetSesionLocal();
       window.location.reload();
     } catch (e) {
-      alert("Error al finalizar");
+      alert("Error al finalizar. Verifica tu conexión.");
     }
   };
 
@@ -659,7 +670,7 @@ const VistaPicker = () => {
     return (
       <div className="ec-picker-centered">
         <div className="ec-spinner"></div>
-        <p>Cargando ruta...</p>
+        <p>Conectando...</p>
       </div>
     );
 
@@ -673,7 +684,7 @@ const VistaPicker = () => {
         />
         <h3>Sin asignación</h3>
         <p style={{ color: "#94a3b8", fontSize: "0.9rem", maxWidth: "250px" }}>
-          Espera a que el administrador te asigne pedidos.
+          El sistema está en espera de nuevas órdenes.
         </p>
         <button
           onClick={() => window.location.reload()}
@@ -686,7 +697,7 @@ const VistaPicker = () => {
             gap: 10,
           }}
         >
-          <FaArrowRight /> Recargar
+          <FaArrowRight /> Actualizar
         </button>
       </div>
     );
@@ -698,24 +709,24 @@ const VistaPicker = () => {
           <span>
             {pendingSync > 0 ? (
               <>
-                <FaSync className="ec-spin" /> Sincronizando...
+                <FaSync className="ec-spin" /> Subiendo datos...
               </>
             ) : (
               <>
-                <FaWifi /> En línea
+                <FaWifi /> Conectado en Vivo
               </>
             )}
           </span>
         ) : (
           <span>
-            <FaExclamationTriangle /> Modo Offline ({pendingSync})
+            <FaExclamationTriangle /> Modo Sin Conexión ({pendingSync})
           </span>
         )}
       </div>
       <header className="ec-picker-sticky-header">
         <div className="ec-header-top">
           <div className="ec-order-info">
-            <span className="ec-label-sm">Sesión Activa</span>
+            <span className="ec-label-sm">Ruta Activa</span>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span className="ec-order-id">
                 #{sessionData.session_id.slice(0, 6)}
@@ -735,7 +746,7 @@ const VistaPicker = () => {
               className="ec-contacts-btn"
               onClick={() => setShowClientsModal(true)}
             >
-              <FaPhone /> Contactos
+              <FaPhone /> Clientes
             </button>
             <div style={{ fontWeight: "bold", marginTop: 5 }}>
               {doneItems.length} / {sessionData.items.length} Items
@@ -790,8 +801,8 @@ const VistaPicker = () => {
             <div className="ec-empty-state">
               <p>
                 {activeZone === "pendientes"
-                  ? "¡Todo Listo!"
-                  : "Nada recogido aún."}
+                  ? "¡Ruta Completada! 🎉"
+                  : "Tu canasta está vacía."}
               </p>
             </div>
           )}
@@ -803,7 +814,7 @@ const VistaPicker = () => {
           <button className="ec-fab-finish" onClick={handleFinish}>
             <div className="ec-fab-content">
               <FaCheck size={24} />
-              <span>FINALIZAR SESIÓN</span>
+              <span>TERMINAR RUTA</span>
             </div>
             <div className="ec-fab-arrow">
               <FaArrowRight />
@@ -830,6 +841,11 @@ const VistaPicker = () => {
         }}
         onConfirm={confirmPicking}
       />
+      
+      {/* El Modal de Sustitución está aquí. 
+         Como el backend ya se actualizó, 'SubstituteModal' (en Modals.jsx) 
+         recibirá automáticamente la lista filtrada y ordenada.
+      */}
       <SubstituteModal
         isOpen={showSubModal}
         originalItem={currentItem}

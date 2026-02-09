@@ -6,7 +6,8 @@ import {
   FaBox,
   FaCheckCircle,
   FaExclamationTriangle,
-  FaClock
+  FaClock,
+  FaCheck
 } from "react-icons/fa";
 import "./LiveSessionModal.css";
 
@@ -26,7 +27,7 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
 
   const { sessionInfo, routeData } = sessionDetail;
 
-  // --- LÓGICA INTERNA: Helpers de Agrupación ---
+  // --- Helpers ---
   const getOrderColor = (orderId) => {
     const idx = routeData.orders_info.findIndex((o) => o.id === orderId);
     return ORDER_COLORS[idx % ORDER_COLORS.length];
@@ -34,13 +35,13 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
 
   const getOrderLetter = (orderId) => {
     const idx = routeData.orders_info.findIndex((o) => o.id === orderId);
-    return String.fromCharCode(65 + idx); // A, B, C...
+    return String.fromCharCode(65 + idx);
   };
 
   const getItemsByOrder = () => {
     const ordersMap = {};
     
-    // Inicializar estructura
+    // 1. Crear estructura base
     routeData.orders_info.forEach((o, idx) => {
       ordersMap[o.id] = {
         customer: o.customer,
@@ -52,7 +53,7 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
       };
     });
 
-    // Poblar items
+    // 2. Distribuir items
     routeData.items.forEach((item) => {
       item.pedidos_involucrados.forEach((ped) => {
         if (ordersMap[ped.id_pedido]) {
@@ -107,38 +108,34 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
           <button className="lsm-close-btn" onClick={onClose}>&times;</button>
         </div>
 
-        {/* BODY (Scrollable) */}
+        {/* BODY (SCROLL PRINCIPAL) */}
         <div className="lsm-body">
           
-          {/* --- VISTA BATCH (La ruta de picking) --- */}
+          {/* --- VISTA BATCH (Grid de productos) --- */}
           {viewMode === "batch" && (
             <>
               {routeData.items.map((item, idx) => (
                 <div key={idx} className={`lsm-item-card ${item.status}`}>
-                  {/* IMAGEN */}
                   <div className="lsm-item-img">
                     {item.image_src ? <img src={item.image_src} alt="" /> : <FaBox color="#cbd5e1" />}
                   </div>
 
-                  {/* INFO */}
                   <div className="lsm-item-content">
                     <div className="lsm-item-name">{item.name}</div>
                     <div className="lsm-item-meta">
                       <span className="lsm-pasillo-badge">
                         {item.pasillo === "Otros" ? "General" : `Pasillo ${item.pasillo}`}
                       </span>
-                      <span><strong>{item.quantity_total}</strong> unidades totales</span>
+                      <span><strong>{item.quantity_total}</strong> un. total</span>
                       
-                      {/* Sub-info si es sustituto */}
                       {item.status === "sustituido" && item.sustituto && (
-                        <span style={{color: '#d97706', display:'flex', alignItems:'center', gap:4}}>
-                           <FaExclamationTriangle size={12}/> Sustituido por: <strong>{item.sustituto.name}</strong>
+                        <span style={{color: '#d97706', display:'flex', alignItems:'center', gap:4, marginLeft:10}}>
+                           <FaExclamationTriangle size={12}/> Por: <strong>{item.sustituto.name}</strong>
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* BOLITAS DE QUIÉN LO PIDIÓ */}
                   <div className="lsm-orders-dots">
                     {item.pedidos_involucrados.map((p, i) => (
                         <div 
@@ -152,7 +149,6 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                     ))}
                   </div>
 
-                  {/* ESTADO */}
                   <div className={`lsm-status-badge ${item.status === 'recolectado' ? 'ok' : item.status === 'sustituido' ? 'change' : 'wait'}`}>
                     {item.status}
                   </div>
@@ -161,53 +157,70 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
             </>
           )}
 
-          {/* --- VISTA ORDERS (Agrupado por cliente) --- */}
+          {/* --- VISTA ORDERS (Agrupado y Ordenado) --- */}
           {viewMode === "orders" && (
-             <>
-                {Object.entries(getItemsByOrder()).map(([orderId, data]) => {
-                    const percentage = data.items.length > 0 
-                        ? Math.round((data.stats.done / data.items.length) * 100) 
-                        : 0;
-                    
-                    return (
-                        <div key={orderId} className="lsm-order-group">
-                            <div className="lsm-og-header">
-                                <div className="lsm-og-user">
-                                    <div className="lsm-og-avatar" style={{background: data.color}}>
-                                        {data.code_letter}
+             <div className="live-orders-container">
+                {Object.entries(getItemsByOrder())
+                    // ✅ ORDENAMIENTO: ID Ascendente para consistencia
+                    .sort(([idA], [idB]) => Number(idA) - Number(idB)) 
+                    .map(([orderId, data]) => {
+                        const percentage = data.items.length > 0 
+                            ? Math.round((data.stats.done / data.items.length) * 100) 
+                            : 0;
+                        
+                        return (
+                            <div key={orderId} className="lsm-order-group">
+                                <div className="lsm-og-header">
+                                    <div className="lsm-og-user">
+                                        <div className="lsm-og-avatar" style={{background: data.color}}>
+                                            {data.code_letter}
+                                        </div>
+                                        <div>
+                                            <div style={{fontWeight:800, color:'#1e293b', fontSize:'1.1rem'}}>
+                                                {data.customer}
+                                            </div>
+                                            <div style={{fontSize:'0.85rem', color:'#64748b'}}>
+                                                Pedido #{orderId} • {formatPrice(data.total_order_value)}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div style={{fontWeight:800, color:'#1e293b'}}>{data.customer}</div>
-                                        <div style={{fontSize:'0.8rem', color:'#64748b'}}>Pedido #{orderId} • {formatPrice(data.total_order_value)}</div>
+                                    <div className="lsm-og-progress">
+                                        <div style={{fontSize:'0.75rem', fontWeight:700, color:'#64748b'}}>
+                                            PROGRESO: {data.stats.done}/{data.items.length} ({percentage}%)
+                                        </div>
+                                        <div className="lsm-prog-bar">
+                                            <div className="lsm-prog-fill" style={{width: `${percentage}%`, background: data.color}}></div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="lsm-og-progress">
-                                    <div style={{fontSize:'0.75rem', fontWeight:700, color:'#64748b'}}>
-                                        {data.stats.done}/{data.items.length} ({percentage}%)
-                                    </div>
-                                    <div className="lsm-prog-bar">
-                                        <div className="lsm-prog-fill" style={{width: `${percentage}%`, background: data.color}}></div>
-                                    </div>
-                                </div>
-                            </div>
 
-                            <div className="lsm-sub-list">
-                                {data.items.map((item, idx) => (
-                                    <div key={idx} className="lsm-sub-item">
-                                        <div style={{width:20, height:20, borderRadius:'50%', background: item.status === 'pendiente' ? '#e2e8f0' : '#dcfce7', display:'flex', alignItems:'center', justifyContent:'center'}}>
-                                            {item.status !== 'pendiente' && <FaCheckCircle size={12} color="#166534"/>}
+                                <div className="lsm-sub-list">
+                                    {data.items.map((item, idx) => (
+                                        <div key={idx} className="lsm-sub-item">
+                                            <div className={`lsm-mini-status ${item.status === 'recolectado' ? 'done' : item.status === 'sustituido' ? 'sub' : 'pend'}`}>
+                                                {item.status === 'recolectado' && <FaCheck size={12}/>}
+                                                {item.status === 'sustituido' && <FaExclamationTriangle size={12}/>}
+                                            </div>
+                                            
+                                            <div style={{flex:1}}>
+                                                <div style={{fontSize:'0.95rem', color:'#334155', fontWeight:600}}>
+                                                    {item.name}
+                                                </div>
+                                                <div style={{fontSize:'0.8rem', color:'#94a3b8'}}>
+                                                    Cant: <strong>{item.qty_needed}</strong> • {item.sku || 'Sin SKU'}
+                                                </div>
+                                            </div>
+                                            
+                                            <div style={{fontWeight:700, fontSize:'0.9rem', color:'#1e293b'}}>
+                                                {formatPrice(item.price)}
+                                            </div>
                                         </div>
-                                        <div style={{flex:1, fontSize:'0.9rem', color:'#334155'}}>
-                                            <strong>{item.qty_needed}x</strong> {item.name}
-                                        </div>
-                                        <div style={{fontWeight:700, fontSize:'0.85rem'}}>{formatPrice(item.price)}</div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )
+                        )
                 })}
-             </>
+             </div>
           )}
 
         </div>

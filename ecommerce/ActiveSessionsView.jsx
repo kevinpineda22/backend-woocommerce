@@ -15,7 +15,8 @@ const SessionTimer = ({ startTime }) => {
 
             if (diff < 0) return;
 
-            const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+            // CORRECCIÓN MATEMÁTICA: Eliminamos el "% 24" para mostrar horas totales
+            const hours = Math.floor(diff / (1000 * 60 * 60)); 
             const minutes = Math.floor((diff / (1000 * 60)) % 60);
             const seconds = Math.floor((diff / 1000) % 60);
 
@@ -23,6 +24,7 @@ const SessionTimer = ({ startTime }) => {
                 `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
             );
             
+            // Alerta si lleva más de 45 minutos
             if (hours > 0 || minutes >= 45) setIsLong(true);
 
         }, 1000);
@@ -67,6 +69,7 @@ const ActiveSessionsView = ({ sessions, onViewDetail }) => {
                 <span className="pa-session-id">#{session.session_id.slice(0, 6)}</span>
               </div>
             </div>
+            {/* Aquí se usa el componente corregido */}
             <SessionTimer startTime={session.start_time} />
           </div>
 
@@ -87,7 +90,7 @@ const ActiveSessionsView = ({ sessions, onViewDetail }) => {
             </div>
           </div>
 
-          {/* --- NUEVA SECCIÓN: TRAZABILIDAD DE PEDIDOS --- */}
+          {/* TRAZABILIDAD DE PEDIDOS (CHIPS) */}
           <div className="pa-batch-summary">
              <div className="pa-bs-header">
                 <FaLayerGroup size={12} color="#64748b"/>
@@ -102,7 +105,7 @@ const ActiveSessionsView = ({ sessions, onViewDetail }) => {
              </div>
           </div>
 
-          {/* ESTADÍSTICAS RÁPIDAS (Grid 3 cols) */}
+          {/* ESTADÍSTICAS RÁPIDAS */}
           <div className="pa-stats-grid">
             <div className="pa-stat-box">
               <span className="pa-stat-num">
