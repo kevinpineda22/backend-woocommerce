@@ -38,7 +38,9 @@ const agruparItemsParaPicking = (orders) => {
 
       mapaProductos[key].pedidos_involucrados.push({
         id_pedido: order.id,
-        nombre_cliente: order.billing ? `${order.billing.first_name} ${order.billing.last_name}` : "Cliente",
+        nombre_cliente: order.billing
+          ? `${order.billing.first_name} ${order.billing.last_name}`
+          : "Cliente",
         cantidad: item.quantity,
       });
     });
@@ -57,10 +59,10 @@ exports.createPickingSession = async (req, res) => {
   try {
     // 1. OBTENER DATOS DE WOOCOMMERCE (Una sola vez - Snapshot)
     const pedidosPromesas = ids_pedidos.map((id) =>
-      WooCommerce.get(`orders/${id}`)
+      WooCommerce.get(`orders/${id}`),
     );
     const responses = await Promise.all(pedidosPromesas);
-    
+
     // 2. CREAR SNAPSHOT LIMPIO
     const snapshotPedidos = responses.map((r) => {
       const o = r.data;
@@ -75,10 +77,10 @@ exports.createPickingSession = async (req, res) => {
           phone: o.billing.phone,
           address_1: o.billing.address_1,
           city: o.billing.city,
-          email: o.billing.email
+          email: o.billing.email,
         },
         customer_note: o.customer_note,
-        line_items: o.line_items.map(item => ({
+        line_items: o.line_items.map((item) => ({
           id: item.id,
           name: item.name,
           product_id: item.product_id,
@@ -89,8 +91,8 @@ exports.createPickingSession = async (req, res) => {
           total: item.total,
           image: item.image,
           meta_data: item.meta_data,
-          parent_name: item.parent_name 
-        }))
+          parent_name: item.parent_name,
+        })),
       };
     });
 
@@ -103,7 +105,7 @@ exports.createPickingSession = async (req, res) => {
           ids_pedidos,
           estado: "en_proceso",
           fecha_inicio: new Date().toISOString(),
-          snapshot_pedidos: snapshotPedidos
+          snapshot_pedidos: snapshotPedidos,
         },
       ])
       .select()
@@ -132,7 +134,9 @@ exports.createPickingSession = async (req, res) => {
 
     if (assignError) throw assignError;
 
-    res.status(200).json({ message: "Sesión creada exitosamente", session_id: session.id });
+    res
+      .status(200)
+      .json({ message: "Sesión creada exitosamente", session_id: session.id });
   } catch (error) {
     console.error("Error creando sesión:", error);
     res.status(500).json({ error: error.message });
@@ -148,7 +152,7 @@ exports.getSessionActive = async (req, res) => {
       .select("id_sesion_actual")
       .eq("id", id_picker)
       .single();
-      
+
     if (!picker || !picker.id_sesion_actual)
       return res.status(404).json({ message: "No tienes una sesión activa." });
 
@@ -162,29 +166,36 @@ exports.getSessionActive = async (req, res) => {
     // 1. OBTENER ORDENES (Lógica Híbrida: Snapshot o Fallback)
     let orders = [];
     if (session.snapshot_pedidos && session.snapshot_pedidos.length > 0) {
-        orders = session.snapshot_pedidos;
+      orders = session.snapshot_pedidos;
     } else {
-        const pedidosPromesas = session.ids_pedidos.map((id) => WooCommerce.get(`orders/${id}`));
-        const responses = await Promise.all(pedidosPromesas);
-        orders = responses.map((r) => r.data);
+      const pedidosPromesas = session.ids_pedidos.map((id) =>
+        WooCommerce.get(`orders/${id}`),
+      );
+      const responses = await Promise.all(pedidosPromesas);
+      orders = responses.map((r) => r.data);
     }
 
     const itemsAgrupados = agruparItemsParaPicking(orders);
 
     // 2. CORRECCIÓN: OBTENER LOS IDs DE ASIGNACIÓN (Evita productos fantasmas)
     const { data: assignments } = await supabase
-        .from('wc_asignaciones_pedidos')
-        .select('id')
-        .eq('id_sesion', sessionId);
-        
-    const assignIds = assignments.map(a => a.id);
+      .from("wc_asignaciones_pedidos")
+      .select("id")
+      .eq("id_sesion", sessionId);
+
+    const assignIds = assignments.map((a) => a.id);
 
     // 3. Obtener Logs filtrados SOLO por esta sesión
     const { data: logs } = await supabase
       .from("wc_log_picking")
-      .select("id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo")
+      .select(
+        "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo",
+      )
       .in("id_asignacion", assignIds) // <--- FILTRO CLAVE
-      .in("id_producto", itemsAgrupados.map((i) => i.product_id));
+      .in(
+        "id_producto",
+        itemsAgrupados.map((i) => i.product_id),
+      );
 
     // 4. Fix categorías
     const productIds = itemsAgrupados.map((i) => i.product_id);
@@ -194,35 +205,42 @@ exports.getSessionActive = async (req, res) => {
         const { data: productsData } = await WooCommerce.get("products", {
           include: productIds.join(","),
           per_page: 100,
-          _fields: "id,categories"
+          _fields: "id,categories",
         });
         productsData.forEach((p) => {
           mapaCategoriasReales[p.id] = p.categories || [];
         });
-      } catch (err) { }
+      } catch (err) {}
     }
 
     const itemsConRuta = itemsAgrupados.map((item) => {
-        const realCategories = mapaCategoriasReales[item.product_id] || item.categorias || [];
-        const info = obtenerInfoPasillo(realCategories, item.name);
-        
-        const logItem = logs?.find(
-          (l) => l.id_producto === item.product_id && 
-          (l.accion === "recolectado" || l.accion === "sustituido")
-        );
+      const realCategories =
+        mapaCategoriasReales[item.product_id] || item.categorias || [];
+      const info = obtenerInfoPasillo(realCategories, item.name);
 
-        return {
-          ...item,
-          pasillo: info.pasillo,
-          prioridad: info.prioridad,
-          categorias_reales: realCategories.map((c) => c.name).filter(n => n !== "Uncategorized"),
-          status: logItem
-            ? logItem.es_sustituto ? "sustituido" : "recolectado"
-            : "pendiente",
-          sustituto: logItem && logItem.es_sustituto
-              ? { name: logItem.nombre_sustituto, price: logItem.precio_nuevo }
-              : null,
-        };
+      const logItem = logs?.find(
+        (l) =>
+          l.id_producto === item.product_id &&
+          (l.accion === "recolectado" || l.accion === "sustituido"),
+      );
+
+      return {
+        ...item,
+        pasillo: info.pasillo,
+        prioridad: info.prioridad,
+        categorias_reales: realCategories
+          .map((c) => c.name)
+          .filter((n) => n !== "Uncategorized"),
+        status: logItem
+          ? logItem.es_sustituto
+            ? "sustituido"
+            : "recolectado"
+          : "pendiente",
+        sustituto:
+          logItem && logItem.es_sustituto
+            ? { name: logItem.nombre_sustituto, price: logItem.precio_nuevo }
+            : null,
+      };
     });
 
     itemsConRuta.sort((a, b) => a.prioridad - b.prioridad);
@@ -232,7 +250,9 @@ exports.getSessionActive = async (req, res) => {
       fecha_inicio: session.fecha_inicio,
       orders_info: orders.map((o) => ({
         id: o.id,
-        customer: o.billing ? `${o.billing.first_name} ${o.billing.last_name}` : "Cliente",
+        customer: o.billing
+          ? `${o.billing.first_name} ${o.billing.last_name}`
+          : "Cliente",
         phone: o.billing?.phone,
         total: o.total,
       })),
@@ -250,8 +270,12 @@ exports.getSessionActive = async (req, res) => {
 
 exports.registerAction = async (req, res) => {
   const {
-    id_sesion, id_producto_original, nombre_producto_original,
-    accion, peso_real, datos_sustituto,
+    id_sesion,
+    id_producto_original,
+    nombre_producto_original,
+    accion,
+    peso_real,
+    datos_sustituto,
   } = req.body;
 
   try {
@@ -289,7 +313,7 @@ exports.registerAction = async (req, res) => {
       fecha_registro: now,
       peso_real: peso_real || null,
       accion: "recolectado",
-      nombre_producto: nombre_producto_original
+      nombre_producto: nombre_producto_original,
     };
 
     if (accion === "sustituido") {
@@ -301,7 +325,7 @@ exports.registerAction = async (req, res) => {
         logEntry.precio_nuevo = datos_sustituto.price;
       }
     } else {
-        logEntry.es_sustituto = false;
+      logEntry.es_sustituto = false;
     }
 
     const { error } = await supabase.from("wc_log_picking").insert([logEntry]);
@@ -326,14 +350,16 @@ exports.searchProduct = async (req, res) => {
 
     if (original_id && !query) {
       // 1. Datos originales
-      const { data: original } = await WooCommerce.get(`products/${original_id}`);
+      const { data: original } = await WooCommerce.get(
+        `products/${original_id}`,
+      );
       const originalPrice = parseFloat(original.price || 0);
 
       // 2. Filtro Categoría
       const validCategories = (original.categories || []).filter(
-        (c) => c.name !== "Uncategorized" && c.slug !== "sin-categoria"
+        (c) => c.name !== "Uncategorized" && c.slug !== "sin-categoria",
       );
-      const categoryIds = validCategories.map(c => c.id).join(",");
+      const categoryIds = validCategories.map((c) => c.id).join(",");
 
       // 3. Keyword Maestra
       const cleanName = original.name.trim();
@@ -351,7 +377,10 @@ exports.searchProduct = async (req, res) => {
       };
       if (categoryIds) searchParams.category = categoryIds;
 
-      const { data: searchResults } = await WooCommerce.get("products", searchParams);
+      const { data: searchResults } = await WooCommerce.get(
+        "products",
+        searchParams,
+      );
 
       // 4. Filtro Precio
       const minPrice = originalPrice * 0.6;
@@ -372,26 +401,27 @@ exports.searchProduct = async (req, res) => {
         const diffB = Math.abs(parseFloat(b.price || 0) - originalPrice);
         return diffA - diffB;
       });
-
     } else if (query) {
       const { data: searchResults } = await WooCommerce.get("products", {
         search: query,
         per_page: 20,
         status: "publish",
-        stock_status: "instock"
+        stock_status: "instock",
       });
       products = searchResults;
     }
 
-    const results = products.map((p) => ({
+    const results = products
+      .map((p) => ({
         id: p.id,
         name: p.name,
         price: p.price,
         image: p.images[0]?.src || null,
         stock: p.stock_quantity,
         sku: p.sku,
-        categories: p.categories
-    })).slice(0, 10);
+        categories: p.categories,
+      }))
+      .slice(0, 10);
 
     res.status(200).json(results);
   } catch (error) {
@@ -406,22 +436,25 @@ exports.searchProduct = async (req, res) => {
 
 exports.validateManualCode = async (req, res) => {
   const { input_code, expected_sku } = req.body;
-  if (!input_code || !expected_sku) return res.status(400).json({ valid: false });
-  
+  if (!input_code || !expected_sku)
+    return res.status(400).json({ valid: false });
+
   const cleanInput = input_code.toString().trim();
   const cleanSku = expected_sku.toString().trim();
 
   try {
-    if (cleanInput === cleanSku) return res.status(200).json({ valid: true, type: "id_directo" });
-    
+    if (cleanInput === cleanSku)
+      return res.status(200).json({ valid: true, type: "id_directo" });
+
     const { data: barcodeMatch } = await supabase
       .from("siesa_codigos_barras")
       .select("id")
       .eq("codigo_barras", cleanInput)
       .eq("f120_id", cleanSku)
       .maybeSingle();
-      
-    if (barcodeMatch) return res.status(200).json({ valid: true, type: "codigo_barras" });
+
+    if (barcodeMatch)
+      return res.status(200).json({ valid: true, type: "codigo_barras" });
     return res.status(200).json({ valid: false });
   } catch (error) {
     res.status(500).json({ valid: false });
@@ -433,10 +466,21 @@ exports.completeSession = async (req, res) => {
   try {
     const now = new Date().toISOString();
     // SOLO ACTUALIZACIÓN LOCAL (Sin WooCommerce)
-    await supabase.from("wc_picking_sessions").update({ estado: "completado", fecha_fin: now }).eq("id", id_sesion);
-    await supabase.from("wc_pickers").update({ estado_picker: "disponible", id_sesion_actual: null }).eq("id", id_picker);
-    await supabase.from("wc_asignaciones_pedidos").update({ estado_asignacion: "completado", fecha_fin: now }).eq("id_sesion", id_sesion);
-    res.status(200).json({ message: "Sesión finalizada correctamente (Local)." });
+    await supabase
+      .from("wc_picking_sessions")
+      .update({ estado: "completado", fecha_fin: now })
+      .eq("id", id_sesion);
+    await supabase
+      .from("wc_pickers")
+      .update({ estado_picker: "disponible", id_sesion_actual: null })
+      .eq("id", id_picker);
+    await supabase
+      .from("wc_asignaciones_pedidos")
+      .update({ estado_asignacion: "completado", fecha_fin: now })
+      .eq("id_sesion", id_sesion);
+    res
+      .status(200)
+      .json({ message: "Sesión finalizada correctamente (Local)." });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -444,15 +488,21 @@ exports.completeSession = async (req, res) => {
 
 exports.getPendingOrders = async (req, res) => {
   try {
-    const { data: wcOrders } = await WooCommerce.get("orders", { status: "processing", per_page: 50 });
+    const { data: wcOrders } = await WooCommerce.get("orders", {
+      status: "processing",
+      per_page: 50,
+    });
     const { data: activeAssignments } = await supabase
       .from("wc_asignaciones_pedidos")
       .select("id_pedido")
       .eq("estado_asignacion", "en_proceso");
-      
+
     const assignedIds = new Set(activeAssignments.map((a) => a.id_pedido));
-    const cleanOrders = wcOrders.map((order) => ({ ...order, is_assigned: assignedIds.has(order.id) }));
-    
+    const cleanOrders = wcOrders.map((order) => ({
+      ...order,
+      is_assigned: assignedIds.has(order.id),
+    }));
+
     res.status(200).json(cleanOrders);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -461,7 +511,10 @@ exports.getPendingOrders = async (req, res) => {
 
 exports.getPickers = async (req, res) => {
   const { email } = req.query;
-  let query = supabase.from("wc_pickers").select("*").order("nombre_completo", { ascending: true });
+  let query = supabase
+    .from("wc_pickers")
+    .select("*")
+    .order("nombre_completo", { ascending: true });
   if (email) query = query.eq("email", email);
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
@@ -476,24 +529,27 @@ exports.getActiveSessionsDashboard = async (req, res) => {
   try {
     const { data: sessions, error } = await supabase
       .from("wc_picking_sessions")
-      .select(`
+      .select(
+        `
           id, fecha_inicio, id_picker, ids_pedidos, snapshot_pedidos,
           wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )
-      `)
+      `,
+      )
       .eq("estado", "en_proceso");
 
     if (error) throw error;
 
     const dashboardData = await Promise.all(
       sessions.map(async (sess) => {
-        
         let orders = [];
         if (sess.snapshot_pedidos && sess.snapshot_pedidos.length > 0) {
-            orders = sess.snapshot_pedidos;
+          orders = sess.snapshot_pedidos;
         } else {
-            const promesas = sess.ids_pedidos.map(id => WooCommerce.get(`orders/${id}`));
-            const resps = await Promise.all(promesas);
-            orders = resps.map(r => r.data);
+          const promesas = sess.ids_pedidos.map((id) =>
+            WooCommerce.get(`orders/${id}`),
+          );
+          const resps = await Promise.all(promesas);
+          orders = resps.map((r) => r.data);
         }
 
         const itemsUnificados = agruparItemsParaPicking(orders);
@@ -502,20 +558,33 @@ exports.getActiveSessionsDashboard = async (req, res) => {
         // Filtro de seguridad por fecha para Dashboard
         const { data: logs } = await supabase
           .from("wc_log_picking")
-          .select("id_producto, accion, es_sustituto, fecha_registro, nombre_producto")
-          .in("id_producto", itemsUnificados.map((i) => i.product_id))
-          .gte("fecha_registro", sess.fecha_inicio); 
+          .select(
+            "id_producto, accion, es_sustituto, fecha_registro, nombre_producto",
+          )
+          .in(
+            "id_producto",
+            itemsUnificados.map((i) => i.product_id),
+          )
+          .gte("fecha_registro", sess.fecha_inicio);
 
-        const recolectados = logs.filter(l => l.accion === "recolectado" && !l.es_sustituto).length;
-        const sustituidos = logs.filter(l => l.es_sustituto).length;
+        const recolectados = logs.filter(
+          (l) => l.accion === "recolectado" && !l.es_sustituto,
+        ).length;
+        const sustituidos = logs.filter((l) => l.es_sustituto).length;
         const completados = recolectados + sustituidos;
-        const percentage = totalItems > 0 ? Math.round((completados / totalItems) * 100) : 0;
+        const percentage =
+          totalItems > 0 ? Math.round((completados / totalItems) * 100) : 0;
 
         let currentLocation = "Inicio";
         if (logs.length > 0) {
-          const lastLog = logs.sort((a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro))[0];
+          const lastLog = logs.sort(
+            (a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro),
+          )[0];
           const infoPasillo = obtenerInfoPasillo([], lastLog.nombre_producto);
-          currentLocation = infoPasillo.pasillo !== "Otros" ? `Pasillo ${infoPasillo.pasillo}` : "General";
+          currentLocation =
+            infoPasillo.pasillo !== "Otros"
+              ? `Pasillo ${infoPasillo.pasillo}`
+              : "General";
         }
 
         return {
@@ -531,7 +600,7 @@ exports.getActiveSessionsDashboard = async (req, res) => {
           orders_count: sess.ids_pedidos.length,
           order_ids: sess.ids_pedidos,
         };
-      })
+      }),
     );
 
     res.status(200).json(dashboardData);
@@ -542,17 +611,19 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 };
 
 // ==========================================
-// 7. HISTORIAL Y AUDITORÍA
+// 7. HISTORIAL Y AUDITORÍA (CORREGIDO HORA COLOMBIA)
 // ==========================================
 
 exports.getHistorySessions = async (req, res) => {
   try {
     const { data: sessions, error } = await supabase
       .from("wc_picking_sessions")
-      .select(`
+      .select(
+        `
           id, fecha_inicio, fecha_fin, estado, ids_pedidos,
           wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )
-      `)
+      `,
+      )
       .eq("estado", "completado")
       .order("fecha_fin", { ascending: false })
       .limit(50);
@@ -564,12 +635,27 @@ exports.getHistorySessions = async (req, res) => {
       const end = new Date(sess.fecha_fin);
       const durationMin = Math.round((end - start) / 60000);
 
+      // OPCIONES PARA FORZAR HORA COLOMBIA
+      const optionsDate = {
+        timeZone: "America/Bogota",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      };
+      const optionsTime = {
+        timeZone: "America/Bogota",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      };
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
         pedidos: sess.ids_pedidos,
-        fecha: end.toLocaleDateString("es-CO"),
-        hora_fin: end.toLocaleTimeString("es-CO"),
+        // Usamos las opciones con timeZone explícito
+        fecha: end.toLocaleDateString("es-CO", optionsDate),
+        hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
       };
     });
@@ -618,7 +704,10 @@ exports.cancelAssignment = async (req, res) => {
       .single();
 
     if (!pickerData || !pickerData.id_sesion_actual) {
-      await supabase.from("wc_pickers").update({ estado_picker: "disponible", id_sesion_actual: null }).eq("id", id_picker);
+      await supabase
+        .from("wc_pickers")
+        .update({ estado_picker: "disponible", id_sesion_actual: null })
+        .eq("id", id_picker);
       return res.status(200).json({ message: "Picker liberado." });
     }
 
@@ -626,13 +715,22 @@ exports.cancelAssignment = async (req, res) => {
     const now = new Date().toISOString();
 
     // 1. Cancelar sesión
-    await supabase.from("wc_picking_sessions").update({ estado: "cancelado", fecha_fin: now }).eq("id", idSesion);
-    
+    await supabase
+      .from("wc_picking_sessions")
+      .update({ estado: "cancelado", fecha_fin: now })
+      .eq("id", idSesion);
+
     // 2. Cancelar TODOS los pedidos asociados a esa sesión
-    await supabase.from("wc_asignaciones_pedidos").update({ estado_asignacion: "cancelado", fecha_fin: now }).eq("id_sesion", idSesion);
-    
+    await supabase
+      .from("wc_asignaciones_pedidos")
+      .update({ estado_asignacion: "cancelado", fecha_fin: now })
+      .eq("id_sesion", idSesion);
+
     // 3. Liberar picker
-    await supabase.from("wc_pickers").update({ estado_picker: "disponible", id_sesion_actual: null }).eq("id", id_picker);
+    await supabase
+      .from("wc_pickers")
+      .update({ estado_picker: "disponible", id_sesion_actual: null })
+      .eq("id", id_picker);
 
     res.status(200).json({ message: "Sesión y pedidos cancelados." });
   } catch (error) {
