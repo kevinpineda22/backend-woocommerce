@@ -20,7 +20,10 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
   const inputRef = useRef(null);
 
   useEffect(() => {
-      if (isOpen) setTimeout(() => inputRef.current?.focus(), 100);
+      if (isOpen) {
+          setCode(""); // ✅ CORRECCIÓN: Limpiar input al abrir
+          setTimeout(() => inputRef.current?.focus(), 100);
+      }
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -102,7 +105,7 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
   );
 };
 
-// --- NUEVO: MODAL DE CLIENTES (CONTACTO) ---
+// --- MODAL DE CLIENTES (CONTACTO) ---
 export const ClientsModal = ({ isOpen, orders, onClose }) => {
     if (!isOpen || !orders) return null;
 
@@ -159,7 +162,7 @@ export const ClientsModal = ({ isOpen, orders, onClose }) => {
     );
 };
 
-// --- MODAL DE SUSTITUCIÓN CON SEGURIDAD (SCAN CHECK) ---
+// --- MODAL DE SUSTITUCIÓN ---
 export const SubstituteModal = ({
   isOpen,
   originalItem,
@@ -222,6 +225,7 @@ export const SubstituteModal = ({
       const cleanInput = verifyCode.trim().toUpperCase();
       const sku = (pendingSub.sku || "").toUpperCase();
       
+      // Lógica laxa para permitir validación rápida
       if (cleanInput === sku || cleanInput.includes(sku) || sku.includes(cleanInput) || cleanInput === "OK" || cleanInput === "CONFIRMAR") {
           onConfirmSubstitute(pendingSub);
       } else {

@@ -1,8 +1,9 @@
 const WooCommerce = require("../services/wooService");
 const { supabase } = require("../services/supabaseClient");
+// Importamos tu mapeador (el Juez para filtrar sugerencias incorrectas)
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 
-// --- HELPER: Agrupar items (Batch Picking) ---
+// --- HELPER: Agrupar items de múltiples pedidos (Batch Picking) ---
 const agruparItemsParaPicking = (orders) => {
   const mapaProductos = {};
 
@@ -15,7 +16,7 @@ const agruparItemsParaPicking = (orders) => {
 
       if (!mapaProductos[key]) {
         mapaProductos[key] = {
-          id: item.id,
+          id: item.id, // ID referencia de línea
           product_id: item.product_id,
           name: item.name,
           sku: item.sku,
@@ -24,9 +25,11 @@ const agruparItemsParaPicking = (orders) => {
           quantity_total: 0,
           pedidos_involucrados: [],
           categorias: item.parent_name ? [{ name: item.parent_name }] : [],
-          // Intentamos recuperar barcode de meta_data si existe
-          barcode: item.meta_data?.find((m) =>
-              ["ean", "barcode", "_ean", "_barcode"].includes(m.key.toLowerCase())
+          barcode:
+            item.meta_data?.find((m) =>
+              ["ean", "barcode", "_ean", "_barcode"].includes(
+                m.key.toLowerCase(),
+              ),
             )?.value || "",
         };
       }
@@ -52,15 +55,13 @@ exports.createPickingSession = async (req, res) => {
   const { id_picker, ids_pedidos } = req.body;
 
   try {
-    // 1. OBTENER DATOS DE WOOCOMMERCE (Una sola vez)
-    // Esto evita saturar la API en el futuro.
+    // 1. OBTENER DATOS DE WOOCOMMERCE (Una sola vez - Snapshot)
     const pedidosPromesas = ids_pedidos.map((id) =>
       WooCommerce.get(`orders/${id}`)
     );
     const responses = await Promise.all(pedidosPromesas);
     
     // 2. CREAR SNAPSHOT LIMPIO
-    // Guardamos una copia estática del pedido en nuestra BD
     const snapshotPedidos = responses.map((r) => {
       const o = r.data;
       return {
@@ -73,20 +74,22 @@ exports.createPickingSession = async (req, res) => {
           last_name: o.billing.last_name,
           phone: o.billing.phone,
           address_1: o.billing.address_1,
-          city: o.billing.city
+          city: o.billing.city,
+          email: o.billing.email
         },
         customer_note: o.customer_note,
         line_items: o.line_items.map(item => ({
           id: item.id,
           name: item.name,
           product_id: item.product_id,
+          variation_id: item.variation_id,
           quantity: item.quantity,
           sku: item.sku,
           price: item.price,
           total: item.total,
           image: item.image,
           meta_data: item.meta_data,
-          parent_name: item.parent_name // Importante para el mapeador
+          parent_name: item.parent_name 
         }))
       };
     });
@@ -100,7 +103,7 @@ exports.createPickingSession = async (req, res) => {
           ids_pedidos,
           estado: "en_proceso",
           fecha_inicio: new Date().toISOString(),
-          snapshot_pedidos: snapshotPedidos // <--- AQUÍ ESTÁ LA OPTIMIZACIÓN
+          snapshot_pedidos: snapshotPedidos
         },
       ])
       .select()
@@ -156,8 +159,7 @@ exports.getSessionActive = async (req, res) => {
       .eq("id", sessionId)
       .single();
 
-    // --- LÓGICA HÍBRIDA (OPTIMIZACIÓN) ---
-    // Si existe snapshot, úsalo. Si no (sesiones viejas), llama a Woo.
+    // 1. OBTENER ORDENES (Lógica Híbrida: Snapshot o Fallback)
     let orders = [];
     if (session.snapshot_pedidos && session.snapshot_pedidos.length > 0) {
         orders = session.snapshot_pedidos;
@@ -169,34 +171,36 @@ exports.getSessionActive = async (req, res) => {
 
     const itemsAgrupados = agruparItemsParaPicking(orders);
 
-    // --- FIX: Categorías ---
-    // Intentamos usar las del snapshot si existen, sino buscamos en Woo
-    // Nota: El snapshot guarda 'parent_name' que el mapeador usa como fallback
+    // 2. CORRECCIÓN: OBTENER LOS IDs DE ASIGNACIÓN (Evita productos fantasmas)
+    const { data: assignments } = await supabase
+        .from('wc_asignaciones_pedidos')
+        .select('id')
+        .eq('id_sesion', sessionId);
+        
+    const assignIds = assignments.map(a => a.id);
+
+    // 3. Obtener Logs filtrados SOLO por esta sesión
+    const { data: logs } = await supabase
+      .from("wc_log_picking")
+      .select("id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo")
+      .in("id_asignacion", assignIds) // <--- FILTRO CLAVE
+      .in("id_producto", itemsAgrupados.map((i) => i.product_id));
+
+    // 4. Fix categorías
     const productIds = itemsAgrupados.map((i) => i.product_id);
     const mapaCategoriasReales = {};
-
-    // Solo consultamos a Woo si realmente nos faltan datos críticos de categoría
-    // Para optimizar, podríamos asumir que el nombre es suficiente, pero mantenemos esto por precisión
     if (productIds.length > 0) {
       try {
-        // OPTIMIZACIÓN: Solo traemos campos necesarios
         const { data: productsData } = await WooCommerce.get("products", {
           include: productIds.join(","),
           per_page: 100,
-          _fields: "id,categories" // Solo pedimos ID y categorías
+          _fields: "id,categories"
         });
         productsData.forEach((p) => {
           mapaCategoriasReales[p.id] = p.categories || [];
         });
-      } catch (err) {
-        console.error("Warning: No se pudieron cargar categorías extra de Woo.");
-      }
+      } catch (err) { }
     }
-
-    const { data: logs } = await supabase
-      .from("wc_log_picking")
-      .select("id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo")
-      .in("id_producto", itemsAgrupados.map((i) => i.product_id));
 
     const itemsConRuta = itemsAgrupados.map((item) => {
         const realCategories = mapaCategoriasReales[item.product_id] || item.categorias || [];
@@ -211,7 +215,7 @@ exports.getSessionActive = async (req, res) => {
           ...item,
           pasillo: info.pasillo,
           prioridad: info.prioridad,
-          categorias_reales: realCategories.map((c) => c.name),
+          categorias_reales: realCategories.map((c) => c.name).filter(n => n !== "Uncategorized"),
           status: logItem
             ? logItem.es_sustituto ? "sustituido" : "recolectado"
             : "pendiente",
@@ -271,7 +275,6 @@ exports.registerAction = async (req, res) => {
       return res.status(200).json({ status: "ok", message: "Reset OK" });
     }
 
-    // Obtener IDs de referencia
     const { data: anyAssign } = await supabase
       .from("wc_asignaciones_pedidos")
       .select("id, id_pedido")
@@ -321,7 +324,6 @@ exports.searchProduct = async (req, res) => {
   try {
     let products = [];
 
-    // CASO A: Recomendación para Sustitución
     if (original_id && !query) {
       // 1. Datos originales
       const { data: original } = await WooCommerce.get(`products/${original_id}`);
@@ -341,7 +343,6 @@ exports.searchProduct = async (req, res) => {
       }
       masterKeyword = masterKeyword.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s]/g, "");
 
-      // 4. Consulta a Woo
       const searchParams = {
         search: masterKeyword,
         per_page: 50,
@@ -352,7 +353,7 @@ exports.searchProduct = async (req, res) => {
 
       const { data: searchResults } = await WooCommerce.get("products", searchParams);
 
-      // 5. Filtro Precio (40% tolerancia)
+      // 4. Filtro Precio
       const minPrice = originalPrice * 0.6;
       const maxPrice = originalPrice * 1.4;
 
@@ -365,16 +366,14 @@ exports.searchProduct = async (req, res) => {
         return true;
       });
 
-      // 6. Ordenar por cercanía de precio
+      // 5. Ordenar por cercanía de precio
       products.sort((a, b) => {
         const diffA = Math.abs(parseFloat(a.price || 0) - originalPrice);
         const diffB = Math.abs(parseFloat(b.price || 0) - originalPrice);
         return diffA - diffB;
       });
 
-    } 
-    // CASO B: Búsqueda Manual
-    else if (query) {
+    } else if (query) {
       const { data: searchResults } = await WooCommerce.get("products", {
         search: query,
         per_page: 20,
@@ -390,7 +389,8 @@ exports.searchProduct = async (req, res) => {
         price: p.price,
         image: p.images[0]?.src || null,
         stock: p.stock_quantity,
-        sku: p.sku
+        sku: p.sku,
+        categories: p.categories
     })).slice(0, 10);
 
     res.status(200).json(results);
@@ -431,11 +431,12 @@ exports.validateManualCode = async (req, res) => {
 exports.completeSession = async (req, res) => {
   const { id_sesion, id_picker } = req.body;
   try {
-    const now = new Date();
+    const now = new Date().toISOString();
+    // SOLO ACTUALIZACIÓN LOCAL (Sin WooCommerce)
     await supabase.from("wc_picking_sessions").update({ estado: "completado", fecha_fin: now }).eq("id", id_sesion);
     await supabase.from("wc_pickers").update({ estado_picker: "disponible", id_sesion_actual: null }).eq("id", id_picker);
     await supabase.from("wc_asignaciones_pedidos").update({ estado_asignacion: "completado", fecha_fin: now }).eq("id_sesion", id_sesion);
-    res.status(200).json({ message: "Sesión finalizada." });
+    res.status(200).json({ message: "Sesión finalizada correctamente (Local)." });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -468,7 +469,7 @@ exports.getPickers = async (req, res) => {
 };
 
 // ==========================================
-// 6. DASHBOARD ANALÍTICO (OPTIMIZADO CON SNAPSHOT)
+// 6. DASHBOARD ANALÍTICO (OPTIMIZADO)
 // ==========================================
 
 exports.getActiveSessionsDashboard = async (req, res) => {
@@ -483,16 +484,13 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 
     if (error) throw error;
 
-    // Aquí ya NO llamamos a WooCommerce. Procesamos localmente.
     const dashboardData = await Promise.all(
       sessions.map(async (sess) => {
         
-        // 1. Obtener ordenes (Del snapshot o fallback a Woo si es muy viejo)
         let orders = [];
         if (sess.snapshot_pedidos && sess.snapshot_pedidos.length > 0) {
             orders = sess.snapshot_pedidos;
         } else {
-            // Fallback de compatibilidad
             const promesas = sess.ids_pedidos.map(id => WooCommerce.get(`orders/${id}`));
             const resps = await Promise.all(promesas);
             orders = resps.map(r => r.data);
@@ -501,18 +499,18 @@ exports.getActiveSessionsDashboard = async (req, res) => {
         const itemsUnificados = agruparItemsParaPicking(orders);
         const totalItems = itemsUnificados.length;
 
-        // 2. Logs de progreso (Supabase)
+        // Filtro de seguridad por fecha para Dashboard
         const { data: logs } = await supabase
           .from("wc_log_picking")
           .select("id_producto, accion, es_sustituto, fecha_registro, nombre_producto")
-          .in("id_producto", itemsUnificados.map((i) => i.product_id));
+          .in("id_producto", itemsUnificados.map((i) => i.product_id))
+          .gte("fecha_registro", sess.fecha_inicio); 
 
         const recolectados = logs.filter(l => l.accion === "recolectado" && !l.es_sustituto).length;
         const sustituidos = logs.filter(l => l.es_sustituto).length;
         const completados = recolectados + sustituidos;
         const percentage = totalItems > 0 ? Math.round((completados / totalItems) * 100) : 0;
 
-        // 3. Ubicación
         let currentLocation = "Inicio";
         if (logs.length > 0) {
           const lastLog = logs.sort((a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro))[0];
