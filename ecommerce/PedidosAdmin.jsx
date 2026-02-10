@@ -16,7 +16,7 @@ import {
 import PendingOrdersView from "./PendingOrdersView";
 import ActiveSessionsView from "./ActiveSessionsView";
 import AssignPickerModal from "./AssignPickerModal";
-import { LiveSessionModal } from "./LiveSessionModal"; // ✅ Importación del módulo nuevo
+import { LiveSessionModal } from "./LiveSessionModal"; 
 import { GestionPickers } from "./GestionPickers";
 import AnaliticaPickers from "./AnaliticaPickers";
 
@@ -90,7 +90,6 @@ const PedidosAdmin = () => {
 
   // --- HANDLERS: ASIGNACIÓN DE PICKERS ---
   
-  // Abrir modal para asignar lotes (varios seleccionados)
   const handleOpenAssignModal = async () => {
     if (selectedIds.size === 0) return;
     try {
@@ -104,7 +103,6 @@ const PedidosAdmin = () => {
     }
   };
 
-  // Asignar un solo pedido directamente (sin seleccionarlo primero)
   const handleAssignSingleOrder = async (order) => {
     setSelectedIds(new Set([order.id]));
     try {
@@ -118,7 +116,6 @@ const PedidosAdmin = () => {
     }
   };
 
-  // Confirmar la asignación en el servidor
   const handleConfirmAssignment = async (picker) => {
     try {
       await axios.post(
@@ -156,8 +153,9 @@ const PedidosAdmin = () => {
   // Ver detalle de una sesión activa (Live Dashboard)
   const handleViewLiveDetail = async (session) => {
     try {
+      // ✅ AQUI ES EL CAMBIO: pedimos incluir eliminados
       const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}`
+        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}&include_removed=true`
       );
       setLiveSessionDetail({ sessionInfo: session, routeData: res.data });
       setShowLiveModal(true);
@@ -167,7 +165,6 @@ const PedidosAdmin = () => {
     }
   };
 
-  // Ver detalle de auditoría (Historial pasado)
   const handleViewHistoryDetail = async (session) => {
     try {
       const res = await axios.get(
@@ -245,7 +242,6 @@ const PedidosAdmin = () => {
 
       {/* CONTENIDO PRINCIPAL */}
       <main className="pedidos-layout-content">
-        {/* VISTAS DE ADMINISTRACIÓN */}
         {currentView === "pickers" ? (
           <GestionPickers />
         ) : currentView === "analitica" ? (
@@ -364,7 +360,6 @@ const PedidosAdmin = () => {
         onConfirm={handleConfirmAssignment}
       />
 
-      {/* ✅ USO DEL NUEVO COMPONENTE MODULARIZADO */}
       {showLiveModal && liveSessionDetail && (
         <LiveSessionModal 
             sessionDetail={liveSessionDetail}
@@ -372,7 +367,6 @@ const PedidosAdmin = () => {
         />
       )}
 
-      {/* MODAL DETALLE HISTORIAL (Aún integrado aquí por simplicidad) */}
       {showHistoryModal && historyDetail && (
         <div
           className="pedidos-modal-overlay high-z"

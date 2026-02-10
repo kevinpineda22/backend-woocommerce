@@ -30,5 +30,6 @@ router.get('/historial-detalle', dashboardCtrl.getSessionLogsDetail);
 
 // Rutas de Gestión
 router.post('/admin-remove-item', adminCtrl.removeItemFromSession);
+router.post('/admin-restore-item', adminCtrl.restoreItemToSession); // ✅ Ruta Nueva
 
 module.exports = router;

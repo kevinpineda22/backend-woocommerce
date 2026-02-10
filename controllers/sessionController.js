@@ -57,7 +57,8 @@ exports.createPickingSession = async (req, res) => {
 };
 
 exports.getSessionActive = async (req, res) => {
-  const { id_picker } = req.query;
+  const { id_picker, include_removed } = req.query; // ✅ Nuevo parámetro
+
   try {
     const { data: picker } = await supabase.from("wc_pickers").select("id_sesion_actual").eq("id", id_picker).single();
     if (!picker || !picker.id_sesion_actual) return res.status(404).json({ message: "No tienes una sesión activa." });
@@ -72,8 +73,15 @@ exports.getSessionActive = async (req, res) => {
 
     const allItems = agruparItemsParaPicking(orders);
     
-    // FILTRO PICKER: Ocultar eliminados
-    const itemsAgrupados = allItems.filter(item => !item.is_removed && item.quantity_total > 0);
+    // ✅ MODIFICACIÓN LÓGICA DE VISIBILIDAD:
+    let itemsAgrupados;
+    if (include_removed === 'true') {
+        // Si es Admin (pidió ver borrados), mostramos TODO (activos y borrados)
+        itemsAgrupados = allItems.filter(item => item.quantity_total > 0 || item.is_removed); 
+    } else {
+        // Si es Picker (comportamiento normal), ocultamos borrados
+        itemsAgrupados = allItems.filter(item => !item.is_removed && item.quantity_total > 0);
+    }
 
     const { data: assignments } = await supabase.from('wc_asignaciones_pedidos').select('id').eq('id_sesion', sessionId);
     const assignIds = assignments.map(a => a.id);
