@@ -171,22 +171,25 @@ exports.getSessionLogsDetail = async (req, res) => {
     // 1. DETECCIÓN INTELIGENTE DE ID
     // Si el ID tiene menos de 30 caracteres (ej: "48093f6e"), buscamos el UUID real
     if (session_id.length < 30) {
-      const { data: sessionMatch, error: searchError } = await supabase
-        .from("wc_picking_sessions")
-        .select("id")
-        .filter("id::text", "ilike", `${session_id}%`)
-        .limit(1)
-        .maybeSingle();
+        // Búsqueda en memoria de las últimas 200 sesiones para evitar problemas de casting UUID::text en Supabase
+        const { data: recentSessions, error: listError } = await supabase
+            .from("wc_picking_sessions")
+            .select("id")
+            .order("fecha_inicio", { ascending: false })
+            .limit(200);
 
-      if (searchError || !sessionMatch) {
-        return res
-          .status(404)
-          .json({
-            error: "No se encontró ninguna sesión con ese código corto.",
-          });
-      }
+        if (listError) {
+            console.error("Error listando sesiones:", listError);
+            return res.status(500).json({ error: "Error buscando la sesión." });
+        }
 
-      session_id = sessionMatch.id;
+        const match = recentSessions.find(s => s.id.toLowerCase().startsWith(session_id.toLowerCase()));
+
+        if (!match) {
+            return res.status(404).json({ error: "No se encontró ninguna sesión reciente con ese código corto." });
+        }
+        
+        session_id = match.id;
     }
 
     // 2. Consulta Original (Ahora session_id es un UUID válido)
