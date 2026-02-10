@@ -115,14 +115,17 @@ exports.getHistorySessions = async (req, res) => {
   }
 };
 
-// ✅ AQUÍ ESTÁ LA FUNCIÓN QUE SOLUCIONA EL TEMA DEL UUID CORTO
+// =========================================================
+// ✅ FUNCIÓN DE AUDITORÍA (CON FIX PARA UUID)
+// =========================================================
 exports.getSessionLogsDetail = async (req, res) => {
   let { session_id } = req.query; 
 
   try {
     if (!session_id) return res.status(400).json({ error: "Falta session_id" });
 
-    // 1. DETECCIÓN INTELIGENTE DE ID (Si es corto, busca el largo)
+    // 1. DETECCIÓN INTELIGENTE DE ID
+    // Si el ID tiene menos de 30 caracteres (ej: "48093f6e"), buscamos el UUID real
     if (session_id.length < 30) {
         const { data: sessionMatch, error: searchError } = await supabase
             .from("wc_picking_sessions")
@@ -134,10 +137,11 @@ exports.getSessionLogsDetail = async (req, res) => {
         if (searchError || !sessionMatch) {
             return res.status(404).json({ error: "No se encontró ninguna sesión con ese código corto." });
         }
+        
         session_id = sessionMatch.id;
     }
 
-    // 2. Consulta de Logs
+    // 2. Consulta Original (Ahora session_id es un UUID válido)
     const { data: assignments } = await supabase.from("wc_asignaciones_pedidos").select("id").eq("id_sesion", session_id);
     
     if (!assignments || assignments.length === 0) {

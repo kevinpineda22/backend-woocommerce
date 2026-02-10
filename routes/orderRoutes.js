@@ -27,7 +27,7 @@ router.get('/pendientes', dashboardCtrl.getPendingOrders);
 router.get('/pickers', dashboardCtrl.getPickers);
 router.get('/historial', dashboardCtrl.getHistorySessions);
 
-// ✅ ESTA ES LA RUTA QUE TE FALTA Y CAUSA EL 404:
+// ✅ ESTA ES LA RUTA CRÍTICA QUE FALTA EN VERCEL:
 router.get('/historial-detalle', dashboardCtrl.getSessionLogsDetail);
 
 // Rutas de Gestión
