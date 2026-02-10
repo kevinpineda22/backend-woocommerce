@@ -26,10 +26,12 @@ router.get('/dashboard-activo', dashboardCtrl.getActiveSessionsDashboard);
 router.get('/pendientes', dashboardCtrl.getPendingOrders);
 router.get('/pickers', dashboardCtrl.getPickers);
 router.get('/historial', dashboardCtrl.getHistorySessions);
+
+// ✅ ESTA ES LA RUTA QUE TE FALTA Y CAUSA EL 404:
 router.get('/historial-detalle', dashboardCtrl.getSessionLogsDetail);
 
 // Rutas de Gestión
 router.post('/admin-remove-item', adminCtrl.removeItemFromSession);
-router.post('/admin-restore-item', adminCtrl.restoreItemToSession); // ✅ Ruta Nueva
+router.post('/admin-restore-item', adminCtrl.restoreItemToSession);
 
 module.exports = router;

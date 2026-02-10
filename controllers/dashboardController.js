@@ -3,8 +3,6 @@ const { supabase } = require("../services/supabaseClient");
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 const { agruparItemsParaPicking } = require("./pickingUtils");
 
-// ... (Las otras funciones: getActiveSessionsDashboard, getPendingOrders, getPickers, getHistorySessions se mantienen igual. Solo cambiaré getSessionLogsDetail abajo)
-
 exports.getActiveSessionsDashboard = async (req, res) => {
   try {
     const { data: sessions, error } = await supabase
@@ -117,40 +115,33 @@ exports.getHistorySessions = async (req, res) => {
   }
 };
 
-// =========================================================
-// ✅ CORRECCIÓN PRINCIPAL PARA EL ERROR 500 DEL AUDITOR
-// =========================================================
+// ✅ AQUÍ ESTÁ LA FUNCIÓN QUE SOLUCIONA EL TEMA DEL UUID CORTO
 exports.getSessionLogsDetail = async (req, res) => {
-  let { session_id } = req.query; // Usamos 'let' para poder reasignarlo
+  let { session_id } = req.query; 
 
   try {
     if (!session_id) return res.status(400).json({ error: "Falta session_id" });
 
-    // 1. DETECCIÓN INTELIGENTE DE ID
-    // Si el ID tiene menos de 30 caracteres, asumimos que es un "Código Corto" visual
-    // y buscamos el UUID real en la base de datos usando texto parcial.
+    // 1. DETECCIÓN INTELIGENTE DE ID (Si es corto, busca el largo)
     if (session_id.length < 30) {
-        // Buscamos en sesiones cualquier ID que comience con ese texto (cast implícito)
         const { data: sessionMatch, error: searchError } = await supabase
             .from("wc_picking_sessions")
             .select("id")
-            .ilike("id::text", `${session_id}%`) // Busca ej: '48093f6e%'
+            .ilike("id::text", `${session_id}%`) 
             .limit(1)
             .maybeSingle();
 
         if (searchError || !sessionMatch) {
             return res.status(404).json({ error: "No se encontró ninguna sesión con ese código corto." });
         }
-        
-        // Reemplazamos el input corto con el UUID real completo
         session_id = sessionMatch.id;
     }
 
-    // 2. Consulta Original (Ahora session_id es siempre un UUID válido)
+    // 2. Consulta de Logs
     const { data: assignments } = await supabase.from("wc_asignaciones_pedidos").select("id").eq("id_sesion", session_id);
     
     if (!assignments || assignments.length === 0) {
-        return res.status(200).json([]); // Retornar vacío si no hay asignaciones, no error 500
+        return res.status(200).json([]); 
     }
 
     const assignIds = assignments.map((a) => a.id);
@@ -170,7 +161,6 @@ exports.getSessionLogsDetail = async (req, res) => {
 
   } catch (error) {
     console.error("Error en Auditoría:", error.message);
-    // Devolvemos 400 si es error de sintaxis UUID, para que el frontend sepa que el ID está mal
     if (error.code === '22P02') { 
         return res.status(400).json({ error: "Formato de ID inválido." });
     }
