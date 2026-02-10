@@ -3,13 +3,15 @@ import axios from "axios";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { 
   FaClipboardCheck, 
-  FaBox, 
   FaSearch, 
   FaCheck, 
   FaTimes, 
   FaCamera, 
-  FaBarcode, 
-  FaExclamationTriangle 
+  FaHistory,
+  FaListOl,
+  FaUserCircle,
+  FaClock,
+  FaExclamationTriangle
 } from "react-icons/fa";
 import "./VistaAuditor.css";
 
@@ -19,43 +21,21 @@ const VistaAuditor = () => {
   const [loading, setLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [activeTab, setActiveTab] = useState("inventory"); // 'inventory' | 'timeline'
   
   const scannerRef = useRef(null);
 
-  // --- LÓGICA DEL ESCÁNER ---
   useEffect(() => {
     let scanner = null;
-
     if (showScanner) {
-      // Configuración del escáner
-      scanner = new Html5QrcodeScanner(
-        "reader",
-        { 
-          fps: 10, 
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0
-        },
-        /* verbose= */ false
-      );
-
-      scanner.render(
-        (decodedText) => {
-          // Éxito al escanear
+      scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 }, false);
+      scanner.render((decodedText) => {
           handleScanSuccess(decodedText);
           scanner.clear();
           setShowScanner(false);
-        },
-        (errorMessage) => {
-          // Error de lectura (ignoramos el ruido)
-        }
-      );
+        }, () => {});
     }
-
-    return () => {
-      if (scanner) {
-        scanner.clear().catch(error => console.error("Failed to clear scanner", error));
-      }
-    };
+    return () => { if (scanner) scanner.clear().catch(console.error); };
   }, [showScanner]);
 
   const handleScanSuccess = (decodedText) => {
@@ -64,7 +44,6 @@ const VistaAuditor = () => {
     fetchAuditData(decodedText);
   };
 
-  // --- LÓGICA DE DATOS ---
   const fetchAuditData = async (id) => {
     if (!id) return;
     setLoading(true);
@@ -76,22 +55,22 @@ const VistaAuditor = () => {
         `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${id}`
       );
       
-      const logs = res.data;
+      // ✅ AHORA RECIBIMOS METADATA Y LOGS SEPARADOS
+      const { metadata, logs } = res.data;
+
       if (!logs || logs.length === 0) {
-          setErrorMsg("Sesión no encontrada o sin items recolectados.");
+          setErrorMsg("Sesión vacía o sin movimientos.");
           setLoading(false);
           return;
       }
 
-      // PROCESAMIENTO DE LOGS: Convertir historial en lista física
+      // PROCESAMIENTO: Agrupar para inventario físico
       const itemsMap = {};
-      let totalItems = 0;
       let substitutedCount = 0;
       
       logs.forEach(log => {
-          // Solo nos interesa lo que FÍSICAMENTE está en la canasta
+          // Solo contamos items físicos (recolectados o sustitutos finales)
           if (log.accion === 'recolectado' || log.accion === 'sustituido') {
-              // Usamos el ID del producto final (si hubo sustitución) o el original
               const key = log.es_sustituto ? (log.id_producto_final || log.id_producto) : log.id_producto;
               
               if (!itemsMap[key]) {
@@ -105,154 +84,172 @@ const VistaAuditor = () => {
                   };
               }
               itemsMap[key].count += 1;
-              totalItems += 1;
               if (log.es_sustituto) substitutedCount += 1;
           }
       });
 
+      // Cálculo de duración
+      let duration = "En curso";
+      if(metadata.end_time && metadata.start_time) {
+          const diff = new Date(metadata.end_time) - new Date(metadata.start_time);
+          duration = Math.round(diff / 60000) + " min";
+      }
+
       setAuditData({ 
-          sessionId: id, 
+          meta: metadata,
           items: Object.values(itemsMap),
-          totalItems,
-          substitutedCount,
-          pickerName: logs[0]?.wc_asignaciones_pedidos?.nombre_picker || "Desconocido"
+          rawLogs: logs,
+          stats: {
+              totalPhysicalItems: logs.filter(l => l.accion === 'recolectado' || l.accion === 'sustituido').length,
+              substitutedCount,
+              duration
+          }
       });
       
     } catch (error) {
       console.error(error);
-      setErrorMsg("Error consultando la sesión. Verifica el ID.");
+      setErrorMsg("Error consultando la sesión.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleManualSubmit = (e) => {
-    if (e.key === "Enter") {
-      fetchAuditData(sessionId);
-    }
-  };
+  const handleManualSubmit = (e) => { if (e.key === "Enter") fetchAuditData(sessionId); };
+  const clearAudit = () => { setAuditData(null); setSessionId(""); setErrorMsg(""); };
 
-  const clearAudit = () => {
-      setAuditData(null);
-      setSessionId("");
-      setErrorMsg("");
-      // Enfocar input manual por si acaso
-      document.getElementById("manual-input")?.focus();
-  };
+  // Helper para formatear fecha
+  const formatTime = (isoString) => isoString ? new Date(isoString).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : '--:--';
 
   return (
     <div className="auditor-layout">
       <header className="auditor-header">
-        <h1><FaClipboardCheck /> Estación de Auditoría</h1>
+        <h1><FaClipboardCheck /> Auditoría 360°</h1>
       </header>
 
       <div className="auditor-body">
         
-        {/* BARRA DE BÚSQUEDA Y ESCÁNER */}
+        {/* BUSCADOR */}
         {!auditData && (
             <div className="auditor-controls">
                 {showScanner ? (
-                    <div className="scanner-container-wrapper">
-                        <div id="reader"></div>
-                        <button className="close-scanner-btn" onClick={() => setShowScanner(false)}>
-                            <FaTimes /> Cerrar Cámara
-                        </button>
-                    </div>
+                    <div className="scanner-wrapper"><div id="reader"></div><button className="close-scanner-btn" onClick={() => setShowScanner(false)}><FaTimes /> Cerrar</button></div>
                 ) : (
                     <div className="scan-bar-container">
-                        <button 
-                            className="auditor-scan-btn" 
-                            onClick={() => setShowScanner(true)}
-                            title="Abrir Cámara"
-                        >
-                            <FaCamera />
-                        </button>
-                        <input
-                            id="manual-input"
-                            className="auditor-input"
-                            placeholder="Escanea el QR o escribe el ID..."
-                            value={sessionId}
-                            onChange={(e) => setSessionId(e.target.value)}
-                            onKeyDown={handleManualSubmit}
-                            autoFocus
-                        />
-                        <button className="auditor-search-btn" onClick={() => fetchAuditData(sessionId)}>
-                            <FaSearch />
-                        </button>
+                        <button className="auditor-scan-btn" onClick={() => setShowScanner(true)}><FaCamera /></button>
+                        <input className="auditor-input" placeholder="ID Sesión o Escanear QR..." value={sessionId} onChange={(e) => setSessionId(e.target.value)} onKeyDown={handleManualSubmit} autoFocus />
+                        <button className="auditor-search-btn" onClick={() => fetchAuditData(sessionId)}><FaSearch /></button>
                     </div>
                 )}
-                
                 {errorMsg && <div className="auditor-error">{errorMsg}</div>}
-                {loading && <div className="auditor-loading">Cargando datos de la nube...</div>}
+                {loading && <div className="auditor-loading">Recuperando expediente...</div>}
             </div>
         )}
 
-        {/* RESULTADOS DE AUDITORÍA */}
+        {/* DASHBOARD DE AUDITORÍA */}
         {auditData && (
-            <div className="audit-results animate-fade-in">
+            <div className="audit-dashboard animate-fade-in">
                 
-                {/* HEADER DE RESULTADOS */}
-                <div className="audit-meta-card">
-                    <div className="am-row">
-                        <span className="am-label">SESIÓN:</span>
-                        <span className="am-value code">#{auditData.sessionId.slice(0,8)}</span>
-                    </div>
-                    <div className="am-row">
-                        <span className="am-label">PICKER:</span>
-                        <span className="am-value">{auditData.pickerName}</span>
-                    </div>
-                    <div className="am-stats-row">
-                        <div className="am-stat">
-                            <span className="am-stat-num">{auditData.totalItems}</span>
-                            <span className="am-stat-desc">Items Totales</span>
+                {/* 1. FICHA TÉCNICA */}
+                <div className="audit-card meta-section">
+                    <div className="meta-row">
+                        <div className="meta-item">
+                            <label>ID SESIÓN</label>
+                            <span className="code-badge">#{auditData.meta.session_id.slice(0,8)}</span>
                         </div>
-                        <div className="am-stat warning">
-                            <span className="am-stat-num">{auditData.substitutedCount}</span>
-                            <span className="am-stat-desc">Sustituciones</span>
+                        <div className="meta-item">
+                            <label>RESPONSABLE</label>
+                            <span className="picker-badge"><FaUserCircle/> {auditData.meta.picker_name}</span>
+                        </div>
+                    </div>
+                    <div className="meta-row secondary">
+                        <div className="meta-item">
+                            <FaClock color="#64748b"/> 
+                            {formatTime(auditData.meta.start_time)} - {formatTime(auditData.meta.end_time)}
+                            <small>({auditData.stats.duration})</small>
+                        </div>
+                        <div className="meta-item">
+                            <strong>{auditData.meta.total_orders}</strong> Pedidos
                         </div>
                     </div>
                 </div>
 
-                {/* LISTA DE ITEMS AGRUPADOS */}
-                <div className="audit-items-grid">
-                    {auditData.items.map((item, idx) => (
-                        <div key={idx} className={`audit-item-card ${item.is_sub ? 'is-sub' : ''}`}>
-                            <div className="audit-qty-box">
-                                x{item.count}
-                            </div>
-                            <div className="audit-info">
-                                <div className="audit-prod-name">
-                                    {item.name}
-                                </div>
-                                {item.is_sub && (
-                                    <div className="audit-sub-alert">
-                                        <FaExclamationTriangle /> Reemplazó a: {item.original_name}
-                                    </div>
-                                )}
-                                <div className="audit-sku">ID: {item.id}</div>
-                            </div>
-                            <div className="audit-check">
-                                <input type="checkbox" className="audit-checkbox" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* ACCIONES FINALES */}
-                <div className="audit-actions-footer">
-                    <button className="audit-btn reject" onClick={clearAudit}>
-                        <FaTimes /> Rechazar / Nueva
+                {/* 2. PESTAÑAS */}
+                <div className="audit-tabs">
+                    <button 
+                        className={`tab-btn ${activeTab === 'inventory' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('inventory')}
+                    >
+                        <FaListOl /> Inventario Físico ({auditData.stats.totalPhysicalItems})
                     </button>
                     <button 
-                        className="audit-btn approve" 
-                        onClick={() => {
-                            alert("✅ Salida Autorizada. El picker puede continuar.");
-                            clearAudit();
-                        }}
+                        className={`tab-btn ${activeTab === 'timeline' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('timeline')}
                     >
-                        <FaCheck /> APROBAR SALIDA
+                        <FaHistory /> Trazabilidad Completa
                     </button>
                 </div>
+
+                {/* 3. CONTENIDO DINÁMICO */}
+                <div className="audit-content-area">
+                    
+                    {/* VISTA A: INVENTARIO AGRUPADO */}
+                    {activeTab === 'inventory' && (
+                        <div className="inventory-grid">
+                            {auditData.items.map((item, idx) => (
+                                <div key={idx} className={`inv-item ${item.is_sub ? 'sub' : ''}`}>
+                                    <div className="inv-qty">x{item.count}</div>
+                                    <div className="inv-details">
+                                        <div className="inv-name">{item.name}</div>
+                                        {item.is_sub && (
+                                            <div className="inv-sub-note">
+                                                <FaExclamationTriangle /> Reemplazó a: {item.original_name}
+                                            </div>
+                                        )}
+                                        <div className="inv-sku">Ref: {item.id}</div>
+                                    </div>
+                                    <input type="checkbox" className="audit-check-big" />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* VISTA B: LÍNEA DE TIEMPO DETALLADA */}
+                    {activeTab === 'timeline' && (
+                        <div className="timeline-container">
+                            {auditData.rawLogs.map((log, idx) => (
+                                <div key={idx} className={`timeline-row ${log.accion}`}>
+                                    <div className="tl-time">{formatTime(log.fecha_registro)}</div>
+                                    <div className="tl-marker"></div>
+                                    <div className="tl-content">
+                                        <div className="tl-title">
+                                            {log.accion === 'recolectado' && (log.es_sustituto ? "🔄 Sustitución" : "✅ Recolección")}
+                                            {log.accion === 'eliminado_admin' && "🗑️ Eliminado por Admin"}
+                                            {log.accion === 'restaurado_admin' && "♻️ Restaurado"}
+                                            {log.accion === 'no_encontrado' && "❌ No Encontrado"}
+                                        </div>
+                                        <div className="tl-desc">
+                                            {log.nombre_producto}
+                                            {log.es_sustituto && <span> ➔ {log.nombre_sustituto}</span>}
+                                        </div>
+                                        {log.motivo && <div className="tl-reason">Motivo: {log.motivo}</div>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                </div>
+
+                {/* 4. FOOTER */}
+                <div className="audit-footer-actions">
+                    <button className="audit-act-btn reject" onClick={clearAudit}>
+                        <FaTimes /> Rechazar
+                    </button>
+                    <button className="audit-act-btn approve" onClick={() => { alert("✅ Salida Autorizada"); clearAudit(); }}>
+                        <FaCheck /> Confirmar Salida
+                    </button>
+                </div>
+
             </div>
         )}
       </div>
