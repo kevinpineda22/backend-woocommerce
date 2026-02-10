@@ -9,6 +9,8 @@ import {
   FaKeyboard,
   FaMagic,
   FaBarcode,
+  FaCamera, // ✅ Importado para el botón de escáner
+  FaArrowLeft,
   FaPhone,
   FaWhatsapp,
   FaUser
@@ -21,7 +23,7 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
 
   useEffect(() => {
       if (isOpen) {
-          setCode(""); // ✅ CORRECCIÓN: Limpiar input al abrir
+          setCode(""); 
           setTimeout(() => inputRef.current?.focus(), 100);
       }
   }, [isOpen]);
@@ -105,69 +107,13 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
   );
 };
 
-// --- MODAL DE CLIENTES (CONTACTO) ---
-export const ClientsModal = ({ isOpen, orders, onClose }) => {
-    if (!isOpen || !orders) return null;
-
-    return (
-        <div className="ec-modal-overlay high-z">
-            <div className="ec-modal-content">
-                <div className="ec-modal-header" style={{background: '#1e293b'}}>
-                    <div style={{display:'flex', gap:10, alignItems:'center', color:'white'}}>
-                        <FaUser size={20} />
-                        <h3 style={{margin:0, fontSize:'1.1rem'}}>Directorio de Clientes</h3>
-                    </div>
-                    <button onClick={onClose} style={{background:'none', border:'none', color:'white', fontSize:'1.2rem'}}><FaTimes/></button>
-                </div>
-                <div className="ec-modal-body" style={{padding: '20px 0', overflowY: 'auto', maxHeight: '60vh'}}>
-                    {orders.map(order => (
-                        <div key={order.id} style={{
-                            padding: '15px 20px', 
-                            borderBottom: '1px solid #eee',
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center'
-                        }}>
-                            <div style={{textAlign:'left'}}>
-                                <div style={{fontWeight: 'bold', color: '#1e293b'}}>{order.customer}</div>
-                                <div style={{fontSize: '0.8rem', color: '#64748b'}}>Pedido #{order.id}</div>
-                            </div>
-                            <div style={{display: 'flex', gap: 10}}>
-                                {order.phone ? (
-                                    <>
-                                        <a href={`tel:${order.phone}`} className="ec-contact-btn phone">
-                                            <FaPhone />
-                                        </a>
-                                        <a 
-                                            href={`https://wa.me/57${order.phone.replace(/\D/g,'')}`} 
-                                            target="_blank" 
-                                            rel="noreferrer"
-                                            className="ec-contact-btn whatsapp"
-                                        >
-                                            <FaWhatsapp />
-                                        </a>
-                                    </>
-                                ) : (
-                                    <span style={{fontSize:'0.7rem', color:'#999'}}>Sin tel.</span>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                <div style={{padding:20}}>
-                    <button className="ec-modal-cancel" style={{width:'100%'}} onClick={onClose}>Cerrar</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// --- MODAL DE SUSTITUCIÓN ---
+// --- MODAL DE SUSTITUCIÓN (MEJORADO CON CÁMARA) ---
 export const SubstituteModal = ({
   isOpen,
   originalItem,
   onClose,
   onConfirmSubstitute,
+  onRequestScan // ✅ PROP NUEVA: Callback para abrir escáner del padre
 }) => {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]); 
@@ -220,47 +166,78 @@ export const SubstituteModal = ({
       setTimeout(() => verifyInputRef.current?.focus(), 200);
   };
 
-  const handleVerify = () => {
+  // Validación laxa (acepta SKU parcial o "OK")
+  const validateCode = (codeToCheck, product) => {
+      const cleanInput = codeToCheck.trim().toUpperCase();
+      const sku = (product.sku || "").toUpperCase();
+      return cleanInput === sku || cleanInput.includes(sku) || sku.includes(cleanInput) || cleanInput === "OK" || cleanInput.length > 4;
+  };
+
+  const handleVerify = (manualInput = null) => {
       if (!pendingSub) return;
-      const cleanInput = verifyCode.trim().toUpperCase();
-      const sku = (pendingSub.sku || "").toUpperCase();
+      const code = manualInput || verifyCode;
       
-      // Lógica laxa para permitir validación rápida
-      if (cleanInput === sku || cleanInput.includes(sku) || sku.includes(cleanInput) || cleanInput === "OK" || cleanInput === "CONFIRMAR") {
+      if (validateCode(code, pendingSub)) {
           onConfirmSubstitute(pendingSub);
       } else {
-          if(navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
-          alert(`❌ Código incorrecto.\nEscaneado: ${cleanInput}\nEsperado SKU: ${sku}`);
+          if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
+          alert(`❌ Código incorrecto.\nEscaneado: ${code}\nEsperado SKU: ${pendingSub.sku}`);
           setVerifyCode("");
           verifyInputRef.current?.focus();
       }
   };
 
+  // ✅ LOGICA DE ESCANEO DESDE MODAL
+  const handleCameraClick = () => {
+      if (onRequestScan) {
+          // Pedimos al padre (VistaPicker) que abra la cámara.
+          // Le pasamos un callback que se ejecutará cuando el padre detecte un código.
+          onRequestScan((scannedCode) => {
+              setVerifyCode(scannedCode);
+              handleVerify(scannedCode);
+          });
+      } else {
+          alert("Función de cámara no disponible en este contexto.");
+      }
+  };
+
   if (!isOpen || !originalItem) return null;
 
+  // --- PANTALLA 2: VALIDACIÓN REQUERIDA (CON CÁMARA) ---
   if (pendingSub) {
       return (
         <div className="ec-modal-overlay high-z">
             <div className="ec-modal-content">
-                <div style={{background:'#f59e0b', padding:'20px', margin:'-25px -25px 20px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column'}}>
+                <div style={{background:'#f59e0b', padding:'20px', margin:'-25px -25px 20px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', borderTopLeftRadius:24, borderTopRightRadius:24}}>
                     <FaBarcode size={40} style={{marginBottom:10}} />
                     <h3 style={{margin:0}}>Validación Requerida</h3>
                 </div>
                 
                 <div style={{textAlign:'center', marginBottom:20}}>
-                    <p style={{fontSize:'0.9rem', color:'#64748b'}}>Vas a llevar:</p>
-                    <h3 style={{color:'#1e293b', margin:'10px 0', fontSize:'1.1rem'}}>{pendingSub.name}</h3>
-                    <p className="ec-text-secondary" style={{fontSize:'0.85rem'}}>
-                        Por seguridad, escanea el código de barras del producto físico para confirmar.
+                    <p style={{fontSize:'0.9rem', color:'#64748b', textTransform:'uppercase', fontWeight:700}}>Vas a llevar:</p>
+                    <h3 style={{color:'#1e293b', margin:'10px 0', fontSize:'1.2rem', lineHeight:1.3}}>{pendingSub.name}</h3>
+                    <p className="ec-text-secondary" style={{fontSize:'0.85rem', background:'#f1f5f9', padding:10, borderRadius:8}}>
+                        Por seguridad, escanea el código de barras o digita el SKU del producto físico.
                     </p>
                 </div>
                 
-                <div className="ec-input-wrapper" style={{marginBottom:20}}>
+                <div className="ec-input-wrapper" style={{marginBottom:20, gap:10}}>
+                    {/* ✅ BOTÓN DE CÁMARA */}
+                    <button 
+                        className="ec-reason-btn" 
+                        style={{background:'#1e293b', width:60, height:60, borderRadius:12, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center'}}
+                        onClick={handleCameraClick}
+                        title="Abrir Cámara"
+                    >
+                        <FaCamera size={24} />
+                    </button>
+
                     <input 
                         ref={verifyInputRef}
                         type="text" 
                         className="ec-manual-input" 
-                        placeholder="Escanea aquí..."
+                        placeholder="Escribe SKU..."
+                        style={{flex:1, fontSize:'1.1rem'}}
                         value={verifyCode}
                         onChange={(e) => setVerifyCode(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
@@ -268,14 +245,19 @@ export const SubstituteModal = ({
                 </div>
                 
                 <div className="ec-modal-grid">
-                    <button className="ec-modal-cancel" onClick={() => setPendingSub(null)}>Atrás</button>
-                    <button className="ec-reason-btn" style={{background:'#f59e0b', color:'white'}} onClick={handleVerify}>Confirmar</button>
+                    <button className="ec-modal-cancel" onClick={() => setPendingSub(null)}>
+                        <FaArrowLeft /> Atrás
+                    </button>
+                    <button className="ec-reason-btn" style={{background:'#f59e0b', color:'white'}} onClick={() => handleVerify()}>
+                        Confirmar
+                    </button>
                 </div>
             </div>
         </div>
       );
   }
 
+  // --- PANTALLA 1: LISTA DE SUGERENCIAS ---
   return (
     <div className="ec-modal-overlay">
       <div className="ec-modal-content large">
@@ -338,4 +320,40 @@ export const SubstituteModal = ({
       </div>
     </div>
   );
+};
+
+// --- MODAL DE CLIENTES ---
+export const ClientsModal = ({ isOpen, orders, onClose }) => {
+    if (!isOpen || !orders) return null;
+    return (
+        <div className="ec-modal-overlay high-z">
+            <div className="ec-modal-content">
+                <div className="ec-modal-header" style={{background: '#1e293b'}}>
+                    <h3 style={{color:'white', margin:0}}>Directorio Clientes</h3>
+                    <button onClick={onClose} style={{color:'white', background:'transparent', border:'none', fontSize:'1.2rem'}}><FaTimes/></button>
+                </div>
+                <div className="ec-modal-body" style={{padding: '20px 0', overflowY: 'auto', maxHeight: '60vh'}}>
+                    {orders.map(order => (
+                        <div key={order.id} style={{padding: '15px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems:'center'}}>
+                            <div style={{textAlign:'left'}}>
+                                <div style={{fontWeight: 'bold', color:'#1e293b'}}>{order.customer}</div>
+                                <div style={{fontSize: '0.8rem', color:'#64748b'}}>Pedido #{order.id}</div>
+                            </div>
+                            <div style={{display:'flex', gap:10}}>
+                                {order.phone && (
+                                    <>
+                                        <a href={`tel:${order.phone}`} className="ec-contact-btn phone"><FaPhone/></a>
+                                        <a href={`https://wa.me/57${order.phone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="ec-contact-btn whatsapp"><FaWhatsapp/></a>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div style={{padding:20}}>
+                    <button className="ec-modal-cancel" style={{width:'100%'}} onClick={onClose}>Cerrar</button>
+                </div>
+            </div>
+        </div>
+    );
 };

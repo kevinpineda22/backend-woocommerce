@@ -130,7 +130,7 @@ exports.getSessionLogsDetail = async (req, res) => {
         const { data: sessionMatch, error: searchError } = await supabase
             .from("wc_picking_sessions")
             .select("id")
-            .ilike("id::text", `${session_id}%`) 
+            .filter("id::text", "ilike", `${session_id}%`)
             .limit(1)
             .maybeSingle();
 

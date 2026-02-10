@@ -9,8 +9,7 @@ import {
   FaClock,
   FaCheck,
   FaTrash,
-  FaTrashRestore,
-  FaHistory
+  FaTrashRestore
 } from "react-icons/fa";
 import "./LiveSessionModal.css";
 
@@ -20,23 +19,19 @@ const formatPrice = (amount) =>
   new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(amount);
 
 export const LiveSessionModal = ({ sessionDetail, onClose }) => {
-  const [viewMode, setViewMode] = useState("batch"); // 'batch' | 'orders'
-  const [showTrash, setShowTrash] = useState(false); // ✅ Nuevo estado: Ver papelera
+  const [viewMode, setViewMode] = useState("batch"); 
+  const [showTrash, setShowTrash] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   if (!sessionDetail) return null;
   const { sessionInfo, routeData } = sessionDetail;
 
-  // --- FILTROS DE LISTAS ---
   const activeItems = useMemo(() => routeData.items.filter(i => !i.is_removed), [routeData]);
   const removedItems = useMemo(() => routeData.items.filter(i => i.is_removed), [routeData]);
-
-  // Lista a mostrar según el toggle
   const displayItems = showTrash ? removedItems : activeItems;
 
-  // --- ACCIONES ADMIN ---
   const handleAdminDelete = async (item) => {
-    if (!window.confirm(`¿ANULAR "${item.name}"? El picker dejará de verlo.`)) return;
+    if (!window.confirm(`¿ANULAR "${item.name}"?`)) return;
     setIsProcessing(true);
     try {
         await axios.post('https://backend-woocommerce.vercel.app/api/orders/admin-remove-item', {
@@ -48,7 +43,7 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
   };
 
   const handleAdminRestore = async (item) => {
-    if (!window.confirm(`¿RESTAURAR "${item.name}" al batch activo?`)) return;
+    if (!window.confirm(`¿RESTAURAR "${item.name}"?`)) return;
     setIsProcessing(true);
     try {
         await axios.post('https://backend-woocommerce.vercel.app/api/orders/admin-restore-item', {
@@ -59,15 +54,13 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
     finally { setIsProcessing(false); }
   };
 
-  // Helpers de colores y letras
   const getOrderColor = (id) => ORDER_COLORS[routeData.orders_info.findIndex(o => o.id === id) % ORDER_COLORS.length];
   const getOrderLetter = (id) => String.fromCharCode(65 + routeData.orders_info.findIndex(o => o.id === id));
 
-  // Helper simplificado para la vista de ordenes (solo activos)
   const getItemsByOrder = () => {
       const map = {};
       routeData.orders_info.forEach((o, i) => map[o.id] = { ...o, color: ORDER_COLORS[i % 5], letter: String.fromCharCode(65+i), items:[], stats:{total:0,done:0}});
-      activeItems.forEach(item => { // Solo usamos activeItems aquí
+      activeItems.forEach(item => { 
           item.pedidos_involucrados.forEach(ped => {
               if(map[ped.id_pedido]) {
                   map[ped.id_pedido].items.push({...item, qty: ped.cantidad});
@@ -94,7 +87,6 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
           </div>
 
           <div className="lsm-controls-group">
-            {/* TOGGLE VISTAS */}
             <div className="lsm-view-toggle">
                 <button className={`lsm-toggle-btn ${viewMode === "batch" && !showTrash ? "active" : ""}`} onClick={() => {setViewMode("batch"); setShowTrash(false)}}>
                 <FaLayerGroup /> Activos ({activeItems.length})
@@ -103,38 +95,33 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                 <FaUserFriends /> Pedidos
                 </button>
             </div>
-
-            {/* BOTÓN PAPELERA */}
             <button 
                 className={`lsm-trash-toggle ${showTrash ? 'active' : ''}`}
                 onClick={() => { setShowTrash(true); setViewMode("batch"); }}
-                title="Ver productos anulados"
+                title="Ver anulados"
             >
-                <FaTrash /> Anulados ({removedItems.length})
+                <FaTrash /> ({removedItems.length})
             </button>
           </div>
-
           <button className="lsm-close-btn" onClick={onClose}>&times;</button>
         </div>
 
         {/* BODY */}
         <div className="lsm-body">
           
-          {/* VISTA BATCH (ACTIVOS O PAPELERA) */}
+          {/* VISTA BATCH */}
           {viewMode === "batch" && (
             <>
               {displayItems.length === 0 && (
                   <div className="lsm-empty-state">
-                      {showTrash ? "No hay productos anulados." : "No hay productos activos."}
+                      {showTrash ? "Papelera vacía." : "¡Todo listo! No hay items pendientes."}
                   </div>
               )}
-
               {displayItems.map((item, idx) => (
                 <div key={idx} className={`lsm-item-card ${showTrash ? 'removed-mode' : item.status}`}>
                   <div className="lsm-item-img">
                     {item.image_src ? <img src={item.image_src} alt="" style={showTrash ? {filter:'grayscale(100%)'} : {}} /> : <FaBox color="#cbd5e1" />}
                   </div>
-
                   <div className="lsm-item-content">
                     <div className="lsm-item-name" style={showTrash ? {textDecoration:'line-through', color:'#ef4444'} : {}}>
                         {item.name}
@@ -147,10 +134,8 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                       )}
                     </div>
                   </div>
-
-                  {/* ACCIONES */}
                   {showTrash ? (
-                      <button className="lsm-restore-btn" onClick={() => handleAdminRestore(item)} disabled={isProcessing} title="Restaurar al Batch">
+                      <button className="lsm-restore-btn" onClick={() => handleAdminRestore(item)} disabled={isProcessing}>
                           <FaTrashRestore /> Restaurar
                       </button>
                   ) : (
@@ -173,18 +158,32 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
             </>
           )}
 
-          {/* VISTA ORDERS (Solo activos) */}
+          {/* VISTA ORDERS (Aquí es donde se arreglaron los estilos) */}
           {viewMode === "orders" && !showTrash && (
              <div className="live-orders-container">
                 {Object.entries(getItemsByOrder()).map(([id, data]) => (
                     <div key={id} className="lsm-order-group">
                         <div className="lsm-og-header">
-                            <strong>{data.customer}</strong> <span>{data.stats.done}/{data.stats.total}</span>
+                            <div>
+                                <strong style={{fontSize:'1.1rem', color:'#1e293b'}}>{data.customer}</strong>
+                                <div style={{fontSize:'0.8rem', color:'#64748b'}}>Pedido #{id}</div>
+                            </div>
+                            <span style={{fontWeight:'700', color: data.stats.done === data.stats.total ? '#10b981' : '#64748b'}}>
+                                {data.stats.done}/{data.stats.total}
+                            </span>
                         </div>
                         <div className="lsm-sub-list">
                             {data.items.map((it, k) => (
                                 <div key={k} className="lsm-sub-item">
-                                    {it.status === 'recolectado' && <FaCheck color="green"/>} {it.name} ({it.qty})
+                                    <div className={`lsm-mini-status ${it.status === 'recolectado' ? 'done' : it.status === 'sustituido' ? 'sub' : 'pend'}`}>
+                                        {it.status === 'recolectado' && <FaCheck/>}
+                                        {it.status === 'sustituido' && <FaExclamationTriangle/>}
+                                    </div>
+                                    <div style={{flex:1}}>
+                                        <div style={{fontWeight:'600', color:'#334155'}}>{it.name}</div>
+                                        <div style={{fontSize:'0.8rem', color:'#94a3b8'}}>Cant: <strong>{it.qty}</strong></div>
+                                    </div>
+                                    <div style={{fontWeight:'700', fontSize:'0.9rem'}}>{formatPrice(it.price)}</div>
                                 </div>
                             ))}
                         </div>
