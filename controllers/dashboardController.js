@@ -282,6 +282,41 @@ exports.getSessionLogsDetail = async (req, res) => {
 
       if (logError) throw logError;
       logs = ls;
+
+      // --- ENRIQUECER CON IMÁGENES DE SUSTITUTOS ---
+      // Los productos sustitutos no vienen en el snapshot del pedido original.
+      try {
+        const missingIds = new Set();
+        logs.forEach((l) => {
+          if (l.es_sustituto && l.id_producto_final) {
+            // Si no tenemos info de este producto nuevo en el mapa...
+            if (!productDetailsMap[l.id_producto_final]) {
+              missingIds.add(l.id_producto_final);
+            }
+          }
+        });
+
+        if (missingIds.size > 0) {
+          const idsParams = Array.from(missingIds).join(",");
+          // Consultar productos a Woo (limitado a 100 por seguridad)
+          const { data: subProds } = await WooCommerce.get(
+            `products?include=${idsParams}&per_page=100`,
+          );
+          if (subProds) {
+            subProds.forEach((p) => {
+              const imgUrl =
+                p.images && p.images.length > 0 ? p.images[0].src : null;
+              productDetailsMap[p.id] = {
+                image: imgUrl,
+                sku: p.sku,
+              };
+            });
+          }
+        }
+      } catch (errSub) {
+        console.error("Error cargando imágenes de sustitutos:", errSub.message);
+      }
+      // -----------------------------------------------------
     }
 
     // 5. RESPUESTA ENRIQUECIDA

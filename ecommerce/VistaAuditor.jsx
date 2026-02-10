@@ -35,6 +35,27 @@ const VistaAuditor = () => {
   // Estado para input manual de verificación
   const [manualVerifyCode, setManualVerifyCode] = useState("");
 
+  // --- PERSISTENCIA: RECUPERAR SESIÓN AL CARGAR ---
+  useEffect(() => {
+    const storedSession = localStorage.getItem("auditor_session_id");
+    if (storedSession) {
+      setSessionId(storedSession);
+      fetchAuditData(storedSession);
+    }
+  }, []);
+
+  // --- PERSISTENCIA: GUARDAR ESTADO DE PROGRESO ---
+  useEffect(() => {
+    if (auditData?.meta?.session_id) {
+      const stateToSave = {
+        sessionId: auditData.meta.session_id,
+        required: Array.from(requiredItems),
+        verified: Array.from(verifiedItems),
+      };
+      localStorage.setItem("auditor_state", JSON.stringify(stateToSave));
+    }
+  }, [requiredItems, verifiedItems, auditData]);
+
   const handleSetIsScanning = (state) => {
     if (!state) setScannerMode(null);
   };
@@ -174,8 +195,33 @@ const VistaAuditor = () => {
       });
 
       const itemsArray = Object.values(itemsMap);
-      const sampleSet = generateSmartSample(itemsArray, logs, metadata);
-      setRequiredItems(sampleSet);
+
+      // --- LOGICA DE PERSISTENCIA O GENERACION DE MUESTRA ---
+      const storedStateStr = localStorage.getItem("auditor_state");
+      let loadedFromStorage = false;
+
+      if (storedStateStr) {
+        try {
+          const storedState = JSON.parse(storedStateStr);
+          // Si la sesión guardada coincide con la que acabamos de cargar
+          if (storedState.sessionId === metadata.session_id) {
+            setRequiredItems(new Set(storedState.required));
+            setVerifiedItems(new Set(storedState.verified));
+            loadedFromStorage = true;
+          }
+        } catch (e) {
+          console.error("Error leyendo estado guardado", e);
+        }
+      }
+
+      if (!loadedFromStorage) {
+        const sampleSet = generateSmartSample(itemsArray, logs, metadata);
+        setRequiredItems(sampleSet);
+        setVerifiedItems(new Set()); // Reiniciar verificados si es nueva sesión
+      }
+
+      // Guardar session_id activo para recarga automática
+      localStorage.setItem("auditor_session_id", metadata.session_id);
 
       let duration = "En curso";
       if (metadata.end_time && metadata.start_time) {
@@ -240,6 +286,8 @@ const VistaAuditor = () => {
     setErrorMsg("");
     setVerifiedItems(new Set());
     setRequiredItems(new Set());
+    localStorage.removeItem("auditor_session_id");
+    localStorage.removeItem("auditor_state");
   };
 
   const isAuditComplete = () => {
