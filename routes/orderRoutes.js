@@ -1,52 +1,34 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const orderController = require("../controllers/orderController");
 
-// ==========================================
-// RUTAS DE GESTIÓN (ADMINISTRADOR)
-// ==========================================
+// Importar Controladores
+const sessionCtrl = require('../controllers/sessionController');
+const actionCtrl = require('../controllers/actionController');
+const productCtrl = require('../controllers/productController');
+const dashboardCtrl = require('../controllers/dashboardController');
+const adminCtrl = require('../controllers/adminController');
 
-// Obtener pedidos pendientes de asignar
-router.get("/pendientes", orderController.getPendingOrders);
+// Rutas de Sesión
+router.post('/crear-sesion', sessionCtrl.createPickingSession);
+router.get('/sesion-activa', sessionCtrl.getSessionActive);
+router.post('/finalizar-sesion', sessionCtrl.completeSession);
+router.post('/cancelar-asignacion', sessionCtrl.cancelAssignment);
 
-// Obtener lista de usuarios con rol 'picker' y su estado
-router.get("/pickers", orderController.getPickers);
+// Rutas de Acción
+router.post('/registrar-accion', actionCtrl.registerAction);
+router.post('/validar-codigo', actionCtrl.validateManualCode);
 
-// Obtener datos para el Super Dashboard en Tiempo Real
-router.get("/dashboard-activo", orderController.getActiveSessionsDashboard);
+// Rutas de Producto
+router.get('/buscar-producto', productCtrl.searchProduct);
 
-// --- AUDITORÍA Y HISTORIAL ---
-router.get("/historial", orderController.getHistorySessions);
-router.get("/historial-detalle", orderController.getSessionLogsDetail);
+// Rutas Dashboard/Admin
+router.get('/dashboard-activo', dashboardCtrl.getActiveSessionsDashboard);
+router.get('/pendientes', dashboardCtrl.getPendingOrders);
+router.get('/pickers', dashboardCtrl.getPickers);
+router.get('/historial', dashboardCtrl.getHistorySessions);
+router.get('/historial-detalle', dashboardCtrl.getSessionLogsDetail);
 
-// --- GESTIÓN DE PICKERS ---
-// Cancelar asignación actual de un picker (Emergencia)
-router.post("/cancelar-asignacion", orderController.cancelAssignment);
-
-// ==========================================
-// RUTAS DE SESIÓN (BATCH PICKING)
-// ==========================================
-
-// Crear una sesión agrupando varios pedidos
-router.post("/crear-sesion", orderController.createPickingSession); 
-
-// ==========================================
-// RUTAS DEL PICKER (APP MÓVIL)
-// ==========================================
-
-// Obtener la sesión actual del picker (Lista de ruta)
-router.get("/sesion-activa", orderController.getSessionActive);
-
-// Buscador Inteligente (Sugerencias y Manual)
-router.get("/buscar-producto", orderController.searchProduct);
-
-// Registrar acciones (Recolectar, Sustituir, Deshacer/Reset)
-router.post("/registrar-accion", orderController.registerAction);
-
-// Finalizar la sesión completa
-router.post("/finalizar-sesion", orderController.completeSession);
-
-// Validar código de barras manual (SIESA)
-router.post("/validar-codigo", orderController.validateManualCode);
+// Rutas de Gestión
+router.post('/admin-remove-item', adminCtrl.removeItemFromSession);
 
 module.exports = router;

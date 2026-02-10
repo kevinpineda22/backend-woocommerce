@@ -1,4 +1,4 @@
-/* LiveSessionModal.css - Versión Robustecida para Scroll Infinito */
+/* LiveSessionModal.css */
 
 :root {
   --lsm-bg: #f8fafc;
@@ -7,7 +7,6 @@
   --lsm-accent: #3b82f6;
 }
 
-/* OVERLAY */
 .lsm-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(15, 23, 42, 0.85);
@@ -16,15 +15,14 @@
   z-index: 3000;
 }
 
-/* CONTENEDOR PRINCIPAL */
 .lsm-content {
   background: white;
   width: 95%; max-width: 1100px;
-  height: 90vh; /* Altura fija relativa a la pantalla */
+  height: 90vh; 
   border-radius: 16px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  display: flex; flex-direction: column; /* Flex vertical */
-  overflow: hidden; /* Evita que el contenedor principal scrollee */
+  display: flex; flex-direction: column; 
+  overflow: hidden; 
   animation: lsm-slide-up 0.3s ease-out;
 }
 
@@ -33,14 +31,13 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- HEADER (FIJO) --- */
 .lsm-header {
   background: var(--lsm-primary);
   padding: 20px 30px;
   display: flex; align-items: center; justify-content: space-between;
   border-bottom: 4px solid var(--lsm-accent);
   color: white; 
-  flex-shrink: 0; /* No se encoge nunca */
+  flex-shrink: 0;
 }
 
 .lsm-header-info { display: flex; align-items: center; gap: 15px; }
@@ -78,21 +75,19 @@
 }
 .lsm-close-btn:hover { opacity: 1; }
 
-/* --- CUERPO (EL ÚNICO CON SCROLL) --- */
 .lsm-body {
   background: var(--lsm-bg);
-  flex: 1; /* Ocupa todo el espacio restante */
-  overflow-y: auto; /* SCROLL AQUÍ */
+  flex: 1; 
+  overflow-y: auto;
   padding: 25px;
   display: flex; flex-direction: column; gap: 20px;
-  min-height: 0; /* Truco Flexbox: Permite scroll interno */
+  min-height: 0;
 }
 
-/* --- VISTA BATCH (ITEMS SUELTOS) --- */
 .lsm-item-card {
   background: white; border: 1px solid var(--lsm-border); border-radius: 12px;
   padding: 15px; display: flex; align-items: center; gap: 20px; transition: transform 0.2s;
-  flex-shrink: 0; /* No dejar que se aplaste */
+  flex-shrink: 0; 
 }
 
 .lsm-item-card.recolectado { border-left: 5px solid #10b981; background: #f0fdf4; }
@@ -116,14 +111,22 @@
   display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+/* ✅ NUEVO: BOTÓN DE ELIMINAR */
+.lsm-delete-btn {
+  background: white; border: 1px solid #ef4444; color: #ef4444;
+  width: 32px; height: 32px; border-radius: 8px; margin-right: 10px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: all 0.2s;
+}
+.lsm-delete-btn:hover { background: #fee2e2; }
+
 .lsm-status-badge { font-size: 0.75rem; font-weight: 800; padding: 5px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; }
 .lsm-status-badge.ok { background: #dcfce7; color: #166534; }
 .lsm-status-badge.change { background: #fef3c7; color: #92400e; }
 .lsm-status-badge.wait { background: #f1f5f9; color: #64748b; }
+.lsm-status-badge.removed { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
 
-/* --- VISTA POR PEDIDOS (TARJETAS GRANDES) --- */
 .live-orders-container {
-    /* Eliminamos el scroll interno de aquí para que use el de lsm-body */
     display: flex; flex-direction: column; gap: 25px;
     padding-bottom: 20px;
 }
@@ -132,7 +135,7 @@
   background: white; border-radius: 12px; border: 1px solid var(--lsm-border);
   overflow: hidden; 
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-  flex-shrink: 0; /* Evita que la tarjeta se colapse */
+  flex-shrink: 0;
 }
 
 .lsm-og-header {
@@ -152,7 +155,6 @@
 .lsm-prog-bar { height: 8px; background: #e2e8f0; border-radius: 4px; margin-top: 5px; overflow: hidden; }
 .lsm-prog-fill { height: 100%; transition: width 0.3s; }
 
-/* Lista interna de productos del pedido */
 .lsm-sub-list { padding: 5px 0; }
 .lsm-sub-item {
   display: flex; align-items: center; gap: 15px; padding: 12px 20px;
@@ -161,7 +163,6 @@
 .lsm-sub-item:last-child { border-bottom: none; }
 .lsm-sub-item:hover { background: #fafafa; }
 
-/* Icono de estado en lista */
 .lsm-mini-status {
     width: 24px; height: 24px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;

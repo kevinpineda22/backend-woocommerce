@@ -1,0 +1,28 @@
+.auditor-layout { background: #f1f5f9; min-height: 100vh; font-family: sans-serif; }
+.auditor-header { background: #1e293b; color: white; padding: 20px; text-align: center; }
+.auditor-body { max-width: 800px; margin: 0 auto; padding: 20px; }
+
+.scan-bar-container { display: flex; gap: 10px; margin-bottom: 30px; }
+.auditor-scan-input { flex: 1; padding: 15px; font-size: 1.2rem; border: 2px solid #cbd5e1; border-radius: 10px; outline: none; }
+.auditor-scan-input:focus { border-color: #3b82f6; }
+.auditor-search-btn { background: #3b82f6; color: white; border: none; padding: 0 25px; border-radius: 10px; font-size: 1.2rem; cursor: pointer; }
+
+.audit-meta-card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.audit-items-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px; }
+
+.audit-item-card { background: white; padding: 15px; border-radius: 10px; display: flex; align-items: center; gap: 15px; border: 1px solid #e2e8f0; }
+.audit-item-card.is-sub { background: #fffbeb; border-color: #fcd34d; }
+.audit-icon { color: #cbd5e1; font-size: 1.5rem; }
+.audit-info { flex: 1; }
+.audit-prod-name { font-weight: 700; color: #1e293b; }
+.sub-label { color: #d97706; font-size: 0.8rem; }
+.audit-qty { background: #e2e8f0; padding: 5px 12px; border-radius: 20px; font-weight: 800; font-size: 1.1rem; }
+
+.audit-actions { display: flex; gap: 20px; }
+.audit-btn { flex: 1; padding: 15px; border: none; border-radius: 12px; color: white; font-weight: 700; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.audit-btn.approve { background: #10b981; }
+.audit-btn.reject { background: #ef4444; }
+
+.auditor-loading { text-align: center; color: #64748b; margin-top: 20px; }
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

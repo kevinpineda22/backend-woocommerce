@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
-import { supabase } from "../../supabaseClient"; // ✅ IMPORTANTE: Importar Supabase
+import { supabase } from "../../supabaseClient"; 
+import QRCode from "react-qr-code"; 
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaCheck,
@@ -16,6 +17,7 @@ import {
   FaUndo,
   FaPhone,
   FaClock,
+  FaCheckCircle 
 } from "react-icons/fa";
 import "./VistaPicker.css";
 import EscanerBarras from "../DesarrolloSurtido_API/EscanerBarras";
@@ -37,7 +39,6 @@ const ORDER_COLORS = [
 const getOrderStyle = (orderIndex) =>
   ORDER_COLORS[orderIndex % ORDER_COLORS.length];
 
-// --- CRONÓMETRO SIMPLE ---
 const SessionTimer = ({ startDate }) => {
   const [elapsed, setElapsed] = useState("00:00");
 
@@ -264,23 +265,20 @@ const VistaPicker = () => {
   const [pendingSync, setPendingSync] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
+  const [showSuccessQR, setShowSuccessQR] = useState(false);
 
-  // Modales
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [showClientsModal, setShowClientsModal] = useState(false);
 
-  // --- FUNCIÓN CRÍTICA: RESET COMPLETO ---
   const resetSesionLocal = () => {
-    console.log("🧹 Ejecutando limpieza profunda de sesión...");
-    setSessionData(null);
+    console.log("🧹 Ejecutando limpieza de caché y cola...");
     localStorage.removeItem("session_active_cache");
     localStorage.removeItem("offline_actions_queue");
     setPendingSync(0);
   };
 
-  // --- INICIALIZACIÓN ---
   useEffect(() => {
     const init = async () => {
       try {
@@ -311,7 +309,6 @@ const VistaPicker = () => {
         setPickerInfo(me);
 
         try {
-          // Intentamos cargar sesión activa (que ahora viene del Snapshot Backend)
           const { data: session } = await axios.get(
             `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${me.id}`,
           );
@@ -319,7 +316,8 @@ const VistaPicker = () => {
           localStorage.setItem("session_active_cache", JSON.stringify(session));
         } catch (err) {
           if (err.response && err.response.status === 404) {
-            resetSesionLocal(); 
+            resetSesionLocal();
+            setSessionData(null);
           } else {
             console.warn("Usando caché por error de red:", err);
             const cachedSession = localStorage.getItem("session_active_cache");
@@ -344,12 +342,8 @@ const VistaPicker = () => {
     };
   }, []);
 
-  // --- 🛡️ REALTIME SECURITY KILL SWITCH (NUEVO) ---
-  // Si el admin cancela, esto saca al picker inmediatamente.
   useEffect(() => {
     if (!sessionData || !pickerInfo) return;
-
-    console.log("🛡️ Activando Kill Switch Realtime para sesión:", sessionData.session_id);
 
     const channel = supabase.channel(`security-session-${sessionData.session_id}`)
         .on(
@@ -358,14 +352,14 @@ const VistaPicker = () => {
                 event: 'UPDATE', 
                 schema: 'public', 
                 table: 'wc_picking_sessions',
-                filter: `id=eq.${sessionData.session_id}` // Escuchamos solo ESTA sesión
+                filter: `id=eq.${sessionData.session_id}`
             }, 
             (payload) => {
                 if (payload.new.estado === 'cancelado') {
-                    // 🚨 KILL SWITCH ACTIVADO
                     if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
                     alert("⛔ ATENCIÓN: El administrador ha CANCELADO esta ruta.");
                     resetSesionLocal();
+                    setSessionData(null);
                     window.location.reload();
                 }
             }
@@ -377,17 +371,13 @@ const VistaPicker = () => {
     };
   }, [sessionData, pickerInfo]);
 
-  // --- SINCRONIZACIÓN DE ACCIONES ---
   useEffect(() => {
     const syncInterval = setInterval(async () => {
-      const queue = JSON.parse(
-        localStorage.getItem("offline_actions_queue") || "[]",
-      );
+      const queue = JSON.parse(localStorage.getItem("offline_actions_queue") || "[]");
       setPendingSync(queue.length);
       if (queue.length === 0 || !navigator.onLine) return;
 
       if (!sessionData && queue.length > 0) {
-        console.warn("Acciones huérfanas detectadas. Limpiando.");
         localStorage.removeItem("offline_actions_queue");
         setPendingSync(0);
         return;
@@ -403,30 +393,18 @@ const VistaPicker = () => {
         localStorage.setItem("offline_actions_queue", JSON.stringify(newQueue));
         setPendingSync(newQueue.length);
       } catch (error) {
-        if (
-          error.response &&
-          (error.response.status === 404 || error.response.status === 500)
-        ) {
-          console.error(
-            "Acción rechazada por servidor, descartando...",
-            action,
-          );
+        if (error.response && (error.response.status === 404 || error.response.status === 500)) {
           const newQueue = queue.slice(1);
-          localStorage.setItem(
-            "offline_actions_queue",
-            JSON.stringify(newQueue),
-          );
+          localStorage.setItem("offline_actions_queue", JSON.stringify(newQueue));
           setPendingSync(newQueue.length);
         }
       }
-    }, 3000); // Sincroniza cada 3s (más rápido)
+    }, 3000); 
     return () => clearInterval(syncInterval);
   }, [sessionData]);
 
   const queueAction = (payload) => {
-    const queue = JSON.parse(
-      localStorage.getItem("offline_actions_queue") || "[]",
-    );
+    const queue = JSON.parse(localStorage.getItem("offline_actions_queue") || "[]");
     queue.push(payload);
     localStorage.setItem("offline_actions_queue", JSON.stringify(queue));
     setPendingSync(queue.length);
@@ -452,17 +430,8 @@ const VistaPicker = () => {
   };
 
   const isWeighable = (item) => {
-    const txt = (
-      item.name +
-      " " +
-      (item.categorias?.[0]?.name || "")
-    ).toLowerCase();
-    return (
-      txt.includes("kg") ||
-      txt.includes("gramos") ||
-      txt.includes("fruver") ||
-      txt.includes("carniceria")
-    );
+    const txt = (item.name + " " + (item.categorias?.[0]?.name || "")).toLowerCase();
+    return (txt.includes("kg") || txt.includes("gramos") || txt.includes("fruver") || txt.includes("carniceria"));
   };
 
   const handleUndo = async (item) => {
@@ -477,16 +446,11 @@ const VistaPicker = () => {
         ...prev,
         items: prev.items.map((i) => {
           if (i.product_id === item.product_id)
-            return {
-              ...i,
-              qty_scanned: 0,
-              status: "pendiente",
-              sustituto: null,
-            };
+            return { ...i, qty_scanned: 0, status: "pendiente", sustituto: null };
           return i;
         }),
       }));
-      // Update local cache
+      
       const cached = JSON.parse(localStorage.getItem("session_active_cache"));
       if (cached) {
         const newItems = cached.items.map((i) => {
@@ -515,8 +479,6 @@ const VistaPicker = () => {
         peso_real: peso,
       };
       
-      // Siempre encolamos la acción, incluso si es parcial
-      // Nota: El backend de logs soporta múltiples entradas por producto
       if(isFinished) queueAction(payload); 
 
       if (isFinished) {
@@ -526,14 +488,9 @@ const VistaPicker = () => {
         if (navigator.vibrate) navigator.vibrate(100);
       }
       
-      updateLocalSessionState(
-        currentItem.product_id,
-        currentScanned,
-        isFinished ? "recolectado" : "pendiente",
-      );
+      updateLocalSessionState(currentItem.product_id, currentScanned, isFinished ? "recolectado" : "pendiente");
       
-      if (!isFinished)
-        setCurrentItem((prev) => ({ ...prev, qty_scanned: currentScanned }));
+      if (!isFinished) setCurrentItem((prev) => ({ ...prev, qty_scanned: currentScanned }));
       else setCurrentItem(null);
     } catch (e) {
       alert("Error local: " + e.message);
@@ -547,15 +504,10 @@ const VistaPicker = () => {
       id_producto_original: currentItem.product_id,
       nombre_producto_original: currentItem.name,
       accion: "sustituido",
-      datos_sustituto: {
-        id: newItem.id,
-        name: newItem.name,
-        price: newItem.price,
-      },
+      datos_sustituto: { id: newItem.id, name: newItem.name, price: newItem.price },
     };
     queueAction(payload);
     
-    // Actualización optimista del estado local
     setSessionData((prev) => {
         const newData = {
             ...prev,
@@ -563,7 +515,7 @@ const VistaPicker = () => {
                 if (i.product_id === currentItem.product_id) {
                 return {
                     ...i,
-                    qty_scanned: currentItem.quantity_total, // Asumimos total completado al sustituir
+                    qty_scanned: currentItem.quantity_total, 
                     status: "sustituido",
                     sustituto: { name: newItem.name, price: newItem.price },
                 };
@@ -582,16 +534,12 @@ const VistaPicker = () => {
   const updateLocalSessionState = (prodId, qty, status) => {
     if (!sessionData) return;
     const newItems = sessionData.items.map((i) => {
-      if (i.product_id === prodId)
-        return { ...i, qty_scanned: qty, status: status };
+      if (i.product_id === prodId) return { ...i, qty_scanned: qty, status: status };
       return i;
     });
     const newSessionData = { ...sessionData, items: newItems };
     setSessionData(newSessionData);
-    localStorage.setItem(
-      "session_active_cache",
-      JSON.stringify(newSessionData),
-    );
+    localStorage.setItem("session_active_cache", JSON.stringify(newSessionData));
   };
 
   const handleManualValidation = async (inputCode) => {
@@ -646,7 +594,7 @@ const VistaPicker = () => {
         { id_sesion: sessionData.session_id, id_picker: pickerInfo.id },
       );
       resetSesionLocal();
-      window.location.reload();
+      setShowSuccessQR(true);
     } catch (e) {
       alert("Error al finalizar. Verifica tu conexión.");
     }
@@ -660,10 +608,8 @@ const VistaPicker = () => {
     setCurrentItem(null);
   };
 
-  const pendingItems =
-    sessionData?.items.filter((i) => i.status === "pendiente") || [];
-  const doneItems =
-    sessionData?.items.filter((i) => i.status !== "pendiente") || [];
+  const pendingItems = sessionData?.items.filter((i) => i.status === "pendiente") || [];
+  const doneItems = sessionData?.items.filter((i) => i.status !== "pendiente") || [];
   const currentList = activeZone === "pendientes" ? pendingItems : doneItems;
 
   if (loading)
@@ -674,14 +620,35 @@ const VistaPicker = () => {
       </div>
     );
 
+  if (showSuccessQR) {
+      return (
+          <div className="ec-picker-centered" style={{background: '#10b981', color:'white'}}>
+              <FaCheckCircle size={60} style={{marginBottom:20}} />
+              <h2>¡Ruta Finalizada!</h2>
+              <p>Dirígete a la zona de auditoría.</p>
+              
+              <div style={{background:'white', padding:20, borderRadius:16, margin:'30px 0'}}>
+                  {sessionData?.session_id && (
+                      <QRCode value={sessionData.session_id} size={200} />
+                  )}
+              </div>
+              <p style={{fontSize:'0.8rem', opacity:0.9}}>ID: {sessionData?.session_id?.slice(0,8)}</p>
+
+              <button 
+                  onClick={() => window.location.reload()} 
+                  className="ec-scan-btn"
+                  style={{marginTop:40, background:'white', color:'#10b981', width:'auto', padding:'10px 30px'}}
+              >
+                  Nueva Ruta
+              </button>
+          </div>
+      );
+  }
+
   if (!sessionData)
     return (
       <div className="ec-picker-centered">
-        <FaShoppingBasket
-          size={50}
-          color="#cbd5e1"
-          style={{ marginBottom: 20 }}
-        />
+        <FaShoppingBasket size={50} color="#cbd5e1" style={{ marginBottom: 20 }} />
         <h3>Sin asignación</h3>
         <p style={{ color: "#94a3b8", fontSize: "0.9rem", maxWidth: "250px" }}>
           El sistema está en espera de nuevas órdenes.
@@ -708,19 +675,13 @@ const VistaPicker = () => {
         {isOnline ? (
           <span>
             {pendingSync > 0 ? (
-              <>
-                <FaSync className="ec-spin" /> Subiendo datos...
-              </>
+              <> <FaSync className="ec-spin" /> Subiendo datos... </>
             ) : (
-              <>
-                <FaWifi /> Conectado en Vivo
-              </>
+              <> <FaWifi /> Conectado en Vivo </>
             )}
           </span>
         ) : (
-          <span>
-            <FaExclamationTriangle /> Modo Sin Conexión ({pendingSync})
-          </span>
+          <span> <FaExclamationTriangle /> Modo Sin Conexión ({pendingSync}) </span>
         )}
       </div>
       <header className="ec-picker-sticky-header">
@@ -734,18 +695,8 @@ const VistaPicker = () => {
               <SessionTimer startDate={sessionData.fecha_inicio} />
             </div>
           </div>
-          <div
-            style={{
-              textAlign: "right",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-            }}
-          >
-            <button
-              className="ec-contacts-btn"
-              onClick={() => setShowClientsModal(true)}
-            >
+          <div style={{ textAlign: "right", display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+            <button className="ec-contacts-btn" onClick={() => setShowClientsModal(true)}>
               <FaPhone /> Clientes
             </button>
             <div style={{ fontWeight: "bold", marginTop: 5 }}>
@@ -758,29 +709,18 @@ const VistaPicker = () => {
             const style = getOrderStyle(idx);
             return (
               <div key={ord.id} className="ec-legend-item">
-                <div
-                  className="ec-legend-dot"
-                  style={{ background: style.color }}
-                ></div>
-                <span style={{ color: style.color, fontWeight: 900 }}>
-                  {style.code}:
-                </span>
+                <div className="ec-legend-dot" style={{ background: style.color }}></div>
+                <span style={{ color: style.color, fontWeight: 900 }}>{style.code}:</span>
                 <span>{ord.customer.split(" ")[0]}</span>
               </div>
             );
           })}
         </div>
         <div className="ec-zones-tabs">
-          <div
-            className={`ec-zone-tab ${activeZone === "pendientes" ? "active" : ""}`}
-            onClick={() => setActiveZone("pendientes")}
-          >
+          <div className={`ec-zone-tab ${activeZone === "pendientes" ? "active" : ""}`} onClick={() => setActiveZone("pendientes")}>
             Pendientes ({pendingItems.length})
           </div>
-          <div
-            className={`ec-zone-tab ${activeZone === "canasta" ? "active" : ""}`}
-            onClick={() => setActiveZone("canasta")}
-          >
+          <div className={`ec-zone-tab ${activeZone === "canasta" ? "active" : ""}`} onClick={() => setActiveZone("canasta")}>
             En Canasta ({doneItems.length})
           </div>
         </div>
@@ -800,9 +740,7 @@ const VistaPicker = () => {
           ) : (
             <div className="ec-empty-state">
               <p>
-                {activeZone === "pendientes"
-                  ? "¡Ruta Completada! 🎉"
-                  : "Tu canasta está vacía."}
+                {activeZone === "pendientes" ? "¡Ruta Completada! 🎉" : "Tu canasta está vacía."}
               </p>
             </div>
           )}
@@ -822,44 +760,11 @@ const VistaPicker = () => {
           </button>
         </div>
       )}
-      <EscanerBarras
-        isScanning={isScanning}
-        setIsScanning={setIsScanning}
-        onScan={handleScanMatch}
-      />
-      <ManualEntryModal
-        isOpen={showManualModal}
-        onClose={() => setShowManualModal(false)}
-        onConfirm={handleManualValidation}
-      />
-      <WeightModal
-        isOpen={showWeightModal}
-        item={currentItem}
-        onClose={() => {
-          setShowWeightModal(false);
-          setCurrentItem(null);
-        }}
-        onConfirm={confirmPicking}
-      />
-      
-      {/* El Modal de Sustitución está aquí. 
-         Como el backend ya se actualizó, 'SubstituteModal' (en Modals.jsx) 
-         recibirá automáticamente la lista filtrada y ordenada.
-      */}
-      <SubstituteModal
-        isOpen={showSubModal}
-        originalItem={currentItem}
-        onClose={() => {
-          setShowSubModal(false);
-          setCurrentItem(null);
-        }}
-        onConfirmSubstitute={confirmSubstitution}
-      />
-      <ClientsModal
-        isOpen={showClientsModal}
-        orders={sessionData.orders_info}
-        onClose={() => setShowClientsModal(false)}
-      />
+      <EscanerBarras isScanning={isScanning} setIsScanning={setIsScanning} onScan={handleScanMatch} />
+      <ManualEntryModal isOpen={showManualModal} onClose={() => setShowManualModal(false)} onConfirm={handleManualValidation} />
+      <WeightModal isOpen={showWeightModal} item={currentItem} onClose={() => { setShowWeightModal(false); setCurrentItem(null); }} onConfirm={confirmPicking} />
+      <SubstituteModal isOpen={showSubModal} originalItem={currentItem} onClose={() => { setShowSubModal(false); setCurrentItem(null); }} onConfirmSubstitute={confirmSubstitution} />
+      <ClientsModal isOpen={showClientsModal} orders={sessionData.orders_info} onClose={() => setShowClientsModal(false)} />
     </div>
   );
 };
