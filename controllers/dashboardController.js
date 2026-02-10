@@ -3,6 +3,8 @@ const { supabase } = require("../services/supabaseClient");
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 const { agruparItemsParaPicking } = require("./pickingUtils");
 
+// ... (Las otras funciones: getActiveSessionsDashboard, getPendingOrders, getPickers, getHistorySessions se mantienen igual. Solo cambiaré getSessionLogsDetail abajo)
+
 exports.getActiveSessionsDashboard = async (req, res) => {
   try {
     const { data: sessions, error } = await supabase
@@ -18,9 +20,8 @@ exports.getActiveSessionsDashboard = async (req, res) => {
             ? sess.snapshot_pedidos 
             : (await Promise.all(sess.ids_pedidos.map(id => WooCommerce.get(`orders/${id}`)))).map(r => r.data);
 
-        // Agrupamos items (incluye eliminados)
         const itemsUnificados = agruparItemsParaPicking(orders);
-        const activeItems = itemsUnificados.filter(i => !i.is_removed); // Contamos solo activos para %
+        const activeItems = itemsUnificados.filter(i => !i.is_removed); 
         const totalItems = activeItems.length;
 
         const { data: logs } = await supabase
@@ -116,15 +117,63 @@ exports.getHistorySessions = async (req, res) => {
   }
 };
 
+// =========================================================
+// ✅ CORRECCIÓN PRINCIPAL PARA EL ERROR 500 DEL AUDITOR
+// =========================================================
 exports.getSessionLogsDetail = async (req, res) => {
-  const { session_id } = req.query;
+  let { session_id } = req.query; // Usamos 'let' para poder reasignarlo
+
   try {
+    if (!session_id) return res.status(400).json({ error: "Falta session_id" });
+
+    // 1. DETECCIÓN INTELIGENTE DE ID
+    // Si el ID tiene menos de 30 caracteres, asumimos que es un "Código Corto" visual
+    // y buscamos el UUID real en la base de datos usando texto parcial.
+    if (session_id.length < 30) {
+        // Buscamos en sesiones cualquier ID que comience con ese texto (cast implícito)
+        const { data: sessionMatch, error: searchError } = await supabase
+            .from("wc_picking_sessions")
+            .select("id")
+            .ilike("id::text", `${session_id}%`) // Busca ej: '48093f6e%'
+            .limit(1)
+            .maybeSingle();
+
+        if (searchError || !sessionMatch) {
+            return res.status(404).json({ error: "No se encontró ninguna sesión con ese código corto." });
+        }
+        
+        // Reemplazamos el input corto con el UUID real completo
+        session_id = sessionMatch.id;
+    }
+
+    // 2. Consulta Original (Ahora session_id es siempre un UUID válido)
     const { data: assignments } = await supabase.from("wc_asignaciones_pedidos").select("id").eq("id_sesion", session_id);
+    
+    if (!assignments || assignments.length === 0) {
+        return res.status(200).json([]); // Retornar vacío si no hay asignaciones, no error 500
+    }
+
     const assignIds = assignments.map((a) => a.id);
-    const { data: logs, error } = await supabase.from("wc_log_picking").select("*").in("id_asignacion", assignIds).order("fecha_registro", { ascending: true });
+    
+    const { data: logs, error } = await supabase
+        .from("wc_log_picking")
+        .select(`
+            *,
+            wc_asignaciones_pedidos ( nombre_picker )
+        `)
+        .in("id_asignacion", assignIds)
+        .order("fecha_registro", { ascending: true });
+
     if (error) throw error;
+    
     res.status(200).json(logs);
+
   } catch (error) {
+    console.error("Error en Auditoría:", error.message);
+    // Devolvemos 400 si es error de sintaxis UUID, para que el frontend sepa que el ID está mal
+    if (error.code === '22P02') { 
+        return res.status(400).json({ error: "Formato de ID inválido." });
+    }
     res.status(500).json({ error: error.message });
   }
 };
