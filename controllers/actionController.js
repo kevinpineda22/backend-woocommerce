@@ -7,9 +7,10 @@ exports.registerAction = async (req, res) => {
     nombre_producto_original,
     accion, // 'recolectado', 'sustituido', 'no_encontrado', 'reset'
     datos_sustituto, // { id, name, price }
-    peso_real,       // Decimal
+    peso_real,       // Decimal (Ej: 1.250)
     motivo,          // String
-    cantidad_afectada // Int (Ej: Faltaron 2 unidades)
+    cantidad_afectada, // Int (Ej: Faltaron 2 unidades)
+    pasillo          // String (Ubicación)
   } = req.body;
 
   try {
@@ -22,10 +23,10 @@ exports.registerAction = async (req, res) => {
       .select("id, id_pedido, snapshot_pedido")
       .eq("id_sesion", id_sesion);
 
-    if (assignError || !assignments) throw new Error("Sesión no válida o sin asignaciones");
+    if (assignError || !assignments || assignments.length === 0) throw new Error("Sesión inválida o sin asignaciones");
 
-    // Lógica para encontrar a qué pedido pertenece el producto
-    let targetAssignment = null;
+    // Lógica para encontrar a qué pedido pertenece el producto (Match en snapshot)
+    let targetAssignment = assignments[0]; // Default
     
     // Primero buscamos coincidencia exacta en los items del pedido
     for (let assign of assignments) {
@@ -37,20 +38,19 @@ exports.registerAction = async (req, res) => {
         }
     }
 
-    // Fallback: Si no se encuentra (raro), usar el primero
-    const id_asignacion_final = targetAssignment ? targetAssignment.id : assignments[0].id;
-    const id_pedido_final = targetAssignment ? targetAssignment.id_pedido : 0;
-
     // 2. Preparar el Log Base
     const logData = {
-      id_asignacion: id_asignacion_final,
-      id_pedido: id_pedido_final,
+      id_asignacion: targetAssignment.id,
+      id_pedido: targetAssignment.id_pedido,
       id_producto: id_producto_original,
+      // Aseguramos guardar el ID original para trazabilidad
+      id_producto_original: id_producto_original, 
       nombre_producto: nombre_producto_original,
       accion: accion,
       fecha_registro: fecha,
       peso_real: peso_real || null,
-      motivo: motivo || null
+      motivo: motivo || null,
+      pasillo: pasillo || "General" // Guardamos el pasillo
     };
 
     // Personalizar según Acción
@@ -65,8 +65,7 @@ exports.registerAction = async (req, res) => {
        // Marca explícita de faltante
     }
 
-    // 3. Insertar Logs (Multiplicar si la cantidad afectada > 1)
-    // Esto es vital para que la contabilidad de items sea exacta
+    // 3. Insertar Logs (Multiplicar si la cantidad afectada > 1 para trazabilidad unitaria)
     const logsToInsert = Array(qty).fill(logData);
     
     const { error: insertError } = await supabase

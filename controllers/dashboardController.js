@@ -2,10 +2,12 @@ const WooCommerce = require("../services/wooService");
 const { supabase } = require("../services/supabaseClient");
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 const { agruparItemsParaPicking } = require("./pickingUtils");
-// ✅ IMPORTANTE: Importamos el nuevo servicio de sincronización
-const { syncSessionToWooCommerce } = require("../services/syncService");
+// ✅ Importamos el motor de sincronización para actualizar WooCommerce
+const { syncOrderToWoo } = require("../services/syncWooService");
 
-// --- DASHBOARD EN VIVO ---
+// =========================================================
+// 1. DASHBOARD EN VIVO (MONITOREO DE RUTAS)
+// =========================================================
 exports.getActiveSessionsDashboard = async (req, res) => {
   try {
     const { data: sessions, error } = await supabase
@@ -17,6 +19,7 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 
     const dashboardData = await Promise.all(
       sessions.map(async (sess) => {
+        // Usar snapshot si existe, sino llamar a Woo
         let orders = sess.snapshot_pedidos && sess.snapshot_pedidos.length > 0 
             ? sess.snapshot_pedidos 
             : (await Promise.all(sess.ids_pedidos.map(id => WooCommerce.get(`orders/${id}`)))).map(r => r.data);
@@ -25,6 +28,7 @@ exports.getActiveSessionsDashboard = async (req, res) => {
         const activeItems = itemsUnificados.filter(i => !i.is_removed); 
         const totalItems = activeItems.length;
 
+        // Consultar progreso real en logs
         const { data: logs } = await supabase
           .from("wc_log_picking")
           .select("id_producto, accion, es_sustituto, fecha_registro, nombre_producto")
@@ -36,6 +40,7 @@ exports.getActiveSessionsDashboard = async (req, res) => {
         const completados = recolectados + sustituidos;
         const percentage = totalItems > 0 ? Math.round((completados / totalItems) * 100) : 0;
 
+        // Determinar ubicación actual aproximada
         let currentLocation = "Inicio";
         if (logs.length > 0) {
           const lastLog = logs.sort((a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro))[0];
@@ -64,6 +69,9 @@ exports.getActiveSessionsDashboard = async (req, res) => {
   }
 };
 
+// =========================================================
+// 2. PEDIDOS PENDIENTES (PARA ASIGNAR)
+// =========================================================
 exports.getPendingOrders = async (req, res) => {
   try {
     const { data: wcOrders } = await WooCommerce.get("orders", { status: "processing", per_page: 50 });
@@ -76,6 +84,9 @@ exports.getPendingOrders = async (req, res) => {
   }
 };
 
+// =========================================================
+// 3. LISTADO DE PICKERS
+// =========================================================
 exports.getPickers = async (req, res) => {
   const { email } = req.query;
   let query = supabase.from("wc_pickers").select("*").order("nombre_completo", { ascending: true });
@@ -85,12 +96,16 @@ exports.getPickers = async (req, res) => {
   res.status(200).json(data);
 };
 
+// =========================================================
+// 4. HISTORIAL DE SESIONES
+// =========================================================
 exports.getHistorySessions = async (req, res) => {
   try {
+    // Traemos completados y auditados
     const { data: sessions, error } = await supabase
       .from("wc_picking_sessions")
       .select(`id, fecha_inicio, fecha_fin, estado, ids_pedidos, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`)
-      .eq("estado", "completado")
+      .in("estado", ["completado", "auditado"]) 
       .order("fecha_fin", { ascending: false })
       .limit(50);
 
@@ -110,6 +125,7 @@ exports.getHistorySessions = async (req, res) => {
         fecha: end.toLocaleDateString("es-CO", optionsDate),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
+        estado: sess.estado
       };
     });
     res.status(200).json(historyData);
@@ -119,37 +135,44 @@ exports.getHistorySessions = async (req, res) => {
 };
 
 // =========================================================
-// ✅ FINALIZAR AUDITORÍA Y DISPARAR SYNC WOOCOMMERCE
+// ✅ 5. FINALIZAR AUDITORÍA, LIBERAR PICKER Y SINCRONIZAR WOO
 // =========================================================
 exports.completeAuditSession = async (req, res) => {
-  const { session_id } = req.body;
+  const { session_id, datos_salida } = req.body;
 
   try {
     if (!session_id) return res.status(400).json({ error: "Falta session_id" });
 
     const now = new Date().toISOString();
 
-    // 1. INFO PICKER & SESIÓN
+    // A. Obtener datos de la sesión (IDs de pedidos y Picker)
     const { data: session, error: getSessError } = await supabase
       .from("wc_picking_sessions")
-      .select("id_picker")
+      .select("id_picker, ids_pedidos")
       .eq("id", session_id)
       .single();
 
     if (getSessError) throw getSessError;
 
-    // 2. ACTUALIZAR ESTADO DE LA SESIÓN -> 'auditado'
+    // B. ACTUALIZAR ESTADO DE LA SESIÓN -> 'auditado'
+    // Esto desbloquea al Picker en el Frontend automáticamente
+    const updatePayload = {
+      estado: "auditado",
+      fecha_fin_auditoria: now,
+    };
+    // Guardamos el snapshot de salida para el historial (QR)
+    if (datos_salida) {
+        updatePayload.datos_salida = datos_salida;
+    }
+
     const { error: sessError } = await supabase
       .from("wc_picking_sessions")
-      .update({
-        estado: "auditado",
-        fecha_fin_auditoria: now,
-      })
+      .update(updatePayload)
       .eq("id", session_id);
 
     if (sessError) throw sessError;
 
-    // 3. LIBERAR PICKER
+    // C. LIBERAR AL PICKER (Status: disponible)
     if (session && session.id_picker) {
       await supabase
         .from("wc_pickers")
@@ -160,7 +183,7 @@ exports.completeAuditSession = async (req, res) => {
         .eq("id", session.id_picker);
     }
 
-    // 4. LOG DE SISTEMA (Auditoría)
+    // D. REGISTRAR LOG DE AUDITORÍA
     const { data: assignments } = await supabase
       .from("wc_asignaciones_pedidos")
       .select("id, id_pedido")
@@ -168,28 +191,30 @@ exports.completeAuditSession = async (req, res) => {
       .limit(1);
 
     if (assignments && assignments.length > 0) {
-      await supabase.from("wc_log_picking").insert([
-        {
-          id_asignacion: assignments[0].id,
-          id_pedido: assignments[0].id_pedido, // Referencial
-          id_producto: 0,
-          accion: "auditoria_finalizada",
-          motivo: "Auditor Aprobó Salida",
-          fecha_registro: now,
-          nombre_producto: "--- SALIDA AUTORIZADA ---",
-        },
-      ]);
+      await supabase.from("wc_log_picking").insert([{
+        id_asignacion: assignments[0].id,
+        id_pedido: assignments[0].id_pedido, // Referencial
+        id_producto: 0,
+        accion: "auditoria_finalizada",
+        motivo: "Salida Autorizada - Sync Woo Iniciado",
+        fecha_registro: now,
+        nombre_producto: "--- PROCESO FINALIZADO ---",
+      }]);
     }
 
-    // =================================================================
-    // 🚀 5. DISPARAR SINCRONIZACIÓN CON WOOCOMMERCE (ASYNC)
-    // =================================================================
-    // "Fire and Forget": No esperamos a que termine para responder al auditor
-    syncSessionToWooCommerce(session_id)
-        .then(() => console.log(`✅ [SYNC OK] Sesión ${session_id} procesada en Woo.`))
-        .catch(err => console.error(`❌ [SYNC FAIL] Error en sesión ${session_id}:`, err));
+    // E. 🚀 DISPARAR SINCRONIZACIÓN CON WOOCOMMERCE (Fire & Forget)
+    // Se ejecuta en segundo plano para no hacer esperar al auditor
+    if (session.ids_pedidos && session.ids_pedidos.length > 0) {
+        (async () => {
+            console.log(`🚀 Iniciando Sync Woo para sesión ${session_id}...`);
+            for (const orderId of session.ids_pedidos) {
+                // Llamamos al servicio de Sync para cada pedido
+                await syncOrderToWoo(session_id, orderId);
+            }
+        })();
+    }
 
-    res.status(200).json({ message: "Proceso finalizado. Sincronización iniciada." });
+    res.status(200).json({ message: "Salida aprobada. Sincronización iniciada." });
     
   } catch (error) {
     console.error("Error finalizando auditoría:", error.message);
@@ -198,7 +223,7 @@ exports.completeAuditSession = async (req, res) => {
 };
 
 // =========================================================
-// ✅ CONSULTA DETALLADA DE AUDITORÍA (NIVEL FORENSE)
+// ✅ 6. CONSULTA DETALLADA (AUDITORÍA & HISTORIAL)
 // =========================================================
 exports.getSessionLogsDetail = async (req, res) => {
   let { session_id } = req.query;
@@ -206,41 +231,36 @@ exports.getSessionLogsDetail = async (req, res) => {
   try {
     if (!session_id) return res.status(400).json({ error: "Falta session_id" });
 
-    // 1. DETECCIÓN INTELIGENTE DE ID CORTO
+    // A. DETECCIÓN INTELIGENTE DE ID CORTO
     if (session_id.length < 30) {
-      const { data: recentSessions, error: listError } = await supabase
+      const { data: recents } = await supabase
         .from("wc_picking_sessions")
         .select("id")
         .order("fecha_inicio", { ascending: false })
-        .limit(200);
+        .limit(100);
 
-      if (listError) return res.status(500).json({ error: "Error de búsqueda." });
-
-      const match = recentSessions.find((s) =>
-        s.id.toLowerCase().startsWith(session_id.toLowerCase())
-      );
-
-      if (!match) return res.status(404).json({ error: "Código de sesión no encontrado." });
+      const match = recents.find((s) => s.id.startsWith(session_id));
+      
+      if (!match) return res.status(404).json({ error: "Sesión no encontrada (ID Corto)." });
       session_id = match.id;
     }
 
-    // 2. OBTENER INFO COMPLETA SESIÓN
+    // B. OBTENER INFO SESIÓN
     const { data: sessionInfo, error: sessError } = await supabase
       .from("wc_picking_sessions")
       .select(`
         id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos,
-        wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )
+        wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo, email)
       `)
       .eq("id", session_id)
       .single();
 
     if (sessError || !sessionInfo) throw new Error("Error obteniendo info de la sesión");
 
-    // 3. RECUPERAR DATOS Y MAPEO DE PRODUCTOS (IMÁGENES)
+    // C. CONSTRUIR INFO PEDIDOS (Snapshot vs Live)
     let ordersData = [];
     let productDetailsMap = {};
 
-    // Procesar snapshot o fetch en vivo
     const processOrderData = (orderList) => {
       return orderList.map((o) => {
         if (o.line_items) {
@@ -248,7 +268,7 @@ exports.getSessionLogsDetail = async (req, res) => {
             const imgUrl = item.image?.src || (item.image && item.image.length > 0 ? item.image[0].src : null);
             productDetailsMap[item.product_id] = { image: imgUrl, sku: item.sku };
             if (item.variation_id) {
-              productDetailsMap[item.variation_id] = { image: imgUrl, sku: item.sku };
+                productDetailsMap[item.variation_id] = { image: imgUrl, sku: item.sku };
             }
           });
         }
@@ -266,74 +286,66 @@ exports.getSessionLogsDetail = async (req, res) => {
       try {
         const wooProms = sessionInfo.ids_pedidos.map((id) => WooCommerce.get(`orders/${id}`));
         const wooRes = await Promise.all(wooProms);
-        const fullOrders = wooRes.map((r) => r.data);
-        ordersData = processOrderData(fullOrders);
+        ordersData = processOrderData(wooRes.map((r) => r.data));
       } catch (e) {
-        console.log("Auditoría: Falló fetch Woo detallado", e.message);
-        ordersData = sessionInfo.ids_pedidos.map((id) => ({ id, customer: "Cliente #" + id, total_items: 0 }));
+        ordersData = sessionInfo.ids_pedidos.map((id) => ({ id, customer: "#" + id, total_items: 0 }));
       }
     }
 
-    // 4. OBTENER LOS LOGS
-    const { data: assignments } = await supabase
-      .from("wc_asignaciones_pedidos")
-      .select("id")
-      .eq("id_sesion", session_id);
-
+    // D. OBTENER LOGS DE ACTIVIDAD
+    const { data: assignments } = await supabase.from("wc_asignaciones_pedidos").select("id").eq("id_sesion", session_id);
+    const assignIds = assignments.map(a => a.id);
+    
     let logs = [];
-    if (assignments && assignments.length > 0) {
-      const assignIds = assignments.map((a) => a.id);
-      const { data: ls, error: logError } = await supabase
-        .from("wc_log_picking")
-        .select("*, wc_asignaciones_pedidos ( nombre_picker )")
-        .in("id_asignacion", assignIds)
-        .order("fecha_registro", { ascending: true });
+    if (assignIds.length > 0) {
+        const { data: ls, error: logError } = await supabase
+            .from("wc_log_picking")
+            .select("*, wc_asignaciones_pedidos(nombre_picker)")
+            .in("id_asignacion", assignIds)
+            .order("fecha_registro", { ascending: true });
 
-      if (logError) throw logError;
-      logs = ls;
+        if (logError) throw logError;
+        logs = ls;
 
-      // Buscar imágenes de sustitutos si faltan
-      try {
-        const missingIds = new Set();
-        logs.forEach((l) => {
-          if (l.es_sustituto && l.id_producto_final && !productDetailsMap[l.id_producto_final]) {
-            missingIds.add(l.id_producto_final);
-          }
-        });
-
-        if (missingIds.size > 0) {
-          const idsParams = Array.from(missingIds).join(",");
-          const { data: subProds } = await WooCommerce.get(`products?include=${idsParams}&per_page=100`);
-          if (subProds) {
-            subProds.forEach((p) => {
-              const imgUrl = p.images && p.images.length > 0 ? p.images[0].src : null;
-              productDetailsMap[p.id] = { image: imgUrl, sku: p.sku };
+        // Enriquecer logs con imágenes de sustitutos si faltan
+        try {
+            const missingIds = new Set();
+            logs.forEach(l => {
+                if(l.es_sustituto && l.id_producto_final && !productDetailsMap[l.id_producto_final]) {
+                    missingIds.add(l.id_producto_final);
+                }
             });
-          }
+
+            if (missingIds.size > 0) {
+                const { data: subProds } = await WooCommerce.get(`products?include=${Array.from(missingIds).join(",")}&per_page=100`);
+                if (subProds) {
+                    subProds.forEach(p => {
+                        productDetailsMap[p.id] = { image: p.images[0]?.src, sku: p.sku };
+                    });
+                }
+            }
+        } catch (e) {
+            console.error("Error cargando img sustitutos:", e.message);
         }
-      } catch (errSub) {
-        console.error("Error cargando imágenes de sustitutos:", errSub.message);
-      }
     }
 
+    // E. RESPUESTA FINAL
     res.status(200).json({
       metadata: {
         session_id: sessionInfo.id,
         picker_name: sessionInfo.wc_pickers?.nombre_completo || "Sin Asignar",
-        picker_email: sessionInfo.wc_pickers?.email,
         start_time: sessionInfo.fecha_inicio,
         end_time: sessionInfo.fecha_fin,
         status: sessionInfo.estado,
-        total_orders: sessionInfo.ids_pedidos.length,
-        order_ids: sessionInfo.ids_pedidos,
+        total_orders: sessionInfo.ids_pedidos.length
       },
       orders_info: ordersData,
       products_map: productDetailsMap,
-      logs: logs,
+      logs: logs
     });
 
   } catch (error) {
-    console.error("Error Auditoría:", error.message);
+    console.error("Error Auditoría Detalle:", error.message);
     if (error.code === '22P02') return res.status(400).json({ error: "Formato de ID inválido." });
     res.status(500).json({ error: error.message });
   }

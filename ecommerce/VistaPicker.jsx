@@ -19,8 +19,8 @@ import {
   FaClock,
   FaCheckCircle,
   FaBan,
-  FaSpinner, // Icono de carga
-  FaLock // Icono de candado
+  FaSpinner, 
+  FaLock 
 } from "react-icons/fa";
 import "./VistaPicker.css";
 import EscanerBarras from "../DesarrolloSurtido_API/EscanerBarras";
@@ -67,7 +67,9 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
   const remaining = total - scanned;
   const isPartial = scanned > 0 && scanned < total;
   const isSubstituted = item.status === "sustituido" && item.sustituto;
+  
   const isShortPick = isCompleted && scanned < total && item.status !== "sustituido";
+
   const formatPrice = (p) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(p);
 
   return (
@@ -99,6 +101,7 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
           <>
             <h4 className="ec-prod-name">{item.name}</h4>
             <div className="ec-price-tag">{item.price > 0 ? formatPrice(item.price) : ""}</div>
+            
             {isShortPick && (
                 <div className="short-pick-alert">
                     <FaExclamationTriangle /> Se encontraron solo {scanned} de {total}
@@ -200,18 +203,15 @@ const VistaPicker = () => {
     }
   }, []);
 
-  // CONFIGURAR LISTENER REALTIME Y POLLING
   useEffect(() => {
     let channel = null;
     let pollingInterval = null;
 
     const setupListener = (sid) => {
-        // Realtime Supabase
         channel = supabase.channel(`live-session-${sid}`)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'wc_picking_sessions', filter: `id=eq.${sid}` }, 
                 async (payload) => {
                     const newState = payload.new.estado;
-                    // LIBERACIÓN AUTOMÁTICA
                     if (newState === 'auditado' || newState === 'finalizado') {
                         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                         resetSesionLocal();
@@ -225,7 +225,6 @@ const VistaPicker = () => {
                 }
             ).subscribe();
 
-        // Polling de respaldo (cada 4s) por si falla el socket
         pollingInterval = setInterval(async () => {
             try {
                 const { data } = await supabase.from("wc_picking_sessions").select("estado").eq("id", sid).single();
@@ -263,7 +262,6 @@ const VistaPicker = () => {
         if (!me) { alert("Usuario no encontrado."); setLoading(false); return; }
         setPickerInfo(me);
 
-        // Si hay una sesión pendiente de auditoría, bloquear aquí
         const savedCompletedId = localStorage.getItem("waiting_for_audit_id");
         if (savedCompletedId) {
             setCompletedSessionId(savedCompletedId);
@@ -332,13 +330,15 @@ const VistaPicker = () => {
           setMissingQtyForSub(missing);
           setShowSubModal(true);
       } else {
+          // ✅ ENVIAMOS PASILLO AQUÍ
           queueAction({
               id_sesion: sessionData.session_id,
               id_producto_original: item.product_id,
               nombre_producto_original: item.name,
               accion: "no_encontrado", 
               cantidad_afectada: missing, 
-              motivo: "Stock Insuficiente"
+              motivo: "Stock Insuficiente",
+              pasillo: item.pasillo // <--- AGREGADO
           });
           updateLocalSessionState(item.product_id, scanned, "recolectado");
       }
@@ -357,9 +357,17 @@ const VistaPicker = () => {
       const currentScanned = (currentItem.qty_scanned || 0) + 1;
       const targetQty = currentItem.quantity_total;
       const isFinished = currentScanned >= targetQty;
-      const payload = { id_sesion: sessionData.session_id, id_producto_original: currentItem.product_id, nombre_producto_original: currentItem.name, accion: "recolectado", peso_real: peso };
-      if(isFinished) queueAction(payload); 
-      else queueAction(payload);
+      // ✅ ENVIAMOS PASILLO AQUÍ
+      const payload = { 
+          id_sesion: sessionData.session_id, 
+          id_producto_original: currentItem.product_id, 
+          nombre_producto_original: currentItem.name, 
+          accion: "recolectado", 
+          peso_real: peso,
+          pasillo: currentItem.pasillo // <--- AGREGADO
+      };
+      
+      queueAction(payload);
 
       if (isFinished) { if (navigator.vibrate) navigator.vibrate([100, 50, 100]); closeAllModals(); } 
       else { if (navigator.vibrate) navigator.vibrate(100); }
@@ -371,13 +379,15 @@ const VistaPicker = () => {
   };
 
   const confirmSubstitution = (newItem, qty) => {
+    // ✅ ENVIAMOS PASILLO AQUÍ
     queueAction({
       id_sesion: sessionData.session_id,
       id_producto_original: currentItem.product_id,
       nombre_producto_original: currentItem.name,
       accion: "sustituido",
       datos_sustituto: { id: newItem.id, name: newItem.name, price: newItem.price },
-      cantidad_afectada: qty || 1
+      cantidad_afectada: qty || 1,
+      pasillo: currentItem.pasillo // <--- AGREGADO
     });
     
     updateLocalSessionState(currentItem.product_id, currentItem.quantity_total, "sustituido", { name: newItem.name, price: newItem.price });
@@ -445,13 +455,16 @@ const VistaPicker = () => {
     setCompletedSessionId(finalId);
 
     try {
-      // Notificamos al backend que se "cerró" el picking, pero el estado sigue en espera de auditoría
-      // Opcional: podrías tener un estado 'esperando_auditoria' en DB, pero con 'en_proceso' y el flag local basta.
-      // El cambio real de estado lo hace el auditor.
-      
+      await axios.post("https://backend-woocommerce.vercel.app/api/orders/finalizar-sesion", { id_sesion: finalId, id_picker: pickerInfo.id });
+      resetSesionLocal();
       setSessionData(null); 
       setShowSuccessQR(true);
     } catch (e) { alert("Error al finalizar."); }
+  };
+
+  const handleExitQR = () => {
+      localStorage.removeItem("waiting_for_audit_id");
+      window.location.reload();
   };
 
   const closeAllModals = () => {
@@ -469,7 +482,6 @@ const VistaPicker = () => {
 
   if (loading) return <div className="ec-picker-centered"><div className="ec-spinner"></div><p>Conectando...</p></div>;
 
-  // ✅ PANTALLA DE BLOQUEO CON QR (SIN BOTÓN DE SALIDA)
   if (showSuccessQR && completedSessionId) {
       return (
           <div className="ec-picker-centered" style={{background: '#10b981', color:'white'}}>

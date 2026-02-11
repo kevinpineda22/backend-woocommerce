@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Html5QrcodeScanner } from "html5-qrcode";
+import QRCode from "react-qr-code";
 import { 
   FaClipboardCheck, 
   FaSearch, 
@@ -16,7 +17,8 @@ import {
   FaExclamationTriangle,
   FaBarcode,
   FaBoxOpen,
-  FaArrowRight
+  FaArrowRight,
+  FaPrint
 } from "react-icons/fa";
 import "./VistaAuditor.css";
 
@@ -81,7 +83,7 @@ const VistaAuditor = () => {
       auditData.items.forEach(item => {
           const itemSku = (item.id || "").toString().toUpperCase(); 
           if (requiredItems.has(item.id)) {
-             if (itemSku === cleanCode || item.name.toUpperCase().includes(cleanCode)) {
+             if (itemSku === cleanCode || item.name.toUpperCase().includes(cleanCode) || (item.sku && item.sku.toUpperCase().includes(cleanCode))) {
                  matchId = item.id;
              }
           }
@@ -251,17 +253,38 @@ const VistaAuditor = () => {
       return requiredArray.every(id => verifiedItems.has(id));
   };
 
+  // --- GENERAR JSON DE SALIDA ---
+  const generateOutputData = () => {
+      if(!auditData) return null;
+      return auditData.groupedItems.map(group => ({
+          order_id: group.id,
+          customer: group.customer,
+          items: group.items.map(i => ({
+              sku: i.sku || i.id,
+              name: i.name,
+              qty: i.count,
+              price: i.price,
+              is_substitution: i.is_sub
+          }))
+      }));
+  };
+
   const handleFinishAudit = async () => {
       if(!isAuditComplete()) {
           alert("⚠️ Faltan productos por verificar.");
           return;
       }
-      if(!window.confirm("¿Confirmar y generar salida?")) return;
+      if(!window.confirm("¿Confirmar salida y liberar Picker?")) return;
 
       try {
+          // ✅ ENVIAMOS LA "FOTO" DE LO QUE SALIÓ (SNAPSHOT) AL BACKEND
+          const outputSnapshot = generateOutputData();
+
           await axios.post("https://backend-woocommerce.vercel.app/api/orders/auditor/finalizar", {
-              session_id: auditData.meta.session_id
+              session_id: auditData.meta.session_id,
+              datos_salida: outputSnapshot // <--- Esto es la trazabilidad
           });
+          
           setShowInvoices(true);
           if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
       } catch (err) {
@@ -271,25 +294,76 @@ const VistaAuditor = () => {
 
   const formatTime = (isoString) => isoString ? new Date(isoString).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--';
 
+  // Helper para generar el string del QR
+  const generateMasterCode = (group) => {
+      const payload = {
+          id: group.id,
+          date: new Date().toISOString().split('T')[0],
+          items: group.items.map(i => ({ s: i.sku || i.id, q: i.count, p: i.price }))
+      };
+      return JSON.stringify(payload);
+  };
+
   if (showInvoices && auditData) {
       return (
           <div className="invoice-mode-layout">
               <div className="invoice-actions no-print">
-                  <button className="audit-act-btn approve" onClick={() => window.print()}>🖨️ IMPRIMIR</button>
-                  <button className="audit-act-btn reject" onClick={clearAudit}>🏠 SALIR</button>
+                  <button className="audit-act-btn approve" onClick={() => window.print()}><FaPrint/> IMPRIMIR</button>
+                  <button className="audit-act-btn reject" onClick={clearAudit}>🏠 FINALIZAR</button>
               </div>
+              
               {auditData.groupedItems.map(group => (
                   <div key={group.id} className="invoice-sheet">
                       <div className="inv-sheet-header">
-                          <div className="sheet-logo">ORDEN SALIDA</div>
+                          <div className="sheet-logo">SALIDA DE MERCANCÍA</div>
                           <div className="sheet-info"><h2>#{group.id}</h2><p>{new Date().toLocaleDateString()}</p></div>
                       </div>
-                      <div className="sheet-customer"><strong>{group.customer}</strong><br/>{group.items.length} items</div>
-                      <div className="sheet-body">
-                          <p className="sheet-note">Auditado y Verificado.</p>
-                          <div className="sheet-check"><div className="check-box">✅ OK</div></div>
+                      
+                      <div className="sheet-customer">
+                          <strong>Cliente:</strong> {group.customer}<br/>
+                          <strong>Items:</strong> {group.items.length} SKUs<br/>
                       </div>
-                      <div className="cut-line">- - - - - - - -</div>
+
+                      {/* ZONA DE QR MAESTRO PARA CAJA */}
+                      <div className="master-code-section">
+                          <div className="qr-wrapper">
+                              <QRCode value={generateMasterCode(group)} size={120} />
+                          </div>
+                          <div className="code-info">
+                              <h4>CÓDIGO DE CAJA</h4>
+                              <p>Contiene la lista completa de productos para facturación rápida.</p>
+                          </div>
+                      </div>
+
+                      {/* TABLA VISUAL DE RESPALDO */}
+                      <table className="invoice-table">
+                          <thead>
+                              <tr>
+                                  <th>Cant.</th>
+                                  <th>Producto</th>
+                                  <th>SKU</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              {group.items.map((item, idx) => (
+                                  <tr key={idx}>
+                                      <td style={{fontWeight:'bold', fontSize:'1.1rem'}}>{item.count}</td>
+                                      <td>
+                                          {item.name}
+                                          {item.is_sub && <span style={{display:'block', fontSize:'0.7rem', color:'#d97706'}}>(Sustituto)</span>}
+                                      </td>
+                                      <td style={{fontFamily:'monospace', fontSize:'0.8rem'}}>{item.sku || item.id}</td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
+
+                      <div className="sheet-footer">
+                          <div className="signatures">
+                              <div>_______________________<br/>Firma Auditor</div>
+                              <div>_______________________<br/>Firma Picker</div>
+                          </div>
+                      </div>
                   </div>
               ))}
           </div>

@@ -6,7 +6,16 @@ const { agruparItemsParaPicking } = require("./pickingUtils");
 exports.createPickingSession = async (req, res) => {
   const { id_picker, ids_pedidos } = req.body;
   try {
-    // 1. Obtener datos para Snapshot
+    // 1. Obtener Nombre Picker
+    const { data: pickerData } = await supabase
+        .from("wc_pickers")
+        .select("nombre_completo")
+        .eq("id", id_picker)
+        .single();
+    
+    const nombrePicker = pickerData ? pickerData.nombre_completo : "Picker";
+
+    // 2. Obtener datos para Snapshot (Llamada a Woo)
     const pedidosPromesas = ids_pedidos.map((id) => WooCommerce.get(`orders/${id}`));
     const responses = await Promise.all(pedidosPromesas);
     
@@ -21,12 +30,12 @@ exports.createPickingSession = async (req, res) => {
         customer_note: o.customer_note,
         line_items: o.line_items.map(item => ({
           ...item,
-          is_removed: false // Inicializamos bandera
+          is_removed: false // Bandera para soft-delete
         }))
       };
     });
 
-    // 2. Insertar Sesión
+    // 3. Insertar Sesión
     const { data: session, error: sessError } = await supabase
       .from("wc_picking_sessions")
       .insert([{
@@ -37,14 +46,24 @@ exports.createPickingSession = async (req, res) => {
 
     if (sessError) throw sessError;
 
-    // 3. Actualizar Picker
+    // 4. Actualizar estado del Picker
     await supabase.from("wc_pickers").update({ estado_picker: "picking", id_sesion_actual: session.id }).eq("id", id_picker);
 
-    // 4. Crear Asignaciones
-    const asignaciones = ids_pedidos.map((idPedido) => ({
-      id_pedido: idPedido, id_picker: id_picker, id_sesion: session.id,
-      estado_asignacion: "en_proceso", fecha_inicio: new Date().toISOString(),
-    }));
+    // 5. Crear Asignaciones (CON NOMBRE Y SNAPSHOT INDIVIDUAL)
+    const asignaciones = ids_pedidos.map((idPedido) => {
+        // Encontrar el snapshot correspondiente a este pedido específico
+        const snapshot = snapshotPedidos.find(s => s.id === idPedido);
+        
+        return {
+          id_pedido: idPedido, 
+          id_picker: id_picker, 
+          id_sesion: session.id,
+          nombre_picker: nombrePicker, // Guardamos el nombre aquí
+          reporte_snapshot: snapshot,  // Guardamos el snapshot individual
+          estado_asignacion: "en_proceso", 
+          fecha_inicio: new Date().toISOString(),
+        };
+    });
 
     const { error: assignError } = await supabase.from("wc_asignaciones_pedidos").insert(asignaciones);
     if (assignError) throw assignError;
@@ -57,7 +76,7 @@ exports.createPickingSession = async (req, res) => {
 };
 
 exports.getSessionActive = async (req, res) => {
-  const { id_picker, include_removed } = req.query; // ✅ Nuevo parámetro
+  const { id_picker, include_removed } = req.query;
 
   try {
     const { data: picker } = await supabase.from("wc_pickers").select("id_sesion_actual").eq("id", id_picker).single();
@@ -66,33 +85,31 @@ exports.getSessionActive = async (req, res) => {
     const sessionId = picker.id_sesion_actual;
     const { data: session } = await supabase.from("wc_picking_sessions").select("*").eq("id", sessionId).single();
 
-    // Obtener órdenes (Snapshot o Woo)
+    // Obtener órdenes (Snapshot o Woo en vivo si falla)
     let orders = session.snapshot_pedidos && session.snapshot_pedidos.length > 0 
         ? session.snapshot_pedidos 
         : (await Promise.all(session.ids_pedidos.map(id => WooCommerce.get(`orders/${id}`)))).map(r => r.data);
 
     const allItems = agruparItemsParaPicking(orders);
     
-    // ✅ MODIFICACIÓN LÓGICA DE VISIBILIDAD:
     let itemsAgrupados;
     if (include_removed === 'true') {
-        // Si es Admin (pidió ver borrados), mostramos TODO (activos y borrados)
         itemsAgrupados = allItems.filter(item => item.quantity_total > 0 || item.is_removed); 
     } else {
-        // Si es Picker (comportamiento normal), ocultamos borrados
         itemsAgrupados = allItems.filter(item => !item.is_removed && item.quantity_total > 0);
     }
 
     const { data: assignments } = await supabase.from('wc_asignaciones_pedidos').select('id').eq('id_sesion', sessionId);
     const assignIds = assignments.map(a => a.id);
 
+    // Logs para determinar estado actual de cada producto
     const { data: logs } = await supabase
       .from("wc_log_picking")
       .select("id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo")
       .in("id_asignacion", assignIds)
       .in("id_producto", itemsAgrupados.map((i) => i.product_id));
 
-    // Fix categorías
+    // Mapeo de Categorías Reales (para ordenar pasillos)
     const productIds = itemsAgrupados.map((i) => i.product_id);
     const mapaCategoriasReales = {};
     if (productIds.length > 0) {
@@ -134,10 +151,14 @@ exports.completeSession = async (req, res) => {
   const { id_sesion, id_picker } = req.body;
   try {
     const now = new Date().toISOString();
+    // Marcamos como completado para que el Auditor lo vea, pero NO liberamos picker aún
     await supabase.from("wc_picking_sessions").update({ estado: "completado", fecha_fin: now }).eq("id", id_sesion);
-    await supabase.from("wc_pickers").update({ estado_picker: "disponible", id_sesion_actual: null }).eq("id", id_picker);
     await supabase.from("wc_asignaciones_pedidos").update({ estado_asignacion: "completado", fecha_fin: now }).eq("id_sesion", id_sesion);
-    res.status(200).json({ message: "Sesión finalizada (Local)." });
+    
+    // El picker queda "atrapado" en su frontend esperando la auditoría
+    // NO actualizamos el estado_picker a 'disponible' aquí.
+    
+    res.status(200).json({ message: "Ruta finalizada. Esperando auditoría." });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
