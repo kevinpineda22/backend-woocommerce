@@ -17,7 +17,10 @@ import {
   FaUndo,
   FaPhone,
   FaClock,
-  FaCheckCircle 
+  FaCheckCircle,
+  FaBan,
+  FaSpinner, // Icono de carga
+  FaLock // Icono de candado
 } from "react-icons/fa";
 import "./VistaPicker.css";
 import EscanerBarras from "../DesarrolloSurtido_API/EscanerBarras";
@@ -39,7 +42,6 @@ const ORDER_COLORS = [
 const getOrderStyle = (orderIndex) =>
   ORDER_COLORS[orderIndex % ORDER_COLORS.length];
 
-// --- CRONÓMETRO ---
 const SessionTimer = ({ startDate }) => {
   const [elapsed, setElapsed] = useState("00:00");
   useEffect(() => {
@@ -59,18 +61,18 @@ const SessionTimer = ({ startDate }) => {
   return <div className="ec-timer-badge"><FaClock /> {elapsed}</div>;
 };
 
-// --- TARJETA DE PRODUCTO ---
 const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
   const scanned = item.qty_scanned || 0;
   const total = item.quantity_total;
   const remaining = total - scanned;
   const isPartial = scanned > 0 && scanned < total;
   const isSubstituted = item.status === "sustituido" && item.sustituto;
+  const isShortPick = isCompleted && scanned < total && item.status !== "sustituido";
   const formatPrice = (p) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(p);
 
   return (
     <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-      className={`ec-product-card ${isCompleted ? "completed" : ""} ${isPartial ? "partial-scan" : ""} ${isSubstituted ? "sustituido-card" : ""}`}
+      className={`ec-product-card ${isCompleted ? "completed" : ""} ${isPartial ? "partial-scan" : ""} ${isSubstituted ? "sustituido-card" : ""} ${isShortPick ? "short-pick-mode" : ""}`}
     >
       <div className="ec-img-wrapper">
         {item.image_src ? <img src={item.image_src} className="ec-prod-img" alt="" /> : <FaBoxOpen color="#ccc" size={30} />}
@@ -97,6 +99,11 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
           <>
             <h4 className="ec-prod-name">{item.name}</h4>
             <div className="ec-price-tag">{item.price > 0 ? formatPrice(item.price) : ""}</div>
+            {isShortPick && (
+                <div className="short-pick-alert">
+                    <FaExclamationTriangle /> Se encontraron solo {scanned} de {total}
+                </div>
+            )}
           </>
         )}
         <div className="ec-req-list">
@@ -122,22 +129,30 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
               <><FaBarcode /><span className="ec-scan-label">SCAN</span></>
             )}
           </button>
+          
+          {isPartial && (
+              <button className="ec-short-btn" onClick={() => onAction(item, "short_pick")} title="Faltan Unidades">
+                  <FaBan />
+              </button>
+          )}
+
           <div style={{ display: "flex", gap: 5 }}>
             <button className="ec-alt-btn" onClick={() => onAction(item, "manual")} title="Teclado"><FaKeyboard size={14} /></button>
-            <button className="ec-alt-btn warning" onClick={() => onAction(item, "substitute")} title="Sustituir"><FaExchangeAlt size={14} /></button>
+            <button className="ec-alt-btn warning" onClick={() => onAction(item, "substitute")} title="Sustituir Total"><FaExchangeAlt size={14} /></button>
           </div>
         </div>
       ) : (
         <div className="ec-action-col">
           <button className="ec-alt-btn" style={{ color: "#dc2626", borderColor: "#fca5a5", background: "#fef2f2" }} onClick={() => { if (window.confirm("¿Devolver a pendientes?")) onAction(item, "undo"); }} title="Devolver a pendientes"><FaUndo /></button>
-          <div style={{ marginTop: 5, color: isSubstituted ? "#d97706" : "#16a34a" }}>{isSubstituted ? <FaExchangeAlt /> : <FaCheck />}</div>
+          <div style={{ marginTop: 5, color: isSubstituted ? "#d97706" : isShortPick ? "#ef4444" : "#16a34a" }}>
+              {isSubstituted ? <FaExchangeAlt /> : isShortPick ? <FaExclamationTriangle /> : <FaCheck />}
+          </div>
         </div>
       )}
     </motion.div>
   );
 };
 
-// --- COMPONENTE PRINCIPAL ---
 const VistaPicker = () => {
   const [loading, setLoading] = useState(true);
   const [sessionData, setSessionData] = useState(null);
@@ -148,21 +163,19 @@ const VistaPicker = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
   const [showSuccessQR, setShowSuccessQR] = useState(false);
-  
-  // ✅ ESTADO PERSISTENTE DEL ID FINALIZADO (Para no perder el QR al recargar)
   const [completedSessionId, setCompletedSessionId] = useState(null);
 
-  // Estados de Modales
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [showClientsModal, setShowClientsModal] = useState(false);
   const [scanOverrideCallback, setScanOverrideCallback] = useState(null);
+  const [missingQtyForSub, setMissingQtyForSub] = useState(0);
 
   const resetSesionLocal = () => {
-    console.log("🧹 Limpieza de sesión...");
     localStorage.removeItem("session_active_cache");
     localStorage.removeItem("offline_actions_queue");
+    localStorage.removeItem("waiting_for_audit_id");
     setPendingSync(0);
   };
 
@@ -178,6 +191,8 @@ const VistaPicker = () => {
       if (err.response && err.response.status === 404) {
         resetSesionLocal();
         setSessionData(null);
+        setShowSuccessQR(false); 
+        setCompletedSessionId(null);
       } else {
         const cached = localStorage.getItem("session_active_cache");
         if(cached) setSessionData(JSON.parse(cached));
@@ -185,7 +200,52 @@ const VistaPicker = () => {
     }
   }, []);
 
-  // --- 1. INICIALIZACIÓN ---
+  // CONFIGURAR LISTENER REALTIME Y POLLING
+  useEffect(() => {
+    let channel = null;
+    let pollingInterval = null;
+
+    const setupListener = (sid) => {
+        // Realtime Supabase
+        channel = supabase.channel(`live-session-${sid}`)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'wc_picking_sessions', filter: `id=eq.${sid}` }, 
+                async (payload) => {
+                    const newState = payload.new.estado;
+                    // LIBERACIÓN AUTOMÁTICA
+                    if (newState === 'auditado' || newState === 'finalizado') {
+                        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                        resetSesionLocal();
+                        window.location.reload();
+                    }
+                    if (newState === 'cancelado') {
+                        alert("⛔ Ruta CANCELADA.");
+                        resetSesionLocal();
+                        window.location.reload();
+                    }
+                }
+            ).subscribe();
+
+        // Polling de respaldo (cada 4s) por si falla el socket
+        pollingInterval = setInterval(async () => {
+            try {
+                const { data } = await supabase.from("wc_picking_sessions").select("estado").eq("id", sid).single();
+                if (data && (data.estado === 'auditado' || data.estado === 'finalizado')) {
+                    resetSesionLocal();
+                    window.location.reload();
+                }
+            } catch (e) {}
+        }, 4000);
+    };
+
+    if (sessionData?.session_id) setupListener(sessionData.session_id);
+    else if (completedSessionId) setupListener(completedSessionId);
+
+    return () => {
+        if (channel) supabase.removeChannel(channel);
+        if (pollingInterval) clearInterval(pollingInterval);
+    };
+  }, [sessionData?.session_id, completedSessionId]);
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -198,21 +258,19 @@ const VistaPicker = () => {
             me = pickers[0];
             localStorage.setItem("picker_info_cache", JSON.stringify(me));
           }
-        } catch (err) {
-          me = JSON.parse(localStorage.getItem("picker_info_cache"));
-        }
+        } catch (err) { me = JSON.parse(localStorage.getItem("picker_info_cache")); }
+        
         if (!me) { alert("Usuario no encontrado."); setLoading(false); return; }
         setPickerInfo(me);
 
-        // ✅ REVISAR SI HAY UN QR PENDIENTE DE AUDITORÍA
+        // Si hay una sesión pendiente de auditoría, bloquear aquí
         const savedCompletedId = localStorage.getItem("waiting_for_audit_id");
         if (savedCompletedId) {
             setCompletedSessionId(savedCompletedId);
             setShowSuccessQR(true);
             setLoading(false);
-            return; // 🛑 NO cargamos sesión nueva, mostramos QR
+            return; 
         }
-
         await refreshSessionData(me.id);
       } catch (e) { console.error("Error init:", e); } 
       finally { setLoading(false); }
@@ -224,50 +282,6 @@ const VistaPicker = () => {
     window.addEventListener("offline", goOffline);
     return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
   }, [refreshSessionData]);
-
-  // --- 2. REALTIME (KILL SWITCH Y UPDATES) ---
-  useEffect(() => {
-    if (!sessionData || !pickerInfo) return;
-    const channel = supabase.channel(`live-session-${sessionData.session_id}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'wc_picking_sessions', filter: `id=eq.${sessionData.session_id}` }, 
-            async (payload) => {
-                if (payload.new.estado === 'cancelado') {
-                    if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
-                    alert("⛔ ATENCIÓN: Ruta CANCELADA por Admin.");
-                    resetSesionLocal();
-                    setSessionData(null);
-                    window.location.reload();
-                    return;
-                }
-                await refreshSessionData(pickerInfo.id);
-            }
-        ).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [sessionData?.session_id, pickerInfo, refreshSessionData]);
-
-  // --- 3. SYNC QUEUE ---
-  useEffect(() => {
-    const syncInterval = setInterval(async () => {
-      const queue = JSON.parse(localStorage.getItem("offline_actions_queue") || "[]");
-      setPendingSync(queue.length);
-      if (queue.length === 0 || !navigator.onLine) return;
-      if (!sessionData && queue.length > 0) { localStorage.removeItem("offline_actions_queue"); setPendingSync(0); return; }
-      const action = queue[0];
-      try {
-        await axios.post("https://backend-woocommerce.vercel.app/api/orders/registrar-accion", action);
-        const newQueue = queue.slice(1);
-        localStorage.setItem("offline_actions_queue", JSON.stringify(newQueue));
-        setPendingSync(newQueue.length);
-      } catch (error) {
-        if (error.response && (error.response.status === 404 || error.response.status === 500)) {
-          const newQueue = queue.slice(1);
-          localStorage.setItem("offline_actions_queue", JSON.stringify(newQueue));
-          setPendingSync(newQueue.length);
-        }
-      }
-    }, 3000); 
-    return () => clearInterval(syncInterval);
-  }, [sessionData]);
 
   const queueAction = (payload) => {
     const queue = JSON.parse(localStorage.getItem("offline_actions_queue") || "[]");
@@ -289,13 +303,45 @@ const VistaPicker = () => {
       if (isWeighable(item)) setShowWeightModal(true);
       else setIsScanning(true);
     } else if (type === "manual") setShowManualModal(true);
-    else if (type === "substitute") setShowSubModal(true);
+    else if (type === "substitute") {
+        setMissingQtyForSub(item.quantity_total - (item.qty_scanned || 0)); 
+        setShowSubModal(true);
+    }
     else if (type === "undo") handleUndo(item);
+    else if (type === "short_pick") handleShortPick(item);
   };
 
   const isWeighable = (item) => {
     const txt = (item.name + " " + (item.categorias?.[0]?.name || "")).toLowerCase();
     return (txt.includes("kg") || txt.includes("gramos") || txt.includes("fruver") || txt.includes("carniceria"));
+  };
+
+  const handleShortPick = async (item) => {
+      const scanned = item.qty_scanned || 0;
+      const total = item.quantity_total;
+      const missing = total - scanned;
+      if(missing <= 0) return;
+
+      const choice = window.confirm(
+          `⚠️ FALTAN ${missing} UNIDADES.\n\n` + 
+          `[ACEPTAR] = Buscar un SUSTITUTO para lo que falta.\n` + 
+          `[CANCELAR] = Enviar INCOMPLETO (cobrar solo ${scanned}).`
+      );
+
+      if (choice) {
+          setMissingQtyForSub(missing);
+          setShowSubModal(true);
+      } else {
+          queueAction({
+              id_sesion: sessionData.session_id,
+              id_producto_original: item.product_id,
+              nombre_producto_original: item.name,
+              accion: "no_encontrado", 
+              cantidad_afectada: missing, 
+              motivo: "Stock Insuficiente"
+          });
+          updateLocalSessionState(item.product_id, scanned, "recolectado");
+      }
   };
 
   const handleUndo = async (item) => {
@@ -324,14 +370,16 @@ const VistaPicker = () => {
     } catch (e) { closeAllModals(); }
   };
 
-  const confirmSubstitution = (newItem) => {
+  const confirmSubstitution = (newItem, qty) => {
     queueAction({
       id_sesion: sessionData.session_id,
       id_producto_original: currentItem.product_id,
       nombre_producto_original: currentItem.name,
       accion: "sustituido",
       datos_sustituto: { id: newItem.id, name: newItem.name, price: newItem.price },
+      cantidad_afectada: qty || 1
     });
+    
     updateLocalSessionState(currentItem.product_id, currentItem.quantity_total, "sustituido", { name: newItem.name, price: newItem.price });
     closeAllModals();
     alert("🔄 Sustitución registrada");
@@ -393,21 +441,17 @@ const VistaPicker = () => {
     if (!window.confirm("¿Finalizar sesión completa?")) return;
     
     const finalId = sessionData.session_id;
-    // ✅ PERSISTENCIA: Guardamos ID para que el QR sobreviva a recargas
     localStorage.setItem("waiting_for_audit_id", finalId);
     setCompletedSessionId(finalId);
 
     try {
-      await axios.post("https://backend-woocommerce.vercel.app/api/orders/finalizar-sesion", { id_sesion: finalId, id_picker: pickerInfo.id });
-      resetSesionLocal();
+      // Notificamos al backend que se "cerró" el picking, pero el estado sigue en espera de auditoría
+      // Opcional: podrías tener un estado 'esperando_auditoria' en DB, pero con 'en_proceso' y el flag local basta.
+      // El cambio real de estado lo hace el auditor.
+      
       setSessionData(null); 
       setShowSuccessQR(true);
     } catch (e) { alert("Error al finalizar."); }
-  };
-
-  const handleExitQR = () => {
-      localStorage.removeItem("waiting_for_audit_id");
-      window.location.reload();
   };
 
   const closeAllModals = () => {
@@ -425,18 +469,31 @@ const VistaPicker = () => {
 
   if (loading) return <div className="ec-picker-centered"><div className="ec-spinner"></div><p>Conectando...</p></div>;
 
-  // ✅ PANTALLA QR PERSISTENTE
+  // ✅ PANTALLA DE BLOQUEO CON QR (SIN BOTÓN DE SALIDA)
   if (showSuccessQR && completedSessionId) {
       return (
           <div className="ec-picker-centered" style={{background: '#10b981', color:'white'}}>
               <FaCheckCircle size={60} style={{marginBottom:20}} />
               <h2>¡Ruta Finalizada!</h2>
-              <p>Dirígete a la zona de auditoría.</p>
-              <div style={{background:'white', padding:20, borderRadius:16, margin:'30px 0'}}>
-                  <QRCode value={completedSessionId} size={200} />
+              <p>Muestra este código al auditor.</p>
+              
+              <div style={{background:'white', padding:20, borderRadius:16, margin:'30px 0', boxShadow: '0 10px 25px rgba(0,0,0,0.2)'}}>
+                  <QRCode value={completedSessionId} size={220} />
               </div>
-              <p style={{fontSize:'0.8rem', opacity:0.9}}>ID: {completedSessionId.slice(0,8)}</p>
-              <button onClick={handleExitQR} className="ec-scan-btn" style={{marginTop:40, background:'white', color:'#10b981', width:'auto', padding:'10px 30px'}}>Nueva Ruta (Auditoría OK)</button>
+              <p style={{fontSize:'0.9rem', fontWeight:'bold', fontFamily:'monospace', background:'rgba(0,0,0,0.1)', padding:'5px 10px', borderRadius:8}}>
+                  ID: {completedSessionId.slice(0,8)}
+              </p>
+
+              <div style={{marginTop:40, display:'flex', flexDirection:'column', alignItems:'center', gap:10}}>
+                  <div style={{display:'flex', alignItems:'center', gap:10, fontSize:'1.1rem', fontWeight:'bold'}}>
+                      <FaLock />
+                      <span>Bloqueado por seguridad</span>
+                  </div>
+                  <div style={{display:'flex', alignItems:'center', gap:8, fontSize:'0.9rem', opacity:0.9}}>
+                      <FaSpinner className="ec-spin" />
+                      Esperando aprobación de salida...
+                  </div>
+              </div>
           </div>
       );
   }
@@ -511,6 +568,7 @@ const VistaPicker = () => {
       <SubstituteModal 
         isOpen={showSubModal} 
         originalItem={currentItem} 
+        missingQty={missingQtyForSub}
         onClose={() => { setShowSubModal(false); setCurrentItem(null); }} 
         onConfirmSubstitute={confirmSubstitution} 
         onRequestScan={handleRequestScan} 

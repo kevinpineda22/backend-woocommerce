@@ -9,11 +9,11 @@ import {
   FaKeyboard,
   FaMagic,
   FaBarcode,
-  FaCamera, // ✅ Importado para el botón de escáner
+  FaCamera, 
   FaArrowLeft,
   FaPhone,
   FaWhatsapp,
-  FaUser
+  FaExclamationCircle
 } from "react-icons/fa";
 
 // --- MODAL DE INGRESO MANUAL ---
@@ -59,17 +59,39 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
   );
 };
 
-// --- MODAL DE PESO ---
+// --- MODAL DE PESO (CON TOLERANCIA ESTRICTA) ---
 export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
   const [weight, setWeight] = useState("");
+  const [error, setError] = useState("");
   const inputRef = useRef(null);
 
   useEffect(() => {
       if (isOpen) {
           setWeight("");
+          setError("");
           setTimeout(() => inputRef.current?.focus(), 100);
       }
   }, [isOpen, item]);
+
+  const validateAndConfirm = () => {
+      const val = parseFloat(weight);
+      const requested = parseFloat(item.quantity_total); // Asumimos que quantity_total es el peso pedido en KG
+      
+      // REGLA: No menos de lo pedido
+      if (val < requested) {
+          setError(`❌ Mínimo requerido: ${requested} Kg`);
+          return;
+      }
+
+      // REGLA: Máximo 50g (0.05kg) por encima
+      const maxAllowed = requested + 0.050;
+      if (val > maxAllowed) {
+          setError(`❌ Excede tolerancia. Máx: ${maxAllowed.toFixed(3)} Kg`);
+          return;
+      }
+
+      onConfirm(val);
+  };
 
   if (!isOpen || !item) return null;
 
@@ -78,9 +100,12 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
       <div className="ec-modal-content">
         <div style={{ textAlign: "center", marginBottom: 15 }}>
             <FaWeightHanging size={40} color="#22c55e" />
-            <h3>Ingresar Peso Final</h3>
+            <h3>Ingresar Peso Real</h3>
             <p style={{fontSize:'1.1rem', margin:'10px 0'}}><strong>{item.name}</strong></p>
-            <p className="ec-text-secondary" style={{fontSize:'0.9rem'}}>Solicitado: {item.quantity_total} un/kg aprox</p>
+            <div style={{fontSize:'0.9rem', background:'#f0fdf4', padding:10, borderRadius:8, border:'1px solid #bbf7d0'}}>
+                Solicitado: <strong>{item.quantity_total} Kg</strong><br/>
+                <small style={{color:'#15803d'}}>Margen permitido: +50g</small>
+            </div>
         </div>
         
         <div className="ec-input-wrapper">
@@ -91,36 +116,42 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
             placeholder="0.000"
             step="0.001"
             value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && weight && parseFloat(weight) > 0 && onConfirm(parseFloat(weight))}
+            onChange={(e) => { setWeight(e.target.value); setError(""); }}
+            onKeyDown={(e) => e.key === 'Enter' && weight && validateAndConfirm()}
           />
           <span style={{ position: "absolute", right: 20, fontWeight: "bold", color: "#94a3b8" }}>KG</span>
         </div>
 
+        {error && (
+            <div style={{color:'#ef4444', marginTop:10, fontWeight:'bold', fontSize:'0.9rem', display:'flex', alignItems:'center', justifyContent:'center', gap:5}}>
+                <FaExclamationCircle/> {error}
+            </div>
+        )}
+
         <div className="ec-modal-grid">
           <button className="ec-modal-cancel" onClick={onClose}>Cancelar</button>
           <button className="ec-reason-btn" style={{ background: "#22c55e", color: "white", width: "100%" }}
-            onClick={() => onConfirm(parseFloat(weight))} disabled={!weight || parseFloat(weight) <= 0}>Confirmar</button>
+            onClick={validateAndConfirm} disabled={!weight}>Confirmar</button>
         </div>
       </div>
     </div>
   );
 };
 
-// --- MODAL DE SUSTITUCIÓN (MEJORADO CON CÁMARA) ---
+// --- MODAL DE SUSTITUCIÓN (ADAPTADO A CANTIDAD) ---
 export const SubstituteModal = ({
   isOpen,
   originalItem,
+  missingQty, // Nueva prop para saber cuántos faltan
   onClose,
   onConfirmSubstitute,
-  onRequestScan // ✅ PROP NUEVA: Callback para abrir escáner del padre
+  onRequestScan 
 }) => {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState([]); 
   const [loading, setLoading] = useState(false);
   const [isManualSearch, setIsManualSearch] = useState(false);
   
-  // ESTADOS DE VERIFICACIÓN
   const [pendingSub, setPendingSub] = useState(null); 
   const [verifyCode, setVerifyCode] = useState(""); 
   const verifyInputRef = useRef(null);
@@ -166,7 +197,6 @@ export const SubstituteModal = ({
       setTimeout(() => verifyInputRef.current?.focus(), 200);
   };
 
-  // Validación laxa (acepta SKU parcial o "OK")
   const validateCode = (codeToCheck, product) => {
       const cleanInput = codeToCheck.trim().toUpperCase();
       const sku = (product.sku || "").toUpperCase();
@@ -178,7 +208,7 @@ export const SubstituteModal = ({
       const code = manualInput || verifyCode;
       
       if (validateCode(code, pendingSub)) {
-          onConfirmSubstitute(pendingSub);
+          onConfirmSubstitute(pendingSub, missingQty); // Pasamos cantidad faltante
       } else {
           if(navigator.vibrate) navigator.vibrate([100, 50, 100]);
           alert(`❌ Código incorrecto.\nEscaneado: ${code}\nEsperado SKU: ${pendingSub.sku}`);
@@ -187,11 +217,8 @@ export const SubstituteModal = ({
       }
   };
 
-  // ✅ LOGICA DE ESCANEO DESDE MODAL
   const handleCameraClick = () => {
       if (onRequestScan) {
-          // Pedimos al padre (VistaPicker) que abra la cámara.
-          // Le pasamos un callback que se ejecutará cuando el padre detecte un código.
           onRequestScan((scannedCode) => {
               setVerifyCode(scannedCode);
               handleVerify(scannedCode);
@@ -203,26 +230,25 @@ export const SubstituteModal = ({
 
   if (!isOpen || !originalItem) return null;
 
-  // --- PANTALLA 2: VALIDACIÓN REQUERIDA (CON CÁMARA) ---
   if (pendingSub) {
       return (
         <div className="ec-modal-overlay high-z">
             <div className="ec-modal-content">
                 <div style={{background:'#f59e0b', padding:'20px', margin:'-25px -25px 20px', color:'white', display:'flex', alignItems:'center', justifyContent:'center', flexDirection:'column', borderTopLeftRadius:24, borderTopRightRadius:24}}>
                     <FaBarcode size={40} style={{marginBottom:10}} />
-                    <h3 style={{margin:0}}>Validación Requerida</h3>
+                    <h3 style={{margin:0}}>Validar Sustituto</h3>
+                    <p style={{margin:0, opacity:0.9, fontSize:'0.9rem'}}>Cantidad a sustituir: <strong>{missingQty}</strong></p>
                 </div>
                 
                 <div style={{textAlign:'center', marginBottom:20}}>
                     <p style={{fontSize:'0.9rem', color:'#64748b', textTransform:'uppercase', fontWeight:700}}>Vas a llevar:</p>
                     <h3 style={{color:'#1e293b', margin:'10px 0', fontSize:'1.2rem', lineHeight:1.3}}>{pendingSub.name}</h3>
                     <p className="ec-text-secondary" style={{fontSize:'0.85rem', background:'#f1f5f9', padding:10, borderRadius:8}}>
-                        Por seguridad, escanea el código de barras o digita el SKU del producto físico.
+                        Escanea el código de barras del producto físico.
                     </p>
                 </div>
                 
                 <div className="ec-input-wrapper" style={{marginBottom:20, gap:10}}>
-                    {/* ✅ BOTÓN DE CÁMARA */}
                     <button 
                         className="ec-reason-btn" 
                         style={{background:'#1e293b', width:60, height:60, borderRadius:12, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center'}}
@@ -257,12 +283,11 @@ export const SubstituteModal = ({
       );
   }
 
-  // --- PANTALLA 1: LISTA DE SUGERENCIAS ---
   return (
     <div className="ec-modal-overlay">
       <div className="ec-modal-content large">
         <div className="ec-modal-header">
-          <h3><FaExchangeAlt /> Sustituir Producto</h3>
+          <h3><FaExchangeAlt /> Sustituir {missingQty} Unidades</h3>
           <button onClick={onClose}><FaTimes /></button>
         </div>
 
@@ -322,7 +347,6 @@ export const SubstituteModal = ({
   );
 };
 
-// --- MODAL DE CLIENTES ---
 export const ClientsModal = ({ isOpen, orders, onClose }) => {
     if (!isOpen || !orders) return null;
     return (
