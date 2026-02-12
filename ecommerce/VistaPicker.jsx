@@ -65,21 +65,27 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
   const scanned = item.qty_scanned || 0;
   const total = item.quantity_total;
   const remaining = total - scanned;
-  const isPartial = scanned > 0 && scanned < total;
-  const isSubstituted = item.status === "sustituido" && item.sustituto;
   
-  const isShortPick = isCompleted && scanned < total && item.status !== "sustituido";
+  const isPartial = scanned > 0 && scanned < total;
+  const isFullySubstituted = item.status === "sustituido" && scanned === 0;
+  
+  // ✅ NUEVA LÓGICA: Estado "Mixto" (Tienes originales y también sustitutos)
+  // Ocurre cuando escaneaste algunos (scanned > 0) Y TAMBIÉN agregaste sustituto (item.sustituto existe)
+  const isMixed = scanned > 0 && item.sustituto;
+
+  const isShortPick = isCompleted && scanned < total && !item.sustituto;
 
   const formatPrice = (p) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(p);
 
   return (
     <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-      className={`ec-product-card ${isCompleted ? "completed" : ""} ${isPartial ? "partial-scan" : ""} ${isSubstituted ? "sustituido-card" : ""} ${isShortPick ? "short-pick-mode" : ""}`}
+      className={`ec-product-card ${isCompleted ? "completed" : ""} ${isPartial ? "partial-scan" : ""} ${isFullySubstituted ? "sustituido-card" : ""} ${isMixed ? "mixed-card" : ""} ${isShortPick ? "short-pick-mode" : ""}`}
     >
       <div className="ec-img-wrapper">
         {item.image_src ? <img src={item.image_src} className="ec-prod-img" alt="" /> : <FaBoxOpen color="#ccc" size={30} />}
         <span className="ec-qty-badge-img">{total}</span>
       </div>
+      
       <div className="ec-info-col">
         <div style={{ display: "flex", flexDirection: "column", gap: "3px", alignItems: "flex-start", marginBottom: "2px" }}>
           <span className="ec-pasillo-badge" style={{ background: "#2563eb", color: "white", padding: "4px 10px", fontSize: "0.8rem", boxShadow: "0 2px 4px rgba(37,99,235,0.3)" }}>
@@ -91,7 +97,20 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
             </span>
           )}
         </div>
-        {isSubstituted ? (
+
+        {/* CASO: MIXTO (Original + Sustituto) - VISUALIZACIÓN DETALLADA */}
+        {isMixed ? (
+            <div className="ec-sub-details">
+                <div style={{borderBottom:'1px dashed #ccc', paddingBottom:4, marginBottom:4}}>
+                    <span className="ec-label-tiny" style={{color:'#16a34a'}}>ORIGINAL:</span>
+                    <span style={{fontWeight:'bold'}}>{scanned} un.</span> {item.name}
+                </div>
+                <div>
+                    <span className="ec-label-tiny" style={{color:'#d97706'}}>SUSTITUTO:</span>
+                    <span style={{fontWeight:'bold'}}>{total - scanned} un.</span> {item.sustituto.name}
+                </div>
+            </div>
+        ) : isFullySubstituted ? (
           <div className="ec-sub-details">
             <div className="ec-original-row"><span className="ec-label-tiny">PIDIÓ:</span><span className="ec-text-crossed">{item.name}</span></div>
             <div className="ec-arrow-down"><FaArrowRight style={{ transform: "rotate(90deg)", fontSize: "0.8rem", color: "#f59e0b" }} /></div>
@@ -109,6 +128,7 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
             )}
           </>
         )}
+
         <div className="ec-req-list">
           {item.pedidos_involucrados.map((ped, idx) => {
             const orderIdx = orderMap[ped.id_pedido] || 0;
@@ -123,6 +143,7 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
           })}
         </div>
       </div>
+
       {!isCompleted ? (
         <div className="ec-action-col">
           <button className={`ec-scan-btn ${isPartial ? "active-partial" : ""}`} onClick={() => onAction(item, "scan")}>
@@ -147,8 +168,8 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
       ) : (
         <div className="ec-action-col">
           <button className="ec-alt-btn" style={{ color: "#dc2626", borderColor: "#fca5a5", background: "#fef2f2" }} onClick={() => { if (window.confirm("¿Devolver a pendientes?")) onAction(item, "undo"); }} title="Devolver a pendientes"><FaUndo /></button>
-          <div style={{ marginTop: 5, color: isSubstituted ? "#d97706" : isShortPick ? "#ef4444" : "#16a34a" }}>
-              {isSubstituted ? <FaExchangeAlt /> : isShortPick ? <FaExclamationTriangle /> : <FaCheck />}
+          <div style={{ marginTop: 5, color: (isFullySubstituted || isMixed) ? "#d97706" : isShortPick ? "#ef4444" : "#16a34a" }}>
+              {(isFullySubstituted || isMixed) ? <FaExchangeAlt /> : isShortPick ? <FaExclamationTriangle /> : <FaCheck />}
           </div>
         </div>
       )}
@@ -203,15 +224,18 @@ const VistaPicker = () => {
     }
   }, []);
 
+  // CONFIGURAR LISTENER REALTIME Y POLLING
   useEffect(() => {
     let channel = null;
     let pollingInterval = null;
 
     const setupListener = (sid) => {
+        // Realtime Supabase
         channel = supabase.channel(`live-session-${sid}`)
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'wc_picking_sessions', filter: `id=eq.${sid}` }, 
                 async (payload) => {
                     const newState = payload.new.estado;
+                    // LIBERACIÓN AUTOMÁTICA
                     if (newState === 'auditado' || newState === 'finalizado') {
                         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                         resetSesionLocal();
@@ -225,6 +249,7 @@ const VistaPicker = () => {
                 }
             ).subscribe();
 
+        // Polling de respaldo (cada 4s) por si falla el socket
         pollingInterval = setInterval(async () => {
             try {
                 const { data } = await supabase.from("wc_picking_sessions").select("estado").eq("id", sid).single();
@@ -262,6 +287,7 @@ const VistaPicker = () => {
         if (!me) { alert("Usuario no encontrado."); setLoading(false); return; }
         setPickerInfo(me);
 
+        // Si hay una sesión pendiente de auditoría, bloquear aquí
         const savedCompletedId = localStorage.getItem("waiting_for_audit_id");
         if (savedCompletedId) {
             setCompletedSessionId(savedCompletedId);
@@ -318,6 +344,7 @@ const VistaPicker = () => {
       const scanned = item.qty_scanned || 0;
       const total = item.quantity_total;
       const missing = total - scanned;
+
       if(missing <= 0) return;
 
       const choice = window.confirm(
@@ -338,7 +365,7 @@ const VistaPicker = () => {
               accion: "no_encontrado", 
               cantidad_afectada: missing, 
               motivo: "Stock Insuficiente",
-              pasillo: item.pasillo // <--- AGREGADO
+              pasillo: item.pasillo 
           });
           updateLocalSessionState(item.product_id, scanned, "recolectado");
       }
@@ -357,14 +384,14 @@ const VistaPicker = () => {
       const currentScanned = (currentItem.qty_scanned || 0) + 1;
       const targetQty = currentItem.quantity_total;
       const isFinished = currentScanned >= targetQty;
-      // ✅ ENVIAMOS PASILLO AQUÍ
+      
       const payload = { 
           id_sesion: sessionData.session_id, 
           id_producto_original: currentItem.product_id, 
           nombre_producto_original: currentItem.name, 
           accion: "recolectado", 
           peso_real: peso,
-          pasillo: currentItem.pasillo // <--- AGREGADO
+          pasillo: currentItem.pasillo 
       };
       
       queueAction(payload);
@@ -379,7 +406,6 @@ const VistaPicker = () => {
   };
 
   const confirmSubstitution = (newItem, qty) => {
-    // ✅ ENVIAMOS PASILLO AQUÍ
     queueAction({
       id_sesion: sessionData.session_id,
       id_producto_original: currentItem.product_id,
@@ -387,9 +413,10 @@ const VistaPicker = () => {
       accion: "sustituido",
       datos_sustituto: { id: newItem.id, name: newItem.name, price: newItem.price },
       cantidad_afectada: qty || 1,
-      pasillo: currentItem.pasillo // <--- AGREGADO
+      pasillo: currentItem.pasillo
     });
     
+    // Al sustituir el resto, ya consideramos el item como "completado" en la vista
     updateLocalSessionState(currentItem.product_id, currentItem.quantity_total, "sustituido", { name: newItem.name, price: newItem.price });
     closeAllModals();
     alert("🔄 Sustitución registrada");

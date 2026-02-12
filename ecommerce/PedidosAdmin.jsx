@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import QRCode from "react-qr-code";
 import { Link } from "react-router-dom";
 import {
   FaBox,
@@ -10,13 +11,15 @@ import {
   FaRunning,
   FaHistory,
   FaFileAlt,
+  FaCheckCircle,
+  FaQrcode,
 } from "react-icons/fa";
 
 // --- COMPONENTES MODULARES ---
 import PendingOrdersView from "./PendingOrdersView";
 import ActiveSessionsView from "./ActiveSessionsView";
 import AssignPickerModal from "./AssignPickerModal";
-import { LiveSessionModal } from "./LiveSessionModal"; 
+import { LiveSessionModal } from "./LiveSessionModal";
 import { GestionPickers } from "./GestionPickers";
 import AnaliticaPickers from "./AnaliticaPickers";
 
@@ -44,12 +47,16 @@ const PedidosAdmin = () => {
   // Modales de Gestión
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showAssignModal, setShowAssignModal] = useState(false);
-  
+
   // Modales de Detalle
   const [liveSessionDetail, setLiveSessionDetail] = useState(null);
   const [showLiveModal, setShowLiveModal] = useState(false);
   const [historyDetail, setHistoryDetail] = useState(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  // Estados visual QR Histórico
+  const [showQrManifest, setShowQrManifest] = useState(false);
+  const [manifestData, setManifestData] = useState(null);
 
   // Filtros
   const [searchTerm, setSearchTerm] = useState("");
@@ -62,14 +69,14 @@ const PedidosAdmin = () => {
     try {
       // 1. Pedidos Pendientes
       const resPending = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/pendientes?t=${Date.now()}`
+        `https://backend-woocommerce.vercel.app/api/orders/pendientes?t=${Date.now()}`,
       );
       const listPending = resPending.data.filter((o) => !o.is_assigned);
       setOrders(listPending);
 
       // 2. Sesiones Activas
       const resActive = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/dashboard-activo?t=${Date.now()}`
+        `https://backend-woocommerce.vercel.app/api/orders/dashboard-activo?t=${Date.now()}`,
       );
       setActiveSessions(resActive.data);
 
@@ -89,12 +96,12 @@ const PedidosAdmin = () => {
   }, [fetchData]);
 
   // --- HANDLERS: ASIGNACIÓN DE PICKERS ---
-  
+
   const handleOpenAssignModal = async () => {
     if (selectedIds.size === 0) return;
     try {
       const res = await axios.get(
-        "https://backend-woocommerce.vercel.app/api/orders/pickers"
+        "https://backend-woocommerce.vercel.app/api/orders/pickers",
       );
       setPickers(res.data);
       setShowAssignModal(true);
@@ -107,7 +114,7 @@ const PedidosAdmin = () => {
     setSelectedIds(new Set([order.id]));
     try {
       const res = await axios.get(
-        "https://backend-woocommerce.vercel.app/api/orders/pickers"
+        "https://backend-woocommerce.vercel.app/api/orders/pickers",
       );
       setPickers(res.data);
       setShowAssignModal(true);
@@ -123,14 +130,16 @@ const PedidosAdmin = () => {
         {
           id_picker: picker.id,
           ids_pedidos: Array.from(selectedIds),
-        }
+        },
       );
       alert(`✅ Misión asignada a ${picker.nombre_completo}`);
       setShowAssignModal(false);
       setSelectedIds(new Set());
       fetchData(); // Recargar datos
     } catch (error) {
-      alert("Error al asignar: " + (error.response?.data?.error || error.message));
+      alert(
+        "Error al asignar: " + (error.response?.data?.error || error.message),
+      );
     }
   };
 
@@ -140,7 +149,7 @@ const PedidosAdmin = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        "https://backend-woocommerce.vercel.app/api/orders/historial"
+        "https://backend-woocommerce.vercel.app/api/orders/historial",
       );
       setHistoryOrders(res.data);
     } catch (e) {
@@ -155,12 +164,14 @@ const PedidosAdmin = () => {
     try {
       // ✅ AQUI ES EL CAMBIO: pedimos incluir eliminados
       const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}&include_removed=true`
+        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}&include_removed=true`,
       );
       setLiveSessionDetail({ sessionInfo: session, routeData: res.data });
       setShowLiveModal(true);
     } catch (e) {
-      alert("No se pudo cargar detalles. Es posible que la sesión haya finalizado.");
+      alert(
+        "No se pudo cargar detalles. Es posible que la sesión haya finalizado.",
+      );
       fetchData(); // Refrescar por si acaso
     }
   };
@@ -168,7 +179,7 @@ const PedidosAdmin = () => {
   const handleViewHistoryDetail = async (session) => {
     try {
       const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}`
+        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}`,
       );
       setHistoryDetail({ session, logs: res.data });
       setShowHistoryModal(true);
@@ -352,7 +363,7 @@ const PedidosAdmin = () => {
       </main>
 
       {/* --- MODALES COMPARTIDOS --- */}
-      
+
       <AssignPickerModal
         isOpen={showAssignModal}
         pickers={pickers}
@@ -361,9 +372,9 @@ const PedidosAdmin = () => {
       />
 
       {showLiveModal && liveSessionDetail && (
-        <LiveSessionModal 
-            sessionDetail={liveSessionDetail}
-            onClose={() => setShowLiveModal(false)}
+        <LiveSessionModal
+          sessionDetail={liveSessionDetail}
+          onClose={() => setShowLiveModal(false)}
         />
       )}
 
@@ -375,9 +386,10 @@ const PedidosAdmin = () => {
           <div
             className="pedidos-modal-content"
             onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: "800px", width: "90%" }}
           >
             <div className="pedidos-modal-header">
-              <h2>Auditoría</h2>
+              <h2>Auditoría Pym</h2>
               <button
                 className="pedidos-modal-close-btn"
                 onClick={() => setShowHistoryModal(false)}
@@ -385,6 +397,53 @@ const PedidosAdmin = () => {
                 &times;
               </button>
             </div>
+
+            {/* ✅ BOTÓN DE CERTIFICADO DE SALIDA */}
+            {historyDetail.final_snapshot && (
+              <div
+                style={{
+                  padding: "10px 20px",
+                  background: "#f0fdf4",
+                  borderBottom: "1px solid #bbf7d0",
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "center",
+                }}
+              >
+                <FaCheckCircle color="#16a34a" />
+                <span style={{ color: "#166534", fontWeight: 600 }}>
+                  Sesión Auditada y Completada.
+                </span>
+                <button
+                  onClick={() => {
+                    setManifestData({
+                      session_id: historyDetail.metadata.session_id,
+                      timestamp: historyDetail.final_snapshot.timestamp,
+                      items: historyDetail.final_snapshot.items,
+                      picker:
+                        historyDetail.metadata.picker_name || "Desconocido",
+                    });
+                    setShowQrManifest(true);
+                  }}
+                  style={{
+                    marginLeft: "auto",
+                    background: "#22c55e",
+                    color: "white",
+                    border: "none",
+                    padding: "6px 12px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontWeight: "bold",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                  }}
+                >
+                  <FaQrcode /> VER CERTIFICADO SALIDA
+                </button>
+              </div>
+            )}
+
             <div className="pedidos-modal-body">
               <div className="audit-timeline">
                 {historyDetail.logs.map((log) => (
@@ -413,6 +472,108 @@ const PedidosAdmin = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showQrManifest && manifestData && (
+        <div
+          className="invoice-mode-layout"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            zIndex: 9999,
+            overflowY: "auto",
+          }}
+        >
+          <div className="invoice-actions no-print">
+            <button
+              style={{ background: "#64748b", color: "white" }}
+              onClick={() => setShowQrManifest(false)}
+            >
+              ❌ CERRAR
+            </button>
+            <button
+              style={{ background: "#2563eb", color: "white" }}
+              onClick={() => window.print()}
+            >
+              🖨️ IMPRIMIR
+            </button>
+          </div>
+
+          <div className="invoice-sheet">
+            <div className="inv-sheet-header">
+              <div className="sheet-logo">MANIFIESTO HISTÓRICO</div>
+              <div className="sheet-info">
+                <h2>Orden #{manifestData.session_id.toString().slice(0, 6)}</h2>
+                <p>{new Date(manifestData.timestamp).toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="sheet-customer">
+              <strong>Auditado por:</strong> Sistema WMS (Historial)
+              <br />
+              <strong>Responsable Original:</strong> {manifestData.picker}
+              <br />
+            </div>
+
+            <div className="master-code-section">
+              <div className="qr-wrapper">
+                <QRCode
+                  value={JSON.stringify({
+                    id: manifestData.session_id,
+                    d: manifestData.timestamp.split("T")[0],
+                    it: manifestData.items.map((x) => [x.sku || x.name, x.qty]),
+                  })}
+                  size={150}
+                />
+              </div>
+              <div className="code-info">
+                <h4>COPIA DIGITAL FINAL</h4>
+                <p>Recuperado del historial seguro de auditoría.</p>
+              </div>
+            </div>
+
+            <table className="invoice-table">
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "center" }}>Cant</th>
+                  <th>Item</th>
+                  <th>SKU / ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {manifestData.items.map((it, k) => (
+                  <tr key={k}>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        fontWeight: "bold",
+                        fontSize: "1.1rem",
+                      }}
+                    >
+                      {it.qty}
+                    </td>
+                    <td>
+                      {it.name}{" "}
+                      {it.type === "sustituido" && (
+                        <strong style={{ color: "#d97706" }}>(SUB)</strong>
+                      )}
+                    </td>
+                    <td style={{ fontFamily: "monospace" }}>{it.sku}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="sheet-footer">
+              <div className="cut-line">
+                - - - - - - Documento informativo - - - - - -
               </div>
             </div>
           </div>
