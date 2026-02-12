@@ -207,15 +207,19 @@ exports.completeAuditSession = async (req, res) => {
 
     const { data: session, error: getSessError } = await supabase
       .from("wc_picking_sessions")
-      .select("id_picker, ids_pedidos")
+      .select("id_picker, ids_pedidos, resumen_metricas") // ✅ Traemos metricas actuales
       .eq("id", session_id)
       .single();
 
     if (getSessError) throw getSessError;
 
+    // ✅ EN LUGAR DE CREAR COLUMNA, USAMOS EL CAMPO JSON EXISTING
+    const currentMetrics = session.resumen_metricas || {};
+    const updatedMetrics = { ...currentMetrics, fecha_fin_auditoria: now };
+
     const updatePayload = {
       estado: "auditado",
-      fecha_fin_auditoria: now,
+      resumen_metricas: updatedMetrics,
     };
     if (datos_salida) updatePayload.datos_salida = datos_salida;
 
