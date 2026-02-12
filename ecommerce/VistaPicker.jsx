@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import axios from "axios";
 import { supabase } from "../../supabaseClient"; 
 import QRCode from "react-qr-code"; 
@@ -195,6 +195,7 @@ const VistaPicker = () => {
   const [showClientsModal, setShowClientsModal] = useState(false);
   const [scanOverrideCallback, setScanOverrideCallback] = useState(null);
   const [missingQtyForSub, setMissingQtyForSub] = useState(0);
+  const isSyncing = useRef(false);
 
   const resetSesionLocal = () => {
     localStorage.removeItem("session_active_cache");
@@ -223,6 +224,58 @@ const VistaPicker = () => {
       }
     }
   }, []);
+
+  // ✅ SYSTEM: SINCRONIZADOR DE COLA (Fix: Datos se enviaban al limbo)
+  useEffect(() => {
+    const processQueue = async () => {
+      if (!navigator.onLine || isSyncing.current) return;
+      isSyncing.current = true;
+
+      try {
+        let queueStr = localStorage.getItem("offline_actions_queue");
+        let queue = queueStr ? JSON.parse(queueStr) : [];
+        
+        if (queue.length === 0) {
+           if (pendingSync > 0) setPendingSync(0);
+           return;
+        }
+
+        // BUCLE DE PROCESAMIENTO (Mientras haya items)
+        while (queue.length > 0) {
+            const item = queue[0];
+            setPendingSync(queue.length);
+
+            try {
+                await axios.post("https://backend-woocommerce.vercel.app/api/orders/registrar-accion", item);
+                
+                // ÉXITO: Volvemos a leer localStorage para no borrar items nuevos
+                const currentQueueStr = localStorage.getItem("offline_actions_queue");
+                const currentQueue = currentQueueStr ? JSON.parse(currentQueueStr) : [];
+                
+                if (currentQueue.length > 0) {
+                    currentQueue.shift(); // Borramos el primero
+                    localStorage.setItem("offline_actions_queue", JSON.stringify(currentQueue));
+                    queue = currentQueue; // Actualizamos referencia local
+                    setPendingSync(currentQueue.length);
+                } else {
+                    queue = [];
+                }
+
+            } catch (err) {
+                console.error("Error sincronizando (Reintento en 3s):", err);
+                break; // Rompemos el bucle
+            }
+        }
+      } finally {
+        isSyncing.current = false;
+      }
+    };
+
+    const interval = setInterval(processQueue, 3000); 
+    processQueue(); 
+
+    return () => clearInterval(interval);
+  }, [pendingSync]); 
 
   // CONFIGURAR LISTENER REALTIME Y POLLING
   useEffect(() => {
@@ -417,7 +470,7 @@ const VistaPicker = () => {
     });
     
     // Al sustituir el resto, ya consideramos el item como "completado" en la vista
-    updateLocalSessionState(currentItem.product_id, currentItem.quantity_total, "sustituido", { name: newItem.name, price: newItem.price });
+    updateLocalSessionState(currentItem.product_id, currentItem.qty_scanned || 0, "sustituido", { name: newItem.name, price: newItem.price });
     closeAllModals();
     alert("🔄 Sustitución registrada");
   };
