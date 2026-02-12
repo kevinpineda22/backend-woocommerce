@@ -42,15 +42,14 @@ exports.registerAction = async (req, res) => {
     const logData = {
       id_asignacion: targetAssignment.id,
       id_pedido: targetAssignment.id_pedido,
-      id_producto: id_producto_original,
-      // Aseguramos guardar el ID original para trazabilidad
-      id_producto_original: id_producto_original, 
+      id_producto: id_producto_original, // Producto afectado
+      id_producto_original: id_producto_original, // ✅ CLAVE PARA LA CORRECCIÓN SPLIT
       nombre_producto: nombre_producto_original,
       accion: accion,
       fecha_registro: fecha,
       peso_real: peso_real || null,
       motivo: motivo || null,
-      pasillo: pasillo || "General" // Guardamos el pasillo
+      pasillo: pasillo || "General" // ✅ CLAVE PARA EL DASHBOARD ADMIN
     };
 
     // Personalizar según Acción
@@ -62,7 +61,6 @@ exports.registerAction = async (req, res) => {
     } 
     else if (accion === "no_encontrado") {
        logData.es_sustituto = false;
-       // Marca explícita de faltante
     }
 
     // 3. Insertar Logs (Multiplicar si la cantidad afectada > 1 para trazabilidad unitaria)

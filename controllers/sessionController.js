@@ -7,15 +7,10 @@ exports.createPickingSession = async (req, res) => {
   const { id_picker, ids_pedidos } = req.body;
   try {
     // 1. Obtener Nombre Picker
-    const { data: pickerData } = await supabase
-        .from("wc_pickers")
-        .select("nombre_completo")
-        .eq("id", id_picker)
-        .single();
-    
+    const { data: pickerData } = await supabase.from("wc_pickers").select("nombre_completo").eq("id", id_picker).single();
     const nombrePicker = pickerData ? pickerData.nombre_completo : "Picker";
 
-    // 2. Obtener datos para Snapshot (Llamada a Woo)
+    // 2. Obtener datos para Snapshot
     const pedidosPromesas = ids_pedidos.map((id) => WooCommerce.get(`orders/${id}`));
     const responses = await Promise.all(pedidosPromesas);
     
@@ -30,14 +25,13 @@ exports.createPickingSession = async (req, res) => {
         customer_note: o.customer_note,
         line_items: o.line_items.map(item => ({
           ...item,
-          is_removed: false // Bandera para soft-delete
+          is_removed: false 
         }))
       };
     });
 
     // 3. Insertar Sesión
-    const { data: session, error: sessError } = await supabase
-      .from("wc_picking_sessions")
+    const { data: session, error: sessError } = await supabase.from("wc_picking_sessions")
       .insert([{
           id_picker, ids_pedidos, estado: "en_proceso",
           fecha_inicio: new Date().toISOString(),
@@ -46,24 +40,15 @@ exports.createPickingSession = async (req, res) => {
 
     if (sessError) throw sessError;
 
-    // 4. Actualizar estado del Picker
+    // 4. Actualizar Picker
     await supabase.from("wc_pickers").update({ estado_picker: "picking", id_sesion_actual: session.id }).eq("id", id_picker);
 
-    // 5. Crear Asignaciones (CON NOMBRE Y SNAPSHOT INDIVIDUAL)
-    const asignaciones = ids_pedidos.map((idPedido) => {
-        // Encontrar el snapshot correspondiente a este pedido específico
-        const snapshot = snapshotPedidos.find(s => s.id === idPedido);
-        
-        return {
-          id_pedido: idPedido, 
-          id_picker: id_picker, 
-          id_sesion: session.id,
-          nombre_picker: nombrePicker, // Guardamos el nombre aquí
-          reporte_snapshot: snapshot,  // Guardamos el snapshot individual
-          estado_asignacion: "en_proceso", 
-          fecha_inicio: new Date().toISOString(),
-        };
-    });
+    // 5. Crear Asignaciones
+    const asignaciones = ids_pedidos.map((idPedido) => ({
+        id_pedido: idPedido, id_picker: id_picker, id_sesion: session.id, nombre_picker: nombrePicker,
+        reporte_snapshot: snapshotPedidos.find(s => s.id === idPedido),
+        estado_asignacion: "en_proceso", fecha_inicio: new Date().toISOString(),
+    }));
 
     const { error: assignError } = await supabase.from("wc_asignaciones_pedidos").insert(asignaciones);
     if (assignError) throw assignError;
@@ -75,6 +60,7 @@ exports.createPickingSession = async (req, res) => {
   }
 };
 
+// ✅ LÓGICA CORREGIDA: SPLIT LINE (1 ORIGINAL + 1 SUSTITUTO)
 exports.getSessionActive = async (req, res) => {
   const { id_picker, include_removed } = req.query;
 
@@ -85,7 +71,7 @@ exports.getSessionActive = async (req, res) => {
     const sessionId = picker.id_sesion_actual;
     const { data: session } = await supabase.from("wc_picking_sessions").select("*").eq("id", sessionId).single();
 
-    // Obtener órdenes (Snapshot o Woo en vivo si falla)
+    // Obtener órdenes (Snapshot o Woo)
     let orders = session.snapshot_pedidos && session.snapshot_pedidos.length > 0 
         ? session.snapshot_pedidos 
         : (await Promise.all(session.ids_pedidos.map(id => WooCommerce.get(`orders/${id}`)))).map(r => r.data);
@@ -102,14 +88,13 @@ exports.getSessionActive = async (req, res) => {
     const { data: assignments } = await supabase.from('wc_asignaciones_pedidos').select('id').eq('id_sesion', sessionId);
     const assignIds = assignments.map(a => a.id);
 
-    // Logs para determinar estado actual de cada producto
+    // 1. TRAER TODOS LOS LOGS DE ESTA SESIÓN
     const { data: logs } = await supabase
       .from("wc_log_picking")
-      .select("id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo")
-      .in("id_asignacion", assignIds)
-      .in("id_producto", itemsAgrupados.map((i) => i.product_id));
+      .select("id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original")
+      .in("id_asignacion", assignIds);
 
-    // Mapeo de Categorías Reales (para ordenar pasillos)
+    // 2. MAPEO DE CATEGORÍAS
     const productIds = itemsAgrupados.map((i) => i.product_id);
     const mapaCategoriasReales = {};
     if (productIds.length > 0) {
@@ -119,17 +104,49 @@ exports.getSessionActive = async (req, res) => {
         } catch (err) {}
     }
 
+    // 3. PROCESAMIENTO DE ESTADO ITEM POR ITEM
     const itemsConRuta = itemsAgrupados.map((item) => {
         const realCategories = mapaCategoriasReales[item.product_id] || item.categorias || [];
         const info = obtenerInfoPasillo(realCategories, item.name);
-        const logItem = logs?.find((l) => l.id_producto === item.product_id && (l.accion === "recolectado" || l.accion === "sustituido"));
+        
+        // 🔍 FILTRO CLAVE: Buscamos logs donde este producto sea el protagonista (original o target)
+        // Usamos id_producto_original para no perder el rastro si fue sustituido
+        const itemLogs = logs.filter(l => 
+            l.id_producto === item.product_id || l.id_producto_original === item.product_id
+        );
+
+        // Contadores Reales
+        const qtyPicked = itemLogs.filter(l => l.accion === 'recolectado').length;
+        const qtySubbed = itemLogs.filter(l => l.accion === 'sustituido').length;
+        const qtyShort = itemLogs.filter(l => l.accion === 'no_encontrado').length;
+        
+        // Datos del sustituto (si existe alguno)
+        const lastSub = itemLogs.find(l => l.accion === 'sustituido');
+
+        // Estado Global
+        let status = "pendiente";
+        const totalProcessed = qtyPicked + qtySubbed + qtyShort;
+        
+        if (totalProcessed >= item.quantity_total) status = "recolectado"; 
+        else if (totalProcessed > 0) status = "parcial"; // Opcional, pero útil
 
         return {
           ...item,
-          pasillo: info.pasillo, prioridad: info.prioridad,
+          pasillo: info.pasillo, 
+          prioridad: info.prioridad,
           categorias_reales: realCategories.map((c) => c.name).filter(n => n !== "Uncategorized"),
-          status: logItem ? (logItem.es_sustituto ? "sustituido" : "recolectado") : "pendiente",
-          sustituto: logItem && logItem.es_sustituto ? { name: logItem.nombre_sustituto, price: logItem.precio_nuevo } : null,
+          
+          status: status,
+          
+          // 👉 ESTA ES LA MAGIA: Enviamos qty_scanned como solo los originales
+          // El frontend calculará (Total - Originales) para saber cuántos son sustitutos
+          qty_scanned: qtyPicked, 
+          
+          sustituto: lastSub ? { 
+              name: lastSub.nombre_sustituto, 
+              price: lastSub.precio_nuevo,
+              qty: qtySubbed 
+          } : null,
         };
     });
 
@@ -151,14 +168,10 @@ exports.completeSession = async (req, res) => {
   const { id_sesion, id_picker } = req.body;
   try {
     const now = new Date().toISOString();
-    // Marcamos como completado para que el Auditor lo vea, pero NO liberamos picker aún
     await supabase.from("wc_picking_sessions").update({ estado: "completado", fecha_fin: now }).eq("id", id_sesion);
+    await supabase.from("wc_pickers").update({ estado_picker: "disponible", id_sesion_actual: null }).eq("id", id_picker); // Aquí liberamos temporalmente, aunque el flujo auditoría lo ajusta luego
     await supabase.from("wc_asignaciones_pedidos").update({ estado_asignacion: "completado", fecha_fin: now }).eq("id_sesion", id_sesion);
-    
-    // El picker queda "atrapado" en su frontend esperando la auditoría
-    // NO actualizamos el estado_picker a 'disponible' aquí.
-    
-    res.status(200).json({ message: "Ruta finalizada. Esperando auditoría." });
+    res.status(200).json({ message: "Sesión finalizada (Local)." });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
