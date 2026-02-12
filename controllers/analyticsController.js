@@ -333,62 +333,117 @@ exports.getPickerRoute = async (req, res) => {
       return res.status(400).json({ error: "id_picker requerido" });
     }
 
-    // Paso 1: Obtener los pedidos del picker
-    let pedidosQuery = supabase
-      .from("wc_asignaciones_pedidos")
-      .select("id_pedido")
-      .eq("id_picker", id_picker)
-      .eq("estado_asignacion", "completado");
+    let pedidoIds = [];
+    let relatedOrdersInfo = [];
 
+    // Paso 1: Identificar sesión MULTIPICKER (pedidos simultáneos)
     if (id_pedido) {
-      pedidosQuery = pedidosQuery.eq("id_pedido", id_pedido);
+       // A. Obtener detalles del pedido solicitado
+       const { data: primaryOrder, error: poError } = await supabase
+         .from("wc_asignaciones_pedidos")
+         .select("id_pedido, fecha_inicio, fecha_fin, nombre_picker")
+         .eq("id_picker", id_picker)
+         .eq("id_pedido", id_pedido)
+         .single();
+       
+       if (poError || !primaryOrder) {
+         // Fallback si no encuentra (raro)
+         pedidoIds = [id_pedido];
+       } else {
+         // B. Buscar pedidos concurrentes (Overlap de tiempo significativo)
+         // Definimos ventana: Que hayan empezado o terminado dentro del rango del principal (+/- 5 min margen)
+         const startTime = new Date(primaryOrder.fecha_inicio).getTime() - (5 * 60 * 1000);
+         const endTime = new Date(primaryOrder.fecha_fin).getTime() + (5 * 60 * 1000);
+
+         const { data: concurrentOrders, error: coError } = await supabase
+            .from("wc_asignaciones_pedidos")
+            .select("id_pedido, fecha_inicio, fecha_fin")
+            .eq("id_picker", id_picker)
+            .eq("estado_asignacion", "completado")
+            .gte("fecha_fin", new Date(startTime).toISOString()) 
+            .lte("fecha_inicio", new Date(endTime).toISOString());
+         
+         if (!coError && concurrentOrders.length > 0) {
+            pedidoIds = concurrentOrders.map(o => o.id_pedido);
+            relatedOrdersInfo = concurrentOrders;
+         } else {
+            pedidoIds = [id_pedido];
+         }
+       }
+    } else {
+       // C. Si no hay id_pedido, traer últimos (comportamiento legacy o por defecto)
+       const { data: recentOrders } = await supabase
+         .from("wc_asignaciones_pedidos")
+         .select("id_pedido")
+         .eq("id_picker", id_picker)
+         .eq("estado_asignacion", "completado")
+         .order("fecha_fin", { ascending: false })
+         .limit(5);
+         
+       pedidoIds = recentOrders ? recentOrders.map(o => o.id_pedido) : [];
     }
-
-    const { data: asignaciones, error: asigError } = await pedidosQuery;
-    
-    if (asigError) throw asigError;
-
-    if (!asignaciones || asignaciones.length === 0) {
+  
+    if (pedidoIds.length === 0) {
       return res.status(200).json({
-        route: [],
-        summary: [],
-        regressions: [],
+        route: [], summary: [], regressions: [], 
         metrics: { total_pasillos_visitados: 0, total_time: 0, total_items: 0 }
       });
     }
 
-    const pedidoIds = asignaciones.map(a => a.id_pedido);
-
-    // Paso 2: Obtener logs de esos pedidos
+    // Paso 2: Obtener logs de TODOS los pedidos de la sesión
     const { data: logs, error } = await supabase
       .from("wc_log_picking")
       .select("accion, pasillo, nombre_producto, fecha_registro, id_pedido")
       .in("id_pedido", pedidoIds)
-      .order("fecha_registro", { ascending: true })
-      .limit(500);
+      .order("fecha_registro", { ascending: true }) // Orden cronológico real mezcla los pedidos
+      .limit(1000);
 
     if (error) throw error;
 
     if (!logs || logs.length === 0) {
       return res.status(200).json({
-        route: [],
-        summary: [],
-        regressions: [],
-        metrics: { total_pasillos_visitados: 0, total_time: 0, total_items: 0 },
-        raw_logs: []
+        route: [], summary: [], regressions: [], 
+        metrics: { total_pasillos_visitados: 0, total_time: 0, total_items: 0 }
       });
     }
 
-    // Agrupar por secuencia de pasillos
+    // Mapeo de colores para pedidos (hasta 5 colores distintos)
+    // El frontend recibirá 'order_color_index'
+    const uniqueOrders = [...new Set(logs.map(l => l.id_pedido))];
+    const orderColorMap = {};
+    uniqueOrders.forEach((oid, idx) => orderColorMap[oid] = idx);
+
+    // Enriquecer logs con color index
+    const enrichedLogs = logs.map(log => ({
+      ...log,
+      order_color_index: orderColorMap[log.id_pedido]
+    }));
+
+    // Agrupar por LOG INDIVIDUAL para máxima fidelidad en animación multipicker
+    // OJO: WarehouseMap.jsx itera sobre 'routeData'. 
+    // Si queremos ver CADA item picado con su color, debemos enviar un paso por cada item (o agrupados muy fino).
+    // El código original agrupaba por PASILLO. 
+    // Para Multipicker, si estamos en Pasillo 1 y picamos A, luego B, luego A -> Son 3 acciones.
+    // Si agrupamos todo el pasillo, perdemos la secuencia de colores.
+    // ESTRATEGIA: Agrupar por (Pasillo + Pedido) consecutivo O desglosar acciones.
+    // Para simplificar mapa: "Cada acción de picking es un paso" si hay cambio, 
+    // O mantenemos "Paso = Visita a Pasillo", pero indicamos qué pedidos se tocaron.
+    // MEJOR: Desglosar un poco mas. Si cambia de pedido DENTRO del mismo pasillo, generamos "mini-paso".
+
     const routeSegments = [];
     let currentSegment = null;
 
     logs.forEach(log => {
       const timestamp = new Date(log.fecha_registro);
       const pasillo = log.pasillo || "S/N";
+      const orderId = log.id_pedido;
 
-      if (!currentSegment || currentSegment.pasillo !== pasillo) {
-        // Nuevo segmento (cambio de pasillo)
+      // Romper segmento si: cambia pasillo O cambia pedido (para mostrar cambio de color)
+      const isNewSegment = !currentSegment 
+          || currentSegment.pasillo !== pasillo 
+          || currentSegment.order_id !== orderId;
+
+      if (isNewSegment) {
         if (currentSegment) {
           currentSegment.end_time = timestamp;
           currentSegment.duration_seconds = Math.round((currentSegment.end_time - currentSegment.start_time) / 1000);
@@ -397,6 +452,8 @@ exports.getPickerRoute = async (req, res) => {
 
         currentSegment = {
           pasillo: pasillo,
+          order_id: orderId,
+          order_color_index: orderColorMap[orderId], // 0, 1, 2...
           start_time: timestamp,
           end_time: timestamp,
           items: 0,
@@ -405,23 +462,23 @@ exports.getPickerRoute = async (req, res) => {
         };
       }
 
-      // Acumular items en el segmento actual
       currentSegment.items++;
       currentSegment.products.push({
         name: log.nombre_producto,
         accion: log.accion,
-        time: timestamp.toISOString()
+        time: timestamp.toISOString(),
+        order_id: log.id_pedido // Para detalle
       });
       currentSegment.end_time = timestamp;
     });
 
-    // Cerrar el último segmento
     if (currentSegment) {
       currentSegment.duration_seconds = Math.round((currentSegment.end_time - currentSegment.start_time) / 1000);
       routeSegments.push(currentSegment);
     }
 
-    // Detectar "regresiones" (visitas repetidas al mismo pasillo)
+    // ... (Regresiones y Stats igual) ...
+    // Detectar "regresiones"
     const pasilloVisits = {};
     routeSegments.forEach(seg => {
       if (!pasilloVisits[seg.pasillo]) pasilloVisits[seg.pasillo] = [];
@@ -439,7 +496,7 @@ exports.getPickerRoute = async (req, res) => {
       }
     });
 
-    // Calcular estadísticas por pasillo (agregadas)
+    // Calcular estadísticas por pasillo
     const pasilloStats = {};
     routeSegments.forEach(seg => {
       if (!pasilloStats[seg.pasillo]) {
@@ -455,7 +512,6 @@ exports.getPickerRoute = async (req, res) => {
       pasilloStats[seg.pasillo].visits++;
     });
 
-    // Formatear para tabla resumen
     const summary = Object.values(pasilloStats).map(p => ({
       ...p,
       avg_time_per_item: p.total_items > 0 ? Math.round(p.total_time / p.total_items) : 0,
@@ -463,6 +519,13 @@ exports.getPickerRoute = async (req, res) => {
     })).sort((a, b) => b.total_time - a.total_time);
 
     res.status(200).json({
+      // Metadata extra para frontend
+      session_info: {
+        is_multipicker: uniqueOrders.length > 1,
+        total_orders: uniqueOrders.length,
+        order_ids: uniqueOrders,
+        related_orders: relatedOrdersInfo
+      },
       route: routeSegments.map(s => ({
         ...s,
         start_time: s.start_time.toISOString(),
@@ -470,7 +533,7 @@ exports.getPickerRoute = async (req, res) => {
       })),
       summary,
       regressions,
-      raw_logs: logs,
+      raw_logs: enrichedLogs,
       metrics: {
         total_pasillos_visitados: Object.keys(pasilloStats).length,
         total_time: routeSegments.reduce((acc, s) => acc + s.duration_seconds, 0),
