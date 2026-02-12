@@ -251,19 +251,23 @@ exports.completeAuditSession = async (req, res) => {
       ]);
     }
 
-    // if (session.ids_pedidos && session.ids_pedidos.length > 0) {
-    //     (async () => {
-    //         for (const orderId of session.ids_pedidos) {
-    //             await syncOrderToWoo(session_id, orderId);
-    //         }
-    //     })();
-    // }
+    if (session.ids_pedidos && session.ids_pedidos.length > 0) {
+      (async () => {
+        for (const orderId of session.ids_pedidos) {
+          // ACTIVAMOS LA SINCRONIZACIÓN PARA PROBAR
+          try {
+            console.log(`🚀 Iniciando Sync para Orden #${orderId}...`);
+            await syncOrderToWoo(session_id, orderId);
+          } catch (err) {
+            console.error(`❌ Error sync orden ${orderId}:`, err);
+          }
+        }
+      })();
+    }
 
-    res
-      .status(200)
-      .json({
-        message: "Salida aprobada. Snapshot guardado y Picker liberado.",
-      });
+    res.status(200).json({
+      message: "Salida aprobada. Snapshot guardado y Picker liberado.",
+    });
   } catch (error) {
     console.error("Error finalizando auditoría:", error.message);
     res.status(500).json({ error: error.message });
