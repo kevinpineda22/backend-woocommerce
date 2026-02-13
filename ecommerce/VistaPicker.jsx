@@ -372,6 +372,23 @@ const VistaPicker = () => {
             console.log("📤 Subiendo acción:", item.accion);
             await axios.post("https://backend-woocommerce.vercel.app/api/orders/registrar-accion", item);
             
+            // ✅ BROADCAST: Notificar al dashboard que hubo un cambio
+            try {
+              await supabase.channel('dashboard-updates').send({
+                type: 'broadcast',
+                event: 'picking_action',
+                payload: { 
+                  session_id: item.id_sesion, 
+                  action: item.accion,
+                  product_id: item.id_producto_original,
+                  timestamp: Date.now()
+                }
+              });
+              console.log('📡 Broadcast enviado al dashboard');
+            } catch (broadcastErr) {
+              console.warn('⚠️ Error enviando broadcast:', broadcastErr);
+            }
+            
             // Éxito: Sacar de la cola
             const currentQueueStr = localStorage.getItem("offline_actions_queue");
             const currentQueue = currentQueueStr ? JSON.parse(currentQueueStr) : [];
@@ -401,7 +418,7 @@ const VistaPicker = () => {
         }
       } finally { isSyncing.current = false; }
     };
-    const interval = setInterval(processQueue, 3000);
+    const interval = setInterval(processQueue, 1000); // Reducido de 3000ms a 1000ms para mayor velocidad
     processQueue();
     return () => clearInterval(interval);
   }, [pendingSync]);

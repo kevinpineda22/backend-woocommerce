@@ -60,15 +60,16 @@ const ActiveSessionsView = ({ onViewDetail }) => {
   useEffect(() => {
     fetchSessions();
 
-    const channel = supabase
-      .channel("admin-dashboard-ultra-fast")
+    // Canal principal para cambios en la base de datos
+    const dbChannel = supabase
+      .channel("admin-dashboard-db-changes")
       // A. Cambios estructurales (Sesiones, Asignaciones) -> Recarga completa
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "wc_picking_sessions" },
         () => {
           console.log("🔄 Cambio en sesiones -> Recargando...");
-          setTimeout(fetchSessions, 500);
+          setTimeout(fetchSessions, 300);
         },
       )
       .on(
@@ -76,21 +77,20 @@ const ActiveSessionsView = ({ onViewDetail }) => {
         { event: "*", schema: "public", table: "wc_asignaciones_pedidos" },
         () => {
           console.log("🔄 Cambio en asignaciones -> Recargando...");
-          setTimeout(fetchSessions, 500);
+          setTimeout(fetchSessions, 300);
         },
       )
 
       // B. Cambios de Logs (Picking Real)
-      // IMPORTANTE: Separamos los eventos para asegurarnos que INSERT se capture
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "wc_log_picking" },
         (payload) => {
           console.log(
-            "⚡ Nuevo Log Insertado -> Recargando dashboard",
+            "⚡ Nuevo Log Insertado -> Recargando dashboard INMEDIATAMENTE",
             payload,
           );
-          setTimeout(() => fetchSessions(), 500);
+          fetchSessions();
         },
       )
       .on(
@@ -104,16 +104,28 @@ const ActiveSessionsView = ({ onViewDetail }) => {
           fetchSessions();
         },
       )
-      // Capturamos cualquier otro evento por si acaso
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "wc_log_picking" },
-        () => fetchSessions(),
+        () => {
+          console.log("⚡ Log Actualizado -> Recargando dashboard");
+          fetchSessions();
+        },
       )
       .subscribe();
 
+    // 🚀 NUEVO: Canal de BROADCAST para actualizaciones instantáneas desde los pickers
+    const broadcastChannel = supabase
+      .channel('dashboard-updates')
+      .on('broadcast', { event: 'picking_action' }, (payload) => {
+        console.log('🔥 BROADCAST RECIBIDO desde picker:', payload);
+        fetchSessions(); // Actualización INMEDIATA sin delay
+      })
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(dbChannel);
+      supabase.removeChannel(broadcastChannel);
     };
   }, [fetchSessions]);
 
