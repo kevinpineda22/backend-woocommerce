@@ -18,14 +18,14 @@ exports.registerAction = async (req, res) => {
     const qty = cantidad_afectada || 1;
 
     // 1. Validar Sesión y obtener Asignación
-    // ✅ CORRECCIÓN AQUÍ: Usamos 'reporte_snapshot' que es como se llama en tu DB
+    // ✅ CORRECCIÓN VITAL: Usamos 'reporte_snapshot' (así se llama en tu DB)
     const { data: assignments, error: assignError } = await supabase
       .from("wc_asignaciones_pedidos")
       .select("id, id_pedido, reporte_snapshot") 
       .eq("id_sesion", id_sesion);
 
     if (assignError || !assignments || assignments.length === 0) {
-        console.error("Error buscando asignación:", assignError);
+        // console.error("Error buscando asignación:", assignError); 
         throw new Error("Sesión inválida o sin asignaciones");
     }
 
