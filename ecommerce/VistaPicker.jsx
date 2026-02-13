@@ -3,13 +3,44 @@ import axios from "axios";
 import { supabase } from "../../supabaseClient"; 
 import QRCode from "react-qr-code"; 
 import { motion, AnimatePresence } from "framer-motion";
-import { FaCheck, FaBoxOpen, FaArrowRight, FaShoppingBasket, FaBarcode, FaExchangeAlt, FaKeyboard, FaWifi, FaExclamationTriangle, FaSync, FaUndo, FaPhone, FaClock, FaCheckCircle, FaBan, FaSpinner, FaLock } from "react-icons/fa";
+import {
+  FaCheck,
+  FaBoxOpen,
+  FaArrowRight,
+  FaShoppingBasket,
+  FaBarcode,
+  FaExchangeAlt,
+  FaKeyboard,
+  FaWifi,
+  FaExclamationTriangle,
+  FaSync,
+  FaUndo,
+  FaPhone,
+  FaClock,
+  FaCheckCircle,
+  FaBan,
+  FaSpinner, 
+  FaLock 
+} from "react-icons/fa";
 import "./VistaPicker.css";
 import EscanerBarras from "../DesarrolloSurtido_API/EscanerBarras";
-import { WeightModal, SubstituteModal, ManualEntryModal, ClientsModal } from "./Modals";
+import {
+  WeightModal,
+  SubstituteModal,
+  ManualEntryModal,
+  ClientsModal,
+} from "./Modals";
 
-const ORDER_COLORS = [{ code: "A", color: "#3b82f6", bg: "#eff6ff" }, { code: "B", color: "#f97316", bg: "#fff7ed" }, { code: "C", color: "#8b5cf6", bg: "#f5f3ff" }, { code: "D", color: "#10b981", bg: "#ecfdf5" }, { code: "E", color: "#ec4899", bg: "#fdf2f8" }];
-const getOrderStyle = (orderIndex) => ORDER_COLORS[orderIndex % ORDER_COLORS.length];
+const ORDER_COLORS = [
+  { code: "A", color: "#3b82f6", bg: "#eff6ff" },
+  { code: "B", color: "#f97316", bg: "#fff7ed" },
+  { code: "C", color: "#8b5cf6", bg: "#f5f3ff" },
+  { code: "D", color: "#10b981", bg: "#ecfdf5" },
+  { code: "E", color: "#ec4899", bg: "#fdf2f8" },
+];
+
+const getOrderStyle = (orderIndex) =>
+  ORDER_COLORS[orderIndex % ORDER_COLORS.length];
 
 const SessionTimer = ({ startDate }) => {
   const [elapsed, setElapsed] = useState("00:00");
@@ -33,12 +64,16 @@ const SessionTimer = ({ startDate }) => {
 const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
   const scannedRaw = item.qty_scanned || 0;
   const total = item.quantity_total;
+  
+  // Visual clamp para evitar números extraños si hay desincronización momentánea
   const scanned = Math.min(scannedRaw, total); 
   const remaining = Math.max(0, total - scanned);
+  
   const isPartial = scanned > 0 && scanned < total;
   const isFullySubstituted = item.status === "sustituido" && scanned === 0;
   const isMixed = scanned > 0 && item.sustituto;
   const isShortPick = isCompleted && scanned < total && !item.sustituto;
+
   const formatPrice = (p) => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(p);
 
   return (
@@ -49,6 +84,7 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
         {item.image_src ? <img src={item.image_src} className="ec-prod-img" alt="" /> : <FaBoxOpen color="#ccc" size={30} />}
         <span className="ec-qty-badge-img">{total}</span>
       </div>
+      
       <div className="ec-info-col">
         <div style={{ display: "flex", flexDirection: "column", gap: "3px", alignItems: "flex-start", marginBottom: "2px" }}>
           <span className="ec-pasillo-badge" style={{ background: "#2563eb", color: "white", padding: "4px 10px", fontSize: "0.8rem", boxShadow: "0 2px 4px rgba(37,99,235,0.3)" }}>
@@ -60,6 +96,8 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
             </span>
           )}
         </div>
+
+        {/* CASO: MIXTO (Original + Sustituto) */}
         {isMixed ? (
             <div className="ec-sub-details">
                 <div style={{borderBottom:'1px dashed #ccc', paddingBottom:4, marginBottom:4}}>
@@ -81,11 +119,15 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
           <>
             <h4 className="ec-prod-name">{item.name}</h4>
             <div className="ec-price-tag">{item.price > 0 ? formatPrice(item.price) : ""}</div>
+            
             {isShortPick && (
-                <div className="short-pick-alert"><FaExclamationTriangle /> Se encontraron solo {scanned} de {total}</div>
+                <div className="short-pick-alert">
+                    <FaExclamationTriangle /> Se encontraron solo {scanned} de {total}
+                </div>
             )}
           </>
         )}
+
         <div className="ec-req-list">
           {item.pedidos_involucrados.map((ped, idx) => {
             const orderIdx = orderMap[ped.id_pedido] || 0;
@@ -100,16 +142,23 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
           })}
         </div>
       </div>
+
       {!isCompleted ? (
         <div className="ec-action-col">
           <button className={`ec-scan-btn ${isPartial ? "active-partial" : ""}`} onClick={() => onAction(item, "scan")}>
             {isPartial ? (
               <div className="ec-scan-progress"><span className="ec-scan-prog-nums">{scanned}/{total}</span><span className="ec-scan-prog-label">FALTAN {remaining}</span></div>
-            ) : (<><FaBarcode /><span className="ec-scan-label">SCAN</span></>)}
+            ) : (
+              <><FaBarcode /><span className="ec-scan-label">SCAN</span></>
+            )}
           </button>
+          
           {isPartial && (
-              <button className="ec-short-btn" onClick={() => onAction(item, "short_pick")} title="Faltan Unidades"><FaBan /></button>
+              <button className="ec-short-btn" onClick={() => onAction(item, "short_pick")} title="Faltan Unidades">
+                  <FaBan />
+              </button>
           )}
+
           <div style={{ display: "flex", gap: 5 }}>
             <button className="ec-alt-btn" onClick={() => onAction(item, "manual")} title="Teclado"><FaKeyboard size={14} /></button>
             <button className="ec-alt-btn warning" onClick={() => onAction(item, "substitute")} title="Sustituir Total"><FaExchangeAlt size={14} /></button>
@@ -138,6 +187,7 @@ const VistaPicker = () => {
   const [currentItem, setCurrentItem] = useState(null);
   const [showSuccessQR, setShowSuccessQR] = useState(false);
   const [completedSessionId, setCompletedSessionId] = useState(null);
+
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [showSubModal, setShowSubModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
@@ -156,11 +206,12 @@ const VistaPicker = () => {
   const refreshSessionData = useCallback(async (idPicker) => {
     if (!idPicker) return;
     try {
-      const { data: session } = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${idPicker}`,
+      // ✅ CACHE BUSTING: Agregamos timestamp para forzar datos frescos del servidor
+      const res = await axios.get(
+        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${idPicker}&t=${Date.now()}`,
       );
-      setSessionData(session);
-      localStorage.setItem("session_active_cache", JSON.stringify(session));
+      setSessionData(res.data);
+      localStorage.setItem("session_active_cache", JSON.stringify(res.data));
     } catch (err) {
       if (err.response && err.response.status === 404) {
         resetSesionLocal();
@@ -176,23 +227,54 @@ const VistaPicker = () => {
     }
   }, []);
 
-  // Listeners
+  // ✅ LISTENER 1: ASIGNACIÓN DE RUTAS
   useEffect(() => {
       if (!pickerInfo?.id) return;
+
+      console.log(`📡 Escuchando asignaciones para picker: ${pickerInfo.id}`);
+
       const channel = supabase.channel(`picker-global-${pickerInfo.id}`)
-          .on('postgres_changes',{ event: 'UPDATE', schema: 'public', table: 'wc_pickers', filter: `id=eq.${pickerInfo.id}` },
-              (payload) => { setLoading(true); refreshSessionData(pickerInfo.id); })
+          .on(
+              'postgres_changes',
+              { 
+                  event: 'UPDATE', 
+                  schema: 'public', 
+                  table: 'wc_pickers', 
+                  filter: `id=eq.${pickerInfo.id}` 
+              },
+              (payload) => {
+                  console.log("🔔 Alerta de Asignación:", payload);
+                  setLoading(true);
+                  refreshSessionData(pickerInfo.id);
+              }
+          )
           .subscribe();
+
       return () => { supabase.removeChannel(channel); };
   }, [pickerInfo?.id, refreshSessionData]);
 
+
+  // ✅ LISTENER 2: CAMBIOS EN LA SESIÓN (Logs, Delete, Cancel)
   useEffect(() => {
       if (!sessionData?.session_id) return;
+
       const sid = sessionData.session_id;
+      console.log(`📡 Escuchando cambios en sesión activa: ${sid}`);
+
       const channel = supabase.channel(`active-session-updates-${sid}`)
-          .on('postgres_changes',{ event: 'UPDATE', schema: 'public', table: 'wc_picking_sessions', filter: `id=eq.${sid}` },
+          // A. Cambios de estado de sesión
+          .on(
+              'postgres_changes',
+              { 
+                  event: 'UPDATE', 
+                  schema: 'public', 
+                  table: 'wc_picking_sessions', 
+                  filter: `id=eq.${sid}` 
+              },
               (payload) => {
+                  console.log("📦 Sesión actualizada:", payload);
                   const newState = payload.new.estado;
+                  
                   if (newState === 'auditado' || newState === 'finalizado') {
                       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
                       resetSesionLocal();
@@ -204,12 +286,22 @@ const VistaPicker = () => {
                   } else {
                       refreshSessionData(pickerInfo.id);
                   }
-              })
-          .on('postgres_changes',{ event: '*', schema: 'public', table: 'wc_log_picking' },
-              () => { refreshSessionData(pickerInfo.id); })
+              }
+          )
+          // B. Cambios en logs (Picking / Undo)
+          .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'wc_log_picking' },
+              (payload) => {
+                  console.log("📝 Log detectado:", payload);
+                  refreshSessionData(pickerInfo.id);
+              }
+          )
           .subscribe();
+
       return () => { supabase.removeChannel(channel); };
   }, [sessionData?.session_id, pickerInfo?.id, refreshSessionData]);
+
 
   useEffect(() => {
     const init = async () => {
@@ -219,18 +311,27 @@ const VistaPicker = () => {
         let me = null;
         try {
           const { data: pickers } = await axios.get(`https://backend-woocommerce.vercel.app/api/orders/pickers?email=${email}`);
-          if (pickers && pickers.length > 0) { me = pickers[0]; localStorage.setItem("picker_info_cache", JSON.stringify(me)); }
+          if (pickers && pickers.length > 0) {
+            me = pickers[0];
+            localStorage.setItem("picker_info_cache", JSON.stringify(me));
+          }
         } catch (err) { me = JSON.parse(localStorage.getItem("picker_info_cache")); }
         
         if (!me) { alert("Usuario no encontrado."); setLoading(false); return; }
         setPickerInfo(me);
 
         const savedCompletedId = localStorage.getItem("waiting_for_audit_id");
-        if (savedCompletedId) { setCompletedSessionId(savedCompletedId); setShowSuccessQR(true); setLoading(false); return; }
+        if (savedCompletedId) {
+            setCompletedSessionId(savedCompletedId);
+            setShowSuccessQR(true);
+            setLoading(false);
+            return; 
+        }
         await refreshSessionData(me.id);
       } catch (e) { console.error("Error init:", e); setLoading(false); } 
     };
     init();
+    
     const goOnline = () => setIsOnline(true);
     const goOffline = () => setIsOnline(false);
     window.addEventListener("online", goOnline);
@@ -254,7 +355,7 @@ const VistaPicker = () => {
     else if (type === "short_pick") handleShortPick(item);
   };
 
-  // ✅ PROCESADOR DE COLA MEJORADO (CON LOGS DE ERROR)
+  // ✅ PROCESADOR DE COLA MEJORADO (Elimina items basura)
   useEffect(() => {
     const processQueue = async () => {
       if (!navigator.onLine || isSyncing.current) return;
@@ -271,7 +372,7 @@ const VistaPicker = () => {
             console.log("📤 Subiendo acción:", item.accion);
             await axios.post("https://backend-woocommerce.vercel.app/api/orders/registrar-accion", item);
             
-            // Si éxito: Sacar de la cola
+            // Éxito: Sacar de la cola
             const currentQueueStr = localStorage.getItem("offline_actions_queue");
             const currentQueue = currentQueueStr ? JSON.parse(currentQueueStr) : [];
             if (currentQueue.length > 0) {
@@ -282,20 +383,20 @@ const VistaPicker = () => {
             } else { queue = []; }
           } catch (err) { 
             console.error("❌ Error subiendo acción:", err);
-            // Si el error es 400 (Bad Request) o 500 pero con mensaje de datos inválidos,
-            // LO SACAMOS DE LA COLA para no atascar todo.
-            if (err.response && (err.response.status === 400 || err.response.status === 500)) {
-                console.warn("⚠️ Acción corrupta eliminada de la cola para evitar bloqueo.");
+            // Si el error es 400 o 500 (Datos inválidos en el servidor), ELIMINAR DE COLA
+            // Esto destraba el "Subiendo..." infinito
+            if (err.response && (err.response.status >= 400)) {
+                console.warn("⚠️ Acción corrupta detectada. Eliminando de la cola para desbloquear.");
                 const currentQueueStr = localStorage.getItem("offline_actions_queue");
                 const currentQueue = currentQueueStr ? JSON.parse(currentQueueStr) : [];
                 if(currentQueue.length > 0) {
-                    currentQueue.shift();
+                    currentQueue.shift(); // Borrar la mala
                     localStorage.setItem("offline_actions_queue", JSON.stringify(currentQueue));
                     queue = currentQueue;
                     setPendingSync(currentQueue.length);
                 }
             }
-            break; // Romper bucle si es error de red
+            break; // Si es error de red (sin response), paramos y reintentamos luego
           }
         }
       } finally { isSyncing.current = false; }
@@ -329,15 +430,8 @@ const VistaPicker = () => {
 
   const handleUndo = async (item) => {
     try {
-      // ✅ FIX: ENVIAR TODOS LOS DATOS NECESARIOS
-      queueAction({ 
-          id_sesion: sessionData.session_id, 
-          id_producto_original: item.product_id, 
-          nombre_producto_original: item.name,
-          accion: "reset",
-          cantidad_afectada: 1, // Por defecto deshacer 1 unidad
-          pasillo: item.pasillo
-      });
+      // Acción reset para borrar logs en backend
+      queueAction({ id_sesion: sessionData.session_id, id_producto_original: item.product_id, accion: "reset", cantidad_afectada: 1, pasillo: item.pasillo });
       updateLocalSessionState(item.product_id, 0, "pendiente", null);
     } catch (e) { alert("Error al deshacer"); }
   };
