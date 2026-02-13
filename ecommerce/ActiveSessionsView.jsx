@@ -7,7 +7,6 @@ import "./PedidosAdmin.css";
 const SessionTimer = ({ startTime }) => {
     const [elapsed, setElapsed] = useState("00:00:00");
     const [isLong, setIsLong] = useState(false);
-
     useEffect(() => {
         const interval = setInterval(() => {
             const start = new Date(startTime).getTime();
@@ -22,7 +21,6 @@ const SessionTimer = ({ startTime }) => {
         }, 1000);
         return () => clearInterval(interval);
     }, [startTime]);
-
     return <div className={`pa-timer ${isLong ? 'danger' : ''}`}><FaClock /> {elapsed}</div>;
 };
 
@@ -43,37 +41,12 @@ const ActiveSessionsView = ({ onViewDetail }) => {
 
   useEffect(() => {
       fetchSessions();
-
-      const channel = supabase.channel('admin-dashboard-global-v2')
-          // 1. Escuchar TODO en sesiones (Crear, Actualizar, Borrar, Admin Edit)
-          .on(
-              'postgres_changes', 
-              { event: '*', schema: 'public', table: 'wc_picking_sessions' }, 
-              () => {
-                  console.log("⚡ Dashboard: Cambio en sesiones");
-                  fetchSessions();
-              }
-          )
-          // 2. Escuchar TODO en logs (Insertar scan, Borrar deshacer)
-          .on(
-              'postgres_changes', 
-              { event: '*', schema: 'public', table: 'wc_log_picking' }, 
-              () => {
-                  console.log("⚡ Dashboard: Cambio en logs (Scan/Undo)");
-                  fetchSessions();
-              }
-          )
-          // 3. Escuchar asignaciones (Nuevas rutas)
-          .on(
-              'postgres_changes',
-              { event: '*', schema: 'public', table: 'wc_asignaciones_pedidos' },
-              () => {
-                  console.log("⚡ Dashboard: Nueva asignación");
-                  fetchSessions();
-              }
-          )
+      const channel = supabase.channel('admin-dashboard-global-v3')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'wc_picking_sessions' }, () => { fetchSessions(); })
+          // ✅ ESCUCHAR DELETE PARA QUE LA BARRA BAJE
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'wc_log_picking' }, () => { fetchSessions(); })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'wc_asignaciones_pedidos' }, () => { fetchSessions(); })
           .subscribe();
-
       return () => { supabase.removeChannel(channel); };
   }, []);
 
@@ -96,62 +69,28 @@ const ActiveSessionsView = ({ onViewDetail }) => {
           <div className="pa-card-header">
             <div className="pa-picker-info">
               <div className="pa-avatar">{session.picker_name ? session.picker_name.charAt(0).toUpperCase() : "?"}</div>
-              <div>
-                <h4>{session.picker_name}</h4>
-                <span className="pa-session-id">#{session.session_id.slice(0, 6)}</span>
-              </div>
+              <div><h4>{session.picker_name}</h4><span className="pa-session-id">#{session.session_id.slice(0, 6)}</span></div>
             </div>
             <SessionTimer startTime={session.start_time} />
           </div>
-
           <div className="pa-progress-section">
-            <div className="pa-progress-labels">
-              <span>Progreso Global</span>
-              <span>{session.progress}%</span>
-            </div>
-            <div className="pa-progress-bar-bg">
-              <div className="pa-progress-bar-fill" style={{ width: `${session.progress}%`, background: session.progress === 100 ? "#10b981" : "#3b82f6" }}></div>
-            </div>
+            <div className="pa-progress-labels"><span>Progreso Global</span><span>{session.progress}%</span></div>
+            <div className="pa-progress-bar-bg"><div className="pa-progress-bar-fill" style={{ width: `${session.progress}%`, background: session.progress === 100 ? "#10b981" : "#3b82f6" }}></div></div>
           </div>
-
           <div className="pa-batch-summary">
-             <div className="pa-bs-header">
-                <FaLayerGroup size={12} color="#64748b"/>
-                <span>Batch de {session.orders_count} pedidos:</span>
-             </div>
-             <div className="pa-bs-list">
-                {session.order_ids && session.order_ids.map(id => (
-                    <span key={id} className="pa-bs-chip">#{id}</span>
-                ))}
-             </div>
+             <div className="pa-bs-header"><FaLayerGroup size={12} color="#64748b"/><span>Batch de {session.orders_count} pedidos:</span></div>
+             <div className="pa-bs-list">{session.order_ids && session.order_ids.map(id => (<span key={id} className="pa-bs-chip">#{id}</span>))}</div>
           </div>
-
           <div className="pa-stats-grid">
-            <div className="pa-stat-box">
-              <span className="pa-stat-num">{session.completed_items - session.substituted_items}</span>
-              <span className="pa-stat-label">✅ Listos</span>
-            </div>
-            <div className="pa-stat-box warning">
-              <span className="pa-stat-num">{session.substituted_items}</span>
-              <span className="pa-stat-label">🔄 Cambios</span>
-            </div>
-            <div className="pa-stat-box pending">
-              <span className="pa-stat-num">{session.total_items - session.completed_items}</span>
-              <span className="pa-stat-label">⏳ Faltan</span>
-            </div>
+            <div className="pa-stat-box"><span className="pa-stat-num">{session.completed_items - session.substituted_items}</span><span className="pa-stat-label">✅ Listos</span></div>
+            <div className="pa-stat-box warning"><span className="pa-stat-num">{session.substituted_items}</span><span className="pa-stat-label">🔄 Cambios</span></div>
+            <div className="pa-stat-box pending"><span className="pa-stat-num">{session.total_items - session.completed_items}</span><span className="pa-stat-label">⏳ Faltan</span></div>
           </div>
-
-          <div className="pa-location-badge">
-            <FaMapMarkerAlt /> {session.current_location}
-          </div>
-
-          <button className="pa-view-detail-btn" onClick={() => onViewDetail(session)}>
-            <FaEye /> Ver Detalle en Vivo
-          </button>
+          <div className="pa-location-badge"><FaMapMarkerAlt /> {session.current_location}</div>
+          <button className="pa-view-detail-btn" onClick={() => onViewDetail(session)}><FaEye /> Ver Detalle en Vivo</button>
         </div>
       ))}
     </div>
   );
 };
-
 export default ActiveSessionsView;

@@ -64,6 +64,8 @@ const SessionTimer = ({ startDate }) => {
 const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
   const scannedRaw = item.qty_scanned || 0;
   const total = item.quantity_total;
+  
+  // Visual clamp para que no se vea feo si hay error de sync momentáneo
   const scanned = Math.min(scannedRaw, total); 
   const remaining = Math.max(0, total - scanned);
   
@@ -95,6 +97,7 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
           )}
         </div>
 
+        {/* CASO: MIXTO (Original + Sustituto) */}
         {isMixed ? (
             <div className="ec-sub-details">
                 <div style={{borderBottom:'1px dashed #ccc', paddingBottom:4, marginBottom:4}}>
@@ -116,6 +119,7 @@ const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
           <>
             <h4 className="ec-prod-name">{item.name}</h4>
             <div className="ec-price-tag">{item.price > 0 ? formatPrice(item.price) : ""}</div>
+            
             {isShortPick && (
                 <div className="short-pick-alert">
                     <FaExclamationTriangle /> Se encontraron solo {scanned} de {total}
@@ -222,8 +226,8 @@ const VistaPicker = () => {
     }
   }, []);
 
-  // ✅ 1. ESCUCHAR ASIGNACIONES (Siempre activo)
-  // Detecta si me asignan una nueva ruta aunque esté en pantalla de "Sin Asignación"
+  // ✅ LISTENER 1: ASIGNACIÓN DE RUTAS (Siempre Activo)
+  // Detecta cambios en la tabla 'wc_pickers' para saber si me asignaron algo nuevo
   useEffect(() => {
       if (!pickerInfo?.id) return;
 
@@ -240,7 +244,7 @@ const VistaPicker = () => {
               },
               (payload) => {
                   console.log("🔔 Alerta de Asignación:", payload);
-                  setLoading(true);
+                  setLoading(true); // Mostrar carga para dar feedback visual
                   refreshSessionData(pickerInfo.id);
               }
           )
@@ -250,8 +254,8 @@ const VistaPicker = () => {
   }, [pickerInfo?.id, refreshSessionData]);
 
 
-  // ✅ 2. ESCUCHAR CAMBIOS EN LA SESIÓN (Admin Delete / Undo)
-  // Se activa solo cuando ya tengo una sesión
+  // ✅ LISTENER 2: CAMBIOS EN LA SESIÓN (Borrado de items, Logs, Cancelación)
+  // Se activa solo cuando existe un session_id
   useEffect(() => {
       if (!sessionData?.session_id) return;
 
@@ -259,7 +263,7 @@ const VistaPicker = () => {
       console.log(`📡 Escuchando cambios en sesión activa: ${sid}`);
 
       const channel = supabase.channel(`active-session-updates-${sid}`)
-          // A. Si el admin borra un item o cancela la sesión (Cambia wc_picking_sessions)
+          // A. Escuchar cambios en la tabla SESIONES (ej. Admin borra un item del snapshot)
           .on(
               'postgres_changes',
               { 
@@ -281,12 +285,12 @@ const VistaPicker = () => {
                       resetSesionLocal();
                       window.location.reload();
                   } else {
-                      // Si cambia algo más (ej. Admin borró item del snapshot), recargamos
+                      // Importante: Si cambia el snapshot (item borrado), recargamos
                       refreshSessionData(pickerInfo.id);
                   }
               }
           )
-          // B. Si alguien (o yo mismo en otro tab) modifica logs (Insert o Delete)
+          // B. Escuchar LOGS (Insertar, Borrar/Undo)
           .on(
               'postgres_changes',
               { event: '*', schema: 'public', table: 'wc_log_picking' },
@@ -353,14 +357,9 @@ const VistaPicker = () => {
 
   const handleCardAction = (item, type) => {
     setCurrentItem(item);
-    if (type === "scan") {
-      if (isWeighable(item)) setShowWeightModal(true);
-      else setIsScanning(true);
-    } else if (type === "manual") setShowManualModal(true);
-    else if (type === "substitute") {
-        setMissingQtyForSub(item.quantity_total - (item.qty_scanned || 0)); 
-        setShowSubModal(true);
-    }
+    if (type === "scan") { if (isWeighable(item)) setShowWeightModal(true); else setIsScanning(true); } 
+    else if (type === "manual") setShowManualModal(true);
+    else if (type === "substitute") { setMissingQtyForSub(item.quantity_total - (item.qty_scanned || 0)); setShowSubModal(true); }
     else if (type === "undo") handleUndo(item);
     else if (type === "short_pick") handleShortPick(item);
   };

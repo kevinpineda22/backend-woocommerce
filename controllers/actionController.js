@@ -17,18 +17,22 @@ exports.registerAction = async (req, res) => {
     const fecha = new Date().toISOString();
     const qty = cantidad_afectada || 1;
 
-    // 1. Validar Sesión
+    // 1. Validar Sesión y obtener Asignación
+    // ✅ CORRECCIÓN AQUÍ: Usamos 'reporte_snapshot' que es como se llama en tu DB
     const { data: assignments, error: assignError } = await supabase
       .from("wc_asignaciones_pedidos")
-      .select("id, id_pedido, snapshot_pedido")
+      .select("id, id_pedido, reporte_snapshot") 
       .eq("id_sesion", id_sesion);
 
-    if (assignError || !assignments || assignments.length === 0) throw new Error("Sesión inválida");
+    if (assignError || !assignments || assignments.length === 0) {
+        console.error("Error buscando asignación:", assignError);
+        throw new Error("Sesión inválida o sin asignaciones");
+    }
 
-    // Lógica de Match (Buscar a qué pedido pertenece)
+    // Lógica de Match (Buscar a qué pedido pertenece el producto)
     let targetAssignment = assignments[0]; 
     for (let assign of assignments) {
-        const items = assign.snapshot_pedido?.line_items || [];
+        const items = assign.reporte_snapshot?.line_items || [];
         const found = items.find(i => i.product_id === id_producto_original || i.variation_id === id_producto_original);
         if (found) {
             targetAssignment = assign;
@@ -37,21 +41,22 @@ exports.registerAction = async (req, res) => {
     }
 
     // =================================================================
-    // 🚨 CORRECCIÓN CRÍTICA: LÓGICA DE RESET (DESHACER)
+    // CASO RESET (DESHACER): BORRAR LOGS FÍSICAMENTE
     // =================================================================
     if (accion === 'reset') {
-        // Buscamos los últimos logs de este producto en esta sesión y los BORRAMOS.
+        // Buscamos los últimos logs de este producto en esta asignación
         const { data: logsToDelete } = await supabase
             .from("wc_log_picking")
             .select("id")
             .eq("id_asignacion", targetAssignment.id)
+            // Buscamos tanto por id_producto como por id_producto_original para cubrir sustitutos
             .or(`id_producto.eq.${id_producto_original},id_producto_original.eq.${id_producto_original}`)
             .order("fecha_registro", { ascending: false })
-            .limit(qty); // Borramos solo la cantidad que se devolvió
+            .limit(qty); 
 
         if (logsToDelete && logsToDelete.length > 0) {
             const ids = logsToDelete.map(l => l.id);
-            // ELIMINACIÓN FÍSICA: Esto hace que el conteo baje en tiempo real
+            // Eliminación física para que el conteo baje
             const { error: delError } = await supabase.from("wc_log_picking").delete().in("id", ids);
             if (delError) throw delError;
         }
@@ -60,7 +65,7 @@ exports.registerAction = async (req, res) => {
     }
 
     // =================================================================
-    // CASO NORMAL (INSERTAR)
+    // CASO NORMAL (INSERTAR ACCIÓN)
     // =================================================================
     const logData = {
       id_asignacion: targetAssignment.id,
@@ -86,6 +91,7 @@ exports.registerAction = async (req, res) => {
     }
 
     const logsToInsert = Array(qty).fill(logData);
+    
     const { error: insertError } = await supabase.from("wc_log_picking").insert(logsToInsert);
 
     if (insertError) throw insertError;
