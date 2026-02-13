@@ -369,12 +369,6 @@ const PedidosAdmin = () => {
                   ? "📦 Pedidos Pendientes"
                   : "🚀 Centro de Comando"}
               </h1>
-              <button
-                onClick={() => fetchData()}
-                className="pedidos-admin-refresh-btn"
-              >
-                <FaSync className={loading ? "fa-spin" : ""} /> Actualizar
-              </button>
             </header>
 
             <div className="pedidos-layout-body">

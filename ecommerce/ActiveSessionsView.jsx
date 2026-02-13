@@ -5,6 +5,7 @@ import {
   FaEye,
   FaClock,
   FaLayerGroup,
+  FaSync,
 } from "react-icons/fa";
 import { supabase } from "../../supabaseClient";
 import axios from "axios";
@@ -79,19 +80,35 @@ const ActiveSessionsView = ({ onViewDetail }) => {
         },
       )
 
-      // B. Cambios de Logs (Picking Real) -> Recarga inteligente
+      // B. Cambios de Logs (Picking Real)
+      // IMPORTANTE: Separamos los eventos para asegurarnos que INSERT se capture
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "wc_log_picking" },
+        { event: "INSERT", schema: "public", table: "wc_log_picking" },
         (payload) => {
-          console.log(`⚡ Actividad Picker detectada (${payload.eventType})`);
-
-          // 1. Disparamos la recarga real del servidor con un delay de seguridad
-          // Esto da tiempo a que el INSERT se propague y sea visible para la query del dashboard
-          setTimeout(() => {
-            fetchSessions();
-          }, 500);
+          console.log(
+            "⚡ Nuevo Log Insertado -> Recargando dashboard",
+            payload,
+          );
+          setTimeout(() => fetchSessions(), 500);
         },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "wc_log_picking" },
+        (payload) => {
+          console.log(
+            "⚡ Log Eliminado (Undo) -> Recargando dashboard",
+            payload,
+          );
+          fetchSessions();
+        },
+      )
+      // Capturamos cualquier otro evento por si acaso
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "wc_log_picking" },
+        () => fetchSessions(),
       )
       .subscribe();
 
@@ -99,6 +116,11 @@ const ActiveSessionsView = ({ onViewDetail }) => {
       supabase.removeChannel(channel);
     };
   }, [fetchSessions]);
+
+  const handleManualRefresh = () => {
+    setLoading(true);
+    fetchSessions();
+  };
 
   if (loading && sessions.length === 0)
     return (
@@ -113,12 +135,40 @@ const ActiveSessionsView = ({ onViewDetail }) => {
         <FaRunning size={50} style={{ marginBottom: 20, opacity: 0.5 }} />
         <h3>Todo tranquilo por aquí.</h3>
         <p>No hay pickers en ruta en este momento.</p>
+        <button
+          className="pa-view-detail-btn"
+          onClick={fetchSessions}
+          style={{ marginTop: 20 }}
+        >
+          <FaSync /> Actualizar
+        </button>
       </div>
     );
   }
 
   return (
     <div className="pa-dashboard-grid">
+      <div
+        style={{
+          gridColumn: "1 / -1",
+          display: "flex",
+          justifyContent: "flex-end",
+          marginBottom: 10,
+        }}
+      >
+        <button
+          className="pa-view-detail-btn"
+          style={{
+            background: "transparent",
+            color: "#64748b",
+            border: "1px solid #cbd5e1",
+          }}
+          onClick={handleManualRefresh}
+        >
+          <FaSync className={loading ? "ec-spin" : ""} /> Refrescar Datos
+        </button>
+      </div>
+
       {sessions.map((session) => (
         <div key={session.session_id} className="pa-dashboard-card">
           <div className="pa-card-header">
