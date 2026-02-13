@@ -1,0 +1,515 @@
+/* LiveSessionModal.css - Versión DEFINITIVA y Reparada */
+
+:root {
+  --lsm-bg: #f8fafc;
+  --lsm-border: #e2e8f0;
+  --lsm-primary: #1e293b;
+  --lsm-accent: #3b82f6;
+  --lsm-success: #10b981;
+  --lsm-warning: #f59e0b;
+  --lsm-danger: #ef4444;
+}
+
+/* =========================================
+   1. OVERLAY Y CONTENEDOR PRINCIPAL
+   ========================================= */
+.lsm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 3000;
+}
+
+.lsm-content {
+  background: white;
+  width: 95%;
+  max-width: 1100px;
+  height: 90vh;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: lsm-slide-up 0.3s ease-out;
+}
+
+@keyframes lsm-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =========================================
+   2. HEADER Y CONTROLES
+   ========================================= */
+.lsm-header {
+  background: var(--lsm-primary);
+  padding: 15px 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 4px solid var(--lsm-accent);
+  color: white;
+  flex-shrink: 0;
+}
+
+.lsm-header-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.lsm-icon-box {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.lsm-title h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: white;
+}
+.lsm-title span {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+/* Grupo de Botones */
+.lsm-controls-group {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.lsm-view-toggle {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  border-radius: 8px;
+  display: flex;
+  gap: 5px;
+}
+
+.lsm-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.lsm-toggle-btn.active {
+  background: var(--lsm-accent);
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Botón Rojo de Papelera */
+.lsm-trash-toggle {
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.lsm-trash-toggle:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: white;
+}
+.lsm-trash-toggle.active {
+  background: var(--lsm-danger);
+  color: white;
+  border-color: var(--lsm-danger);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.lsm-close-btn {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 2rem;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  margin-left: 20px;
+}
+.lsm-close-btn:hover {
+  opacity: 1;
+}
+
+/* =========================================
+   3. CUERPO (SCROLL AREA)
+   ========================================= */
+.lsm-body {
+  background: var(--lsm-bg);
+  flex: 1;
+  overflow-y: auto;
+  padding: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+}
+
+.lsm-empty-state {
+  text-align: center;
+  padding: 60px;
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 1.1rem;
+}
+
+/* =========================================
+   4. VISTA BATCH (Tarjetas de Productos)
+   ========================================= */
+.lsm-item-card {
+  background: white;
+  border: 1px solid var(--lsm-border);
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+/* Estados de colores */
+.lsm-item-card.recolectado {
+  border-left: 5px solid var(--lsm-success);
+  background: #f0fdf4;
+}
+.lsm-item-card.sustituido {
+  border-left: 5px solid var(--lsm-warning);
+  background: #fffbeb;
+}
+.lsm-item-card.pendiente {
+  border-left: 5px solid #cbd5e1;
+}
+.lsm-item-card.removed-mode {
+  background: #fff5f5;
+  border-color: #feb2b2;
+  opacity: 0.8;
+  border-left: 5px solid var(--lsm-danger);
+}
+
+.lsm-item-img {
+  width: 60px;
+  height: 60px;
+  background: white;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.lsm-item-img img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+}
+
+.lsm-item-content {
+  flex: 1;
+  min-width: 0;
+}
+.lsm-item-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 5px;
+  white-space: normal;
+}
+.lsm-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+.lsm-pasillo-badge {
+  background: #e2e8f0;
+  color: #475569;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.lsm-orders-dots {
+  display: flex;
+  gap: -8px;
+  margin-left: auto;
+}
+.lsm-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: white;
+  font-weight: 700;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Badge de Estado */
+.lsm-status-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 5px 12px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.lsm-status-badge.ok {
+  background: #dcfce7;
+  color: #166534;
+}
+.lsm-status-badge.change {
+  background: #fef3c7;
+  color: #92400e;
+}
+.lsm-status-badge.wait {
+  background: #f1f5f9;
+  color: #64748b;
+}
+.lsm-status-badge.removed {
+  background: #fee2e2;
+  color: var(--lsm-danger);
+  border: 1px solid #fca5a5;
+}
+
+/* Botones Acción Batch */
+.lsm-delete-btn {
+  background: white;
+  border: 1px solid var(--lsm-danger);
+  color: var(--lsm-danger);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.lsm-delete-btn:hover {
+  background: #fee2e2;
+}
+
+.lsm-restore-btn {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.1s;
+}
+.lsm-restore-btn:hover {
+  background: #bbf7d0;
+  transform: scale(1.05);
+}
+
+/* =========================================
+   5. VISTA POR PEDIDOS (AQUÍ ESTABA EL ERROR)
+   ========================================= */
+
+/* Contenedor de la lista de tarjetas de pedidos */
+.live-orders-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 20px;
+  width: 100%;
+}
+
+/* La tarjeta blanca que agrupa un pedido */
+.lsm-order-group {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid var(--lsm-border);
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header del pedido (Nombre cliente, progreso) */
+.lsm-og-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+}
+
+/* Lista interna de productos */
+.lsm-sub-list {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* CADA FILA DE PRODUCTO DENTRO DEL PEDIDO */
+.lsm-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px 20px;
+  border-bottom: 1px dashed #f1f5f9;
+  transition: background 0.1s;
+  background: white;
+}
+
+.lsm-sub-item:last-child {
+  border-bottom: none;
+}
+.lsm-sub-item:hover {
+  background: #fafafa;
+}
+
+/* Icono pequeño de estado (Check verde / Alerta naranja) */
+.lsm-mini-status {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.8rem;
+}
+.lsm-mini-status.done {
+  background: #dcfce7;
+  color: #166534;
+}
+.lsm-mini-status.sub {
+  background: #fef3c7;
+  color: #92400e;
+}
+.lsm-mini-status.pend {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #cbd5e1;
+}
+
+/* =========================================
+   6. ESTILOS DE DESGLOSE DE SUSTITUCIÓN
+   ========================================= */
+
+/* Estilo Base (usado en Batch y Orders) */
+.lsm-sub-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-left: 2px solid #cbd5e1;
+  padding-left: 8px;
+  margin-left: 10px;
+  font-size: 0.8rem;
+}
+
+/* Variante para la vista de PEDIDOS (más detallada y destacada) */
+.lsm-sub-breakdown.extended {
+  margin-top: 8px;
+  background: #fffbeb;
+  border-left: 3px solid #f59e0b;
+  border-radius: 0 6px 6px 0;
+  padding: 8px 12px;
+  margin-left: 0;
+}
+
+/* Header "Solicitado: X un." */
+.lsm-sub-header {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+/* Contenedor de filas de desglose items */
+.lsm-sub-rows-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Fila individual (Original / Sustituto) */
+.lsm-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  width: fit-content;
+}
+
+.lsm-sub-row.original {
+  background: white;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.lsm-sub-row.warning {
+  background: white;
+  border: 1px solid #fcd34d;
+  color: #b45309;
+}
+
+/* Advertencia para items compartidos */
+.lsm-shared-warning {
+  font-size: 0.75rem;
+  color: #9a3412;
+  font-style: italic;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
