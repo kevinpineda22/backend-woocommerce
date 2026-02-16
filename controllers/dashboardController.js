@@ -238,7 +238,7 @@ exports.completeAuditSession = async (req, res) => {
     const updatedMetrics = { ...currentMetrics, fecha_fin_auditoria: now };
 
     const updatePayload = {
-      estado: "auditado",
+      estado: "completado", // ✅ Estado Correcto para escuchar en Frontend
       resumen_metricas: updatedMetrics,
     };
     if (datos_salida) updatePayload.datos_salida = datos_salida;
@@ -263,6 +263,12 @@ exports.completeAuditSession = async (req, res) => {
       .select("id, id_pedido")
       .eq("id_sesion", session_id)
       .limit(1);
+
+    // ✅ Actualizar estado de asignaciones también a 'completado'
+    await supabase
+      .from("wc_asignaciones_pedidos")
+      .update({ estado_asignacion: "completado", fecha_fin: now })
+      .eq("id_sesion", session_id);
     if (assignments && assignments.length > 0) {
       await supabase.from("wc_log_picking").insert([
         {
@@ -291,11 +297,9 @@ exports.completeAuditSession = async (req, res) => {
       })();
     }
 
-    res
-      .status(200)
-      .json({
-        message: "Salida aprobada. Snapshot guardado y Picker liberado.",
-      });
+    res.status(200).json({
+      message: "Salida aprobada. Snapshot guardado y Picker liberado.",
+    });
   } catch (error) {
     console.error("Error finalizando auditoría:", error.message);
     res.status(500).json({ error: error.message });

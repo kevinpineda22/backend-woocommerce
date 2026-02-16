@@ -244,10 +244,16 @@ exports.completeSession = async (req, res) => {
       .from("wc_picking_sessions")
       .update({ estado: "completado", fecha_fin: now })
       .eq("id", id_sesion);
+
+    // [INSTRUCCION 2026-02-13] Se comenta para que el picker NO se libere aquí.
+    // El picker seguirá en session_actual hasta que el Auditor lo libere en Dashboard.
+    /*
     await supabase
       .from("wc_pickers")
       .update({ estado_picker: "disponible", id_sesion_actual: null })
-      .eq("id", id_picker); // Aquí liberamos temporalmente, aunque el flujo auditoría lo ajusta luego
+      .eq("id", id_picker); 
+    */
+
     await supabase
       .from("wc_asignaciones_pedidos")
       .update({ estado_asignacion: "completado", fecha_fin: now })

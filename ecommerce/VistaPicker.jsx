@@ -214,6 +214,13 @@ const VistaPicker = () => {
       localStorage.setItem("session_active_cache", JSON.stringify(res.data));
     } catch (err) {
       if (err.response && err.response.status === 404) {
+        
+        // 🛡️ PROTECCIÓN DE QR: Si estamos esperando auditoría, NO borramos la pantalla
+        if (localStorage.getItem("waiting_for_audit_id")) {
+            setLoading(false);
+            return; // Detenemos aquí para que el QR siga visible
+        }
+
         resetSesionLocal();
         setSessionData(null);
         setShowSuccessQR(false); 
@@ -231,8 +238,6 @@ const VistaPicker = () => {
   useEffect(() => {
       if (!pickerInfo?.id) return;
 
-      console.log(`📡 Escuchando asignaciones para picker: ${pickerInfo.id}`);
-
       const channel = supabase.channel(`picker-global-${pickerInfo.id}`)
           .on(
               'postgres_changes',
@@ -243,7 +248,6 @@ const VistaPicker = () => {
                   filter: `id=eq.${pickerInfo.id}` 
               },
               (payload) => {
-                  console.log("🔔 Alerta de Asignación:", payload);
                   setLoading(true);
                   refreshSessionData(pickerInfo.id);
               }
@@ -259,7 +263,6 @@ const VistaPicker = () => {
       if (!sessionData?.session_id) return;
 
       const sid = sessionData.session_id;
-      console.log(`📡 Escuchando cambios en sesión activa: ${sid}`);
 
       const channel = supabase.channel(`active-session-updates-${sid}`)
           // A. Cambios de estado de sesión
@@ -272,11 +275,16 @@ const VistaPicker = () => {
                   filter: `id=eq.${sid}` 
               },
               (payload) => {
-                  console.log("📦 Sesión actualizada:", payload);
                   const newState = payload.new.estado;
                   
-                  if (newState === 'auditado' || newState === 'finalizado') {
+                  if (newState === 'auditado' || newState === 'finalizado' || newState === 'completado') {
                       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                      
+                      // ✅ FIX: Liberar pantalla verde automáticamente
+                      localStorage.removeItem("waiting_for_audit_id");
+                      setCompletedSessionId(null);
+                      setShowSuccessQR(false);
+
                       resetSesionLocal();
                       window.location.reload();
                   } else if (newState === 'cancelado') {
@@ -293,7 +301,6 @@ const VistaPicker = () => {
               'postgres_changes',
               { event: '*', schema: 'public', table: 'wc_log_picking' },
               (payload) => {
-                  console.log("📝 Log detectado:", payload);
                   refreshSessionData(pickerInfo.id);
               }
           )
@@ -301,6 +308,40 @@ const VistaPicker = () => {
 
       return () => { supabase.removeChannel(channel); };
   }, [sessionData?.session_id, pickerInfo?.id, refreshSessionData]);
+
+  // ✅ LISTENER 3: MONITOR DE SESIÓN EN ESPERA DE AUDITORÍA (CASO RELOAD O 404)
+  useEffect(() => {
+    if (!completedSessionId) return;
+
+    console.log("🔒 Monitoreando sesión bloqueada para liberación:", completedSessionId);
+
+    const channel = supabase.channel(`waiting-session-${completedSessionId}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'wc_picking_sessions', 
+          filter: `id=eq.${completedSessionId}` 
+        },
+        (payload) => {
+          const newState = payload.new.estado;
+          console.log("🔒 Cambio de estado en sesión bloqueada:", newState);
+
+          if (['auditado', 'finalizado', 'completado', 'cancelado'].includes(newState)) {
+             if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+             localStorage.removeItem("waiting_for_audit_id");
+             setCompletedSessionId(null);
+             setShowSuccessQR(false);
+             window.location.reload();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [completedSessionId]);
+
 
 
   useEffect(() => {
@@ -320,6 +361,7 @@ const VistaPicker = () => {
         if (!me) { alert("Usuario no encontrado."); setLoading(false); return; }
         setPickerInfo(me);
 
+        // Recuperar estado de auditoría si existe
         const savedCompletedId = localStorage.getItem("waiting_for_audit_id");
         if (savedCompletedId) {
             setCompletedSessionId(savedCompletedId);
@@ -355,7 +397,7 @@ const VistaPicker = () => {
     else if (type === "short_pick") handleShortPick(item);
   };
 
-  // ✅ PROCESADOR DE COLA MEJORADO (Elimina items basura)
+  // ✅ PROCESADOR DE COLA MEJORADO
   useEffect(() => {
     const processQueue = async () => {
       if (!navigator.onLine || isSyncing.current) return;
@@ -372,7 +414,7 @@ const VistaPicker = () => {
             console.log("📤 Subiendo acción:", item.accion);
             await axios.post("https://backend-woocommerce.vercel.app/api/orders/registrar-accion", item);
             
-            // ✅ BROADCAST: Notificar al dashboard que hubo un cambio
+            // ✅ BROADCAST
             try {
               await supabase.channel('dashboard-updates').send({
                 type: 'broadcast',
@@ -384,7 +426,6 @@ const VistaPicker = () => {
                   timestamp: Date.now()
                 }
               });
-              console.log('📡 Broadcast enviado al dashboard');
             } catch (broadcastErr) {
               console.warn('⚠️ Error enviando broadcast:', broadcastErr);
             }
@@ -400,25 +441,34 @@ const VistaPicker = () => {
             } else { queue = []; }
           } catch (err) { 
             console.error("❌ Error subiendo acción:", err);
-            // Si el error es 400 o 500 (Datos inválidos en el servidor), ELIMINAR DE COLA
-            // Esto destraba el "Subiendo..." infinito
+            
+            // 🚨 DETECTOR DE SESIÓN ZOMBIE 🚨
+            if (err.response && err.response.data && err.response.data.error && err.response.data.error.includes("Sesión inválida")) {
+                console.error("💀 SESIÓN LOCAL MUERTA: Limpiando todo.");
+                resetSesionLocal();
+                localStorage.removeItem("offline_actions_queue");
+                window.location.reload(); 
+                return;
+            }
+
+            // Si es otro error 400/500, borramos solo el item malo
             if (err.response && (err.response.status >= 400)) {
-                console.warn("⚠️ Acción corrupta detectada. Eliminando de la cola para desbloquear.");
+                console.warn("⚠️ Acción corrupta. Eliminando de cola.");
                 const currentQueueStr = localStorage.getItem("offline_actions_queue");
                 const currentQueue = currentQueueStr ? JSON.parse(currentQueueStr) : [];
                 if(currentQueue.length > 0) {
-                    currentQueue.shift(); // Borrar la mala
+                    currentQueue.shift();
                     localStorage.setItem("offline_actions_queue", JSON.stringify(currentQueue));
                     queue = currentQueue;
                     setPendingSync(currentQueue.length);
                 }
             }
-            break; // Si es error de red (sin response), paramos y reintentamos luego
+            break; 
           }
         }
       } finally { isSyncing.current = false; }
     };
-    const interval = setInterval(processQueue, 1000); // Reducido de 3000ms a 1000ms para mayor velocidad
+    const interval = setInterval(processQueue, 1000); 
     processQueue();
     return () => clearInterval(interval);
   }, [pendingSync]);
@@ -447,7 +497,6 @@ const VistaPicker = () => {
 
   const handleUndo = async (item) => {
     try {
-      // Acción reset para borrar logs en backend
       queueAction({ id_sesion: sessionData.session_id, id_producto_original: item.product_id, accion: "reset", cantidad_afectada: 1, pasillo: item.pasillo });
       updateLocalSessionState(item.product_id, 0, "pendiente", null);
     } catch (e) { alert("Error al deshacer"); }
@@ -490,7 +539,27 @@ const VistaPicker = () => {
   };
   const handleScanMatch = (code) => { if (scanOverrideCallback) { scanOverrideCallback(code); setScanOverrideCallback(null); setIsScanning(false); return; } if (!currentItem) return; const c = code.trim().toUpperCase(); const sku = (currentItem.sku || "").trim().toUpperCase(); const ean = (currentItem.barcode || "").trim().toUpperCase(); if (c === sku || c === ean || (ean && ean.endsWith(c))) confirmPicking(); else { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); alert(`Código ${c} no coincide.`); } };
   const handleRequestScan = (callback) => { setScanOverrideCallback(() => callback); setIsScanning(true); };
-  const handleFinish = async () => { if (pendingSync > 0) { alert(`⚠️ Tienes ${pendingSync} acciones pendientes.`); return; } if (!window.confirm("¿Finalizar sesión completa?")) return; const finalId = sessionData.session_id; localStorage.setItem("waiting_for_audit_id", finalId); setCompletedSessionId(finalId); try { await axios.post("https://backend-woocommerce.vercel.app/api/orders/finalizar-sesion", { id_sesion: finalId, id_picker: pickerInfo.id }); resetSesionLocal(); setSessionData(null); setShowSuccessQR(true); } catch (e) { alert("Error al finalizar."); } };
+  
+  // ✅ FIX FINAL: No borramos 'waiting_for_audit_id' aquí
+  const handleFinish = async () => { 
+      if (pendingSync > 0) { alert(`⚠️ Tienes ${pendingSync} acciones pendientes.`); return; } 
+      if (!window.confirm("¿Finalizar sesión completa?")) return; 
+      
+      const finalId = sessionData.session_id;
+      localStorage.setItem("waiting_for_audit_id", finalId);
+      setCompletedSessionId(finalId); 
+      
+      try { 
+          await axios.post("https://backend-woocommerce.vercel.app/api/orders/finalizar-sesion", { id_sesion: finalId, id_picker: pickerInfo.id }); 
+          
+          // No llamamos resetSesionLocal() completo para no borrar el flag
+          localStorage.removeItem("session_active_cache");
+          localStorage.removeItem("offline_actions_queue");
+          setSessionData(null); 
+          setShowSuccessQR(true); 
+      } catch (e) { alert("Error al finalizar."); } 
+  };
+  
   const handleExitQR = () => { localStorage.removeItem("waiting_for_audit_id"); window.location.reload(); };
   const closeAllModals = () => { setIsScanning(false); setShowWeightModal(false); setShowManualModal(false); setShowSubModal(false); setCurrentItem(null); setScanOverrideCallback(null); };
   const pendingItems = sessionData?.items.filter((i) => i.status === "pendiente") || [];

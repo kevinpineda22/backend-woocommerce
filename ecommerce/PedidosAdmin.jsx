@@ -218,15 +218,42 @@ const PedidosAdmin = () => {
       const res = await axios.get(
         `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}`,
       );
-      // CORRECCION: Extraemos 'logs' del objeto de respuesta para que el .map funcione
+      // CORRECCION: Extender respuesta completa para tener acceso a metadata y final_snapshot
       setHistoryDetail({
         session,
-        logs: res.data.logs || [],
-        fullData: res.data,
+        ...res.data,
+        logs: res.data.logs || [], // Garantizar array
       });
       setShowHistoryModal(true);
     } catch (e) {
       alert("Error cargando detalles del historial.");
+    }
+  };
+
+  const handleViewManifestDirect = async (session) => {
+    try {
+      // Reutilizamos el endpoint de detalle para obtener el snapshot
+      const res = await axios.get(
+        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}`,
+      );
+
+      const { final_snapshot, metadata } = res.data;
+      if (!final_snapshot) {
+        alert(
+          "Esta sesión no tiene certificado de salida (no ha sido auditada o es antigua).",
+        );
+        return;
+      }
+
+      setManifestData({
+        session_id: metadata.session_id,
+        timestamp: final_snapshot.timestamp,
+        items: final_snapshot.items,
+        picker: metadata.picker_name || "Desconocido",
+      });
+      setShowQrManifest(true);
+    } catch (e) {
+      alert("Error cargando certificado.");
     }
   };
 
@@ -345,12 +372,21 @@ const PedidosAdmin = () => {
                             {sess.duracion}
                           </span>
                         </td>
-                        <td>
+                        <td style={{ display: "flex", gap: "5px" }}>
                           <button
                             className="gp-btn-icon warning"
+                            title="Ver Logs Detallados"
                             onClick={() => handleViewHistoryDetail(sess)}
                           >
                             <FaFileAlt />
+                          </button>
+                          <button
+                            className="gp-btn-icon"
+                            style={{ color: "#16a34a" }}
+                            title="Ver Certificado Salida"
+                            onClick={() => handleViewManifestDirect(sess)}
+                          >
+                            <FaQrcode />
                           </button>
                         </td>
                       </tr>
