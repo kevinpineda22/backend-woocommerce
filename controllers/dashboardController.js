@@ -5,6 +5,39 @@ const { agruparItemsParaPicking } = require("./pickingUtils");
 const { syncOrderToWoo } = require("../services/syncWooService");
 
 // =========================================================
+// HELPER: Obtener códigos de barras desde SIESA
+// =========================================================
+async function getBarcodesFromSiesa(productIds) {
+  try {
+    if (!productIds || productIds.length === 0) return {};
+
+    // Buscar en items_siesa por f120_id para obtener códigos de barras
+    const { data: barcodes, error } = await supabase
+      .from("siesa_codigos_barras")
+      .select("f120_id, codigo_barras")
+      .in("f120_id", productIds);
+
+    if (error) {
+      console.error("Error obteniendo códigos de barras SIESA:", error);
+      return {};
+    }
+
+    // Crear mapa: f120_id -> código_barras (tomamos el primero si hay múltiples)
+    const barcodeMap = {};
+    barcodes.forEach((bc) => {
+      if (!barcodeMap[bc.f120_id]) {
+        barcodeMap[bc.f120_id] = bc.codigo_barras;
+      }
+    });
+
+    return barcodeMap;
+  } catch (error) {
+    console.error("Error en getBarcodesFromSiesa:", error);
+    return {};
+  }
+}
+
+// =========================================================
 // 1. DASHBOARD EN VIVO (CÁLCULO EXACTO & REALTIME)
 // =========================================================
 exports.getActiveSessionsDashboard = async (req, res) => {
@@ -485,6 +518,24 @@ exports.getSessionLogsDetail = async (req, res) => {
         }
       } catch (e) {}
     }
+
+    // ✅ OBTENER CÓDIGOS DE BARRAS DESDE SIESA
+    const productIds = Array.from(
+      new Set(
+        Object.keys(productDetailsMap)
+          .map((id) => parseInt(id))
+          .filter(Boolean),
+      ),
+    );
+    const barcodeMap = await getBarcodesFromSiesa(productIds);
+
+    // Agregar códigos de barras al productDetailsMap
+    Object.keys(productDetailsMap).forEach((productId) => {
+      const barcode = barcodeMap[parseInt(productId)];
+      if (barcode) {
+        productDetailsMap[productId].barcode = barcode;
+      }
+    });
 
     res.status(200).json({
       metadata: {

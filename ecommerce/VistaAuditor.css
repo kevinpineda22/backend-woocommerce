@@ -764,6 +764,33 @@
   font-size: 1rem;
 }
 
+/* INFORMACIÓN DEL CLIENTE */
+.sheet-customer {
+  margin-bottom: 10px;
+  font-size: 0.75rem;
+  color: #334155;
+  display: flex;
+  gap: 20px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.customer-field {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.customer-field .label {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.customer-field .value {
+  font-weight: 500;
+  color: #475569;
+}
+
 /* CÓDIGO MAESTRO */
 .master-code-section {
   display: flex;
@@ -809,37 +836,133 @@
   text-align: center;
 }
 
-/* FIRMAS */
-.sheet-footer .signatures {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 50px;
-}
-.sheet-footer .signatures div {
-  width: 45%;
-  border-top: 1px solid #000;
-  padding-top: 10px;
-  font-weight: 700;
-  text-align: center;
-}
-
 @media print {
+  /* Ocultar todo lo que no sea el manifiesto */
   .auditor-header,
   .no-print,
-  .audit-footer-section {
+  .audit-footer-section,
+  .invoice-actions {
     display: none !important;
   }
-  .invoice-mode-layout {
-    background: white;
-    padding: 0;
-    margin: 0;
+
+  /* Layout limpio para impresión */
+  body,
+  html {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
+
+  .invoice-mode-layout {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: static !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
   .invoice-sheet {
-    box-shadow: none;
-    width: 100%;
-    max-width: 100%;
-    margin: 0;
-    border-radius: 0;
-    padding: 0;
-}
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    border-radius: 0 !important;
+    padding: 15mm 12mm !important;
+    border: none !important;
+    page-break-after: always;
+  }
+
+  /* Header */
+  .inv-sheet-header {
+    padding-bottom: 8px !important;
+    margin-bottom: 12px !important;
+    border-bottom: 2px solid #000 !important;
+  }
+
+  .manifest-logo-img {
+    height: 35px !important;
+  }
+
+  .manifest-title {
+    font-size: 1.1rem !important;
+  }
+
+  .sheet-info h2 {
+    font-size: 0.95rem !important;
+  }
+
+  .sheet-info p {
+    font-size: 0.7rem !important;
+  }
+
+  /* Información del cliente */
+  .sheet-customer {
+    margin-bottom: 10px !important;
+    padding-bottom: 8px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Sección QR */
+  .master-code-section {
+    margin-bottom: 12px !important;
+    padding: 8px !important;
+    border: 1px solid #000 !important;
+    background: white !important;
+  }
+
+  .qr-wrapper {
+    padding: 3px !important;
+    border: 1px solid #000 !important;
+  }
+
+  .code-info h4 {
+    font-size: 0.8rem !important;
+  }
+
+  .code-info p {
+    font-size: 0.7rem !important;
+  }
+
+  /* Tabla */
+  .invoice-table {
+    margin-bottom: 0 !important;
+    page-break-inside: auto;
+  }
+
+  .invoice-table thead {
+    display: table-header-group;
+    background: #000 !important;
+  }
+
+  .invoice-table th {
+    color: white !important;
+    padding: 5px 6px !important;
+    font-size: 0.65rem !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .invoice-table td {
+    padding: 4px 6px !important;
+    border-bottom: 1px solid #ddd !important;
+  }
+
+  .invoice-table tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .invoice-table tbody tr:nth-child(even) {
+    background-color: #f8f8f8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Evitar saltos de página en secciones críticas */
+  .inv-sheet-header,
+  .master-code-section,
+  .sheet-customer {
+    page-break-inside: avoid;
+  }
 }

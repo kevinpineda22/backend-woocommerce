@@ -1,5 +1,5 @@
 import React from "react";
-import QRCode from "react-qr-code";
+import ManifestSheet from "./ManifestSheet";
 import "./ManifestInvoiceModal.css";
 
 /**
@@ -8,6 +8,8 @@ import "./ManifestInvoiceModal.css";
  */
 const ManifestInvoiceModal = ({ manifestData, onClose }) => {
   if (!manifestData) return null;
+
+  const [selectedOrderIndex, setSelectedOrderIndex] = React.useState(0);
 
   const handlePrint = () => {
     window.print();
@@ -32,6 +34,10 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
     return "";
   };
 
+  const currentOrder = orders[selectedOrderIndex];
+  const itemCount = currentOrder?.items?.length || 0;
+  const densityClass = getDensityClass(itemCount);
+
   return (
     <div className="invoice-mode-layout">
       {/* Botones de Acción (no imprimibles) */}
@@ -54,101 +60,58 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
         )}
       </div>
 
-      {/* Hoja de Factura */}
-      {orders.map((order, orderIndex) => {
-        const items = order.items || [];
-        const itemCount = items.length;
-        const densityClass = getDensityClass(itemCount);
-        const orderId = order.order_id || order.id || manifestData.session_id;
-
-        return (
-          <div key={orderIndex} className={`invoice-sheet ${densityClass}`}>
-            {/* Header */}
-            <div className="inv-sheet-header">
-              <div className="sheet-logo">MANIFIESTO SALIDA</div>
-              <div className="sheet-info">
-                <h2>Orden #{orderId?.toString().slice(0, 6)}</h2>
-                <p>{new Date(manifestData.timestamp).toLocaleString()}</p>
-              </div>
-            </div>
-
-            {/* Información del Cliente/Responsable */}
-            <div className="sheet-customer">
-              <strong>Responsable:</strong> {manifestData.picker} <br />
-              {order.customer && (
-                <>
-                  <strong>Cliente:</strong> {order.customer} <br />
-                </>
-              )}
-              <strong>Total Items:</strong> {itemCount}
-            </div>
-
-            {/* Sección QR Code */}
-            <div className="master-code-section">
-              <div className="qr-wrapper">
-                <QRCode
-                  value={JSON.stringify(
-                    items.map((x) => [x.sku || x.name, x.qty || x.count || 0]),
-                  )}
-                  size={80}
-                />
-              </div>
-              <div className="code-info">
-                <h4>CERTIFICADO DIGITAL</h4>
-                <p>Auditoría completada exitosamente.</p>
-              </div>
-            </div>
-
-            {/* Tabla de Productos */}
-            <table className="invoice-table">
-              <thead>
-                <tr>
-                  <th className="col-qty">Cant</th>
-                  <th className="col-item">Item</th>
-                  <th className="col-barcode">Escáner</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, index) => (
-                  <tr key={index}>
-                    {/* Cantidad */}
-                    <td className="cell-qty">{item.qty || item.count || 0}</td>
-
-                    {/* Información del Producto */}
-                    <td className="cell-item">
-                      <div className="item-name">{item.name}</div>
-
-                      {(item.type === "sustituido" || item.is_sub) && (
-                        <div className="item-substitute-badge">
-                          🔄 Artículo Sustituto
-                        </div>
-                      )}
-
-                      <div className="item-sku">SKU: {item.sku || "N/A"}</div>
-                    </td>
-
-                    {/* Código de Barras */}
-                    <td className="cell-barcode">
-                      <div className="product-barcode-render">
-                        {item.sku
-                          ? `*${item.sku.toUpperCase()}*`
-                          : `*${item.id}*`}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Footer */}
-            <div className="sheet-footer">
-              <div className="cut-line">
-                - - - - - - FIN DEL DOCUMENTO - - - - - -
-              </div>
-            </div>
+      {/* Selector de Pedidos (si hay múltiples) */}
+      {orders.length > 1 && (
+        <div className="order-selector no-print">
+          <div className="order-selector-label">Seleccionar Pedido:</div>
+          <div className="order-selector-buttons">
+            {orders.map((order, idx) => (
+              <button
+                key={idx}
+                className={`order-selector-btn ${idx === selectedOrderIndex ? "active" : ""}`}
+                onClick={() => setSelectedOrderIndex(idx)}
+              >
+                #{order.id?.toString().slice(0, 6) || `Pedido ${idx + 1}`}
+              </button>
+            ))}
           </div>
-        );
-      })}
+        </div>
+      )}
+
+      {/* Hoja de Factura */}
+      {currentOrder &&
+        (() => {
+          const items = currentOrder.items || [];
+          const orderId =
+            currentOrder.order_id || currentOrder.id || manifestData.session_id;
+
+          // Normalizar items para ManifestSheet
+          const normalizedItems = items.map((item) => ({
+            id: item.id || item.sku,
+            name: item.name,
+            sku: item.sku || item.id,
+            barcode: item.barcode || item.sku || item.id, // ✅ Usa barcode de SIESA
+            qty: item.qty || item.count || 0,
+            count: item.count,
+            type: item.type,
+            is_sub: item.type === "sustituido" || item.is_sub,
+          }));
+
+          return (
+            <ManifestSheet
+              key={selectedOrderIndex}
+              order={{
+                id: orderId,
+                customer: currentOrder.customer,
+                items: normalizedItems,
+              }}
+              timestamp={manifestData.timestamp}
+              pickerName={manifestData.picker || "Sistema WMS"}
+              orderIndex={selectedOrderIndex}
+              densityClass={densityClass}
+            />
+          );
+        })()}
     </div>
   );
 };

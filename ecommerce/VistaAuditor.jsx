@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Html5QrcodeScanner } from "html5-qrcode";
-import QRCode from "react-qr-code";
+import ManifestSheet from "./ManifestSheet";
 import {
   FaClipboardCheck,
   FaSearch,
@@ -190,6 +190,7 @@ const VistaAuditor = () => {
               order_id: log.id_pedido,
               image: prodDetail?.image || null,
               sku: prodDetail?.sku || null,
+              barcode: prodDetail?.barcode || null, // ✅ Código de barras de SIESA
             };
           }
           itemsMap[key].count += 1;
@@ -437,108 +438,24 @@ const VistaAuditor = () => {
         </div>
 
         {normalizedOrders.map((order, orderIndex) => {
-          const renderItems = (order.items || []).map((i) => ({
+          // Normalizar items para que tengan el formato esperado por ManifestSheet
+          const normalizedItems = (order.items || []).map((i) => ({
+            id: i.id || i.sku,
             name: i.name,
             sku: i.sku || i.id,
+            barcode: i.barcode || i.sku || i.id, // ✅ Usa barcode de SIESA
             qty: i.qty || i.count || 1,
             is_sub: i.type === "sustituido" || i.is_sub,
           }));
-          const qrValue = JSON.stringify(
-            renderItems.map((x) => [x.sku || x.name, x.qty]),
-          );
 
           return (
-            <div key={orderIndex} className="invoice-sheet">
-              <div className="inv-sheet-header">
-                <div className="sheet-logo">MANIFIESTO DE SALIDA</div>
-                <div className="sheet-info">
-                  <h2>Orden #{order.id?.toString().slice(0, 6)}</h2>
-                  <p>{new Date(qrData.timestamp).toLocaleString()}</p>
-                </div>
-              </div>
-
-              <div className="sheet-customer">
-                <strong>Auditado por:</strong> Sistema WMS
-                <br />
-                <strong>Picker:</strong>{" "}
-                {auditData.meta.picker_name || "Personal WMS"}
-                <br />
-                {order.customer && (
-                  <>
-                    <strong>Cliente:</strong> {order.customer}
-                    <br />
-                  </>
-                )}
-              </div>
-
-              <div className="master-code-section">
-                <div className="qr-wrapper">
-                  <QRCode value={qrValue} size={150} />
-                </div>
-                <div className="code-info">
-                  <h4>SCAN POS / ERP</h4>
-                  <p>
-                    Escanea este código en caja para cargar los{" "}
-                    {renderItems.length} items.
-                  </p>
-                </div>
-              </div>
-
-              <table className="invoice-table">
-                <thead>
-                  <tr>
-                    <th>Cant.</th>
-                    <th>Producto</th>
-                    <th>SKU / ID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {renderItems.map((item, idx) => (
-                    <tr key={idx}>
-                      <td
-                        style={{
-                          fontWeight: "bold",
-                          fontSize: "1.1rem",
-                          textAlign: "center",
-                        }}
-                      >
-                        {item.qty}
-                      </td>
-                      <td>
-                        {item.name}
-                        {item.is_sub && (
-                          <span
-                            style={{
-                              display: "block",
-                              fontSize: "0.7rem",
-                              color: "#d97706",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            (SUSTITUTO)
-                          </span>
-                        )}
-                      </td>
-                      <td
-                        style={{ fontFamily: "monospace", fontSize: "0.8rem" }}
-                      >
-                        {item.sku}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="sheet-footer">
-                <div className="signatures">
-                  <div>Firma Auditor / Supervisor</div>
-                  <div>Firma Responsable (Picker)</div>
-                </div>
-                <div className="cut-line">
-                  - - - - - - - - - - Fin Del Documento - - - - - - - - - -
-                </div>
-              </div>
-            </div>
+            <ManifestSheet
+              key={orderIndex}
+              order={{ ...order, items: normalizedItems }}
+              timestamp={qrData.timestamp}
+              pickerName={auditData.meta.picker_name}
+              orderIndex={orderIndex}
+            />
           );
         })}
       </div>
