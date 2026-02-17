@@ -88,13 +88,23 @@ const VistaAuditor = () => {
     let matchId = null;
 
     auditData.items.forEach((item) => {
-      const itemSku = (item.id || "").toString().toUpperCase();
       if (requiredItems.has(item.id)) {
-        if (
-          itemSku === cleanCode ||
-          item.name.toUpperCase().includes(cleanCode) ||
-          (item.sku && item.sku.toUpperCase().includes(cleanCode))
-        ) {
+        // ✅ PRIORIDAD 1: Códigos de barras escaneados durante el picking
+        const scannedBarcodes = auditData.scannedBarcodes?.[item.id];
+        if (scannedBarcodes && scannedBarcodes.has(cleanCode)) {
+          matchId = item.id;
+          return;
+        }
+
+        // ✅ PRIORIDAD 2: Código de barras de SIESA (backup)
+        if (item.barcode && item.barcode.trim().toUpperCase() === cleanCode) {
+          matchId = item.id;
+          return;
+        }
+
+        // ✅ PRIORIDAD 3: SKU o ID (fallback)
+        const itemSku = (item.id || "").toString().toUpperCase();
+        if (itemSku === cleanCode || (item.sku && item.sku.toUpperCase() === cleanCode)) {
           matchId = item.id;
         }
       }
@@ -170,12 +180,22 @@ const VistaAuditor = () => {
 
       const itemsMap = {};
       let substitutedCount = 0;
+      const scannedBarcodesMap = {};  // ✅ NUEVO: Mapa de códigos escaneados por producto
 
       logs.forEach((log) => {
         if (log.accion === "recolectado" || log.accion === "sustituido") {
           const key = log.es_sustituto
             ? log.id_producto_final || log.id_producto
             : log.id_producto;
+          
+          // ✅ GUARDAR código de barras escaneado si existe
+          if (log.codigo_barras_escaneado) {
+            if (!scannedBarcodesMap[key]) {
+              scannedBarcodesMap[key] = new Set();
+            }
+            scannedBarcodesMap[key].add(log.codigo_barras_escaneado.trim().toUpperCase());
+          }
+          
           if (!itemsMap[key]) {
             const prodDetail = products_map ? products_map[key] : null;
             itemsMap[key] = {
@@ -258,6 +278,7 @@ const VistaAuditor = () => {
         items: itemsArray,
         groupedItems: finalGroups,
         rawLogs: logs,
+        scannedBarcodes: scannedBarcodesMap,  // ✅ NUEVO: Mapa de códigos escaneados
         // ✅ Guardamos el snapshot si existe
         finalSnapshot: final_snapshot,
         stats: {
@@ -640,6 +661,18 @@ const VistaAuditor = () => {
                                       `Ref: ${item.id}`
                                     )}
                                   </div>
+                                  {/* ✅ MOSTRAR códigos escaneados para verificación */}
+                                  {isRequired && !isVerified && auditData.scannedBarcodes?.[item.id] && (
+                                    <div style={{
+                                      fontSize: "0.7rem",
+                                      color: "#059669",
+                                      marginTop: "4px",
+                                      fontWeight: "600"
+                                    }}>
+                                      <FaBarcode style={{ marginRight: "4px" }} />
+                                      {Array.from(auditData.scannedBarcodes[item.id]).join(", ")}
+                                    </div>
+                                  )}
                                   {item.is_sub && (
                                     <div className="inv-sub-note">
                                       <FaExclamationTriangle /> Sustitución:{" "}

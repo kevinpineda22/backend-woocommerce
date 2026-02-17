@@ -10,7 +10,8 @@ exports.registerAction = async (req, res) => {
     peso_real,       
     motivo,          
     cantidad_afectada, 
-    pasillo          
+    pasillo,
+    codigo_barras_escaneado  // ✅ NUEVO: Código de barras exacto que se escaneó
   } = req.body;
 
   try {
@@ -77,7 +78,8 @@ exports.registerAction = async (req, res) => {
       fecha_registro: fecha,
       peso_real: peso_real || null,
       motivo: motivo || null,
-      pasillo: pasillo || "General" 
+      pasillo: pasillo || "General",
+      codigo_barras_escaneado: codigo_barras_escaneado || null  // ✅ NUEVO
     };
 
     if (accion === "sustituido" && datos_sustituto) {

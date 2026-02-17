@@ -346,6 +346,7 @@ const VistaPicker = () => {
   const [showClientsModal, setShowClientsModal] = useState(false);
   const [scanOverrideCallback, setScanOverrideCallback] = useState(null);
   const [missingQtyForSub, setMissingQtyForSub] = useState(0);
+  const [lastScannedBarcode, setLastScannedBarcode] = useState(null); // ✅ NUEVO: Guardar código escaneado
   const isSyncing = useRef(false);
 
   const resetSesionLocal = () => {
@@ -819,6 +820,7 @@ const VistaPicker = () => {
       accion: "recolectado",
       peso_real: peso,
       pasillo: itemRef.pasillo,
+      codigo_barras_escaneado: lastScannedBarcode || itemRef.barcode || itemRef.sku,  // ✅ NUEVO
     };
     queueAction(payload);
     if (isFinished) {
@@ -885,6 +887,7 @@ const VistaPicker = () => {
   const handleManualValidation = async (inputCode) => {
     if (!isOnline) {
       if (window.confirm("⚠️ Estás Offline. ¿Forzar?")) {
+        setLastScannedBarcode(inputCode.trim().toUpperCase());  // ✅ GUARDAR código manual
         setShowManualModal(false);
         if (isWeighable(currentItem)) setShowWeightModal(true);
         else confirmPicking();
@@ -898,6 +901,7 @@ const VistaPicker = () => {
         { input_code: inputCode, expected_sku: currentItem.sku },
       );
       if (res.data.valid) {
+        setLastScannedBarcode(inputCode.trim().toUpperCase());  // ✅ GUARDAR código validado
         setShowManualModal(false);
         if (isWeighable(currentItem)) setShowWeightModal(true);
         else confirmPicking();
@@ -919,8 +923,10 @@ const VistaPicker = () => {
     const c = code.trim().toUpperCase();
     const sku = (currentItem.sku || "").trim().toUpperCase();
     const ean = (currentItem.barcode || "").trim().toUpperCase();
-    if (c === sku || c === ean || (ean && ean.endsWith(c))) confirmPicking();
-    else {
+    if (c === sku || c === ean || (ean && ean.endsWith(c))) {
+      setLastScannedBarcode(c);  // ✅ GUARDAR código antes de confirmar
+      confirmPicking();
+    } else {
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       alert(`Código ${c} no coincide.`);
     }
