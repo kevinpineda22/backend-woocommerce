@@ -26,6 +26,7 @@ router.get("/dashboard-activo", dashboardCtrl.getActiveSessionsDashboard);
 router.get("/pendientes", dashboardCtrl.getPendingOrders);
 router.get("/pickers", dashboardCtrl.getPickers);
 router.get("/historial", dashboardCtrl.getHistorySessions);
+router.get("/pendientes-auditoria", dashboardCtrl.getPendingAuditSessions);
 
 router.get("/historial-detalle", dashboardCtrl.getSessionLogsDetail);
 router.post("/auditor/finalizar", dashboardCtrl.completeAuditSession);

@@ -175,7 +175,7 @@ exports.getHistorySessions = async (req, res) => {
       .select(
         `id, fecha_inicio, fecha_fin, estado, ids_pedidos, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
       )
-      .in("estado", ["completado", "auditado"])
+      .in("estado", ["auditado"])
       .order("fecha_fin", { ascending: false })
       .limit(50);
 
@@ -209,6 +209,57 @@ exports.getHistorySessions = async (req, res) => {
       };
     });
     res.status(200).json(historyData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// =========================================================
+// 4B. PENDIENTES DE AUDITORIA
+// =========================================================
+exports.getPendingAuditSessions = async (req, res) => {
+  try {
+    const { data: sessions, error } = await supabase
+      .from("wc_picking_sessions")
+      .select(
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
+      )
+      .eq("estado", "pendiente_auditoria")
+      .order("fecha_fin", { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+
+    const pendingData = sessions.map((sess) => {
+      const start = new Date(sess.fecha_inicio);
+      const end = sess.fecha_fin ? new Date(sess.fecha_fin) : null;
+      const durationMin = end
+        ? Math.round((end - start) / 60000)
+        : Math.round((Date.now() - start.getTime()) / 60000);
+      const optionsDate = {
+        timeZone: "America/Bogota",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      };
+      const optionsTime = {
+        timeZone: "America/Bogota",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      };
+
+      return {
+        id: sess.id,
+        picker: sess.wc_pickers?.nombre_completo || "Desconocido",
+        pedidos: sess.ids_pedidos,
+        fecha: end ? end.toLocaleDateString("es-CO", optionsDate) : "--",
+        hora_fin: end ? end.toLocaleTimeString("es-CO", optionsTime) : "--",
+        duracion: `${durationMin} min`,
+        estado: sess.estado,
+      };
+    });
+    res.status(200).json(pendingData);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

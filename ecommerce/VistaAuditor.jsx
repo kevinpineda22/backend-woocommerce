@@ -801,8 +801,8 @@ const VistaAuditor = () => {
 
             <div className="audit-footer-section">
               <div className="audit-actions-row">
-                {/* Si ya está auditada, no mostramos aprobar, solo salir. 
-                    CORREGIDO: Si es "completado" significa que espera auditoría, así que SÍ mostramos el botón. */}
+                {/* Si ya está auditada, no mostramos aprobar, solo salir.
+                  Si es "pendiente_auditoria" significa que espera auditoría. */}
                 {auditData.meta.status === "auditado" ? (
                   <button className="audit-act-btn reject" onClick={clearAudit}>
                     🏠 VOLVER AL INICIO

@@ -9,6 +9,7 @@ import {
   FaUserTag,
   FaRunning,
   FaHistory,
+  FaClipboardCheck,
 } from "react-icons/fa";
 
 import { supabase } from "../../supabaseClient";
@@ -21,6 +22,7 @@ import { LiveSessionModal } from "./LiveSessionModal";
 import { GestionPickers } from "./GestionPickers";
 import AnaliticaPickers from "./AnaliticaPickers";
 import HistoryView from "./HistoryView";
+import PendingAuditView from "./PendingAuditView";
 import HistoryDetailModal from "./HistoryDetailModal";
 import ManifestInvoiceModal from "./ManifestInvoiceModal";
 
@@ -43,6 +45,7 @@ const PedidosAdmin = () => {
   const [orders, setOrders] = useState([]);
   const [activeSessions, setActiveSessions] = useState([]);
   const [historyOrders, setHistoryOrders] = useState([]);
+  const [pendingAuditOrders, setPendingAuditOrders] = useState([]);
   const [pickers, setPickers] = useState([]);
 
   // Modales de Gestión
@@ -81,11 +84,20 @@ const PedidosAdmin = () => {
       );
       setActiveSessions(resActive.data);
 
+      const resAuditPending = await axios.get(
+        `https://backend-woocommerce.vercel.app/api/orders/pendientes-auditoria?t=${Date.now()}`,
+      );
+      setPendingAuditOrders(resAuditPending.data || []);
+
       const totalProcessOrders = resActive.data.reduce(
         (sum, s) => sum + (s.orders_count || 0),
         0,
       );
-      setStats({ pending: listPending.length, process: totalProcessOrders });
+      setStats({
+        pending: listPending.length,
+        process: totalProcessOrders,
+        auditPending: resAuditPending.data?.length || 0,
+      });
     } catch (error) {
       console.error("Error fetching data:", error);
     } finally {
@@ -183,6 +195,20 @@ const PedidosAdmin = () => {
     }
   };
 
+  const fetchPendingAudit = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(
+        "https://backend-woocommerce.vercel.app/api/orders/pendientes-auditoria",
+      );
+      setPendingAuditOrders(res.data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleViewLiveDetail = async (session) => {
     try {
       const res = await axios.get(
@@ -268,6 +294,18 @@ const PedidosAdmin = () => {
           </button>
           <div className="pedidos-nav-label spacer">AUDITORÍA</div>
           <button
+            className={`pedidos-layout-sidebar-button ${currentView === "audit_pending" ? "active" : ""}`}
+            onClick={() => {
+              setCurrentView("audit_pending");
+              fetchPendingAudit();
+            }}
+          >
+            <FaClipboardCheck /> <span>Pendiente Auditoría</span>{" "}
+            <span className="pedidos-badge-count-blue">
+              {stats.auditPending || 0}
+            </span>
+          </button>
+          <button
             className={`pedidos-layout-sidebar-button ${currentView === "history" ? "active" : ""}`}
             onClick={() => {
               setCurrentView("history");
@@ -298,6 +336,15 @@ const PedidosAdmin = () => {
           <GestionPickers />
         ) : currentView === "analitica" ? (
           <AnaliticaPickers />
+        ) : currentView === "audit_pending" ? (
+          /* VISTA PENDIENTES AUDITORIA */
+          <PendingAuditView
+            pendingOrders={pendingAuditOrders}
+            loading={loading}
+            onRefresh={fetchPendingAudit}
+            onViewDetail={handleViewHistoryDetail}
+            onViewManifest={handleViewManifestDirect}
+          />
         ) : currentView === "history" ? (
           /* VISTA DE HISTORIAL */
           <>

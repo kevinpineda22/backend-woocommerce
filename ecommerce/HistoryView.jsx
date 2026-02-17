@@ -7,12 +7,14 @@ const HistoryView = ({
   loading,
   onViewDetail,
   onViewManifest,
+  loadingText = "Cargando historial...",
+  emptyText = "📭 No hay registros en el historial",
 }) => {
   if (loading) {
     return (
       <div className="history-loading-state">
         <div className="pedidos-spinner-large"></div>
-        <p>Cargando historial...</p>
+        <p>{loadingText}</p>
       </div>
     );
   }
@@ -20,7 +22,7 @@ const HistoryView = ({
   if (historyOrders.length === 0) {
     return (
       <div className="history-empty-state">
-        <p>📭 No hay registros en el historial</p>
+        <p>{emptyText}</p>
       </div>
     );
   }

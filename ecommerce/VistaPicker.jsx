@@ -362,8 +362,22 @@ const VistaPicker = () => {
       const res = await axios.get(
         `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${idPicker}&t=${Date.now()}`,
       );
-      setSessionData(res.data);
-      localStorage.setItem("session_active_cache", JSON.stringify(res.data));
+      const data = res.data;
+
+      if (["pendiente_auditoria", "completado"].includes(data.estado)) {
+        const waitingId =
+          localStorage.getItem("waiting_for_audit_id") || data.session_id;
+        localStorage.setItem("waiting_for_audit_id", waitingId);
+        setCompletedSessionId(waitingId);
+        setShowSuccessQR(true);
+        localStorage.removeItem("session_active_cache");
+        setSessionData(null);
+        setLoading(false);
+        return;
+      }
+
+      setSessionData(data);
+      localStorage.setItem("session_active_cache", JSON.stringify(data));
     } catch (err) {
       if (err.response && err.response.status === 404) {
         // 🛡️ PROTECCIÓN DE QR: Si estamos esperando auditoría, NO borramos la pantalla
@@ -431,7 +445,7 @@ const VistaPicker = () => {
         (payload) => {
           const newState = payload.new.estado;
 
-          if (newState === "completado") {
+          if (["pendiente_auditoria", "completado"].includes(newState)) {
             const waitingId =
               localStorage.getItem("waiting_for_audit_id") || sid;
             localStorage.setItem("waiting_for_audit_id", waitingId);

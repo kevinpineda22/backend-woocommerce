@@ -218,6 +218,7 @@ exports.getSessionActive = async (req, res) => {
 
     res.status(200).json({
       session_id: session.id,
+      estado: session.estado,
       fecha_inicio: session.fecha_inicio,
       active_assignments_ids: assignIds,
       orders_info: orders.map((o) => ({
@@ -242,7 +243,7 @@ exports.completeSession = async (req, res) => {
     const now = new Date().toISOString();
     await supabase
       .from("wc_picking_sessions")
-      .update({ estado: "completado", fecha_fin: now })
+      .update({ estado: "pendiente_auditoria", fecha_fin: now })
       .eq("id", id_sesion);
 
     // [INSTRUCCION 2026-02-13] Se comenta para que el picker NO se libere aquí.
@@ -258,7 +259,9 @@ exports.completeSession = async (req, res) => {
       .from("wc_asignaciones_pedidos")
       .update({ estado_asignacion: "completado", fecha_fin: now })
       .eq("id_sesion", id_sesion);
-    res.status(200).json({ message: "Sesión finalizada (Local)." });
+    res
+      .status(200)
+      .json({ message: "Sesión finalizada. Esperando auditoría." });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
