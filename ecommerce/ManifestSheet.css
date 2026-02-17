@@ -234,6 +234,16 @@
   transform-origin: right center;
 }
 
+.barcode-number {
+  font-family: monospace;
+  font-size: 0.65rem;
+  color: #000;
+  font-weight: 600;
+  text-align: right;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+}
+
 /* =========================================
    MODOS DE DENSIDAD
    ========================================= */
@@ -278,6 +288,10 @@
   font-size: 1.5rem;
 }
 
+.manifest-sheet.very-compact .barcode-number {
+  font-size: 0.6rem;
+}
+
 .manifest-sheet.very-compact .manifest-table {
   font-size: 0.7rem;
 }
@@ -316,6 +330,10 @@
 
 .manifest-sheet.ultra-compact .product-barcode {
   font-size: 1.2rem;
+}
+
+.manifest-sheet.ultra-compact .barcode-number {
+  font-size: 0.5rem;
 }
 
 /* =========================================

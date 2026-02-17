@@ -307,6 +307,7 @@ const VistaAuditor = () => {
         qty: i.count,
         price: i.price,
         is_sub: i.is_sub,
+        barcode: i.barcode || i.sku || i.id, // ✅ Incluir código de barras de SIESA
       })),
     }));
   };

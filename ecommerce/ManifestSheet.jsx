@@ -109,6 +109,7 @@ const ManifestSheet = ({
                   <div className="product-barcode">
                     *{barcode.toString().toUpperCase()}*
                   </div>
+                  <div className="barcode-number">{barcode.toString()}</div>
                 </td>
               </tr>
             );

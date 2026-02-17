@@ -246,7 +246,7 @@ const PedidosAdmin = () => {
         `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}`,
       );
 
-      const { final_snapshot, metadata } = res.data;
+      const { final_snapshot, metadata, products_map } = res.data;
       if (!final_snapshot) {
         alert(
           "Esta sesión no tiene certificado de salida (no ha sido auditada o es antigua).",
@@ -254,8 +254,24 @@ const PedidosAdmin = () => {
         return;
       }
 
+      // ✅ Mergear códigos de barras del products_map con los items del snapshot
+      const enrichedSnapshot = { ...final_snapshot };
+      if (products_map && enrichedSnapshot.orders) {
+        enrichedSnapshot.orders = enrichedSnapshot.orders.map((order) => ({
+          ...order,
+          items: order.items.map((item) => ({
+            ...item,
+            barcode:
+              products_map[item.id]?.barcode ||
+              item.barcode ||
+              item.sku ||
+              item.id,
+          })),
+        }));
+      }
+
       setManifestData({
-        ...final_snapshot,
+        ...enrichedSnapshot,
         session_id: metadata.session_id,
         picker: metadata.picker_name || "Desconocido",
       });
