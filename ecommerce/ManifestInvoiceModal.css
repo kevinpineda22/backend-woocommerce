@@ -1,0 +1,803 @@
+/* =========================================
+   MANIFEST INVOICE MODAL - Factura de Salida
+   ========================================= */
+@import url("https://fonts.googleapis.com/css2?family=Libre+Barcode+39+Text&display=swap");
+
+/* =========================================
+   CONTENEDOR PRINCIPAL (OVERLAY)
+   ========================================= */
+.invoice-mode-layout {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  padding: 40px 0;
+  overflow-y: auto;
+  z-index: 5000;
+  animation: fadeInOverlay 0.3s ease-out;
+}
+
+@keyframes fadeInOverlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* =========================================
+   BOTONES DE ACCIÓN (NO IMPRIMIBLES)
+   ========================================= */
+.invoice-actions {
+  position: fixed;
+  top: 30px;
+  right: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  z-index: 10000;
+}
+
+.invoice-btn-close,
+.invoice-btn-print {
+  border: none;
+  padding: 12px 25px;
+  border-radius: 50px;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+  color: white;
+}
+
+.invoice-btn-close {
+  background: #64748b;
+}
+
+.invoice-btn-close:hover {
+  background: #475569;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.invoice-btn-print {
+  background: #2563eb;
+}
+
+.invoice-btn-print:hover {
+  background: #1d4ed8;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
+}
+
+.density-indicator {
+  background: #f59e0b;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 50px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.3px;
+  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);
+}
+
+/* =========================================
+   HOJA DE FACTURA (A4)
+   ========================================= */
+.invoice-sheet {
+  background: white;
+  width: 210mm;
+  max-height: 297mm;
+  padding: 8mm 12mm;
+  border-radius: 2px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  color: #1e293b;
+  position: relative;
+  margin: 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  animation: slideInSheet 0.4s ease-out;
+  overflow: hidden;
+}
+
+@keyframes slideInSheet {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* =========================================
+   HEADER DE FACTURA
+   ========================================= */
+.inv-sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.sheet-logo {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: -1px;
+}
+
+.sheet-info {
+  text-align: right;
+}
+
+.sheet-info h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: #2563eb;
+  font-weight: 800;
+}
+
+.sheet-info p {
+  margin: 2px 0 0 0;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.7rem;
+}
+
+/* =========================================
+   INFORMACIÓN DEL CLIENTE/RESPONSABLE
+   ========================================= */
+.sheet-customer {
+  margin-bottom: 8px;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: #334155;
+  background: #f1f5f9;
+  padding: 6px 10px;
+  border-left: 3px solid #94a3b8;
+  border-radius: 4px;
+}
+
+.sheet-customer strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+/* =========================================
+   SECCIÓN QR CODE
+   ========================================= */
+.master-code-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  page-break-inside: avoid;
+  background: #fafbfc;
+}
+
+.qr-wrapper {
+  background: white;
+  padding: 4px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.code-info h4 {
+  margin: 0 0 3px 0;
+  color: #0f172a;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.code-info p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+/* =========================================
+   TABLA DE PRODUCTOS
+   ========================================= */
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+  font-size: 0.75rem;
+}
+
+.invoice-table thead {
+  background: #0f172a;
+}
+
+.invoice-table th {
+  color: white;
+  padding: 6px 8px;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-align: left;
+}
+
+.invoice-table th.col-qty {
+  text-align: center;
+  width: 45px;
+}
+
+.invoice-table th.col-barcode {
+  text-align: right;
+  width: 140px;
+}
+
+.invoice-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.invoice-table tbody tr:nth-child(even) {
+  background-color: #f8fafc;
+}
+
+.invoice-table tbody tr:hover {
+  background-color: #f1f5f9;
+}
+
+.invoice-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+
+/* Celda de Cantidad */
+.cell-qty {
+  text-align: center;
+  font-weight: bold;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+/* Celda de Item */
+.cell-item {
+  vertical-align: middle;
+}
+
+.item-name {
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: #0f172a;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.item-substitute-badge {
+  font-size: 0.6rem;
+  color: #d97706;
+  font-weight: bold;
+  margin-bottom: 1px;
+  display: inline-block;
+  background: #fef3c7;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.item-sku {
+  font-size: 0.6rem;
+  color: #64748b;
+  font-family: monospace;
+  font-weight: 600;
+}
+
+/* Celda de Código de Barras */
+.cell-barcode {
+  text-align: right;
+  vertical-align: middle;
+}
+
+.product-barcode-render {
+  font-family: "Libre Barcode 39 Text", cursive;
+  font-size: 1.6rem;
+  color: #000;
+  line-height: 1;
+  white-space: nowrap;
+  font-weight: 400;
+  transform: scaleY(1.1);
+  transform-origin: right center;
+}
+
+/* =========================================
+   FOOTER DE FACTURA
+   ========================================= */
+.sheet-footer {
+  margin-top: auto;
+  text-align: center;
+  color: #94a3b8;
+  padding-top: 8px;
+}
+
+.cut-line {
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 4px;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+/* =========================================
+   MODOS DE DENSIDAD (Ajuste Automático)
+   ========================================= */
+
+/* COMPACT: 16-25 productos */
+.invoice-sheet.compact {
+  padding: 6mm 10mm;
+}
+
+.invoice-sheet.compact .inv-sheet-header {
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.invoice-sheet.compact .sheet-logo {
+  font-size: 1.2rem;
+}
+
+.invoice-sheet.compact .sheet-customer {
+  margin-bottom: 6px;
+  padding: 5px 8px;
+  font-size: 0.7rem;
+}
+
+.invoice-sheet.compact .master-code-section {
+  margin-bottom: 8px;
+  padding: 6px;
+  gap: 10px;
+}
+
+.invoice-sheet.compact .code-info h4 {
+  font-size: 0.75rem;
+}
+
+.invoice-sheet.compact .code-info p {
+  font-size: 0.65rem;
+}
+
+.invoice-sheet.compact .invoice-table {
+  font-size: 0.7rem;
+  margin-bottom: 8px;
+}
+
+.invoice-sheet.compact .invoice-table th {
+  padding: 5px 6px;
+  font-size: 0.6rem;
+}
+
+.invoice-sheet.compact .invoice-table td {
+  padding: 3px 6px;
+}
+
+.invoice-sheet.compact .cell-qty {
+  font-size: 0.9rem;
+}
+
+.invoice-sheet.compact .item-name {
+  font-size: 0.7rem;
+  margin-bottom: 2px;
+}
+
+.invoice-sheet.compact .item-sku {
+  font-size: 0.58rem;
+}
+
+.invoice-sheet.compact .product-barcode-render {
+  font-size: 1.5rem;
+}
+
+/* VERY COMPACT: 26-40 productos */
+.invoice-sheet.very-compact {
+  padding: 5mm 8mm;
+}
+
+.invoice-sheet.very-compact .inv-sheet-header {
+  padding-bottom: 5px;
+  margin-bottom: 6px;
+}
+
+.invoice-sheet.very-compact .sheet-logo {
+  font-size: 1.1rem;
+}
+
+.invoice-sheet.very-compact .sheet-info h2 {
+  font-size: 0.9rem;
+}
+
+.invoice-sheet.very-compact .sheet-customer {
+  margin-bottom: 5px;
+  padding: 4px 6px;
+  font-size: 0.65rem;
+  line-height: 1.2;
+}
+
+.invoice-sheet.very-compact .master-code-section {
+  margin-bottom: 6px;
+  padding: 5px;
+  gap: 8px;
+}
+
+.invoice-sheet.very-compact .code-info h4 {
+  font-size: 0.7rem;
+}
+
+.invoice-sheet.very-compact .code-info p {
+  font-size: 0.6rem;
+}
+
+.invoice-sheet.very-compact .invoice-table {
+  font-size: 0.65rem;
+  margin-bottom: 6px;
+}
+
+.invoice-sheet.very-compact .invoice-table th {
+  padding: 4px 5px;
+  font-size: 0.55rem;
+}
+
+.invoice-sheet.very-compact .invoice-table td {
+  padding: 2px 5px;
+}
+
+.invoice-sheet.very-compact .cell-qty {
+  font-size: 0.85rem;
+}
+
+.invoice-sheet.very-compact .item-name {
+  font-size: 0.65rem;
+  margin-bottom: 1px;
+  line-height: 1.1;
+}
+
+.invoice-sheet.very-compact .item-sku {
+  font-size: 0.52rem;
+}
+
+.invoice-sheet.very-compact .item-substitute-badge {
+  font-size: 0.52rem;
+  padding: 1px 3px;
+}
+
+.invoice-sheet.very-compact .product-barcode-render {
+  font-size: 1.3rem;
+}
+
+.invoice-sheet.very-compact .sheet-footer {
+  padding-top: 6px;
+}
+
+/* ULTRA COMPACT: 40+ productos */
+.invoice-sheet.ultra-compact {
+  padding: 4mm 6mm;
+  max-height: 290mm;
+}
+
+.invoice-sheet.ultra-compact .inv-sheet-header {
+  padding-bottom: 4px;
+  margin-bottom: 5px;
+  border-bottom-width: 1px;
+}
+
+.invoice-sheet.ultra-compact .sheet-logo {
+  font-size: 1rem;
+}
+
+.invoice-sheet.ultra-compact .sheet-info h2 {
+  font-size: 0.85rem;
+}
+
+.invoice-sheet.ultra-compact .sheet-info p {
+  font-size: 0.6rem;
+}
+
+.invoice-sheet.ultra-compact .sheet-customer {
+  margin-bottom: 4px;
+  padding: 3px 5px;
+  font-size: 0.6rem;
+  line-height: 1.1;
+}
+
+.invoice-sheet.ultra-compact .master-code-section {
+  margin-bottom: 5px;
+  padding: 4px;
+  gap: 6px;
+}
+
+.invoice-sheet.ultra-compact .qr-wrapper {
+  padding: 2px;
+}
+
+.invoice-sheet.ultra-compact .code-info h4 {
+  font-size: 0.65rem;
+  margin-bottom: 2px;
+}
+
+.invoice-sheet.ultra-compact .code-info p {
+  font-size: 0.55rem;
+}
+
+.invoice-sheet.ultra-compact .invoice-table {
+  font-size: 0.6rem;
+  margin-bottom: 5px;
+}
+
+.invoice-sheet.ultra-compact .invoice-table th {
+  padding: 3px 4px;
+  font-size: 0.5rem;
+}
+
+.invoice-sheet.ultra-compact .invoice-table td {
+  padding: 1.5px 4px;
+}
+
+.invoice-sheet.ultra-compact .cell-qty {
+  font-size: 0.75rem;
+}
+
+.invoice-sheet.ultra-compact .item-name {
+  font-size: 0.6rem;
+  margin-bottom: 1px;
+  line-height: 1;
+}
+
+.invoice-sheet.ultra-compact .item-sku {
+  font-size: 0.48rem;
+}
+
+.invoice-sheet.ultra-compact .item-substitute-badge {
+  font-size: 0.48rem;
+  padding: 1px 2px;
+}
+
+.invoice-sheet.ultra-compact .product-barcode-render {
+  font-size: 1.1rem;
+}
+
+.invoice-sheet.ultra-compact .sheet-footer {
+  padding-top: 4px;
+}
+
+.invoice-sheet.ultra-compact .cut-line {
+  font-size: 0.5rem;
+  padding-top: 2px;
+}
+
+/* =========================================
+   ESTILOS DE IMPRESIÓN
+   ========================================= */
+@media print {
+  /* Ocultar elementos no imprimibles */
+  .invoice-actions,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Layout de impresión */
+  body,
+  html {
+    background: white;
+    margin: 0;
+    padding: 0;
+  }
+
+  .invoice-mode-layout {
+    position: static !important;
+    background: white !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  .invoice-sheet {
+    box-shadow: none !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    min-height: auto !important;
+    padding: 8mm 10mm !important;
+    border: none !important;
+    transform: scale(0.95);
+    transform-origin: top center;
+  }
+
+  /* Reducir aún más el tamaño en impresión */
+  .inv-sheet-header {
+    padding-bottom: 6px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .sheet-logo {
+    font-size: 1.1rem !important;
+  }
+
+  .sheet-info h2 {
+    font-size: 0.9rem !important;
+  }
+
+  .sheet-customer {
+    margin-bottom: 6px !important;
+    padding: 4px 8px !important;
+    font-size: 0.7rem !important;
+  }
+
+  .master-code-section {
+    margin-bottom: 8px !important;
+    padding: 6px !important;
+  }
+
+  .code-info h4 {
+    font-size: 0.75rem !important;
+  }
+
+  .code-info p {
+    font-size: 0.65rem !important;
+  }
+
+  .invoice-table {
+    margin-bottom: 8px !important;
+    font-size: 0.7rem !important;
+  }
+
+  .invoice-table th {
+    padding: 4px 6px !important;
+    font-size: 0.6rem !important;
+  }
+
+  .invoice-table td {
+    padding: 3px 6px !important;
+  }
+
+  .cell-qty {
+    font-size: 0.9rem !important;
+  }
+
+  .item-name {
+    font-size: 0.7rem !important;
+    margin-bottom: 1px !important;
+  }
+
+  .item-sku {
+    font-size: 0.55rem !important;
+  }
+
+  .item-substitute-badge {
+    font-size: 0.55rem !important;
+    padding: 1px 3px !important;
+  }
+
+  .product-barcode-render {
+    font-size: 1.4rem !important;
+  }
+
+  .sheet-footer {
+    padding-top: 6px !important;
+  }
+
+  .cut-line {
+    padding-top: 3px !important;
+    font-size: 0.55rem !important;
+  }
+
+  /* Tabla de productos */
+  .invoice-table {
+    page-break-inside: auto;
+  }
+
+  .invoice-table tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .invoice-table thead {
+    display: table-header-group;
+  }
+
+  .invoice-table tfoot {
+    display: table-footer-group;
+  }
+
+  /* Header */
+  .inv-sheet-header {
+    border-bottom: 2px solid #000 !important;
+  }
+
+  /* Table header */
+  .invoice-table th {
+    background-color: #eee !important;
+    color: #000 !important;
+    border-bottom: 2px solid #000;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Customer info */
+  .sheet-customer {
+    background-color: #f9f9f9 !important;
+    border-left: 2px solid #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* QR Section */
+  .master-code-section {
+    background-color: #fafbfc !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Barcode */
+  .product-barcode-render {
+    color: #000 !important;
+  }
+
+  /* Evitar saltos de página en secciones críticas */
+  .master-code-section,
+  .inv-sheet-header,
+  .sheet-customer {
+    page-break-inside: avoid;
+  }
+
+  /* Escalado adicional para modos de densidad en impresión */
+  .invoice-sheet.compact {
+    transform: scale(0.92) !important;
+  }
+
+  .invoice-sheet.very-compact {
+    transform: scale(0.88) !important;
+  }
+
+  .invoice-sheet.ultra-compact {
+    transform: scale(0.83) !important;
+    padding: 3mm 5mm !important;
+  }
+
+  /* Reducción extra para ultra-compact en impresión */
+  .invoice-sheet.ultra-compact .invoice-table td {
+    padding: 1px 3px !important;
+  }
+
+  .invoice-sheet.ultra-compact .item-name {
+    font-size: 0.55rem !important;
+  }
+
+  .invoice-sheet.ultra-compact .cell-qty {
+    font-size: 0.7rem !important;
+  }
+
+  .invoice-sheet.ultra-compact .product-barcode-render {
+    font-size: 1rem !important;
+  }
+}

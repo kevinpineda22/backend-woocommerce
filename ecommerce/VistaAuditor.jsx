@@ -303,7 +303,7 @@ const VistaAuditor = () => {
         id: i.id,
         sku: i.sku || i.id,
         name: i.name,
-        count: i.count,
+        qty: i.count,
         price: i.price,
         is_sub: i.is_sub,
       })),
@@ -316,7 +316,7 @@ const VistaAuditor = () => {
       // Reemplazamos la vista actual con el snapshot guardado
       setAuditData((prev) => ({
         ...prev,
-        groupedItems: prev.finalSnapshot,
+        groupedItems: prev.groupedItems,
       }));
       setShowInvoices(true);
     }
@@ -342,15 +342,7 @@ const VistaAuditor = () => {
       const snapshotPayload = {
         timestamp: new Date().toISOString(),
         session_id: auditData.meta.session_id,
-        // Usamos los items planos verificados (itemsMap convertido a array en fetchAuditData)
-        items: auditData.items.map((i) => ({
-          id: i.id,
-          name: i.name,
-          sku: i.sku,
-          qty: i.count, // importante mantener consistencia de nombres (qty vs count)
-          price: i.price,
-          type: i.is_sub ? "sustituido" : "original",
-        })),
+        orders: generateOutputData(),
       };
 
       // Llamamos al nuevo endpoint que genera el QR en backend
@@ -413,26 +405,22 @@ const VistaAuditor = () => {
   if (showInvoices && auditData) {
     // Intentamos usar los datos del servidor (finalSnapshot) o fallamos a los locales
     const qrData = auditData.finalSnapshot || {
-      // Fallback por si acaso
-      items: auditData.items || [],
       session_id: auditData.meta.session_id,
       timestamp: new Date().toISOString(),
+      orders: generateOutputData(),
     };
 
-    // Helper para renderizar items en el formato del QR
-    const renderItems = qrData.items.map((i) => ({
-      name: i.name,
-      sku: i.sku || i.id,
-      qty: i.qty || i.count || 1, // backend devuelve 'qty', frontend usaba 'count'
-      is_sub: i.type === "sustituido",
-    }));
-
-    // JSON para el QR (Minificado)
-    const qrValue = JSON.stringify({
-      id: qrData.session_id,
-      d: qrData.timestamp.split("T")[0],
-      it: renderItems.map((x) => [x.sku || x.name, x.qty]), // Formato super corto para que el QR sea legible [SKU, CANT]
-    });
+    const normalizedOrders = Array.isArray(qrData.orders)
+      ? qrData.orders
+      : qrData.items
+        ? [
+            {
+              id: qrData.order_id || qrData.session_id,
+              customer: "Cliente",
+              items: qrData.items,
+            },
+          ]
+        : [];
 
     return (
       <div className="invoice-mode-layout">
@@ -448,89 +436,111 @@ const VistaAuditor = () => {
           </button>
         </div>
 
-        <div className="invoice-sheet">
-          <div className="inv-sheet-header">
-            <div className="sheet-logo">MANIFIESTO DE SALIDA</div>
-            <div className="sheet-info">
-              <h2>Orden #{qrData.session_id.toString().slice(0, 6)}</h2>
-              <p>{new Date(qrData.timestamp).toLocaleString()}</p>
-            </div>
-          </div>
+        {normalizedOrders.map((order, orderIndex) => {
+          const renderItems = (order.items || []).map((i) => ({
+            name: i.name,
+            sku: i.sku || i.id,
+            qty: i.qty || i.count || 1,
+            is_sub: i.type === "sustituido" || i.is_sub,
+          }));
+          const qrValue = JSON.stringify(
+            renderItems.map((x) => [x.sku || x.name, x.qty]),
+          );
 
-          <div className="sheet-customer">
-            <strong>Auditado por:</strong> Sistema WMS
-            <br />
-            <strong>Picker:</strong>{" "}
-            {auditData.meta.picker_name || "Personal WMS"}
-            <br />
-          </div>
+          return (
+            <div key={orderIndex} className="invoice-sheet">
+              <div className="inv-sheet-header">
+                <div className="sheet-logo">MANIFIESTO DE SALIDA</div>
+                <div className="sheet-info">
+                  <h2>Orden #{order.id?.toString().slice(0, 6)}</h2>
+                  <p>{new Date(qrData.timestamp).toLocaleString()}</p>
+                </div>
+              </div>
 
-          <div className="master-code-section">
-            <div className="qr-wrapper">
-              <QRCode value={qrValue} size={150} />
-            </div>
-            <div className="code-info">
-              <h4>SCAN POS / ERP</h4>
-              <p>
-                Escanea este código en caja para cargar los {renderItems.length}{" "}
-                items.
-              </p>
-            </div>
-          </div>
+              <div className="sheet-customer">
+                <strong>Auditado por:</strong> Sistema WMS
+                <br />
+                <strong>Picker:</strong>{" "}
+                {auditData.meta.picker_name || "Personal WMS"}
+                <br />
+                {order.customer && (
+                  <>
+                    <strong>Cliente:</strong> {order.customer}
+                    <br />
+                  </>
+                )}
+              </div>
 
-          <table className="invoice-table">
-            <thead>
-              <tr>
-                <th>Cant.</th>
-                <th>Producto</th>
-                <th>SKU / ID</th>
-              </tr>
-            </thead>
-            <tbody>
-              {renderItems.map((item, idx) => (
-                <tr key={idx}>
-                  <td
-                    style={{
-                      fontWeight: "bold",
-                      fontSize: "1.1rem",
-                      textAlign: "center",
-                    }}
-                  >
-                    {item.qty}
-                  </td>
-                  <td>
-                    {item.name}
-                    {item.is_sub && (
-                      <span
+              <div className="master-code-section">
+                <div className="qr-wrapper">
+                  <QRCode value={qrValue} size={150} />
+                </div>
+                <div className="code-info">
+                  <h4>SCAN POS / ERP</h4>
+                  <p>
+                    Escanea este código en caja para cargar los{" "}
+                    {renderItems.length} items.
+                  </p>
+                </div>
+              </div>
+
+              <table className="invoice-table">
+                <thead>
+                  <tr>
+                    <th>Cant.</th>
+                    <th>Producto</th>
+                    <th>SKU / ID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {renderItems.map((item, idx) => (
+                    <tr key={idx}>
+                      <td
                         style={{
-                          display: "block",
-                          fontSize: "0.7rem",
-                          color: "#d97706",
                           fontWeight: "bold",
+                          fontSize: "1.1rem",
+                          textAlign: "center",
                         }}
                       >
-                        (SUSTITUTO)
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
-                    {item.sku}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        {item.qty}
+                      </td>
+                      <td>
+                        {item.name}
+                        {item.is_sub && (
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "0.7rem",
+                              color: "#d97706",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            (SUSTITUTO)
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        style={{ fontFamily: "monospace", fontSize: "0.8rem" }}
+                      >
+                        {item.sku}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
-          <div className="sheet-footer">
-            <div className="signatures">
-              <div>Firma Auditor / Supervisor</div>
-              <div>Firma Responsable (Picker)</div>
+              <div className="sheet-footer">
+                <div className="signatures">
+                  <div>Firma Auditor / Supervisor</div>
+                  <div>Firma Responsable (Picker)</div>
+                </div>
+                <div className="cut-line">
+                  - - - - - - - - - - Fin Del Documento - - - - - - - - - -
+                </div>
+              </div>
             </div>
-            <div className="cut-line">
-              - - - - - - - - - - Fin Del Documento - - - - - - - - - -
-            </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
     );
   }

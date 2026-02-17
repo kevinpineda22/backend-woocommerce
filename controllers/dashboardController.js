@@ -238,7 +238,7 @@ exports.completeAuditSession = async (req, res) => {
     const updatedMetrics = { ...currentMetrics, fecha_fin_auditoria: now };
 
     const updatePayload = {
-      estado: "completado", // ✅ Estado Correcto para escuchar en Frontend
+      estado: "auditado", // ✅ Estado final luego de auditoria
       resumen_metricas: updatedMetrics,
     };
     if (datos_salida) updatePayload.datos_salida = datos_salida;
