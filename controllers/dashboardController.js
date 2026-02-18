@@ -5,9 +5,9 @@ const { agruparItemsParaPicking } = require("./pickingUtils");
 const { syncOrderToWoo } = require("../services/syncWooService");
 
 // =========================================================
-// HELPER: Obtener TODOS los códigos de barras válidos por producto
+// HELPER: Obtener códigos de barras desde SIESA
 // =========================================================
-async function getAllBarcodesFromSiesa(productIds) {
+async function getBarcodesFromSiesa(productIds) {
   try {
     if (!productIds || productIds.length === 0) return {};
 
@@ -27,59 +27,28 @@ async function getAllBarcodesFromSiesa(productIds) {
       if (!barcodesByProduct[bc.f120_id]) {
         barcodesByProduct[bc.f120_id] = [];
       }
-      
-      const cleaned = (bc.codigo_barras || "").toString().trim().toUpperCase();
+      barcodesByProduct[bc.f120_id].push(bc.codigo_barras);
+    });
+
+    // Seleccionar el mejor código de barras por producto
+    const barcodeMap = {};
+    Object.keys(barcodesByProduct).forEach((productId) => {
+      const codes = barcodesByProduct[productId];
       
       // Filtrar códigos válidos
-      if (cleaned && cleaned.length >= 8) {
-        if (!cleaned.endsWith("+") && 
-            !cleaned.startsWith("M") && 
-            !cleaned.startsWith("N") &&
-            /^\d+$/.test(cleaned)) {
-          barcodesByProduct[bc.f120_id].push(cleaned);
-        }
-      }
-    });
-
-    // Ordenar: EAN-13 primero
-    Object.keys(barcodesByProduct).forEach((productId) => {
-      barcodesByProduct[productId].sort((a, b) => {
-        if (a.length === 13 && b.length !== 13) return -1;
-        if (a.length !== 13 && b.length === 13) return 1;
-        return 0;
+      const validCodes = codes.filter(code => {
+        const cleaned = (code || "").toString().trim().toUpperCase();
+        if (!cleaned || cleaned.length < 8) return false;
+        if (cleaned.endsWith("+")) return false;
+        if (cleaned.startsWith("M") || cleaned.startsWith("N")) return false;
+        return /^\d+$/.test(cleaned);
       });
-    });
 
-    return barcodesByProduct;
-  } catch (error) {
-    console.error("Error en getAllBarcodesFromSiesa:", error);
-    return {};
-  }
-}
-
-// =========================================================
-// HELPER LEGACY: Obtener primer código de barras desde SIESA
-// =========================================================
-async function getBarcodesFromSiesa(productIds) {
-  try {
-    if (!productIds || productIds.length === 0) return {};
-
-    const { data: barcodes, error } = await supabase
-      .from("siesa_codigos_barras")
-      .select("f120_id, codigo_barras")
-      .in("f120_id", productIds);
-
-    if (error) {
-      console.error("Error obteniendo códigos de barras SIESA:", error);
-      return {};
-    }
-
-    // Crear mapa: f120_id -> código_barras (tomamos el primero si hay múltiples)
-    const barcodeMap = {};
-    barcodes.forEach((bc) => {
-      if (!barcodeMap[bc.f120_id]) {
-        barcodeMap[bc.f120_id] = bc.codigo_barras;
-      }
+      // Priorizar códigos EAN-13 (13 dígitos), luego cualquier código válido
+      const ean13 = validCodes.find(c => c.length === 13);
+      const firstValid = validCodes[0];
+      
+      barcodeMap[productId] = ean13 || firstValid || null;
     });
 
     return barcodeMap;
@@ -571,7 +540,7 @@ exports.getSessionLogsDetail = async (req, res) => {
       } catch (e) {}
     }
 
-    // ✅ OBTENER CÓDIGOS DE BARRAS DESDE SIESA (principal + todos)
+    // ✅ OBTENER CÓDIGOS DE BARRAS DESDE SIESA
     const productIds = Array.from(
       new Set(
         Object.keys(productDetailsMap)
@@ -580,16 +549,16 @@ exports.getSessionLogsDetail = async (req, res) => {
       ),
     );
     const barcodeMap = await getBarcodesFromSiesa(productIds);
-    const allBarcodesMap = await getAllBarcodesFromSiesa(productIds);
 
     // Agregar códigos de barras al productDetailsMap
     Object.keys(productDetailsMap).forEach((productId) => {
       const barcode = barcodeMap[parseInt(productId)];
-      const allBarcodes = allBarcodesMap[parseInt(productId)] || [];
       if (barcode) {
         productDetailsMap[productId].barcode = barcode;
+        console.log(`✅ Producto ${productId}: código de barras = ${barcode}`);
+      } else {
+        console.log(`⚠️ Producto ${productId}: sin código de barras válido en SIESA`);
       }
-      productDetailsMap[productId].all_barcodes = allBarcodes;
     });
 
     res.status(200).json({
