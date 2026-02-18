@@ -89,20 +89,29 @@ const VistaAuditor = () => {
 
     auditData.items.forEach((item) => {
       if (requiredItems.has(item.id)) {
-        // ✅ PRIORIDAD 1: Códigos de barras escaneados durante el picking
+        // ✅ PRIORIDAD 1: Si el picker ESCANEÓ → validar contra códigos exactos
         const scannedBarcodes = auditData.scannedBarcodes?.[item.id];
-        if (scannedBarcodes && scannedBarcodes.has(cleanCode)) {
-          matchId = item.id;
-          return;
+        if (scannedBarcodes && scannedBarcodes.size > 0) {
+          if (scannedBarcodes.has(cleanCode)) {
+            matchId = item.id;
+            return;
+          }
+        } else {
+          // ✅ PRIORIDAD 2: Si el picker INGRESÓ MANUALMENTE → aceptar CUALQUIER código válido de SIESA
+          const allBarcodes = item.all_barcodes || [];
+          if (allBarcodes.length > 0 && allBarcodes.includes(cleanCode)) {
+            matchId = item.id;
+            return;
+          }
+
+          // ✅ PRIORIDAD 3: Código de barras principal (fallback)
+          if (item.barcode && item.barcode.trim().toUpperCase() === cleanCode) {
+            matchId = item.id;
+            return;
+          }
         }
 
-        // ✅ PRIORIDAD 2: Código de barras de SIESA (backup)
-        if (item.barcode && item.barcode.trim().toUpperCase() === cleanCode) {
-          matchId = item.id;
-          return;
-        }
-
-        // ✅ PRIORIDAD 3: SKU o ID (fallback)
+        // ✅ PRIORIDAD 4: SKU o ID (fallback final)
         const itemSku = (item.id || "").toString().toUpperCase();
         if (itemSku === cleanCode || (item.sku && item.sku.toUpperCase() === cleanCode)) {
           matchId = item.id;
@@ -210,7 +219,8 @@ const VistaAuditor = () => {
               order_id: log.id_pedido,
               image: prodDetail?.image || null,
               sku: prodDetail?.sku || null,
-              barcode: prodDetail?.barcode || null, // ✅ Código de barras de SIESA
+              barcode: prodDetail?.barcode || null, // ✅ Código de barras principal
+              all_barcodes: prodDetail?.all_barcodes || [], // ✅ TODOS los códigos válidos
             };
           }
           itemsMap[key].count += 1;
@@ -661,8 +671,8 @@ const VistaAuditor = () => {
                                       `Ref: ${item.id}`
                                     )}
                                   </div>
-                                  {/* ✅ MOSTRAR códigos escaneados para verificación */}
-                                  {isRequired && !isVerified && auditData.scannedBarcodes?.[item.id] && (
+                                  {/* ✅ MOSTRAR códigos de barras para verificación */}
+                                  {isRequired && !isVerified && (
                                     <div style={{
                                       fontSize: "0.7rem",
                                       color: "#059669",
@@ -670,7 +680,21 @@ const VistaAuditor = () => {
                                       fontWeight: "600"
                                     }}>
                                       <FaBarcode style={{ marginRight: "4px" }} />
-                                      {Array.from(auditData.scannedBarcodes[item.id]).join(", ")}
+                                      {auditData.scannedBarcodes?.[item.id] && 
+                                       auditData.scannedBarcodes[item.id].size > 0 ? (
+                                        // Si picker ESCANEÓ → mostrar código exacto
+                                        <span>Escaneado: {Array.from(auditData.scannedBarcodes[item.id]).join(", ")}</span>
+                                      ) : (
+                                        // Si picker ingresó SKU → mostrar todos los códigos válidos
+                                        <span>
+                                          {item.all_barcodes && item.all_barcodes.length > 0 
+                                            ? `Válidos: ${item.all_barcodes.slice(0, 3).join(", ")}${item.all_barcodes.length > 3 ? "..." : ""}`
+                                            : item.barcode 
+                                              ? `Código: ${item.barcode}` 
+                                              : "Use SKU"
+                                          }
+                                        </span>
+                                      )}
                                     </div>
                                   )}
                                   {item.is_sub && (

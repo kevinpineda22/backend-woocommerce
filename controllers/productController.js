@@ -1,4 +1,61 @@
 const WooCommerce = require("../services/wooService");
+const { supabase } = require("../services/supabaseClient");
+
+// ✅ HELPER: Obtener códigos de barras desde SIESA (con filtrado inteligente)
+async function getBarcodesFromSiesa(productIds) {
+  try {
+    if (!productIds || productIds.length === 0) return {};
+
+    const { data: barcodes, error } = await supabase
+      .from("siesa_codigos_barras")
+      .select("f120_id, codigo_barras")
+      .in("f120_id", productIds);
+
+    if (error) {
+      console.error("Error obteniendo códigos de barras SIESA:", error);
+      return {};
+    }
+
+    // Agrupar por producto y filtrar códigos válidos
+    const barcodesByProduct = {};
+    barcodes.forEach((bc) => {
+      if (!barcodesByProduct[bc.f120_id]) {
+        barcodesByProduct[bc.f120_id] = [];
+      }
+      barcodesByProduct[bc.f120_id].push(bc.codigo_barras);
+    });
+
+    // Seleccionar el mejor código de barras por producto
+    const barcodeMap = {};
+    Object.keys(barcodesByProduct).forEach((productId) => {
+      const codes = barcodesByProduct[productId];
+      
+      // Filtrar códigos válidos:
+      // 1. Eliminar códigos que terminen en '+'
+      // 2. Eliminar códigos que empiecen con 'M' o 'N'
+      // 3. Eliminar códigos con letras mezcladas
+      const validCodes = codes.filter(code => {
+        const cleaned = (code || "").toString().trim().toUpperCase();
+        if (!cleaned || cleaned.length < 8) return false;
+        if (cleaned.endsWith("+")) return false;
+        if (cleaned.startsWith("M") || cleaned.startsWith("N")) return false;
+        // Solo aceptar códigos numéricos puros
+        return /^\d+$/.test(cleaned);
+      });
+
+      // Priorizar códigos EAN-13 (13 dígitos), luego cualquier código válido
+      const ean13 = validCodes.find(c => c.length === 13);
+      const firstValid = validCodes[0];
+      
+      barcodeMap[productId] = ean13 || firstValid || null;
+    });
+
+    return barcodeMap;
+  } catch (error) {
+    console.error("Error en getBarcodesFromSiesa:", error);
+    return {};
+  }
+}
 
 exports.searchProduct = async (req, res) => {
   const { query, original_id } = req.query;
@@ -37,6 +94,10 @@ exports.searchProduct = async (req, res) => {
       products = searchResults;
     }
 
+    // ✅ OBTENER CÓDIGOS DE BARRAS DE SIESA
+    const productIds = products.map(p => p.id);
+    const barcodeMapSiesa = await getBarcodesFromSiesa(productIds);
+
     const results = products.map((p) => ({
         id: p.id, 
         name: p.name, 
@@ -45,9 +106,10 @@ exports.searchProduct = async (req, res) => {
         stock: p.stock_quantity, 
         sku: p.sku, 
         categories: p.categories,
-        barcode: p.meta_data?.find((m) => 
+        // ✅ PRIORIDAD: SIESA > WooCommerce meta_data > SKU
+        barcode: barcodeMapSiesa[p.id] || p.meta_data?.find((m) => 
           ["ean", "barcode", "_ean", "_barcode"].includes(m.key.toLowerCase())
-        )?.value || ""  // ✅ AGREGAR código de barras
+        )?.value || p.sku
     })).slice(0, 10);
 
     res.status(200).json(results);
