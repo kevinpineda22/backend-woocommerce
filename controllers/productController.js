@@ -38,7 +38,16 @@ exports.searchProduct = async (req, res) => {
     }
 
     const results = products.map((p) => ({
-        id: p.id, name: p.name, price: p.price, image: p.images[0]?.src || null, stock: p.stock_quantity, sku: p.sku, categories: p.categories
+        id: p.id, 
+        name: p.name, 
+        price: p.price, 
+        image: p.images[0]?.src || null, 
+        stock: p.stock_quantity, 
+        sku: p.sku, 
+        categories: p.categories,
+        barcode: p.meta_data?.find((m) => 
+          ["ean", "barcode", "_ean", "_barcode"].includes(m.key.toLowerCase())
+        )?.value || ""  // ✅ AGREGAR código de barras
     })).slice(0, 10);
 
     res.status(200).json(results);

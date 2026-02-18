@@ -853,6 +853,7 @@ const VistaPicker = () => {
       },
       cantidad_afectada: qty || 1,
       pasillo: currentItem.pasillo,
+      codigo_barras_escaneado: newItem.barcode || newItem.sku,  // ✅ Código del sustituto
     });
     updateLocalSessionState(
       currentItem.product_id,
@@ -887,7 +888,8 @@ const VistaPicker = () => {
   const handleManualValidation = async (inputCode) => {
     if (!isOnline) {
       if (window.confirm("⚠️ Estás Offline. ¿Forzar?")) {
-        setLastScannedBarcode(inputCode.trim().toUpperCase());  // ✅ GUARDAR código manual
+        // ✅ RESOLVER al código de barras real del producto
+        setLastScannedBarcode(currentItem.barcode || inputCode.trim().toUpperCase());
         setShowManualModal(false);
         if (isWeighable(currentItem)) setShowWeightModal(true);
         else confirmPicking();
@@ -901,7 +903,8 @@ const VistaPicker = () => {
         { input_code: inputCode, expected_sku: currentItem.sku },
       );
       if (res.data.valid) {
-        setLastScannedBarcode(inputCode.trim().toUpperCase());  // ✅ GUARDAR código validado
+        // ✅ GUARDAR el código de barras REAL del producto, no el SKU ingresado
+        setLastScannedBarcode(currentItem.barcode || inputCode.trim().toUpperCase());
         setShowManualModal(false);
         if (isWeighable(currentItem)) setShowWeightModal(true);
         else confirmPicking();
@@ -924,7 +927,8 @@ const VistaPicker = () => {
     const sku = (currentItem.sku || "").trim().toUpperCase();
     const ean = (currentItem.barcode || "").trim().toUpperCase();
     if (c === sku || c === ean || (ean && ean.endsWith(c))) {
-      setLastScannedBarcode(c);  // ✅ GUARDAR código antes de confirmar
+      // ✅ PRIORIDAD: Si escaneó el barcode real, guardarlo. Si escaneó SKU, guardar el barcode del producto
+      setLastScannedBarcode(c === sku ? (currentItem.barcode || c) : c);
       confirmPicking();
     } else {
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
