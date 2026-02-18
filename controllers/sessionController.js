@@ -211,8 +211,17 @@ exports.getSessionActive = async (req, res) => {
       } catch (err) {}
     }
 
-    // ✅ 2B. OBTENER CÓDIGOS DE BARRAS DE SIESA
-    const barcodeMapSiesa = await getBarcodesFromSiesa(productIds);
+    // ✅ 2B. OBTENER CÓDIGOS DE BARRAS DE SIESA (por SKU, no por product_id)
+    const skuList = Array.from(
+      new Set(
+        itemsAgrupados
+          .map((item) => parseInt(item.sku))
+          .filter((sku) => !isNaN(sku)),
+      ),
+    );
+    
+    console.log(`🔍 Buscando códigos de barras para ${skuList.length} SKUs`);
+    const barcodeMapSiesa = await getBarcodesFromSiesa(skuList);
     console.log("📊 Códigos de barras obtenidos de SIESA:", Object.keys(barcodeMapSiesa).length);
 
     // 3. PROCESAMIENTO DE ESTADO ITEM POR ITEM
@@ -264,8 +273,8 @@ exports.getSessionActive = async (req, res) => {
         // El frontend calculará (Total - Originales) para saber cuántos son sustitutos
         qty_scanned: qtyPicked,
 
-        // ✅ CÓDIGO DE BARRAS: Prioridad SIESA > WooCommerce > SKU
-        barcode: barcodeMapSiesa[item.product_id] || item.barcode || item.sku,
+        // ✅ CÓDIGO DE BARRAS: Prioridad SIESA (por SKU) > WooCommerce > SKU
+        barcode: barcodeMapSiesa[parseInt(item.sku)] || item.barcode || item.sku,
 
         sustituto: lastSub
           ? {

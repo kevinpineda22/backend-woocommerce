@@ -94,9 +94,15 @@ exports.searchProduct = async (req, res) => {
       products = searchResults;
     }
 
-    // ✅ OBTENER CÓDIGOS DE BARRAS DE SIESA
-    const productIds = products.map(p => p.id);
-    const barcodeMapSiesa = await getBarcodesFromSiesa(productIds);
+    // ✅ OBTENER CÓDIGOS DE BARRAS DE SIESA (por SKU, no por product_id)
+    const skuList = Array.from(
+      new Set(
+        products
+          .map((p) => parseInt(p.sku))
+          .filter((sku) => !isNaN(sku)),
+      ),
+    );
+    const barcodeMapSiesa = await getBarcodesFromSiesa(skuList);
 
     const results = products.map((p) => ({
         id: p.id, 
@@ -106,8 +112,8 @@ exports.searchProduct = async (req, res) => {
         stock: p.stock_quantity, 
         sku: p.sku, 
         categories: p.categories,
-        // ✅ PRIORIDAD: SIESA > WooCommerce meta_data > SKU
-        barcode: barcodeMapSiesa[p.id] || p.meta_data?.find((m) => 
+        // ✅ PRIORIDAD: SIESA (por SKU) > WooCommerce meta_data > SKU
+        barcode: barcodeMapSiesa[parseInt(p.sku)] || p.meta_data?.find((m) => 
           ["ean", "barcode", "_ean", "_barcode"].includes(m.key.toLowerCase())
         )?.value || p.sku
     })).slice(0, 10);

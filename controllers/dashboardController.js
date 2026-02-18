@@ -540,24 +540,32 @@ exports.getSessionLogsDetail = async (req, res) => {
       } catch (e) {}
     }
 
-    // ✅ OBTENER CÓDIGOS DE BARRAS DESDE SIESA
-    const productIds = Array.from(
+    // ✅ OBTENER CÓDIGOS DE BARRAS DESDE SIESA (por SKU, no por product_id)
+    const skuList = Array.from(
       new Set(
-        Object.keys(productDetailsMap)
-          .map((id) => parseInt(id))
-          .filter(Boolean),
+        Object.values(productDetailsMap)
+          .map((p) => p.sku)
+          .filter(Boolean)
+          .map((sku) => parseInt(sku))
+          .filter((sku) => !isNaN(sku)),
       ),
     );
-    const barcodeMap = await getBarcodesFromSiesa(productIds);
+    
+    console.log(`🔍 Buscando códigos de barras para ${skuList.length} SKUs:`, skuList);
+    const barcodeMapBySku = await getBarcodesFromSiesa(skuList);
+    console.log(`📦 Códigos encontrados:`, Object.keys(barcodeMapBySku).length);
 
-    // Agregar códigos de barras al productDetailsMap
+    // Agregar códigos de barras al productDetailsMap (mapear de SKU a product_id)
     Object.keys(productDetailsMap).forEach((productId) => {
-      const barcode = barcodeMap[parseInt(productId)];
+      const sku = productDetailsMap[productId].sku;
+      const skuAsNumber = parseInt(sku);
+      const barcode = barcodeMapBySku[skuAsNumber];
+      
       if (barcode) {
         productDetailsMap[productId].barcode = barcode;
-        console.log(`✅ Producto ${productId}: código de barras = ${barcode}`);
+        console.log(`✅ Producto ${productId} (SKU ${sku}): código = ${barcode}`);
       } else {
-        console.log(`⚠️ Producto ${productId}: sin código de barras válido en SIESA`);
+        console.log(`⚠️ Producto ${productId} (SKU ${sku}): sin código válido en SIESA`);
       }
     });
 
