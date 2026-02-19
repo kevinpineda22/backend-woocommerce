@@ -3,6 +3,62 @@ const { supabase } = require("../services/supabaseClient");
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 const { agruparItemsParaPicking } = require("./pickingUtils");
 
+// ✅ HELPER: Obtener códigos de barras desde SIESA (con filtrado inteligente)
+async function getBarcodesFromSiesa(productIds) {
+  try {
+    if (!productIds || productIds.length === 0) return {};
+
+    const { data: barcodes, error } = await supabase
+      .from("siesa_codigos_barras")
+      .select("f120_id, codigo_barras")
+      .in("f120_id", productIds);
+
+    if (error) {
+      console.error("Error obteniendo códigos de barras SIESA:", error);
+      return {};
+    }
+
+    // Agrupar por producto y filtrar códigos válidos
+    const barcodesByProduct = {};
+    barcodes.forEach((bc) => {
+      if (!barcodesByProduct[bc.f120_id]) {
+        barcodesByProduct[bc.f120_id] = [];
+      }
+      barcodesByProduct[bc.f120_id].push(bc.codigo_barras);
+    });
+
+    // Seleccionar el mejor código de barras por producto
+    const barcodeMap = {};
+    Object.keys(barcodesByProduct).forEach((productId) => {
+      const codes = barcodesByProduct[productId];
+      
+      // Filtrar códigos válidos:
+      // 1. Eliminar códigos que terminen en '+'
+      // 2. Eliminar códigos que empiecen con 'M' o 'N'
+      // 3. Eliminar códigos con letras mezcladas
+      const validCodes = codes.filter(code => {
+        const cleaned = (code || "").toString().trim().toUpperCase();
+        if (!cleaned || cleaned.length < 8) return false;
+        if (cleaned.endsWith("+")) return false;
+        if (cleaned.startsWith("M") || cleaned.startsWith("N")) return false;
+        // Solo aceptar códigos numéricos puros
+        return /^\d+$/.test(cleaned);
+      });
+
+      // Priorizar códigos EAN-13 (13 dígitos), luego cualquier código válido
+      const ean13 = validCodes.find(c => c.length === 13);
+      const firstValid = validCodes[0];
+      
+      barcodeMap[productId] = ean13 || firstValid || null;
+    });
+
+    return barcodeMap;
+  } catch (error) {
+    console.error("Error en getBarcodesFromSiesa:", error);
+    return {};
+  }
+}
+
 exports.createPickingSession = async (req, res) => {
   const { id_picker, ids_pedidos } = req.body;
   try {
@@ -155,6 +211,19 @@ exports.getSessionActive = async (req, res) => {
       } catch (err) {}
     }
 
+    // ✅ 2B. OBTENER CÓDIGOS DE BARRAS DE SIESA (por SKU, no por product_id)
+    const skuList = Array.from(
+      new Set(
+        itemsAgrupados
+          .map((item) => parseInt(item.sku))
+          .filter((sku) => !isNaN(sku)),
+      ),
+    );
+    
+    console.log(`🔍 Buscando códigos de barras para ${skuList.length} SKUs`);
+    const barcodeMapSiesa = await getBarcodesFromSiesa(skuList);
+    console.log("📊 Códigos de barras obtenidos de SIESA:", Object.keys(barcodeMapSiesa).length);
+
     // 3. PROCESAMIENTO DE ESTADO ITEM POR ITEM
     const itemsConRuta = itemsAgrupados.map((item) => {
       const realCategories =
@@ -203,6 +272,9 @@ exports.getSessionActive = async (req, res) => {
         // 👉 ESTA ES LA MAGIA: Enviamos qty_scanned como solo los originales
         // El frontend calculará (Total - Originales) para saber cuántos son sustitutos
         qty_scanned: qtyPicked,
+
+        // ✅ CÓDIGO DE BARRAS: Prioridad SIESA (por SKU) > WooCommerce > SKU
+        barcode: barcodeMapSiesa[parseInt(item.sku)] || item.barcode || item.sku,
 
         sustituto: lastSub
           ? {
