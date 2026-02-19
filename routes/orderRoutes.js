@@ -35,4 +35,6 @@ router.post("/auditor/finalizar", dashboardCtrl.completeAuditSession);
 router.post("/admin-remove-item", adminCtrl.removeItemFromSession);
 router.post("/admin-restore-item", adminCtrl.restoreItemToSession);
 
+// Ruta temporal para espiar metadatos
+router.get("/espiar-pedido/:id", dashboardCtrl.espiarPedido);
 module.exports = router;

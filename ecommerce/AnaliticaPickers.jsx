@@ -13,7 +13,9 @@ import {
   FaRoute,
   FaMapMarkedAlt,
   FaTimes,
-  FaQuestionCircle // [NEW]
+  FaQuestionCircle,
+  FaExchangeAlt,
+  FaBan // [NEW]
 } from "react-icons/fa";
 import "./AnaliticaPickers.css";
 import WarehouseMap from "./WarehouseMap"; 
@@ -28,8 +30,43 @@ const RouteSelectionView = ({ fetchPickerRoute, dateRange }) => { // [MOD]: Reci
       try {
         const BASE_URL = "https://backend-woocommerce.vercel.app/api";
         // Pasamos el filtro de rango al backend tambien
-        const { data } = await axios.get(`${BASE_URL}/analytics/routes-history?range=${dateRange}`);
-        setRoutesHistory(Array.isArray(data) ? data : []);
+        const { data: rawRoutes } = await axios.get(`${BASE_URL}/analytics/routes-history?range=${dateRange}`);
+        
+        let processedRoutes = Array.isArray(rawRoutes) ? rawRoutes : [];
+
+        // Lógica de Agrupación de Sesiones (Multipicker)
+        // Agrupamos si: Mismo Picker Y Fin (fecha_fin) con diferencia < 5 minutos
+        const sessions = [];
+        const processedIds = new Set();
+
+        processedRoutes.forEach(route => {
+            if (processedIds.has(route.id)) return;
+
+            const routeTime = new Date(route.fecha_fin).getTime();
+            
+            // Buscar pedidos hermanos (mismo picker, tiempo similar)
+            const siblings = processedRoutes.filter(r => 
+                r.id_picker === route.id_picker &&
+                r.id !== route.id &&
+                !processedIds.has(r.id) && 
+                Math.abs(new Date(r.fecha_fin).getTime() - routeTime) < 5 * 60 * 1000 // 5 min diferencia max
+            );
+
+            // Marcar todos como procesados
+            processedIds.add(route.id);
+            siblings.forEach(s => processedIds.add(s.id));
+
+            // Crear objeto sesión
+            sessions.push({
+                ...route,
+                is_multipicker: siblings.length > 0,
+                related_orders: siblings,
+                total_orders: 1 + siblings.length,
+                orders_display: [route.id_pedido, ...siblings.map(s => s.id_pedido)].join(', ')
+            });
+        });
+
+        setRoutesHistory(sessions);
       } catch (err) {
         console.error(err);
       } finally {
@@ -58,21 +95,41 @@ const RouteSelectionView = ({ fetchPickerRoute, dateRange }) => { // [MOD]: Reci
             className="route-card-item"
             onClick={() => fetchPickerRoute(route.id_picker, route.id_pedido)}
             style={{
-                border: '1px solid #e2e8f0', 
+                border: route.is_multipicker ? '2px solid #3b82f6' : '1px solid #e2e8f0', // Borde azul para multipicker
                 borderRadius: 8, 
                 padding: 15, 
                 cursor: 'pointer',
-                background: 'white',
+                background: route.is_multipicker ? '#eff6ff' : 'white', // Fondo azulito para multipicker
                 transition: 'all 0.2s ease',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                position: 'relative'
             }}
             onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
             onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
           >
-            <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 5}}>
-                <span style={{fontWeight: 'bold', color: '#2d3748'}}>Pedido #{route.id_pedido}</span>
-                <span style={{fontSize: '0.8rem', color: '#718096'}}>{new Date(route.fecha_fin).toLocaleDateString()}</span>
+            {route.is_multipicker && (
+                <div style={{
+                    position: 'absolute', top: -10, right: 10, background: '#3b82f6', color: 'white', 
+                    fontSize: '0.7rem', padding: '2px 8px', borderRadius: 10, fontWeight: 'bold'
+                }}>
+                    MULTIPICKER ({route.total_orders})
+                </div>
+            )}
+
+            <div style={{display: 'flex', flexDirection: 'column', marginBottom: 8}}>
+                {route.is_multipicker ? (
+                    <div>
+                        <span style={{fontSize: '0.8rem', color: '#64748b'}}>Sesión Conjunta:</span>
+                        <div style={{fontWeight: 'bold', color: '#2b6cb0', fontSize: '1rem', wordBreak: 'break-all'}}>
+                           #{route.orders_display}
+                        </div>
+                    </div>
+                ) : (
+                    <span style={{fontWeight: 'bold', color: '#2d3748'}}>Pedido #{route.id_pedido}</span>
+                )}
+                <span style={{fontSize: '0.8rem', color: '#718096', marginTop: 2}}>{new Date(route.fecha_fin).toLocaleDateString()} {new Date(route.fecha_fin).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
             </div>
+            
             <div style={{display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8}}>
                 <div style={{width: 24, height: 24, borderRadius: '50%', background: '#edf2f7', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem'}}>👷</div>
                 <span style={{fontSize: '0.9rem', fontWeight: 500}}>{route.nombre_picker || 'Picker'}</span>
@@ -571,11 +628,15 @@ const AnaliticaPickers = () => {
                 <div style={{ display: "flex", alignItems: "center", gap: 15 }}>
                   <div
                     className={`badge-log ${
-                      log.accion === "recolectado" ? "success" : "error"
+                      log.accion === "recolectado" ? "success" : 
+                      log.accion === "sustituido" ? "warning" : "error"
                     }`}
+                    style={log.accion === "sustituido" ? { background: '#fffbeb', color: '#d97706', borderColor: '#fcd34d' } : {}}
                   >
                     {log.accion === "recolectado" ? (
                       <FaShoppingBasket />
+                    ) : log.accion === "sustituido" ? (
+                      <FaExchangeAlt />
                     ) : (
                       <FaExclamationTriangle />
                     )}
@@ -654,7 +715,9 @@ const AnaliticaPickers = () => {
                     <FaExclamationTriangle /> Ineficiencias Detectadas
                   </h3>
                   <div style={{display: 'grid', gap: 10}}>
-                    {routeData.regressions.map((r, i) => (
+                    {routeData.regressions
+                        .filter(r => r.pasillo !== 'S/N' && r.pasillo !== 'MESA') // [MOD] Ignorar regresiones a zona virtual
+                        .map((r, i) => (
                       <div key={i} style={{fontSize: '0.95rem', color: '#92400e', background: 'white', padding: '10px 15px', borderRadius: 8, border: '1px solid #fcd34d', display: 'flex', alignItems: 'center', gap: 10}}>
                          <span style={{background: '#fef3c7', padding: '4px 8px', borderRadius: 4, fontWeight: 'bold'}}>Pasillo {r.pasillo}</span>
                          <span>{r.message}</span>
@@ -671,7 +734,10 @@ const AnaliticaPickers = () => {
                     <h3 style={{margin: 0, fontSize: '1rem', color: '#475569'}}>🗺️ Reproducción de Recorrido en Planta</h3>
                  </div>
                  <div style={{background: '#1e1e24'}}>
-                    <WarehouseMap routeData={routeData.raw_logs || []} />
+                    <WarehouseMap 
+                        routeData={routeData.raw_logs || []} 
+                        sessionInfo={routeData.session_info}
+                    />
                  </div>
               </div>
 
@@ -689,22 +755,37 @@ const AnaliticaPickers = () => {
                         
                         return (
                           <div key={i} style={{display: 'flex', alignItems: 'center', gap: 12}}>
-                            <div style={{
-                                width: '60px', 
-                                height: '60px', 
-                                background: isRegression ? '#fee2e2' : '#eff6ff', 
-                                color: isRegression ? '#dc2626' : '#2563eb',
-                                borderRadius: 8, 
-                                display: 'flex', 
-                                flexDirection: 'column',
-                                alignItems: 'center', 
-                                justifyContent: 'center',
-                                border: `1px solid ${isRegression ? '#fecaca' : '#bfdbfe'}`,
-                                flexShrink: 0
-                            }}>
-                              <span style={{fontSize: '0.7rem', textTransform: 'uppercase', fontWeight: 'bold'}}>Pasillo</span>
-                              <span style={{fontSize: '1.2rem', fontWeight: '800'}}>{seg.pasillo}</span>
-                            </div>
+                            {/* LOGICA DE ETIQUETA DE PASILLO (Soporte Cancelados) */}
+                            {(() => {
+                                const isCancelled = seg.products.some(p => ['retirado', 'no_encontrado'].includes(p.accion));
+                                const label = isCancelled && seg.pasillo === 'S/N' ? 'FAIL' : (seg.pasillo === 'S/N' ? 'MESA' : seg.pasillo);
+                                const colorBg = isCancelled ? '#fef2f2' : (isRegression ? '#fee2e2' : '#eff6ff');
+                                const colorText = isCancelled ? '#ef4444' : (isRegression ? '#dc2626' : '#2563eb');
+                                const borderColor = isCancelled ? '#fecaca' : (isRegression ? '#fecaca' : '#bfdbfe');
+
+                                return (
+                                    <div style={{
+                                        width: '60px', 
+                                        height: '60px', 
+                                        background: colorBg, 
+                                        color: colorText,
+                                        borderRadius: 8, 
+                                        display: 'flex', 
+                                        flexDirection: 'column',
+                                        alignItems: 'center', 
+                                        justifyContent: 'center',
+                                        border: `1px solid ${borderColor}`,
+                                        flexShrink: 0
+                                    }}>
+                                    <span style={{fontSize: '0.65rem', textTransform: 'uppercase', fontWeight: 'bold'}}>
+                                        {isCancelled && seg.pasillo === 'S/N' ? 'Not Found' : 'Pasillo'}
+                                    </span>
+                                    <span style={{fontSize: label.length > 3 ? '0.8rem' : '1.2rem', fontWeight: '800'}}>
+                                        {label}
+                                    </span>
+                                    </div>
+                                );
+                            })()}
 
                             <div style={{flex: 1}}>
                                 <div style={{display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: '0.85rem'}}>
@@ -719,7 +800,21 @@ const AnaliticaPickers = () => {
                                         borderRadius: 5
                                     }}></div>
                                 </div>
-                                <div style={{fontSize: '0.75rem', color: '#94a3b8', marginTop: 4}}>{seg.items} items recogidos</div>
+                                <div style={{fontSize: '0.75rem', color: '#94a3b8', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap'}}>
+                                    <span>{seg.items} items proc.</span>
+                                    {seg.products && seg.products.some(p => p.accion === 'sustituido') && (
+                                        <span style={{color: '#d97706', background: '#fffbeb', padding: '1px 6px', borderRadius: 4, border: '1px solid #fcd34d', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 'bold', fontSize: '0.7rem'}}>
+                                            <FaExchangeAlt size={10} /> 
+                                            {seg.products.filter(p => p.accion === 'sustituido').length} Sust.
+                                        </span>
+                                    )}
+                                    {seg.products && seg.products.some(p => ['retirado', 'no_encontrado'].includes(p.accion)) && (
+                                        <span style={{color: '#ef4444', background: '#fef2f2', padding: '1px 6px', borderRadius: 4, border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 'bold', fontSize: '0.7rem'}}>
+                                            <FaBan size={10} /> 
+                                            {seg.products.filter(p => ['retirado', 'no_encontrado'].includes(p.accion)).length} Canc.
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                           </div>
                         );
@@ -743,7 +838,10 @@ const AnaliticaPickers = () => {
                         <tbody>
                             {routeData.summary.map((s, i) => (
                             <tr key={i} style={{borderBottom: '1px solid #f1f5f9'}}>
-                                <td style={{padding: '12px', fontWeight: '600', color: '#334155'}}>{s.pasillo} {s.visits > 1 && <span style={{fontSize:'0.7rem', background:'#fef3c7', color:'#b45309', padding:'2px 6px', borderRadius:4, marginLeft:5}}>x{s.visits}</span>}</td>
+                                <td style={{padding: '12px', fontWeight: '600', color: '#334155'}}>
+                                    {s.pasillo === 'S/N' ? 'GENERAL' : s.pasillo} 
+                                    {s.visits > 1 && <span style={{fontSize:'0.7rem', background:'#fef3c7', color:'#b45309', padding:'2px 6px', borderRadius:4, marginLeft:5}}>x{s.visits}</span>}
+                                </td>
                                 <td style={{padding: '12px', fontFamily: 'monospace'}}>{s.total_time_formatted}</td>
                                 <td style={{padding: '12px'}}>{s.total_items}</td>
                                 <td style={{padding: '12px'}}>

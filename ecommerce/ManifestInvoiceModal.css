@@ -655,10 +655,20 @@
    ESTILOS DE IMPRESIÓN
    ========================================= */
 @media print {
-  /* Ocultar elementos no imprimibles */
+  /* 🚫 OCULTAR SIDEBAR, NAVEGACIÓN Y ELEMENTOS NO IMPRIMIBLES */
   .invoice-actions,
   .order-selector,
-  .no-print {
+  .no-print,
+  .pedidos-layout-sidebar,
+  .pedidos-layout-content,
+  .history-table-container,
+  .pickers-table,
+  .pedidos-table-container,
+  table:not(.manifest-table):not(.invoice-table),
+  .admin-sidebar,
+  nav,
+  .navbar,
+  header {
     display: none !important;
   }
 
@@ -690,7 +700,6 @@
     padding: 15mm 12mm !important;
     border: none !important;
     border-radius: 0 !important;
-    page-break-after: always;
   }
 
   /* Header optimizado para impresión */
@@ -724,25 +733,32 @@
     gap: 15px !important;
   }
 
-  /* Sección QR */
+  /* 📱 SECCIÓN QR - AMPLIADA */
   .master-code-section {
-    margin-bottom: 12px !important;
-    padding: 8px !important;
-    border: 1px solid #000 !important;
+    margin-bottom: 15px !important;
+    padding: 12px !important;
+    border: 3px solid #000 !important;
     background: white !important;
   }
 
   .qr-wrapper {
-    padding: 3px !important;
-    border: 1px solid #000 !important;
+    padding: 8px !important;
+    border: 2px solid #000 !important;
+  }
+
+  .qr-wrapper svg {
+    width: 110px !important;
+    height: 110px !important;
   }
 
   .code-info h4 {
-    font-size: 0.8rem !important;
+    font-size: 0.9rem !important;
+    font-weight: 900 !important;
   }
 
   .code-info p {
-    font-size: 0.7rem !important;
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
   }
 
   /* Tabla */
@@ -795,7 +811,16 @@
   }
 
   .product-barcode-render {
-    font-size: 1.5rem !important;
+    font-size: 2.2rem !important;
+    font-weight: 400 !important;
+    letter-spacing: 1.5px !important;
+    transform: scaleY(1.3) !important;
+  }
+
+  .barcode-number {
+    font-size: 0.75rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 1.2px !important;
   }
 
   /* Control de saltos de página */

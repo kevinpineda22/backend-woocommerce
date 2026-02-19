@@ -379,6 +379,16 @@ const VistaPicker = () => {
 
       setSessionData(data);
       localStorage.setItem("session_active_cache", JSON.stringify(data));
+      
+      // 🔍 DEBUG: Ver qué barcodes llegan
+      console.log("🔍 DEBUG SESSION DATA - Items recibidos:");
+      data.items?.slice(0, 3).forEach(item => {
+        console.log(`  - ${item.name}:`, {
+          barcode: item.barcode,
+          sku: item.sku,
+          product_id: item.product_id
+        });
+      });
     } catch (err) {
       if (err.response && err.response.status === 404) {
         // 🛡️ PROTECCIÓN DE QR: Si estamos esperando auditoría, NO borramos la pantalla
@@ -813,6 +823,10 @@ const VistaPicker = () => {
     const currentScanned = (itemRef.qty_scanned || 0) + 1;
     const targetQty = itemRef.quantity_total;
     const isFinished = currentScanned >= targetQty;
+    
+    // ✅ Si lastScannedBarcode es null, significa entrada manual (no se guardará código específico)
+    console.log("📤 Enviando:", lastScannedBarcode ? `Código: ${lastScannedBarcode}` : "Entrada MANUAL (sin barcode)");
+    
     const payload = {
       id_sesion: sessionData.session_id,
       id_producto_original: itemRef.product_id,
@@ -820,7 +834,7 @@ const VistaPicker = () => {
       accion: "recolectado",
       peso_real: peso,
       pasillo: itemRef.pasillo,
-      codigo_barras_escaneado: lastScannedBarcode || itemRef.barcode || itemRef.sku,  // ✅ NUEVO
+      codigo_barras_escaneado: lastScannedBarcode,  // null si fue manual, código exacto si fue escaneado
     };
     queueAction(payload);
     if (isFinished) {
@@ -853,6 +867,7 @@ const VistaPicker = () => {
       },
       cantidad_afectada: qty || 1,
       pasillo: currentItem.pasillo,
+      codigo_barras_escaneado: newItem.barcode || newItem.sku,  // ✅ Código del sustituto
     });
     updateLocalSessionState(
       currentItem.product_id,
@@ -887,7 +902,9 @@ const VistaPicker = () => {
   const handleManualValidation = async (inputCode) => {
     if (!isOnline) {
       if (window.confirm("⚠️ Estás Offline. ¿Forzar?")) {
-        setLastScannedBarcode(inputCode.trim().toUpperCase());  // ✅ GUARDAR código manual
+        // ⚠️ NO GUARDAR barcode si fue entrada manual, porque no sabemos cuál código tiene el producto físico
+        console.log("🔍 DEBUG OFFLINE - Entrada MANUAL, no se guardará barcode específico");
+        setLastScannedBarcode(null);  // null = entrada manual, no escaneado
         setShowManualModal(false);
         if (isWeighable(currentItem)) setShowWeightModal(true);
         else confirmPicking();
@@ -901,7 +918,9 @@ const VistaPicker = () => {
         { input_code: inputCode, expected_sku: currentItem.sku },
       );
       if (res.data.valid) {
-        setLastScannedBarcode(inputCode.trim().toUpperCase());  // ✅ GUARDAR código validado
+        // ⚠️ NO GUARDAR barcode específico en entrada manual
+        console.log("🔍 DEBUG - Entrada MANUAL validada, no se guarda barcode específico");
+        setLastScannedBarcode(null);  // null = permitirá validar con cualquier barcode en auditoría
         setShowManualModal(false);
         if (isWeighable(currentItem)) setShowWeightModal(true);
         else confirmPicking();
@@ -924,7 +943,9 @@ const VistaPicker = () => {
     const sku = (currentItem.sku || "").trim().toUpperCase();
     const ean = (currentItem.barcode || "").trim().toUpperCase();
     if (c === sku || c === ean || (ean && ean.endsWith(c))) {
-      setLastScannedBarcode(c);  // ✅ GUARDAR código antes de confirmar
+      // ✅ GUARDAR el código EXACTO que se escaneó (no resolver a otro)
+      console.log("🔍 ESCANEO exitoso - Código guardado:", c);
+      setLastScannedBarcode(c);
       confirmPicking();
     } else {
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);

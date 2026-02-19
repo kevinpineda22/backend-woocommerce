@@ -558,3 +558,23 @@ exports.getSessionLogsDetail = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// =========================================================
+// RUTA TEMPORAL PARA ESPIAR METADATOS DE WOOCOMMERCE
+// =========================================================
+exports.espiarPedido = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    // Llamamos directamente a WooCommerce
+    const { data: order } = await WooCommerce.get(`orders/${orderId}`);
+    
+    // Devolvemos el pedido completo para que lo veas en el navegador
+    res.status(200).json({
+      mensaje: "Aquí están los datos crudos del pedido",
+      line_items: order.line_items,
+      shipping_lines: order.shipping_lines
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

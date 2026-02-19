@@ -1120,3 +1120,57 @@
   background: #e2e8f0;
   color: #94a3b8;
 }
+
+/* =========================================
+   ESTILOS DE IMPRESIÓN
+   ========================================= */
+@media print {
+  /* 🚫 OCULTAR SIDEBAR Y NAVEGACIÓN */
+  .pedidos-layout-sidebar,
+  .pedidos-layout-sidebar-header,
+  .pedidos-layout-sidebar-nav,
+  .pedidos-back-button,
+  nav,
+  .navbar,
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  /* � OCULTAR TODO EL CONTENIDO PRINCIPAL (historial, tablas, etc.) */
+  .pedidos-layout-content,
+  .history-table-container,
+  .pickers-table,
+  .pedidos-table-container,
+  table:not(.manifest-table):not(.invoice-table) {
+    display: none !important;
+  }
+
+  /* ✅ MOSTRAR SOLO EL MODAL DE MANIFIESTO */
+  .invoice-mode-layout {
+    display: block !important;
+    position: static !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 📄 AJUSTAR CONTENIDO PRINCIPAL */
+  .pedidos-layout-main-container {
+    position: static !important;
+    display: block !important;
+  }
+
+  /* 🖨️ CONFIGURACIÓN DE PÁGINA */
+  body,
+  html {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  @page {
+    margin: 10mm;
+    size: A4 portrait;
+  }
+}

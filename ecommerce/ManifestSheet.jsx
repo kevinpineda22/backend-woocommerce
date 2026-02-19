@@ -66,7 +66,7 @@ const ManifestSheet = ({
       {/* QR Code Section */}
       <div className="manifest-qr-section">
         <div className="qr-wrapper">
-          <QRCode value={qrValue} size={90} />
+          <QRCode value={qrValue} size={100} />
         </div>
         <div className="qr-info">
           <h4>CERTIFICADO DE SALIDA</h4>
