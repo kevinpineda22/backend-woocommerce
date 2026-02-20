@@ -22,9 +22,9 @@ import { LiveSessionModal } from "./LiveSessionModal";
 import { GestionPickers } from "./GestionPickers";
 import AnaliticaPickers from "./AnaliticaPickers";
 import HistoryView from "./HistoryView";
-import PendingAuditView from "./PendingAuditView";
+import PendingAuditView from "../PendingAuditView";
 import HistoryDetailModal from "./HistoryDetailModal";
-import ManifestInvoiceModal from "./ManifestInvoiceModal";
+import ManifestInvoiceModal from "../shared/ManifestInvoiceModal";
 
 import "./PedidosAdmin.css";
 

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { 
   FaSearch, FaCalendarAlt, FaMapMarkerAlt, 
   FaCheckDouble, FaTimes, FaBox, FaClock,
-  FaCheck, FaUserCheck, FaBoxOpen, FaPhone
+  FaCheck, FaUserCheck, FaBoxOpen, FaPhone, FaWalking
 } from "react-icons/fa";
 import "./PedidosAdmin.css"; 
 
@@ -21,7 +21,7 @@ const PendingOrdersView = ({
   filterZone, setFilterZone, 
   selectedIds, setSelectedIds,
   onAssignClick,
-  onAssignSingleDirect // Nueva prop para asignar directo desde el modal
+  onAssignSingleDirect 
 }) => {
 
   const displayedOrders = useMemo(() => {
@@ -58,12 +58,15 @@ const PendingOrdersView = ({
     setSelectedIds(newSet);
   };
 
-  // Manejamos el modal internamente en esta vista
   const [localSelectedOrder, setLocalSelectedOrder] = useState(null);
+
+  // ✅ Función auxiliar para detectar recogida
+  const isPickupOrder = (order) => {
+    return order.shipping_lines?.some(ship => ship.method_id === 'local_pickup');
+  };
 
   return (
     <>
-      {/* 1. BARRA DE FILTROS */}
       <div className="pedidos-admin-filters-container">
          <div className="pedidos-admin-filter-group">
             <label><FaSearch/> Buscar</label>
@@ -101,7 +104,6 @@ const PendingOrdersView = ({
          </div>
       </div>
 
-      {/* 2. GRID DE PEDIDOS */}
       {loading && orders.length === 0 ? (
         <div className="pedidos-main-loading">
             <div className="pedidos-spinner-large"></div>
@@ -116,6 +118,8 @@ const PendingOrdersView = ({
           ) : (
             displayedOrders.map(order => {
                 const isSelected = selectedIds.has(order.id);
+                const isPickup = isPickupOrder(order);
+
                 return (
                   <div key={order.id} className={`pa-ticket-card ${isSelected ? 'selected' : ''}`}>
                      <div 
@@ -126,7 +130,14 @@ const PendingOrdersView = ({
                      </div>
                      <div className="pa-ticket-content" onClick={() => setLocalSelectedOrder(order)}>
                         <div className="pa-ticket-header">
-                            <span className="pa-ticket-id">#{order.id}</span>
+                            <div>
+                                <span className="pa-ticket-id">#{order.id}</span>
+                                {isPickup && (
+                                  <span style={{background: '#d946ef', color: 'white', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 'bold', marginLeft: '5px', display: 'inline-flex', alignItems: 'center', gap: '3px'}}>
+                                    <FaWalking /> RECOGIDA
+                                  </span>
+                                )}
+                            </div>
                             <span className="pa-ticket-date">
                                 <FaClock size={12} style={{marginRight:4}}/> 
                                 {new Date(order.date_created).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
@@ -139,7 +150,11 @@ const PendingOrdersView = ({
                                 <span className="pa-meta-price">{formatPrice(order.total)}</span>
                             </div>
                             <div className="pa-ticket-address">
-                                <FaMapMarkerAlt color="#ef4444" /> {order.billing?.address_1}, {order.billing?.city}
+                                {isPickup ? (
+                                    <span style={{color: '#a21caf', fontWeight: 'bold'}}>Retira el cliente en sucursal</span>
+                                ) : (
+                                    <><FaMapMarkerAlt color="#ef4444" /> {order.billing?.address_1}, {order.billing?.city}</>
+                                )}
                             </div>
                         </div>
                      </div>
@@ -150,12 +165,10 @@ const PendingOrdersView = ({
         </div>
       )}
 
-      {/* 3. MODAL DETALLE PEDIDO (OPTIMIZADO CON SCROLL INTERNO) */}
+      {/* MODAL DETALLE PEDIDO */}
       {localSelectedOrder && (
         <div className="pedidos-modal-overlay" onClick={() => setLocalSelectedOrder(null)}>
           <div className="pedidos-modal-content large animate-fade-in" onClick={(e) => e.stopPropagation()}>
-            
-            {/* HEADER */}
             <div className="pa-modal-header-custom">
               <div className="pa-modal-header-left">
                 <div className="pa-modal-icon-badge"><FaBoxOpen size={20} /></div>
@@ -174,7 +187,6 @@ const PendingOrdersView = ({
             </div>
 
             <div className="pa-modal-body-custom">
-              {/* INFO SUPERIOR (FIJA) */}
               <div className="pa-detail-info-grid">
                 <div className="pa-detail-card">
                   <h4 className="pa-section-title"><FaUserCheck /> Cliente</h4>
@@ -186,8 +198,14 @@ const PendingOrdersView = ({
                 </div>
                 <div className="pa-detail-card">
                   <h4 className="pa-section-title"><FaMapMarkerAlt /> Entrega</h4>
-                  <p className="pa-info-main-text">{localSelectedOrder.billing?.address_1}</p>
-                  <p className="pa-info-sub-text">{localSelectedOrder.billing?.city}</p>
+                  {isPickupOrder(localSelectedOrder) ? (
+                      <p className="pa-info-main-text" style={{color: '#a21caf'}}>🚶‍♂️ Recogida en Sucursal</p>
+                  ) : (
+                      <>
+                        <p className="pa-info-main-text">{localSelectedOrder.billing?.address_1}</p>
+                        <p className="pa-info-sub-text">{localSelectedOrder.billing?.city}</p>
+                      </>
+                  )}
                   {localSelectedOrder.customer_note && (
                       <div className="pa-note-box">
                           <strong>Nota:</strong> {localSelectedOrder.customer_note}
@@ -196,11 +214,12 @@ const PendingOrdersView = ({
                 </div>
               </div>
 
-              {/* LISTA DE PRODUCTOS (SCROLLABLE) */}
               <div className="pa-products-section">
                 <h4 className="pa-products-count-title">Productos <span>{localSelectedOrder.line_items.length}</span></h4>
                 <div className="pa-products-list-scroll">
-                  {localSelectedOrder.line_items.map((item) => (
+                  {localSelectedOrder.line_items.map((item) => {
+                    const noteMeta = item.meta_data?.find(m => m.key === '_wcfx_item_note' || m.key === 'Nota de preparación');
+                    return (
                     <div key={item.id} className="pa-product-detailed-row">
                       <div className="pa-prod-image-container">
                         {item.image?.src ? <img src={item.image.src} alt="" /> : <FaBox size={24} color="#cbd5e1" />}
@@ -212,18 +231,21 @@ const PendingOrdersView = ({
                           <span className="pa-prod-sku-tag">{item.sku || "N/A"}</span>
                           <span className="pa-prod-price-tag">{formatPrice(item.total)}</span>
                         </div>
+                        {/* Mostramos nota del producto en admin también */}
+                        {noteMeta && (
+                          <div style={{marginTop: '5px', fontSize: '0.8rem', color: '#b45309', background: '#fffbeb', padding: '4px 8px', borderRadius: '4px'}}>
+                            <strong>Nota:</strong> {noteMeta.value}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               </div>
 
-              {/* FOOTER ACCIONES (FIJO) */}
               <div className="pa-modal-footer-custom">
                 <div className="pa-footer-left">
-                    <button className="pa-btn-secondary" onClick={() => setLocalSelectedOrder(null)}>
-                        Cerrar
-                    </button>
+                    <button className="pa-btn-secondary" onClick={() => setLocalSelectedOrder(null)}>Cerrar</button>
                     <button 
                         className={`pa-btn-toggle ${selectedIds.has(localSelectedOrder.id) ? 'active' : ''}`}
                         onClick={() => toggleSelection(localSelectedOrder.id)}
@@ -235,7 +257,6 @@ const PendingOrdersView = ({
                     <button 
                         className="pa-btn-success"
                         onClick={() => {
-                            // Asignación Directa: Cierra modal local y dispara el proceso
                             setLocalSelectedOrder(null);
                             onAssignSingleDirect(localSelectedOrder);
                         }}
@@ -250,7 +271,6 @@ const PendingOrdersView = ({
         </div>
       )}
 
-      {/* 4. BARRA DE ACCIÓN (BATCH) */}
       {selectedIds.size > 0 && (
         <div className="batch-action-bar">
             <div className="batch-info"><strong>{selectedIds.size}</strong> seleccionados</div>

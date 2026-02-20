@@ -1,6 +1,6 @@
 import React from "react";
 import { FaSync } from "react-icons/fa";
-import HistoryView from "./HistoryView";
+import HistoryView from "./admin/HistoryView";
 
 const PendingAuditView = ({
   pendingOrders,
