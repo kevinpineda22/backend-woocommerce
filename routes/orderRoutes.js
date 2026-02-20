@@ -34,6 +34,7 @@ router.post("/auditor/finalizar", dashboardCtrl.completeAuditSession);
 // Rutas de Gestión
 router.post("/admin-remove-item", adminCtrl.removeItemFromSession);
 router.post("/admin-restore-item", adminCtrl.restoreItemToSession);
+router.post("/admin-force-pick", adminCtrl.forcePickItemToSession);
 
 // Ruta temporal para espiar metadatos
 router.get("/espiar-pedido/:id", dashboardCtrl.espiarPedido);

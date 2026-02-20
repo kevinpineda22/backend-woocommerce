@@ -96,3 +96,75 @@ exports.restoreItemToSession = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+// ✅ NUEVA FUNCIÓN: PASAR A CANASTA (FORZADO POR ADMIN)
+exports.forcePickItemToSession = async (req, res) => {
+  const { id_sesion, id_producto } = req.body;
+
+  try {
+    const now = new Date().toISOString();
+
+    // 1. Obtener todas las asignaciones (pedidos) de esta sesión
+    const { data: assignments } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("id, id_pedido, reporte_snapshot")
+      .eq("id_sesion", id_sesion);
+
+    if (!assignments || assignments.length === 0) {
+        throw new Error("Asignaciones no encontradas");
+    }
+
+    // 2. Traer logs actuales para saber cuántos faltan
+    const { data: currentLogs } = await supabase
+      .from("wc_log_picking")
+      .select("id_pedido, accion")
+      .eq("id_producto_original", id_producto)
+      .in("id_asignacion", assignments.map(a => a.id));
+
+    const logsToInsert = [];
+
+    // 3. Revisar cada pedido y agregar lo que falte
+    for (let assign of assignments) {
+      const items = assign.reporte_snapshot?.line_items || [];
+      // Buscar el producto en este pedido
+      const foundItem = items.find(i => i.product_id === id_producto || i.variation_id === id_producto);
+
+      if (foundItem) {
+        const requiredQty = foundItem.quantity;
+        
+        // Contar cuántos ya están listos en este pedido
+        const pickedQty = currentLogs.filter(l => 
+          l.id_pedido === assign.id_pedido && 
+          ['recolectado', 'sustituido', 'no_encontrado'].includes(l.accion)
+        ).length;
+
+        const missingQty = requiredQty - pickedQty;
+
+        // Crear un log por cada unidad que falta
+        for (let i = 0; i < missingQty; i++) {
+          logsToInsert.push({
+            id_asignacion: assign.id,
+            id_pedido: assign.id_pedido,
+            id_producto: id_producto,
+            id_producto_original: id_producto,
+            nombre_producto: foundItem.name,
+            accion: "recolectado",
+            fecha_registro: now,
+            motivo: "Aprobado manualmente por Admin en Dashboard",
+            pasillo: "Admin",
+            codigo_barras_escaneado: "ADMIN_OVERRIDE"
+          });
+        }
+      }
+    }
+
+    // Insertar a la base de datos
+    if (logsToInsert.length > 0) {
+      const { error: insertError } = await supabase.from("wc_log_picking").insert(logsToInsert);
+      if (insertError) throw insertError;
+    }
+
+    res.status(200).json({ message: "Producto enviado a canasta correctamente." });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
