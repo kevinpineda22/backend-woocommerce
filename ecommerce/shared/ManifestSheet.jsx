@@ -5,13 +5,9 @@ import "./ManifestSheet.css";
 
 /**
  * Componente Reutilizable de Manifiesto de Salida
+ * Diseñado para caber en UNA sola hoja por pedido.
  *
- * @param {Object} props
- * @param {Object} props.order - Datos del pedido { id, customer, items }
- * @param {string} props.timestamp - Fecha/hora de emisión
- * @param {string} props.pickerName - Nombre del picker
- * @param {number} props.orderIndex - Índice del pedido (para keys)
- * @param {string} props.densityClass - Clase de densidad (opcional: compact, very-compact, ultra-compact)
+ * Layout:  Header → Cliente → QR → Tabla compacta → Grid de Barcodes
  */
 const ManifestSheet = ({
   order,
@@ -75,47 +71,59 @@ const ManifestSheet = ({
         </div>
       </div>
 
-      {/* Products Table */}
+      {/* Products Table — SIN columna de barcode para ahorrar espacio */}
       <table className="manifest-table">
         <thead>
           <tr>
+            <th className="col-num">#</th>
             <th className="col-qty">Cant.</th>
             <th className="col-item">Producto</th>
-            <th className="col-barcode">Código</th>
+            <th className="col-ref">Referencia</th>
           </tr>
         </thead>
         <tbody>
           {items.map((item, idx) => {
-            const barcode = item.barcode || item.sku || item.id;
-            const itemName = item.name;
             const qty = item.qty || item.count || 1;
             const isSub = item.type === "sustituido" || item.is_sub;
 
             return (
               <tr key={idx}>
-                {/* Cantidad */}
+                <td className="cell-num">{idx + 1}</td>
                 <td className="cell-qty">{qty}</td>
-
-                {/* Producto */}
                 <td className="cell-item">
-                  <div className="item-name">{itemName}</div>
+                  <span className="item-name">{item.name}</span>
                   {isSub && (
-                    <div className="item-substitute-badge">🔄 SUSTITUTO</div>
+                    <span className="item-substitute-badge">🔄 SUST.</span>
                   )}
-                  <div className="item-sku">REF: {item.sku || item.id}</div>
                 </td>
-
-                {/* Código de Barras */}
-                <td className="cell-barcode">
-                  <div className="product-barcode">
-                    *{barcode.toString().toUpperCase()}*
-                  </div>
-                </td>
+                <td className="cell-ref">{item.sku || item.id}</td>
               </tr>
             );
           })}
         </tbody>
       </table>
+
+      {/* Grid de Códigos de Barras — layout horizontal compacto */}
+      <div className="manifest-barcodes-section">
+        <div className="manifest-barcodes-title">CÓDIGOS DE BARRAS</div>
+        <div className="manifest-barcodes-grid">
+          {items.map((item, idx) => {
+            const barcode = item.barcode || item.sku || item.id;
+            const qty = item.qty || item.count || 1;
+            return (
+              <div key={idx} className="manifest-barcode-cell">
+                <div className="manifest-barcode-font">
+                  *{barcode.toString().toUpperCase()}*
+                </div>
+                <div className="manifest-barcode-label">
+                  {barcode.toString()}{" "}
+                  <span className="manifest-barcode-qty">×{qty}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 };

@@ -135,7 +135,7 @@
 }
 
 /* =========================================
-   TABLA DE PRODUCTOS
+   TABLA DE PRODUCTOS (compacta, sin barcodes)
    ========================================= */
 .manifest-table {
   width: 100%;
@@ -150,7 +150,7 @@
 
 .manifest-table th {
   color: white;
-  padding: 6px 8px;
+  padding: 5px 8px;
   text-transform: uppercase;
   font-size: 0.65rem;
   font-weight: 700;
@@ -158,14 +158,19 @@
   text-align: left;
 }
 
-.manifest-table th.col-qty {
+.manifest-table th.col-num {
   text-align: center;
-  width: 45px;
+  width: 28px;
 }
 
-.manifest-table th.col-barcode {
+.manifest-table th.col-qty {
+  text-align: center;
+  width: 40px;
+}
+
+.manifest-table th.col-ref {
   text-align: right;
-  width: 140px;
+  width: 100px;
 }
 
 .manifest-table tbody tr:nth-child(even) {
@@ -173,16 +178,24 @@
 }
 
 .manifest-table td {
-  padding: 4px 8px;
+  padding: 3px 8px;
   border-bottom: 1px solid #e2e8f0;
   vertical-align: middle;
+}
+
+/* Celda numeración */
+.cell-num {
+  text-align: center;
+  font-size: 0.65rem;
+  color: #94a3b8;
+  font-weight: 600;
 }
 
 /* Celda de Cantidad */
 .cell-qty {
   text-align: center;
   font-weight: bold;
-  font-size: 1rem;
+  font-size: 0.9rem;
   color: #0f172a;
 }
 
@@ -193,56 +206,90 @@
 
 .item-name {
   font-weight: 700;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: #0f172a;
   line-height: 1.2;
-  margin-bottom: 2px;
 }
 
 .item-substitute-badge {
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   color: #d97706;
   font-weight: bold;
-  margin-bottom: 1px;
   display: inline-block;
   background: #fef3c7;
   padding: 1px 4px;
   border-radius: 3px;
-}
-
-.item-sku {
-  font-size: 0.6rem;
-  color: #64748b;
-  font-family: monospace;
-  font-weight: 600;
-}
-
-/* Celda de Código de Barras */
-.cell-barcode {
-  text-align: right;
+  margin-left: 4px;
   vertical-align: middle;
 }
 
-.product-barcode {
-  font-family: "Libre Barcode 39 Text", cursive;
-  font-size: 2rem;
-  color: #000;
-  line-height: 1.1;
-  white-space: nowrap;
-  font-weight: 400;
-  transform: scaleY(1.2);
-  transform-origin: right center;
-  letter-spacing: 1px;
+/* Celda de Referencia */
+.cell-ref {
+  text-align: right;
+  font-family: monospace;
+  font-size: 0.6rem;
+  color: #64748b;
+  font-weight: 600;
 }
 
-.barcode-number {
-  font-family: monospace;
-  font-size: 0.7rem;
+/* =========================================
+   GRID DE CÓDIGOS DE BARRAS (horizontal)
+   ========================================= */
+.manifest-barcodes-section {
+  margin-top: 8px;
+  border-top: 2px solid #0f172a;
+  padding-top: 6px;
+  page-break-inside: avoid;
+}
+
+.manifest-barcodes-title {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.manifest-barcodes-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px 8px;
+}
+
+.manifest-barcode-cell {
+  text-align: center;
+  padding: 3px 2px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #fafbfc;
+  overflow: hidden;
+}
+
+.manifest-barcode-font {
+  font-family: "Libre Barcode 39 Text", cursive;
+  font-size: 1.5rem;
   color: #000;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manifest-barcode-label {
+  font-family: monospace;
+  font-size: 0.55rem;
+  color: #334155;
   font-weight: 700;
-  text-align: right;
-  margin-top: 3px;
-  letter-spacing: 1px;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.manifest-barcode-qty {
+  color: #2563eb;
+  font-weight: 800;
 }
 
 /* =========================================
@@ -267,6 +314,14 @@
   font-size: 1.2rem;
 }
 
+.manifest-sheet.compact .manifest-barcodes-grid {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.manifest-sheet.compact .manifest-barcode-font {
+  font-size: 1.3rem;
+}
+
 /* VERY COMPACT: 26-40 productos */
 .manifest-sheet.very-compact {
   padding: 5mm 8mm;
@@ -285,22 +340,30 @@
   font-size: 1.1rem;
 }
 
-.manifest-sheet.very-compact .product-barcode {
-  font-size: 1.5rem;
-}
-
-.manifest-sheet.very-compact .barcode-number {
-  font-size: 0.6rem;
-}
-
 .manifest-sheet.very-compact .manifest-table {
   font-size: 0.7rem;
+}
+
+.manifest-sheet.very-compact .manifest-table td {
+  padding: 2px 6px;
+}
+
+.manifest-sheet.very-compact .manifest-barcodes-grid {
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px 6px;
+}
+
+.manifest-sheet.very-compact .manifest-barcode-font {
+  font-size: 1.1rem;
+}
+
+.manifest-sheet.very-compact .manifest-barcode-label {
+  font-size: 0.5rem;
 }
 
 /* ULTRA COMPACT: 40+ productos */
 .manifest-sheet.ultra-compact {
   padding: 4mm 6mm;
-  max-height: 290mm;
 }
 
 .manifest-sheet.ultra-compact .manifest-header {
@@ -321,20 +384,39 @@
   font-size: 0.65rem;
 }
 
+.manifest-sheet.ultra-compact .manifest-table td {
+  padding: 1px 4px;
+}
+
 .manifest-sheet.ultra-compact .item-name {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
 }
 
-.manifest-sheet.ultra-compact .item-sku {
-  font-size: 0.5rem;
+.manifest-sheet.ultra-compact .manifest-qr-section {
+  padding: 8px;
+  gap: 10px;
 }
 
-.manifest-sheet.ultra-compact .product-barcode {
-  font-size: 1.2rem;
+.manifest-sheet.ultra-compact .qr-wrapper svg {
+  width: 70px !important;
+  height: 70px !important;
 }
 
-.manifest-sheet.ultra-compact .barcode-number {
-  font-size: 0.5rem;
+.manifest-sheet.ultra-compact .manifest-barcodes-grid {
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px 4px;
+}
+
+.manifest-sheet.ultra-compact .manifest-barcode-cell {
+  padding: 2px 1px;
+}
+
+.manifest-sheet.ultra-compact .manifest-barcode-font {
+  font-size: 0.95rem;
+}
+
+.manifest-sheet.ultra-compact .manifest-barcode-label {
+  font-size: 0.45rem;
 }
 
 /* =========================================
@@ -345,7 +427,7 @@
   .pedidos-layout-sidebar,
   .pedidos-layout-content,
   .history-table-container,
-  .pickers-table,
+  .hv-table,
   .pedidos-table-container,
   table:not(.manifest-table),
   .admin-sidebar,
@@ -448,7 +530,7 @@
   }
 
   .manifest-table th {
-    padding: 5px 6px !important;
+    padding: 4px 6px !important;
     font-size: 0.65rem !important;
     color: white !important;
     -webkit-print-color-adjust: exact;
@@ -456,7 +538,7 @@
   }
 
   .manifest-table td {
-    padding: 4px 6px !important;
+    padding: 2px 6px !important;
     border-bottom: 1px solid #ddd !important;
   }
 
@@ -467,37 +549,45 @@
   }
 
   .cell-qty {
-    font-size: 0.95rem !important;
+    font-size: 0.85rem !important;
   }
 
   .item-name {
-    font-size: 0.75rem !important;
-    margin-bottom: 2px !important;
-  }
-
-  .item-sku {
-    font-size: 0.6rem !important;
+    font-size: 0.7rem !important;
   }
 
   .item-substitute-badge {
-    font-size: 0.6rem !important;
+    font-size: 0.55rem !important;
     background: #fef3c7 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* 📊 CÓDIGOS DE BARRAS - AMPLIADOS */
-  .product-barcode {
-    font-size: 2.2rem !important;
-    font-weight: 400 !important;
-    letter-spacing: 1.5px !important;
-    transform: scaleY(1.3) !important;
+  /* 📊 GRID DE CÓDIGOS DE BARRAS */
+  .manifest-barcodes-section {
+    margin-top: 6px !important;
+    border-top: 2px solid #000 !important;
+    page-break-inside: avoid !important;
   }
 
-  .barcode-number {
-    font-size: 0.75rem !important;
-    font-weight: 800 !important;
-    letter-spacing: 1.2px !important;
+  .manifest-barcodes-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 3px 6px !important;
+  }
+
+  .manifest-barcode-cell {
+    border: 1px solid #ccc !important;
+    padding: 2px !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-barcode-font {
+    font-size: 1.4rem !important;
+  }
+
+  .manifest-barcode-label {
+    font-size: 0.55rem !important;
   }
 
   /* Control de saltos de página */
@@ -521,21 +611,31 @@
     page-break-inside: avoid;
   }
 
-  /* Escalado adicional para modos de densidad en impresión */
-  .manifest-sheet.compact {
-    transform: scale(0.92) !important;
+  /* Escalado para modos de densidad en impresión */
+  .manifest-sheet.compact .manifest-barcodes-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
   }
 
-  .manifest-sheet.very-compact {
-    transform: scale(0.88) !important;
+  .manifest-sheet.very-compact .manifest-barcodes-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
   }
 
-  .manifest-sheet.ultra-compact {
-    transform: scale(0.83) !important;
-    padding: 3mm 5mm !important;
+  .manifest-sheet.very-compact .manifest-barcode-font {
+    font-size: 1.1rem !important;
   }
 
-  /* Reducción extra para ultra-compact en impresión */
+  .manifest-sheet.ultra-compact .manifest-barcodes-grid {
+    grid-template-columns: repeat(6, 1fr) !important;
+  }
+
+  .manifest-sheet.ultra-compact .manifest-barcode-font {
+    font-size: 0.9rem !important;
+  }
+
+  .manifest-sheet.ultra-compact .manifest-barcode-label {
+    font-size: 0.45rem !important;
+  }
+
   .manifest-sheet.ultra-compact .manifest-table td {
     padding: 1px 3px !important;
   }
@@ -546,9 +646,5 @@
 
   .manifest-sheet.ultra-compact .cell-qty {
     font-size: 0.7rem !important;
-  }
-
-  .manifest-sheet.ultra-compact .product-barcode {
-    font-size: 1rem !important;
   }
 }
