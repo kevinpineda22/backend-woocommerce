@@ -88,6 +88,7 @@ exports.createPickingSession = async (req, res) => {
         date_created: o.date_created,
         total: o.total,
         billing: o.billing,
+        shipping: o.shipping,
         customer_note: o.customer_note,
         line_items: o.line_items.map((item) => ({
           ...item,
@@ -307,6 +308,9 @@ exports.getSessionActive = async (req, res) => {
           ? `${o.billing.first_name} ${o.billing.last_name}`
           : "Cliente",
         phone: o.billing?.phone,
+        email: o.billing?.email,
+        billing: o.billing,
+        shipping: o.shipping,
         total: o.total,
       })),
       items: itemsConRuta,

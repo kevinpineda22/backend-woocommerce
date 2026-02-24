@@ -18,6 +18,20 @@ const ManifestSheet = ({
 }) => {
   const items = order.items || [];
   const orderId = order.id;
+  const billing = order.billing || {};
+  const shipping = order.shipping || {};
+
+  // Dirección de envío (usa shipping, fallback a billing)
+  const addr = shipping.address_1 || billing.address_1 || "";
+  const city = shipping.city || billing.city || "";
+  const state = shipping.state || billing.state || "";
+  const fullAddress = [addr, city, state].filter(Boolean).join(", ");
+
+  // Nombre del cliente
+  const customerName =
+    order.customer ||
+    [billing.first_name, billing.last_name].filter(Boolean).join(" ") ||
+    "Cliente";
 
   // Generar QR Value: Cantidad * Código (separado por salto de línea \r\n para simular ENTER)
   const qrValue = items
@@ -46,18 +60,38 @@ const ManifestSheet = ({
         </div>
       </div>
 
-      {/* Customer Info */}
+      {/* Customer & Shipping Info */}
       <div className="manifest-customer">
-        <div className="customer-field">
-          <span className="label">Picker:</span>
-          <span className="value">{pickerName}</span>
-        </div>
-        {order.customer && (
+        <div className="customer-row">
           <div className="customer-field">
             <span className="label">Cliente:</span>
-            <span className="value">{order.customer}</span>
+            <span className="value">{customerName}</span>
           </div>
-        )}
+          {billing.phone && (
+            <div className="customer-field">
+              <span className="label">Tel:</span>
+              <span className="value">{billing.phone}</span>
+            </div>
+          )}
+          {billing.email && (
+            <div className="customer-field">
+              <span className="label">Email:</span>
+              <span className="value">{billing.email}</span>
+            </div>
+          )}
+        </div>
+        <div className="customer-row">
+          {fullAddress && (
+            <div className="customer-field">
+              <span className="label">Dirección:</span>
+              <span className="value">{fullAddress}</span>
+            </div>
+          )}
+          <div className="customer-field">
+            <span className="label">Picker:</span>
+            <span className="value">{pickerName}</span>
+          </div>
+        </div>
       </div>
 
       {/* QR Code Section */}
@@ -78,7 +112,7 @@ const ManifestSheet = ({
             <th className="col-num">#</th>
             <th className="col-qty">Cant.</th>
             <th className="col-item">Producto</th>
-            <th className="col-ref">Referencia</th>
+            <th className="col-ref">Item</th>
           </tr>
         </thead>
         <tbody>
@@ -116,6 +150,7 @@ const ManifestSheet = ({
                   *{barcode.toString().toUpperCase()}*
                 </div>
                 <div className="manifest-barcode-label">
+                  <span className="manifest-barcode-num">#{idx + 1}</span>
                   {barcode.toString()}{" "}
                   <span className="manifest-barcode-qty">×{qty}</span>
                 </div>

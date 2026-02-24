@@ -543,6 +543,10 @@ exports.getSessionLogsDetail = async (req, res) => {
           customer:
             (o.billing?.first_name + " " + o.billing?.last_name).trim() ||
             "Cliente",
+          phone: o.billing?.phone,
+          email: o.billing?.email,
+          billing: o.billing,
+          shipping: o.shipping,
           total_items:
             o.line_items?.reduce((acc, i) => acc + i.quantity, 0) || 0,
         };
