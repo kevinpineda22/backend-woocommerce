@@ -25,6 +25,8 @@ router.get("/buscar-producto", productCtrl.searchProduct);
 router.get("/dashboard-activo", dashboardCtrl.getActiveSessionsDashboard);
 router.get("/pendientes", dashboardCtrl.getPendingOrders);
 router.get("/pickers", dashboardCtrl.getPickers);
+router.get("/pendientes-pago", dashboardCtrl.getPendingPaymentSessions);
+router.post("/marcar-pagado", dashboardCtrl.markSessionAsPaid);
 router.get("/historial", dashboardCtrl.getHistorySessions);
 router.get("/pendientes-auditoria", dashboardCtrl.getPendingAuditSessions);
 

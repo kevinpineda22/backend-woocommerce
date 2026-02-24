@@ -34,9 +34,9 @@ async function getBarcodesFromSiesa(productIds) {
     const barcodeMap = {};
     Object.keys(barcodesByProduct).forEach((productId) => {
       const codes = barcodesByProduct[productId];
-      
+
       // Filtrar códigos válidos
-      const validCodes = codes.filter(code => {
+      const validCodes = codes.filter((code) => {
         const cleaned = (code || "").toString().trim().toUpperCase();
         if (!cleaned || cleaned.length < 8) return false;
         if (cleaned.endsWith("+")) return false;
@@ -45,9 +45,9 @@ async function getBarcodesFromSiesa(productIds) {
       });
 
       // Priorizar códigos EAN-13 (13 dígitos), luego cualquier código válido
-      const ean13 = validCodes.find(c => c.length === 13);
+      const ean13 = validCodes.find((c) => c.length === 13);
       const firstValid = validCodes[0];
-      
+
       barcodeMap[productId] = ean13 || firstValid || null;
     });
 
@@ -222,6 +222,69 @@ exports.getPickers = async (req, res) => {
 // =========================================================
 // 4. HISTORIAL DE SESIONES
 // =========================================================
+exports.getPendingPaymentSessions = async (req, res) => {
+  try {
+    const { data: sessions, error } = await supabase
+      .from("wc_picking_sessions")
+      .select(
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
+      )
+      .eq("estado", "auditado")
+      .order("fecha_fin", { ascending: false });
+
+    if (error) throw error;
+
+    const pendingData = sessions.map((sess) => {
+      const start = new Date(sess.fecha_inicio);
+      const end = new Date(sess.fecha_fin);
+      const durationMin = Math.round((end - start) / 60000);
+      const optionsDate = {
+        timeZone: "America/Bogota",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      };
+      const optionsTime = {
+        timeZone: "America/Bogota",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      };
+
+      return {
+        id: sess.id,
+        picker: sess.wc_pickers?.nombre_completo || "Desconocido",
+        pedidos: sess.ids_pedidos,
+        fecha: end.toLocaleDateString("es-CO", optionsDate),
+        hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
+        duracion: `${durationMin} min`,
+        estado: sess.estado,
+      };
+    });
+    res.status(200).json(pendingData);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.markSessionAsPaid = async (req, res) => {
+  const { session_id } = req.body;
+  try {
+    if (!session_id) return res.status(400).json({ error: "Falta session_id" });
+
+    const { error } = await supabase
+      .from("wc_picking_sessions")
+      .update({ estado: "finalizado" })
+      .eq("id", session_id);
+
+    if (error) throw error;
+
+    res.status(200).json({ message: "Sesión marcada como pagada/finalizada." });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 exports.getHistorySessions = async (req, res) => {
   try {
     const { data: sessions, error } = await supabase
@@ -229,7 +292,7 @@ exports.getHistorySessions = async (req, res) => {
       .select(
         `id, fecha_inicio, fecha_fin, estado, ids_pedidos, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
       )
-      .in("estado", ["auditado"])
+      .in("estado", ["finalizado"])
       .order("fecha_fin", { ascending: false })
       .limit(50);
 
@@ -550,8 +613,11 @@ exports.getSessionLogsDetail = async (req, res) => {
           .filter((sku) => !isNaN(sku)),
       ),
     );
-    
-    console.log(`🔍 Buscando códigos de barras para ${skuList.length} SKUs:`, skuList);
+
+    console.log(
+      `🔍 Buscando códigos de barras para ${skuList.length} SKUs:`,
+      skuList,
+    );
     const barcodeMapBySku = await getBarcodesFromSiesa(skuList);
     console.log(`📦 Códigos encontrados:`, Object.keys(barcodeMapBySku).length);
 
@@ -560,12 +626,16 @@ exports.getSessionLogsDetail = async (req, res) => {
       const sku = productDetailsMap[productId].sku;
       const skuAsNumber = parseInt(sku);
       const barcode = barcodeMapBySku[skuAsNumber];
-      
+
       if (barcode) {
         productDetailsMap[productId].barcode = barcode;
-        console.log(`✅ Producto ${productId} (SKU ${sku}): código = ${barcode}`);
+        console.log(
+          `✅ Producto ${productId} (SKU ${sku}): código = ${barcode}`,
+        );
       } else {
-        console.log(`⚠️ Producto ${productId} (SKU ${sku}): sin código válido en SIESA`);
+        console.log(
+          `⚠️ Producto ${productId} (SKU ${sku}): sin código válido en SIESA`,
+        );
       }
     });
 
@@ -599,12 +669,12 @@ exports.espiarPedido = async (req, res) => {
     const orderId = req.params.id;
     // Llamamos directamente a WooCommerce
     const { data: order } = await WooCommerce.get(`orders/${orderId}`);
-    
+
     // Devolvemos el pedido completo para que lo veas en el navegador
     res.status(200).json({
       mensaje: "Aquí están los datos crudos del pedido",
       line_items: order.line_items,
-      shipping_lines: order.shipping_lines
+      shipping_lines: order.shipping_lines,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
