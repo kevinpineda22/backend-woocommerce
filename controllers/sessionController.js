@@ -31,24 +31,28 @@ async function getBarcodesFromSiesa(productIds) {
     const barcodeMap = {};
     Object.keys(barcodesByProduct).forEach((productId) => {
       const codes = barcodesByProduct[productId];
-      
-      // Filtrar códigos válidos:
-      // 1. Eliminar códigos que terminen en '+'
-      // 2. Eliminar códigos que empiecen con 'M' o 'N'
-      // 3. Eliminar códigos con letras mezcladas
-      const validCodes = codes.filter(code => {
-        const cleaned = (code || "").toString().trim().toUpperCase();
-        if (!cleaned || cleaned.length < 8) return false;
-        if (cleaned.endsWith("+")) return false;
-        if (cleaned.startsWith("M") || cleaned.startsWith("N")) return false;
-        // Solo aceptar códigos numéricos puros
-        return /^\d+$/.test(cleaned);
-      });
 
-      // Priorizar códigos EAN-13 (13 dígitos), luego cualquier código válido
-      const ean13 = validCodes.find(c => c.length === 13);
+      // Limpiar y filtrar códigos válidos:
+      // 1. Preservar '+' del final (algunos productos SIESA lo necesitan en POS)
+      // 2. Eliminar códigos que empiecen con 'M' o 'N'
+      // 3. Aceptar códigos numéricos puros o numéricos con '+' al final
+      const validCodes = codes
+        .map((code) => (code || "").toString().trim())
+        .filter((cleaned) => {
+          if (!cleaned || cleaned.replace(/\+$/, "").length < 8) return false;
+          if (
+            cleaned.toUpperCase().startsWith("M") ||
+            cleaned.toUpperCase().startsWith("N")
+          )
+            return false;
+          // Aceptar dígitos con '+' opcional al final
+          return /^\d+\+?$/.test(cleaned);
+        });
+
+      // Priorizar EAN-13 (parte numérica = 13 dígitos), luego cualquier código válido
+      const ean13 = validCodes.find((c) => c.replace(/\+$/, "").length === 13);
       const firstValid = validCodes[0];
-      
+
       barcodeMap[productId] = ean13 || firstValid || null;
     });
 
@@ -219,10 +223,13 @@ exports.getSessionActive = async (req, res) => {
           .filter((sku) => !isNaN(sku)),
       ),
     );
-    
+
     console.log(`🔍 Buscando códigos de barras para ${skuList.length} SKUs`);
     const barcodeMapSiesa = await getBarcodesFromSiesa(skuList);
-    console.log("📊 Códigos de barras obtenidos de SIESA:", Object.keys(barcodeMapSiesa).length);
+    console.log(
+      "📊 Códigos de barras obtenidos de SIESA:",
+      Object.keys(barcodeMapSiesa).length,
+    );
 
     // 3. PROCESAMIENTO DE ESTADO ITEM POR ITEM
     const itemsConRuta = itemsAgrupados.map((item) => {
@@ -274,7 +281,8 @@ exports.getSessionActive = async (req, res) => {
         qty_scanned: qtyPicked,
 
         // ✅ CÓDIGO DE BARRAS: Prioridad SIESA (por SKU) > WooCommerce > SKU
-        barcode: barcodeMapSiesa[parseInt(item.sku)] || item.barcode || item.sku,
+        barcode:
+          barcodeMapSiesa[parseInt(item.sku)] || item.barcode || item.sku,
 
         sustituto: lastSub
           ? {

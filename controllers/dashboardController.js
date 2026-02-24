@@ -35,17 +35,25 @@ async function getBarcodesFromSiesa(productIds) {
     Object.keys(barcodesByProduct).forEach((productId) => {
       const codes = barcodesByProduct[productId];
 
-      // Filtrar códigos válidos
-      const validCodes = codes.filter((code) => {
-        const cleaned = (code || "").toString().trim().toUpperCase();
-        if (!cleaned || cleaned.length < 8) return false;
-        if (cleaned.endsWith("+")) return false;
-        if (cleaned.startsWith("M") || cleaned.startsWith("N")) return false;
-        return /^\d+$/.test(cleaned);
-      });
+      // Limpiar y filtrar códigos válidos:
+      // 1. Preservar '+' del final (algunos productos SIESA lo necesitan en POS)
+      // 2. Eliminar códigos que empiecen con 'M' o 'N'
+      // 3. Aceptar códigos numéricos puros o numéricos con '+' al final
+      const validCodes = codes
+        .map((code) => (code || "").toString().trim())
+        .filter((cleaned) => {
+          if (!cleaned || cleaned.replace(/\+$/, "").length < 8) return false;
+          if (
+            cleaned.toUpperCase().startsWith("M") ||
+            cleaned.toUpperCase().startsWith("N")
+          )
+            return false;
+          // Aceptar dígitos con '+' opcional al final
+          return /^\d+\+?$/.test(cleaned);
+        });
 
-      // Priorizar códigos EAN-13 (13 dígitos), luego cualquier código válido
-      const ean13 = validCodes.find((c) => c.length === 13);
+      // Priorizar EAN-13 (parte numérica = 13 dígitos), luego cualquier código válido
+      const ean13 = validCodes.find((c) => c.replace(/\+$/, "").length === 13);
       const firstValid = validCodes[0];
 
       barcodeMap[productId] = ean13 || firstValid || null;

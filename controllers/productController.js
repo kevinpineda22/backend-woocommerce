@@ -29,24 +29,28 @@ async function getBarcodesFromSiesa(productIds) {
     const barcodeMap = {};
     Object.keys(barcodesByProduct).forEach((productId) => {
       const codes = barcodesByProduct[productId];
-      
-      // Filtrar códigos válidos:
-      // 1. Eliminar códigos que terminen en '+'
-      // 2. Eliminar códigos que empiecen con 'M' o 'N'
-      // 3. Eliminar códigos con letras mezcladas
-      const validCodes = codes.filter(code => {
-        const cleaned = (code || "").toString().trim().toUpperCase();
-        if (!cleaned || cleaned.length < 8) return false;
-        if (cleaned.endsWith("+")) return false;
-        if (cleaned.startsWith("M") || cleaned.startsWith("N")) return false;
-        // Solo aceptar códigos numéricos puros
-        return /^\d+$/.test(cleaned);
-      });
 
-      // Priorizar códigos EAN-13 (13 dígitos), luego cualquier código válido
-      const ean13 = validCodes.find(c => c.length === 13);
+      // Limpiar y filtrar códigos válidos:
+      // 1. Preservar '+' del final (algunos productos SIESA lo necesitan en POS)
+      // 2. Eliminar códigos que empiecen con 'M' o 'N'
+      // 3. Aceptar códigos numéricos puros o numéricos con '+' al final
+      const validCodes = codes
+        .map((code) => (code || "").toString().trim())
+        .filter((cleaned) => {
+          if (!cleaned || cleaned.replace(/\+$/, "").length < 8) return false;
+          if (
+            cleaned.toUpperCase().startsWith("M") ||
+            cleaned.toUpperCase().startsWith("N")
+          )
+            return false;
+          // Aceptar dígitos con '+' opcional al final
+          return /^\d+\+?$/.test(cleaned);
+        });
+
+      // Priorizar EAN-13 (parte numérica = 13 dígitos), luego cualquier código válido
+      const ean13 = validCodes.find((c) => c.replace(/\+$/, "").length === 13);
       const firstValid = validCodes[0];
-      
+
       barcodeMap[productId] = ean13 || firstValid || null;
     });
 
@@ -64,18 +68,33 @@ exports.searchProduct = async (req, res) => {
 
     // SMART SUBSTITUTION
     if (original_id && !query) {
-      const { data: original } = await WooCommerce.get(`products/${original_id}`);
+      const { data: original } = await WooCommerce.get(
+        `products/${original_id}`,
+      );
       const originalPrice = parseFloat(original.price || 0);
-      const validCategories = (original.categories || []).filter(c => c.name !== "Uncategorized" && c.slug !== "sin-categoria");
-      const categoryIds = validCategories.map(c => c.id).join(",");
+      const validCategories = (original.categories || []).filter(
+        (c) => c.name !== "Uncategorized" && c.slug !== "sin-categoria",
+      );
+      const categoryIds = validCategories.map((c) => c.id).join(",");
 
-      let masterKeyword = original.name.trim().split(" ")[0].replace(/[^a-zA-Z0-9]/g, "");
+      let masterKeyword = original.name
+        .trim()
+        .split(" ")[0]
+        .replace(/[^a-zA-Z0-9]/g, "");
       if (masterKeyword.length <= 3) masterKeyword = original.name.trim();
 
-      const searchParams = { search: masterKeyword, per_page: 50, status: "publish", stock_status: "instock" };
+      const searchParams = {
+        search: masterKeyword,
+        per_page: 50,
+        status: "publish",
+        stock_status: "instock",
+      };
       if (categoryIds) searchParams.category = categoryIds;
 
-      const { data: searchResults } = await WooCommerce.get("products", searchParams);
+      const { data: searchResults } = await WooCommerce.get(
+        "products",
+        searchParams,
+      );
 
       const minPrice = originalPrice * 0.6;
       const maxPrice = originalPrice * 1.4;
@@ -83,40 +102,58 @@ exports.searchProduct = async (req, res) => {
       products = searchResults.filter((p) => {
         if (p.id === parseInt(original_id)) return false;
         const pPrice = parseFloat(p.price || 0);
-        if (originalPrice > 0 && pPrice > 0 && (pPrice < minPrice || pPrice > maxPrice)) return false;
+        if (
+          originalPrice > 0 &&
+          pPrice > 0 &&
+          (pPrice < minPrice || pPrice > maxPrice)
+        )
+          return false;
         return true;
       });
 
-      products.sort((a, b) => Math.abs(parseFloat(a.price||0) - originalPrice) - Math.abs(parseFloat(b.price||0) - originalPrice));
-
+      products.sort(
+        (a, b) =>
+          Math.abs(parseFloat(a.price || 0) - originalPrice) -
+          Math.abs(parseFloat(b.price || 0) - originalPrice),
+      );
     } else if (query) {
-      const { data: searchResults } = await WooCommerce.get("products", { search: query, per_page: 20, status: "publish", stock_status: "instock" });
+      const { data: searchResults } = await WooCommerce.get("products", {
+        search: query,
+        per_page: 20,
+        status: "publish",
+        stock_status: "instock",
+      });
       products = searchResults;
     }
 
     // ✅ OBTENER CÓDIGOS DE BARRAS DE SIESA (por SKU, no por product_id)
     const skuList = Array.from(
       new Set(
-        products
-          .map((p) => parseInt(p.sku))
-          .filter((sku) => !isNaN(sku)),
+        products.map((p) => parseInt(p.sku)).filter((sku) => !isNaN(sku)),
       ),
     );
     const barcodeMapSiesa = await getBarcodesFromSiesa(skuList);
 
-    const results = products.map((p) => ({
-        id: p.id, 
-        name: p.name, 
-        price: p.price, 
-        image: p.images[0]?.src || null, 
-        stock: p.stock_quantity, 
-        sku: p.sku, 
+    const results = products
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        image: p.images[0]?.src || null,
+        stock: p.stock_quantity,
+        sku: p.sku,
         categories: p.categories,
         // ✅ PRIORIDAD: SIESA (por SKU) > WooCommerce meta_data > SKU
-        barcode: barcodeMapSiesa[parseInt(p.sku)] || p.meta_data?.find((m) => 
-          ["ean", "barcode", "_ean", "_barcode"].includes(m.key.toLowerCase())
-        )?.value || p.sku
-    })).slice(0, 10);
+        barcode:
+          barcodeMapSiesa[parseInt(p.sku)] ||
+          p.meta_data?.find((m) =>
+            ["ean", "barcode", "_ean", "_barcode"].includes(
+              m.key.toLowerCase(),
+            ),
+          )?.value ||
+          p.sku,
+      }))
+      .slice(0, 10);
 
     res.status(200).json(results);
   } catch (error) {
