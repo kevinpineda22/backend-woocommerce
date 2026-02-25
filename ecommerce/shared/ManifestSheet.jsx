@@ -1,6 +1,7 @@
 import React from "react";
 import QRCode from "react-qr-code";
 import { getAssetUrl } from "../../../config/storage";
+import { checkSiesaBarcodes } from "../../services/siesaService";
 import "./ManifestSheet.css";
 
 /**
@@ -33,11 +34,33 @@ const ManifestSheet = ({
     [billing.first_name, billing.last_name].filter(Boolean).join(" ") ||
     "Cliente";
 
+  const [correctedCodes, setCorrectedCodes] = React.useState({});
+
+  React.useEffect(() => {
+    const codes = items
+      .map((item) => item.barcode || item.sku || item.name)
+      .filter((c) => c && c !== "N/A");
+
+    if (codes.length > 0) {
+      checkSiesaBarcodes(codes).then((map) => {
+        if (map && Object.keys(map).length > 0) {
+          setCorrectedCodes(map);
+        }
+      });
+    }
+  }, [items]);
+
   // Generar QR Value: Cantidad * Código (separado por salto de línea \r\n para simular ENTER)
   const qrValue = items
     .map((item) => {
       const qty = item.qty || item.count || 1;
-      const code = item.barcode || item.sku || item.name || "N/A";
+      let code = item.barcode || item.sku || item.name || "N/A";
+
+      // Aplicar corrección de Siesa (si existe)
+      if (correctedCodes[code]) {
+        code = correctedCodes[code];
+      }
+
       return `${qty}*${code}`;
     })
     .join("\r\n");
