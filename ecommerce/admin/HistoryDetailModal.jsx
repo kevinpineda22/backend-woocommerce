@@ -47,20 +47,23 @@ const SessionSummary = ({ metadata }) => (
 );
 
 const ProductThumbnail = ({ item, productsMap }) => {
-  const img = productsMap?.[item.id_producto]?.image;
+  const prod = productsMap?.[item.id_producto] || {};
+  const img = prod.image;
   const qty = item.cantidad || 1;
-  const sku = item.sku_producto || item.id_producto;
+  // ✅ Priorizamos Barcode > SKU > item.sku_producto > vacío (no mostrar ID)
+  const displayCode = prod.barcode || prod.sku || item.sku_producto || "";
+
   return (
     <div className="hdm-product-item">
       <div className="hdm-product-img-wrapper">
         {img ? (
-          <img src={img} alt={sku} className="hdm-product-img" />
+          <img src={img} alt={displayCode} className="hdm-product-img" />
         ) : (
           <div className="hdm-product-img" style={{ background: "#e2e8f0" }} />
         )}
         <span className="hdm-product-qty">{qty}</span>
       </div>
-      <div className="hdm-product-sku">{sku}</div>
+      <div className="hdm-product-sku">{displayCode}</div>
     </div>
   );
 };

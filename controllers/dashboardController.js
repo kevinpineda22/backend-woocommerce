@@ -459,22 +459,28 @@ exports.completeAuditSession = async (req, res) => {
       ]);
     }
 
-    // Sync Woo (Background)
+    // Sync Woo — AWAIT obligatorio para que se complete antes de cerrar la respuesta
+    // (En Vercel serverless, el proceso muere al enviar res.json si no esperamos)
+    const syncResults = [];
     if (session.ids_pedidos && session.ids_pedidos.length > 0) {
-      (async () => {
-        for (const orderId of session.ids_pedidos) {
-          try {
-            console.log(`🚀 Iniciando Sync para Orden #${orderId}...`);
-            await syncOrderToWoo(session_id, orderId);
-          } catch (err) {
-            console.error(`❌ Error sync orden ${orderId}:`, err);
-          }
+      for (const orderId of session.ids_pedidos) {
+        try {
+          console.log(`🚀 Iniciando Sync para Orden #${orderId}...`);
+          const result = await syncOrderToWoo(session_id, orderId);
+          syncResults.push({ orderId, success: result });
+        } catch (err) {
+          console.error(`❌ Error sync orden ${orderId}:`, err);
+          syncResults.push({ orderId, success: false, error: err.message });
         }
-      })();
+      }
     }
 
+    const allSynced = syncResults.every((r) => r.success);
     res.status(200).json({
-      message: "Salida aprobada. Snapshot guardado y Picker liberado.",
+      message: allSynced
+        ? "Salida aprobada. Pedidos sincronizados con WooCommerce."
+        : "Salida aprobada. Algunos pedidos tuvieron errores de sincronización.",
+      sync_results: syncResults,
     });
   } catch (error) {
     console.error("Error finalizando auditoría:", error.message);

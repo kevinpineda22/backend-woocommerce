@@ -471,7 +471,7 @@ const VistaAuditor = () => {
           const normalizedItems = (order.items || []).map((i) => ({
             id: i.id || i.sku,
             name: i.name,
-            sku: i.sku || i.id,
+            sku: i.barcode || i.sku || "", // ✅ Preferir barcode, luego sku, nunca ID de Woo
             barcode: i.barcode || i.sku || i.id, // ✅ Usa barcode de SIESA
             qty: i.qty || i.count || 1,
             is_sub: i.type === "sustituido" || i.is_sub,
@@ -665,6 +665,8 @@ const VistaAuditor = () => {
                                     {isRequired && !isVerified ? (
                                       <span className="hidden-code">●●●●</span>
                                     ) : (
+                                      item.barcode ||
+                                      item.sku ||
                                       `Ref: ${item.id}`
                                     )}
                                   </div>

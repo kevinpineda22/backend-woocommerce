@@ -142,6 +142,11 @@ const ManifestSheet = ({
           {items.map((item, idx) => {
             const qty = item.qty || item.count || 1;
             const isSub = item.type === "sustituido" || item.is_sub;
+            const rawCode = item.barcode || item.sku;
+            const displayCode =
+              rawCode && correctedCodes[rawCode]
+                ? correctedCodes[rawCode]
+                : item.barcode || item.sku || "";
 
             return (
               <tr key={idx}>
@@ -153,7 +158,22 @@ const ManifestSheet = ({
                     <span className="item-substitute-badge">🔄 SUST.</span>
                   )}
                 </td>
-                <td className="cell-ref">{item.sku || item.id}</td>
+                <td className="cell-ref">
+                  {displayCode}
+                  {rawCode && correctedCodes[rawCode] && (
+                    <span
+                      style={{
+                        color: "#16a34a",
+                        marginLeft: "4px",
+                        fontWeight: "bold",
+                        fontSize: "0.8em",
+                      }}
+                      title="Código ajustado (+)"
+                    >
+                      ●
+                    </span>
+                  )}
+                </td>
               </tr>
             );
           })}
