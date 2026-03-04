@@ -633,7 +633,9 @@ exports.getSessionLogsDetail = async (req, res) => {
     } else {
       try {
         // Multi-sede: usar cliente WC de la sede de la sesión
-        const detailClient = await getWooClient(sessionInfo.sede_id || req.sedeId);
+        const detailClient = await getWooClient(
+          sessionInfo.sede_id || req.sedeId,
+        );
         const wooProms = sessionInfo.ids_pedidos.map((id) =>
           detailClient.get(`orders/${id}`),
         );
@@ -677,7 +679,9 @@ exports.getSessionLogsDetail = async (req, res) => {
           }
         });
         if (missingIds.size > 0) {
-          const subClient = await getWooClient(sessionInfo.sede_id || req.sedeId);
+          const subClient = await getWooClient(
+            sessionInfo.sede_id || req.sedeId,
+          );
           const { data: subProds } = await subClient.get(
             `products?include=${Array.from(missingIds).join(",")}&per_page=100`,
           );
@@ -762,7 +766,10 @@ exports.espiarPedido = async (req, res) => {
       order = resp.data;
     } else {
       const result = await getOrderFromAnySede(orderId);
-      if (!result) return res.status(404).json({ error: "Pedido no encontrado en ninguna sede" });
+      if (!result)
+        return res
+          .status(404)
+          .json({ error: "Pedido no encontrado en ninguna sede" });
       order = result.order;
     }
 
@@ -812,7 +819,11 @@ exports.diagnosticoWoo = async (req, res) => {
     if (req.sedeId) {
       const client = await getWooClient(req.sedeId);
       const { data } = await client.get("orders", params);
-      orders = data.map((o) => ({ ...o, _sede_id: req.sedeId, _sede_name: req.sedeName }));
+      orders = data.map((o) => ({
+        ...o,
+        _sede_id: req.sedeId,
+        _sede_name: req.sedeName,
+      }));
     } else {
       orders = await fetchFromAllSedes("orders", params);
     }
@@ -824,11 +835,16 @@ exports.diagnosticoWoo = async (req, res) => {
         status: o.status,
         date_created: o.date_created,
         total: o.total,
-        billing_name: `${o.billing?.first_name || ""} ${o.billing?.last_name || ""}`.trim(),
+        billing_name:
+          `${o.billing?.first_name || ""} ${o.billing?.last_name || ""}`.trim(),
         sede: o._sede_name || "desconocida",
         sede_id: o._sede_id || null,
-        meta_keys: (o.meta_data || []).map((m) => `${m.key} = ${String(m.value).substring(0, 80)}`),
-        shipping_methods: (o.shipping_lines || []).map((s) => `${s.method_title} (${s.method_id})`),
+        meta_keys: (o.meta_data || []).map(
+          (m) => `${m.key} = ${String(m.value).substring(0, 80)}`,
+        ),
+        shipping_methods: (o.shipping_lines || []).map(
+          (s) => `${s.method_title} (${s.method_id})`,
+        ),
       };
     });
 

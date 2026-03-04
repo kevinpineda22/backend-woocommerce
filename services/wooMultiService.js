@@ -15,8 +15,7 @@
  *   const allOrders = await fetchFromAllSedes('orders', { status: 'processing' });
  */
 
-const WooCommerceRestApi =
-  require("@woocommerce/woocommerce-rest-api").default;
+const WooCommerceRestApi = require("@woocommerce/woocommerce-rest-api").default;
 require("dotenv").config();
 
 const { getAllSedes } = require("./sedeConfig");

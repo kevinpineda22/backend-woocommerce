@@ -202,7 +202,10 @@ exports.diagnosticarSedePedido = async (req, res) => {
     const orderId = req.params.id;
     // Multi-sede: buscar el pedido en cualquier sede
     const result = await getOrderFromAnySede(orderId);
-    if (!result) return res.status(404).json({ error: "Pedido no encontrado en ninguna sede" });
+    if (!result)
+      return res
+        .status(404)
+        .json({ error: "Pedido no encontrado en ninguna sede" });
     const order = result.order;
 
     // Intentar detectar automáticamente
