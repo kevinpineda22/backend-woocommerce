@@ -7,6 +7,9 @@
 
 const { supabase } = require("../services/supabaseClient");
 const WooCommerce = require("../services/wooService");
+
+// Multi-sede WooCommerce (WordPress Multisite)
+const { getOrderFromAnySede } = require("../services/wooMultiService");
 const {
   getAllSedes,
   invalidateSedeCache,
@@ -197,7 +200,10 @@ exports.assignUserToSede = async (req, res) => {
 exports.diagnosticarSedePedido = async (req, res) => {
   try {
     const orderId = req.params.id;
-    const { data: order } = await WooCommerce.get(`orders/${orderId}`);
+    // Multi-sede: buscar el pedido en cualquier sede
+    const result = await getOrderFromAnySede(orderId);
+    if (!result) return res.status(404).json({ error: "Pedido no encontrado en ninguna sede" });
+    const order = result.order;
 
     // Intentar detectar automáticamente
     const rawSedeValue = extractSedeFromOrder(order);

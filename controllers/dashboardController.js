@@ -9,6 +9,13 @@ const {
   WOO_SEDE_META_KEYS,
 } = require("../services/sedeConfig");
 
+// Multi-sede WooCommerce (WordPress Multisite)
+const {
+  getWooClient,
+  fetchFromAllSedes,
+  getOrderFromAnySede,
+} = require("../services/wooMultiService");
+
 // =========================================================
 // HELPER: Obtener códigos de barras desde SIESA
 // =========================================================
@@ -107,11 +114,14 @@ exports.getActiveSessionsDashboard = async (req, res) => {
         let orders =
           sess.snapshot_pedidos && sess.snapshot_pedidos.length > 0
             ? sess.snapshot_pedidos
-            : (
-                await Promise.all(
-                  sess.ids_pedidos.map((id) => WooCommerce.get(`orders/${id}`)),
-                )
-              ).map((r) => r.data);
+            : await (async () => {
+                // Multi-sede: usar el cliente WC de la sede de esta sesión
+                const sessClient = await getWooClient(sess.sede_id);
+                const results = await Promise.all(
+                  sess.ids_pedidos.map((id) => sessClient.get(`orders/${id}`)),
+                );
+                return results.map((r) => r.data);
+              })();
 
         // B. Calcular Universo de Items (Líneas únicas)
         const itemsUnificados = agruparItemsParaPicking(orders);
@@ -205,12 +215,26 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 // =========================================================
 exports.getPendingOrders = async (req, res) => {
   try {
-    const { data: wcOrders } = await WooCommerce.get("orders", {
-      status: "processing",
-      per_page: 50,
-    });
+    // ── MULTI-SEDE (WordPress Multisite): Cada sede tiene su propio WooCommerce ──
+    let wcOrders;
+    if (req.sedeId) {
+      // Sede específica → usar su cliente WooCommerce
+      const client = await getWooClient(req.sedeId);
+      const { data } = await client.get("orders", {
+        status: "processing",
+        per_page: 50,
+      });
+      // Tagear cada pedido con la sede de origen
+      wcOrders = data.map((o) => ({ ...o, _sede_id: req.sedeId }));
+    } else {
+      // "Todas las sedes" → consultar TODOS los WooCommerce en paralelo
+      wcOrders = await fetchFromAllSedes("orders", {
+        status: "processing",
+        per_page: 50,
+      });
+    }
 
-    // Filtro Multi-Sede: Obtener asignaciones activas (filtradas por sede si aplica)
+    // Obtener asignaciones activas
     let assignQuery = supabase
       .from("wc_asignaciones_pedidos")
       .select("id_pedido")
@@ -221,35 +245,16 @@ exports.getPendingOrders = async (req, res) => {
     const { data: activeAssignments } = await assignQuery;
     const assignedIds = new Set(activeAssignments.map((a) => a.id_pedido));
 
-    // Filtro Multi-Sede: Filtrar pedidos WooCommerce por sede
-    let filteredOrders = wcOrders;
-    if (req.sedeId) {
-      // Obtener la sede activa para hacer match
-      const { getSedeById } = require("../services/sedeConfig");
-      const sedeActiva = await getSedeById(req.sedeId);
+    const cleanOrders = wcOrders.map((order) => ({
+      ...order,
+      is_assigned: assignedIds.has(order.id),
+      sede_detected: order._sede_name || null,
+      sede_id: order._sede_id || null,
+    }));
 
-      if (sedeActiva) {
-        filteredOrders = [];
-        for (const order of wcOrders) {
-          const { sede_id: orderSedeId } = await getSedeFromWooOrder(order);
-          if (orderSedeId === req.sedeId) {
-            filteredOrders.push(order);
-          }
-        }
-      }
-    }
-
-    const cleanOrders = filteredOrders.map((order) => {
-      // Extraer info de sede del pedido para mostrar en el frontend
-      const sedeRaw = extractSedeFromOrder(order);
-      return {
-        ...order,
-        is_assigned: assignedIds.has(order.id),
-        sede_detected: sedeRaw || null,
-      };
-    });
     res.status(200).json(cleanOrders);
   } catch (e) {
+    console.error("Error getPendingOrders:", e.message);
     res.status(500).json({ error: e.message });
   }
 };
@@ -627,8 +632,10 @@ exports.getSessionLogsDetail = async (req, res) => {
       ordersData = processOrderData(sessionInfo.snapshot_pedidos);
     } else {
       try {
+        // Multi-sede: usar cliente WC de la sede de la sesión
+        const detailClient = await getWooClient(sessionInfo.sede_id || req.sedeId);
         const wooProms = sessionInfo.ids_pedidos.map((id) =>
-          WooCommerce.get(`orders/${id}`),
+          detailClient.get(`orders/${id}`),
         );
         const wooRes = await Promise.all(wooProms);
         ordersData = processOrderData(wooRes.map((r) => r.data));
@@ -670,7 +677,8 @@ exports.getSessionLogsDetail = async (req, res) => {
           }
         });
         if (missingIds.size > 0) {
-          const { data: subProds } = await WooCommerce.get(
+          const subClient = await getWooClient(sessionInfo.sede_id || req.sedeId);
+          const { data: subProds } = await subClient.get(
             `products?include=${Array.from(missingIds).join(",")}&per_page=100`,
           );
           if (subProds) {
@@ -746,7 +754,17 @@ exports.getSessionLogsDetail = async (req, res) => {
 exports.espiarPedido = async (req, res) => {
   try {
     const orderId = req.params.id;
-    const { data: order } = await WooCommerce.get(`orders/${orderId}`);
+    // Multi-sede: intentar con sede del request, luego buscar en todas
+    let order;
+    if (req.sedeId) {
+      const client = await getWooClient(req.sedeId);
+      const resp = await client.get(`orders/${orderId}`);
+      order = resp.data;
+    } else {
+      const result = await getOrderFromAnySede(orderId);
+      if (!result) return res.status(404).json({ error: "Pedido no encontrado en ninguna sede" });
+      order = result.order;
+    }
 
     // Detección de sede
     const sedeRaw = extractSedeFromOrder(order);
@@ -789,10 +807,17 @@ exports.diagnosticoWoo = async (req, res) => {
     const params = { per_page: perPage, orderby: "date", order: "desc" };
     if (status !== "any") params.status = status;
 
-    const { data: orders } = await WooCommerce.get("orders", params);
+    // Multi-sede: si hay sede específica usar esa, si no consultar TODAS
+    let orders;
+    if (req.sedeId) {
+      const client = await getWooClient(req.sedeId);
+      const { data } = await client.get("orders", params);
+      orders = data.map((o) => ({ ...o, _sede_id: req.sedeId, _sede_name: req.sedeName }));
+    } else {
+      orders = await fetchFromAllSedes("orders", params);
+    }
 
     const resumen = orders.map((o) => {
-      const sedeRaw = extractSedeFromOrder(o);
       return {
         id: o.id,
         number: o.number,
@@ -800,7 +825,8 @@ exports.diagnosticoWoo = async (req, res) => {
         date_created: o.date_created,
         total: o.total,
         billing_name: `${o.billing?.first_name || ""} ${o.billing?.last_name || ""}`.trim(),
-        sede_raw: sedeRaw || "❌ Sin sede detectada",
+        sede: o._sede_name || "desconocida",
+        sede_id: o._sede_id || null,
         meta_keys: (o.meta_data || []).map((m) => `${m.key} = ${String(m.value).substring(0, 80)}`),
         shipping_methods: (o.shipping_lines || []).map((s) => `${s.method_title} (${s.method_id})`),
       };

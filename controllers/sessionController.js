@@ -7,6 +7,9 @@ const {
   getSedeFromWooOrder,
 } = require("../services/sedeConfig");
 
+// Multi-sede WooCommerce (WordPress Multisite)
+const { getWooClient } = require("../services/wooMultiService");
+
 // ✅ HELPER: Obtener códigos de barras desde SIESA (con filtrado inteligente)
 async function getBarcodesFromSiesa(productIds) {
   try {
@@ -81,9 +84,10 @@ exports.createPickingSession = async (req, res) => {
     // Multi-Sede: La sede de la sesión viene del picker, del request, o del pedido
     let sedeId = req.sedeId || pickerData?.sede_id || null;
 
-    // 2. Obtener datos para Snapshot
+    // 2. Obtener datos para Snapshot (Multi-sede: usar cliente WC de la sede)
+    const sessClient = await getWooClient(sedeId || req.sedeId);
     const pedidosPromesas = ids_pedidos.map((id) =>
-      WooCommerce.get(`orders/${id}`),
+      sessClient.get(`orders/${id}`),
     );
     const responses = await Promise.all(pedidosPromesas);
 
@@ -188,11 +192,14 @@ exports.getSessionActive = async (req, res) => {
     let orders =
       session.snapshot_pedidos && session.snapshot_pedidos.length > 0
         ? session.snapshot_pedidos
-        : (
-            await Promise.all(
-              session.ids_pedidos.map((id) => WooCommerce.get(`orders/${id}`)),
-            )
-          ).map((r) => r.data);
+        : await (async () => {
+            // Multi-sede: usar el cliente WC de la sede de la sesión
+            const activeClient = await getWooClient(session.sede_id);
+            const results = await Promise.all(
+              session.ids_pedidos.map((id) => activeClient.get(`orders/${id}`)),
+            );
+            return results.map((r) => r.data);
+          })();
 
     const allItems = agruparItemsParaPicking(orders);
 
@@ -226,7 +233,9 @@ exports.getSessionActive = async (req, res) => {
     const mapaCategoriasReales = {};
     if (productIds.length > 0) {
       try {
-        const { data: productsData } = await WooCommerce.get("products", {
+        // Multi-sede: usar cliente WC de la sede de la sesión
+        const catClient = await getWooClient(session.sede_id);
+        const { data: productsData } = await catClient.get("products", {
           include: productIds.join(","),
           per_page: 100,
           _fields: "id,categories",

@@ -1,6 +1,9 @@
 const WooCommerce = require("../services/wooService");
 const { supabase } = require("../services/supabaseClient");
 
+// Multi-sede WooCommerce (WordPress Multisite)
+const { getWooClient } = require("../services/wooMultiService");
+
 // ✅ HELPER: Obtener códigos de barras desde SIESA (con filtrado inteligente)
 async function getBarcodesFromSiesa(productIds) {
   try {
@@ -66,9 +69,12 @@ exports.searchProduct = async (req, res) => {
   try {
     let products = [];
 
+    // Multi-sede: usar el cliente WC de la sede actual
+    const prodClient = await getWooClient(req.sedeId);
+
     // SMART SUBSTITUTION
     if (original_id && !query) {
-      const { data: original } = await WooCommerce.get(
+      const { data: original } = await prodClient.get(
         `products/${original_id}`,
       );
       const originalPrice = parseFloat(original.price || 0);
@@ -91,7 +97,7 @@ exports.searchProduct = async (req, res) => {
       };
       if (categoryIds) searchParams.category = categoryIds;
 
-      const { data: searchResults } = await WooCommerce.get(
+      const { data: searchResults } = await prodClient.get(
         "products",
         searchParams,
       );
@@ -117,7 +123,7 @@ exports.searchProduct = async (req, res) => {
           Math.abs(parseFloat(b.price || 0) - originalPrice),
       );
     } else if (query) {
-      const { data: searchResults } = await WooCommerce.get("products", {
+      const { data: searchResults } = await prodClient.get("products", {
         search: query,
         per_page: 20,
         status: "publish",
