@@ -2,6 +2,10 @@ const WooCommerce = require("../services/wooService");
 const { supabase } = require("../services/supabaseClient");
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 const { agruparItemsParaPicking } = require("./pickingUtils");
+const {
+  getPickerSedeId,
+  getSedeFromWooOrder,
+} = require("../services/sedeConfig");
 
 // ✅ HELPER: Obtener códigos de barras desde SIESA (con filtrado inteligente)
 async function getBarcodesFromSiesa(productIds) {
@@ -66,19 +70,30 @@ async function getBarcodesFromSiesa(productIds) {
 exports.createPickingSession = async (req, res) => {
   const { id_picker, ids_pedidos } = req.body;
   try {
-    // 1. Obtener Nombre Picker
+    // 1. Obtener Nombre y Sede del Picker
     const { data: pickerData } = await supabase
       .from("wc_pickers")
-      .select("nombre_completo")
+      .select("nombre_completo, sede_id")
       .eq("id", id_picker)
       .single();
     const nombrePicker = pickerData ? pickerData.nombre_completo : "Picker";
+
+    // Multi-Sede: La sede de la sesión viene del picker, del request, o del pedido
+    let sedeId = req.sedeId || pickerData?.sede_id || null;
 
     // 2. Obtener datos para Snapshot
     const pedidosPromesas = ids_pedidos.map((id) =>
       WooCommerce.get(`orders/${id}`),
     );
     const responses = await Promise.all(pedidosPromesas);
+
+    // Si no tenemos sede del picker, intentar sacarla del primer pedido
+    if (!sedeId && responses.length > 0) {
+      const { sede_id: orderSedeId } = await getSedeFromWooOrder(
+        responses[0].data,
+      );
+      if (orderSedeId) sedeId = orderSedeId;
+    }
 
     const snapshotPedidos = responses.map((r) => {
       const o = r.data;
@@ -97,7 +112,7 @@ exports.createPickingSession = async (req, res) => {
       };
     });
 
-    // 3. Insertar Sesión
+    // 3. Insertar Sesión (con sede_id)
     const { data: session, error: sessError } = await supabase
       .from("wc_picking_sessions")
       .insert([
@@ -107,6 +122,7 @@ exports.createPickingSession = async (req, res) => {
           estado: "en_proceso",
           fecha_inicio: new Date().toISOString(),
           snapshot_pedidos: snapshotPedidos,
+          sede_id: sedeId, // ✅ MULTI-SEDE
         },
       ])
       .select()
@@ -120,7 +136,7 @@ exports.createPickingSession = async (req, res) => {
       .update({ estado_picker: "picking", id_sesion_actual: session.id })
       .eq("id", id_picker);
 
-    // 5. Crear Asignaciones
+    // 5. Crear Asignaciones (con sede_id)
     const asignaciones = ids_pedidos.map((idPedido) => ({
       id_pedido: idPedido,
       id_picker: id_picker,
@@ -129,6 +145,7 @@ exports.createPickingSession = async (req, res) => {
       reporte_snapshot: snapshotPedidos.find((s) => s.id === idPedido),
       estado_asignacion: "en_proceso",
       fecha_inicio: new Date().toISOString(),
+      sede_id: sedeId, // ✅ MULTI-SEDE
     }));
 
     const { error: assignError } = await supabase
@@ -136,7 +153,11 @@ exports.createPickingSession = async (req, res) => {
       .insert(asignaciones);
     if (assignError) throw assignError;
 
-    res.status(200).json({ message: "Sesión creada", session_id: session.id });
+    res.status(200).json({
+      message: "Sesión creada",
+      session_id: session.id,
+      sede_id: sedeId,
+    });
   } catch (error) {
     console.error("Error createSession:", error);
     res.status(500).json({ error: error.message });

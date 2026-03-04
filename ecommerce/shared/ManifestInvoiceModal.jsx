@@ -89,8 +89,9 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
           const normalizedItems = items.map((item) => ({
             id: item.id || item.sku,
             name: item.name,
+            original_name: item.original_name || null,
             sku: item.sku || item.id,
-            barcode: item.barcode || item.sku || item.id, // ✅ Usa barcode de SIESA
+            barcode: item.barcode || item.sku || item.id,
             qty: item.qty || item.count || 0,
             count: item.count,
             type: item.type,

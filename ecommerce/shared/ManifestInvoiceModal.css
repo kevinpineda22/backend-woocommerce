@@ -1,6 +1,7 @@
 /* =========================================
    MANIFEST INVOICE MODAL - Factura de Salida
    ========================================= */
+@import url("https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Libre+Barcode+39+Text&display=swap");
 
 /* =========================================
@@ -161,6 +162,8 @@
   padding: 8mm 12mm;
   border-radius: 2px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  font-family: "Cabin", Helvetica, sans-serif;
+  font-size: 16px;
   color: #1e293b;
   position: relative;
   margin: 0 auto;

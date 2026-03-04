@@ -1,4 +1,5 @@
 /* ManifestSheet.css - Componente Reutilizable de Manifiesto */
+@import url("https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Libre+Barcode+39+Text&display=swap");
 
 /* =========================================
@@ -11,7 +12,8 @@
   padding: 12mm 10mm;
   border-radius: 4px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-  font-family: "Arial", sans-serif;
+  font-family: "Cabin", Helvetica, sans-serif;
+  font-size: 16px;
   color: #1e293b;
   margin: 0 auto 20px;
 }
@@ -221,14 +223,150 @@
 
 .item-substitute-badge {
   font-size: 0.55rem;
-  color: #d97706;
-  font-weight: bold;
+  color: #b45309;
+  font-weight: 800;
   display: inline-block;
-  background: #fef3c7;
-  padding: 1px 4px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  padding: 1px 6px;
   border-radius: 3px;
-  margin-left: 4px;
+  margin-left: 6px;
   vertical-align: middle;
+  border: 1px solid #fbbf24;
+  letter-spacing: 0.3px;
+}
+
+/* =========================================
+   FILAS DE SUSTITUCIÓN EN TABLA
+   ========================================= */
+
+/* Fila del producto original retirado (tachado) */
+.manifest-row-original-replaced {
+  background: #fef2f2 !important;
+}
+
+.manifest-row-original-replaced td {
+  border-bottom: none !important;
+  padding-top: 6px !important;
+  padding-bottom: 2px !important;
+}
+
+.original-replaced-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.original-icon {
+  color: #dc2626;
+  font-weight: 900;
+  font-size: 0.7rem;
+}
+
+.original-name-strikethrough {
+  text-decoration: line-through;
+  color: #9ca3af;
+  font-size: 0.68rem;
+  font-weight: 500;
+}
+
+.original-replaced-label {
+  font-size: 0.5rem;
+  font-weight: 800;
+  color: #dc2626;
+  background: #fee2e2;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+  border: 1px solid #fca5a5;
+}
+
+.original-qty-badge {
+  font-size: 0.65rem;
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/* Fila del producto sustituto (nuevo) */
+.manifest-row-substitute {
+  background: #fffbeb !important;
+}
+
+.manifest-row-substitute td {
+  border-bottom: 1.5px solid #fde68a !important;
+  padding-bottom: 5px !important;
+}
+
+/* =========================================
+   RESUMEN DE SUSTITUCIONES
+   ========================================= */
+.manifest-substitutions-summary {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  border: 1.5px solid #fbbf24;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  page-break-inside: avoid;
+}
+
+.substitutions-summary-title {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #fde68a;
+}
+
+.substitutions-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.substitution-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.65rem;
+  padding: 3px 0;
+}
+
+.sub-summary-original {
+  color: #9ca3af;
+  text-decoration: line-through;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub-summary-arrow {
+  color: #d97706;
+  font-weight: 900;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.sub-summary-new {
+  color: #92400e;
+  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub-summary-qty {
+  color: #b45309;
+  font-weight: 800;
+  font-size: 0.6rem;
+  flex-shrink: 0;
 }
 
 /* Celda de Item (ref) */
@@ -296,7 +434,7 @@
 }
 
 .manifest-barcode-num {
-  font-family: Arial, sans-serif;
+  font-family: "Cabin", Helvetica, sans-serif;
   font-size: 0.5rem;
   font-weight: 800;
   color: #2563eb;
@@ -572,6 +710,31 @@
   .item-substitute-badge {
     font-size: 0.55rem !important;
     background: #fef3c7 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-row-original-replaced {
+    background: #fef2f2 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-row-substitute {
+    background: #fffbeb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-substitutions-summary {
+    background: #fffbeb !important;
+    border-color: #fbbf24 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .original-replaced-label {
+    background: #fee2e2 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }

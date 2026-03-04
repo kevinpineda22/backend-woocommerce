@@ -3,6 +3,11 @@ const { supabase } = require("../services/supabaseClient");
 const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 const { agruparItemsParaPicking } = require("./pickingUtils");
 const { syncOrderToWoo } = require("../services/syncWooService");
+const {
+  getSedeFromWooOrder,
+  extractSedeFromOrder,
+  WOO_SEDE_META_KEYS,
+} = require("../services/sedeConfig");
 
 // =========================================================
 // HELPER: Obtener códigos de barras desde SIESA
@@ -79,13 +84,20 @@ exports.getActiveSessionsDashboard = async (req, res) => {
   res.setHeader("Expires", "0");
 
   try {
-    // 1. Obtener sesiones en proceso
-    const { data: sessions, error } = await supabase
+    // 1. Obtener sesiones en proceso (FILTRADAS POR SEDE)
+    let sessQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, id_picker, ids_pedidos, snapshot_pedidos, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
+        `id, fecha_inicio, id_picker, ids_pedidos, snapshot_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
       )
       .eq("estado", "en_proceso");
+
+    // Filtro Multi-Sede
+    if (req.sedeId) {
+      sessQuery = sessQuery.eq("sede_id", req.sedeId);
+    }
+
+    const { data: sessions, error } = await sessQuery;
 
     if (error) throw error;
 
@@ -197,15 +209,45 @@ exports.getPendingOrders = async (req, res) => {
       status: "processing",
       per_page: 50,
     });
-    const { data: activeAssignments } = await supabase
+
+    // Filtro Multi-Sede: Obtener asignaciones activas (filtradas por sede si aplica)
+    let assignQuery = supabase
       .from("wc_asignaciones_pedidos")
       .select("id_pedido")
       .eq("estado_asignacion", "en_proceso");
+    if (req.sedeId) {
+      assignQuery = assignQuery.eq("sede_id", req.sedeId);
+    }
+    const { data: activeAssignments } = await assignQuery;
     const assignedIds = new Set(activeAssignments.map((a) => a.id_pedido));
-    const cleanOrders = wcOrders.map((order) => ({
-      ...order,
-      is_assigned: assignedIds.has(order.id),
-    }));
+
+    // Filtro Multi-Sede: Filtrar pedidos WooCommerce por sede
+    let filteredOrders = wcOrders;
+    if (req.sedeId) {
+      // Obtener la sede activa para hacer match
+      const { getSedeById } = require("../services/sedeConfig");
+      const sedeActiva = await getSedeById(req.sedeId);
+
+      if (sedeActiva) {
+        filteredOrders = [];
+        for (const order of wcOrders) {
+          const { sede_id: orderSedeId } = await getSedeFromWooOrder(order);
+          if (orderSedeId === req.sedeId) {
+            filteredOrders.push(order);
+          }
+        }
+      }
+    }
+
+    const cleanOrders = filteredOrders.map((order) => {
+      // Extraer info de sede del pedido para mostrar en el frontend
+      const sedeRaw = extractSedeFromOrder(order);
+      return {
+        ...order,
+        is_assigned: assignedIds.has(order.id),
+        sede_detected: sedeRaw || null,
+      };
+    });
     res.status(200).json(cleanOrders);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -219,9 +261,13 @@ exports.getPickers = async (req, res) => {
   const { email } = req.query;
   let query = supabase
     .from("wc_pickers")
-    .select("*")
+    .select("*, wc_sedes(nombre, slug)")
     .order("nombre_completo", { ascending: true });
   if (email) query = query.eq("email", email);
+  // Filtro Multi-Sede
+  if (req.sedeId) {
+    query = query.eq("sede_id", req.sedeId);
+  }
   const { data, error } = await query;
   if (error) return res.status(500).json({ error: error.message });
   res.status(200).json(data);
@@ -232,13 +278,18 @@ exports.getPickers = async (req, res) => {
 // =========================================================
 exports.getPendingPaymentSessions = async (req, res) => {
   try {
-    const { data: sessions, error } = await supabase
+    let payQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
       )
       .eq("estado", "auditado")
       .order("fecha_fin", { ascending: false });
+    // Filtro Multi-Sede
+    if (req.sedeId) {
+      payQuery = payQuery.eq("sede_id", req.sedeId);
+    }
+    const { data: sessions, error } = await payQuery;
 
     if (error) throw error;
 
@@ -295,14 +346,19 @@ exports.markSessionAsPaid = async (req, res) => {
 
 exports.getHistorySessions = async (req, res) => {
   try {
-    const { data: sessions, error } = await supabase
+    let histQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
       )
       .in("estado", ["finalizado"])
       .order("fecha_fin", { ascending: false })
       .limit(50);
+    // Filtro Multi-Sede
+    if (req.sedeId) {
+      histQuery = histQuery.eq("sede_id", req.sedeId);
+    }
+    const { data: sessions, error } = await histQuery;
 
     if (error) throw error;
 
@@ -344,14 +400,19 @@ exports.getHistorySessions = async (req, res) => {
 // =========================================================
 exports.getPendingAuditSessions = async (req, res) => {
   try {
-    const { data: sessions, error } = await supabase
+    let auditQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email )`,
       )
       .eq("estado", "pendiente_auditoria")
       .order("fecha_fin", { ascending: false })
       .limit(100);
+    // Filtro Multi-Sede
+    if (req.sedeId) {
+      auditQuery = auditQuery.eq("sede_id", req.sedeId);
+    }
+    const { data: sessions, error } = await auditQuery;
 
     if (error) throw error;
 
@@ -685,14 +746,32 @@ exports.getSessionLogsDetail = async (req, res) => {
 exports.espiarPedido = async (req, res) => {
   try {
     const orderId = req.params.id;
-    // Llamamos directamente a WooCommerce
     const { data: order } = await WooCommerce.get(`orders/${orderId}`);
 
-    // Devolvemos el pedido completo para que lo veas en el navegador
+    // Detección de sede
+    const sedeRaw = extractSedeFromOrder(order);
+    const { sede_id, sede_raw_value } = await getSedeFromWooOrder(order);
+
     res.status(200).json({
-      mensaje: "Aquí están los datos crudos del pedido",
+      mensaje: "Datos crudos del pedido (con detección de sede)",
+
+      // ★ DETECCIÓN DE SEDE
+      sede_detectada: {
+        valor_crudo: sedeRaw,
+        sede_id_resuelto: sede_id,
+        estado: sedeRaw
+          ? "✅ Campo de sede encontrado"
+          : "❌ No se detectó sede",
+        campos_buscados: WOO_SEDE_META_KEYS,
+      },
+
+      // Meta_data completa (para encontrar el campo de sede manualmente)
+      meta_data: order.meta_data,
       line_items: order.line_items,
       shipping_lines: order.shipping_lines,
+      fee_lines: order.fee_lines,
+      billing: order.billing,
+      shipping: order.shipping,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -6,8 +6,12 @@ export const usePickerSession = () => {
   const [loading, setLoading] = useState(true);
   const [sessionData, setSessionData] = useState(null);
   const [pickerInfo, setPickerInfo] = useState(null);
+  const [pickerSedeId, setPickerSedeId] = useState(null);
   const [showSuccessQR, setShowSuccessQR] = useState(false);
   const [completedSessionId, setCompletedSessionId] = useState(null);
+
+  // Helper: construir sede param para URLs
+  const sedeParam = pickerSedeId ? `sede_id=${pickerSedeId}` : "";
 
   const resetSesionLocal = useCallback(() => {
     localStorage.removeItem("session_active_cache");
@@ -16,11 +20,13 @@ export const usePickerSession = () => {
   }, []);
 
   const refreshSessionData = useCallback(
-    async (idPicker) => {
+    async (idPicker, sedeId = null) => {
       if (!idPicker) return;
+      const sp =
+        sedeId || pickerSedeId ? `&sede_id=${sedeId || pickerSedeId}` : "";
       try {
         const res = await axios.get(
-          `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${idPicker}&t=${Date.now()}`,
+          `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${idPicker}&t=${Date.now()}${sp}`,
         );
         const data = res.data;
 
@@ -71,14 +77,20 @@ export const usePickerSession = () => {
         let me = null;
         try {
           const { data: pickers } = await axios.get(
-            `https://backend-woocommerce.vercel.app/api/orders/pickers?email=${email}`,
+            `https://backend-woocommerce.vercel.app/api/orders/pickers?email=${email}&sede_id=todas`,
           );
           if (pickers && pickers.length > 0) {
             me = pickers[0];
             localStorage.setItem("picker_info_cache", JSON.stringify(me));
+            // Guardar sede del picker
+            if (me.sede_id) {
+              setPickerSedeId(me.sede_id);
+              localStorage.setItem("ecommerce_sede_id", me.sede_id);
+            }
           }
         } catch (err) {
           me = JSON.parse(localStorage.getItem("picker_info_cache"));
+          if (me?.sede_id) setPickerSedeId(me.sede_id);
         }
 
         if (!me) {
@@ -95,7 +107,7 @@ export const usePickerSession = () => {
           setLoading(false);
           return;
         }
-        await refreshSessionData(me.id);
+        await refreshSessionData(me.id, me.sede_id);
       } catch (e) {
         setLoading(false);
       }
@@ -288,7 +300,7 @@ export const usePickerSession = () => {
 
     try {
       await axios.post(
-        "https://backend-woocommerce.vercel.app/api/orders/finalizar-sesion",
+        `https://backend-woocommerce.vercel.app/api/orders/finalizar-sesion${sedeParam ? "?" + sedeParam : ""}`,
         { id_sesion: finalId, id_picker: pickerInfo.id },
       );
       localStorage.removeItem("session_active_cache");
@@ -304,6 +316,8 @@ export const usePickerSession = () => {
     loading,
     sessionData,
     pickerInfo,
+    pickerSedeId,
+    sedeParam,
     showSuccessQR,
     completedSessionId,
     resetSesionLocal,

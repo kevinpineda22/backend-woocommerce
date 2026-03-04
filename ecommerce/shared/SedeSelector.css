@@ -1,0 +1,198 @@
+/* ========================================
+   SEDE SELECTOR — Estilos
+   ======================================== */
+
+/* Badge (para usuarios NO super_admin) */
+.sede-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.sede-badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3b82f6;
+  animation: sedePulse 2s infinite;
+}
+
+@keyframes sedePulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Selector Completo (Super Admin) */
+.sede-selector {
+  position: relative;
+  z-index: 1000;
+}
+
+.sede-selector-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.sede-selector-trigger:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.sede-selector-icon {
+  font-size: 1.1rem;
+}
+
+.sede-selector-label {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sede-selector-arrow {
+  font-size: 0.6rem;
+  transition: transform 0.2s ease;
+  color: #94a3b8;
+}
+
+.sede-selector-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* Compact variant */
+.sede-selector--compact .sede-selector-trigger {
+  padding: 5px 10px;
+  font-size: 0.8rem;
+}
+
+.sede-selector--compact .sede-selector-label {
+  max-width: 120px;
+}
+
+/* Backdrop */
+.sede-selector-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+/* Dropdown */
+.sede-selector-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 260px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e2e8f0;
+  padding: 6px;
+  animation: sedeDropIn 0.15s ease-out;
+  z-index: 1001;
+}
+
+@keyframes sedeDropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sede-selector-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.sede-selector-option:hover {
+  background: #f1f5f9;
+}
+
+.sede-selector-option.active {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.sede-option-icon {
+  font-size: 1.3rem;
+}
+
+.sede-option-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.sede-option-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #1e293b;
+}
+
+.sede-option-desc {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.sede-option-check {
+  color: #3b82f6;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.sede-selector-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 4px 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sede-selector-label {
+    max-width: 100px;
+    font-size: 0.8rem;
+  }
+
+  .sede-selector-dropdown {
+    right: 0;
+    left: auto;
+    min-width: 220px;
+  }
+}

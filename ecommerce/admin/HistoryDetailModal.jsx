@@ -1,5 +1,17 @@
-import React from "react";
-import { FaCheckCircle, FaQrcode } from "react-icons/fa";
+import React, { useMemo } from "react";
+import {
+  FaCheckCircle,
+  FaQrcode,
+  FaExchangeAlt,
+  FaBoxOpen,
+  FaTimesCircle,
+  FaArrowRight,
+  FaClock,
+  FaUser,
+  FaTruck,
+  FaPhone,
+  FaEnvelope,
+} from "react-icons/fa";
 import "./HistoryView.css";
 
 /* ─── Helpers ─── */
@@ -19,129 +31,273 @@ const formatTime = (dateStr) =>
 const calcDuration = (start, end) =>
   Math.round((new Date(end) - new Date(start)) / 60000);
 
-const getLogLabel = (log) => {
-  if (log.accion === "recolectado")
-    return log.es_sustituto ? "🔄 Sustituyó" : "✅ Recolectó";
-  if (log.accion === "auditoria_finalizada") return "🏁 Finalizado";
-  return log.accion;
+/* ─── Stats Cards ─── */
+const StatsBar = ({ logs }) => {
+  const stats = useMemo(() => {
+    const picked = logs.filter(
+      (l) => l.accion === "recolectado" && !l.es_sustituto,
+    ).length;
+    const substituted = logs.filter((l) => l.accion === "sustituido").length;
+    const notFound = logs.filter((l) => l.accion === "no_encontrado").length;
+    return { picked, substituted, notFound };
+  }, [logs]);
+
+  return (
+    <div className="hdm-stats-bar">
+      <div className="hdm-stat-card hdm-stat-picked">
+        <FaBoxOpen className="hdm-stat-icon" />
+        <div className="hdm-stat-info">
+          <span className="hdm-stat-number">{stats.picked}</span>
+          <span className="hdm-stat-label">Recolectados</span>
+        </div>
+      </div>
+      <div className="hdm-stat-card hdm-stat-substituted">
+        <FaExchangeAlt className="hdm-stat-icon" />
+        <div className="hdm-stat-info">
+          <span className="hdm-stat-number">{stats.substituted}</span>
+          <span className="hdm-stat-label">Sustituidos</span>
+        </div>
+      </div>
+      <div className="hdm-stat-card hdm-stat-notfound">
+        <FaTimesCircle className="hdm-stat-icon" />
+        <div className="hdm-stat-info">
+          <span className="hdm-stat-number">{stats.notFound}</span>
+          <span className="hdm-stat-label">No Encontrados</span>
+        </div>
+      </div>
+    </div>
+  );
 };
 
-/* ─── Subcomponentes ─── */
+/* ─── Session Summary (mejorado) ─── */
 const SessionSummary = ({ metadata }) => (
   <div className="hdm-summary">
-    <div>
-      <div className="hdm-summary-label">Inicio</div>
-      <div className="hdm-summary-value">{formatTime(metadata.start_time)}</div>
+    <div className="hdm-summary-item">
+      <FaClock className="hdm-summary-icon" />
+      <div>
+        <div className="hdm-summary-label">Inicio</div>
+        <div className="hdm-summary-value">
+          {formatTime(metadata.start_time)}
+        </div>
+      </div>
     </div>
-    <div>
-      <div className="hdm-summary-label">Fin</div>
-      <div className="hdm-summary-value">{formatTime(metadata.end_time)}</div>
+    <div className="hdm-summary-item">
+      <FaClock className="hdm-summary-icon" />
+      <div>
+        <div className="hdm-summary-label">Fin</div>
+        <div className="hdm-summary-value">{formatTime(metadata.end_time)}</div>
+      </div>
     </div>
-    <div>
-      <div className="hdm-summary-label">Duración</div>
-      <div className="hdm-summary-value hdm-summary-value--accent">
-        {calcDuration(metadata.start_time, metadata.end_time)} min
+    <div className="hdm-summary-item">
+      <div>
+        <div className="hdm-summary-label">Duración</div>
+        <div className="hdm-summary-value hdm-summary-value--accent">
+          {calcDuration(metadata.start_time, metadata.end_time)} min
+        </div>
+      </div>
+    </div>
+    <div className="hdm-summary-item">
+      <FaUser className="hdm-summary-icon" />
+      <div>
+        <div className="hdm-summary-label">Picker</div>
+        <div className="hdm-summary-value">{metadata.picker_name}</div>
       </div>
     </div>
   </div>
 );
 
-const ProductThumbnail = ({ item, productsMap }) => {
-  const prod = productsMap?.[item.id_producto] || {};
-  const img = prod.image;
-  const qty = item.cantidad || 1;
-  // ✅ Priorizamos Barcode > SKU > item.sku_producto > vacío (no mostrar ID)
-  const displayCode = prod.barcode || prod.sku || item.sku_producto || "";
-
-  return (
-    <div className="hdm-product-item">
-      <div className="hdm-product-img-wrapper">
-        {img ? (
-          <img src={img} alt={displayCode} className="hdm-product-img" />
-        ) : (
-          <div className="hdm-product-img" style={{ background: "#e2e8f0" }} />
-        )}
-        <span className="hdm-product-qty">{qty}</span>
-      </div>
-      <div className="hdm-product-sku">{displayCode}</div>
-    </div>
-  );
-};
-
-const LogEntry = ({ log }) => {
+/* ─── Producto con Imagen (mejorado) ─── */
+const ProductCard = ({ log, productsMap }) => {
   const isSub = log.es_sustituto;
+  const isNotFound = log.accion === "no_encontrado";
+  const isSystem = log.accion === "auditoria_finalizada";
+
+  if (isSystem) return null;
+
+  // Imagen del producto original
+  const originalProd = productsMap?.[log.id_producto] || {};
+  const originalImg = originalProd.image;
+
+  // Imagen del producto sustituto
+  const subProd = isSub ? productsMap?.[log.id_producto_final] || {} : {};
+  const subImg = subProd.image;
+
+  // Código display
+  const displayCode = originalProd.barcode || originalProd.sku || "";
+
   return (
     <div
-      className={`hdm-log-item ${isSub ? "hdm-log-item--sub" : "hdm-log-item--normal"}`}
+      className={`hdm-product-card ${isSub ? "hdm-product-card--sub" : ""} ${isNotFound ? "hdm-product-card--notfound" : ""}`}
     >
-      <span className="hdm-log-time">
-        {new Date(log.fecha_registro).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
-      </span>{" "}
-      <span className="hdm-log-action">{getLogLabel(log)}</span>
-      <strong>{log.nombre_producto}</strong>
-      {isSub && (
-        <div className="hdm-log-sub-detail">
-          Por: {log.nombre_sustituto} (
-          <span className="hdm-log-sub-price">
-            {formatPrice(log.precio_nuevo)}
-          </span>
-          )
+      {/* Status indicator bar */}
+      <div
+        className={`hdm-product-status-bar ${isSub ? "sub" : isNotFound ? "notfound" : "normal"}`}
+      />
+
+      <div className="hdm-product-card-body">
+        {/* Hora */}
+        <div className="hdm-product-time">{formatTime(log.fecha_registro)}</div>
+
+        {/* Imagen y detalles del producto */}
+        <div className="hdm-product-main">
+          <div className="hdm-product-img-container">
+            {originalImg ? (
+              <img src={originalImg} alt="" className="hdm-product-img-large" />
+            ) : (
+              <div className="hdm-product-img-placeholder">
+                <FaBoxOpen size={20} color="#94a3b8" />
+              </div>
+            )}
+          </div>
+
+          <div className="hdm-product-details">
+            <div
+              className={`hdm-product-name ${isNotFound ? "hdm-strikethrough" : ""} ${isSub ? "hdm-strikethrough" : ""}`}
+            >
+              {log.nombre_producto}
+            </div>
+            {displayCode && (
+              <div className="hdm-product-code">{displayCode}</div>
+            )}
+
+            {/* Badge de estado */}
+            {!isSub && !isNotFound && (
+              <span className="hdm-badge hdm-badge--success">
+                ✓ Recolectado
+              </span>
+            )}
+            {isNotFound && (
+              <span className="hdm-badge hdm-badge--danger">
+                ✕ No Encontrado
+              </span>
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Bloque de sustitución */}
+        {isSub && (
+          <div className="hdm-substitution-block">
+            <div className="hdm-sub-arrow-container">
+              <div className="hdm-sub-arrow-line" />
+              <div className="hdm-sub-arrow-badge">
+                <FaExchangeAlt size={10} />
+                <span>SUSTITUIDO POR</span>
+              </div>
+              <div className="hdm-sub-arrow-line" />
+            </div>
+
+            <div className="hdm-product-main hdm-sub-product">
+              <div className="hdm-product-img-container">
+                {subImg ? (
+                  <img src={subImg} alt="" className="hdm-product-img-large" />
+                ) : (
+                  <div className="hdm-product-img-placeholder hdm-placeholder--sub">
+                    <FaExchangeAlt size={20} color="#d97706" />
+                  </div>
+                )}
+              </div>
+              <div className="hdm-product-details">
+                <div className="hdm-product-name hdm-product-name--sub">
+                  {log.nombre_sustituto}
+                </div>
+                {log.precio_nuevo > 0 && (
+                  <div className="hdm-product-price">
+                    {formatPrice(log.precio_nuevo)}
+                  </div>
+                )}
+                <span className="hdm-badge hdm-badge--warning">
+                  ↳ Sustituto
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Motivo si existe */}
+        {log.motivo && (
+          <div className="hdm-product-reason">
+            <strong>Motivo:</strong> {log.motivo}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
+/* ─── Order Card (mejorado) ─── */
 const OrderCard = ({ orderInfo, logs, productsMap }) => {
   const order = orderInfo || {};
   const billing = order.billing || {};
+  const shipping = order.shipping || {};
   const orderLogs = logs.filter(
-    (l) => String(l.id_pedido) === String(order.id),
-  );
-  const orderProducts = logs.filter(
     (l) =>
-      String(l.id_pedido) === String(order.id) && l.accion === "recolectado",
+      String(l.id_pedido) === String(order.id) &&
+      l.accion !== "auditoria_finalizada",
   );
+
+  const subsCount = orderLogs.filter((l) => l.es_sustituto).length;
+  const notFoundCount = orderLogs.filter(
+    (l) => l.accion === "no_encontrado",
+  ).length;
+
+  const addr = shipping.address_1 || billing.address_1 || "";
+  const city = shipping.city || billing.city || "";
 
   return (
     <div className="hdm-order-card">
       <div className="hdm-order-header">
-        <h4 className="hdm-order-title">Pedido #{order.id}</h4>
+        <div className="hdm-order-header-left">
+          <h4 className="hdm-order-title">
+            <FaTruck className="hdm-order-icon" />
+            Pedido #{order.id}
+          </h4>
+          <div className="hdm-order-tags">
+            <span className="hdm-order-tag">{orderLogs.length} acciones</span>
+            {subsCount > 0 && (
+              <span className="hdm-order-tag hdm-order-tag--warning">
+                {subsCount} sustituciones
+              </span>
+            )}
+            {notFoundCount > 0 && (
+              <span className="hdm-order-tag hdm-order-tag--danger">
+                {notFoundCount} no encontrados
+              </span>
+            )}
+          </div>
+        </div>
         {billing.first_name && (
           <div className="hdm-order-customer">
             <div className="hdm-order-customer-name">
-              {billing.first_name} {billing.last_name}
+              <FaUser size={11} /> {billing.first_name} {billing.last_name}
             </div>
-            <div className="hdm-order-customer-contact">
-              {billing.phone || billing.email || ""}
-            </div>
+            {billing.phone && (
+              <div className="hdm-order-customer-contact">
+                <FaPhone size={10} /> {billing.phone}
+              </div>
+            )}
+            {billing.email && (
+              <div className="hdm-order-customer-contact">
+                <FaEnvelope size={10} /> {billing.email}
+              </div>
+            )}
+            {(addr || city) && (
+              <div className="hdm-order-customer-contact">
+                <FaTruck size={10} /> {[addr, city].filter(Boolean).join(", ")}
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Grid de productos recolectados */}
-      {orderProducts.length > 0 && (
-        <div className="hdm-products-section">
-          <div className="hdm-products-title">
-            Productos ({orderProducts.length})
-          </div>
-          <div className="hdm-products-grid">
-            {orderProducts.map((p) => (
-              <ProductThumbnail key={p.id} item={p} productsMap={productsMap} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Novedades / Logs del pedido */}
-      {orderLogs.length > 0 ? (
-        orderLogs.map((log) => <LogEntry key={log.id} log={log} />)
-      ) : (
-        <p className="hdm-no-logs">Sin novedades</p>
-      )}
+      {/* Lista de productos como tarjetas */}
+      <div className="hdm-products-list">
+        {orderLogs.map((log) => (
+          <ProductCard key={log.id} log={log} productsMap={productsMap} />
+        ))}
+        {orderLogs.length === 0 && (
+          <p className="hdm-no-logs">Sin novedades registradas</p>
+        )}
+      </div>
     </div>
   );
 };
@@ -152,6 +308,12 @@ const HistoryDetailModal = ({ historyDetail, onClose, onViewManifest }) => {
 
   const { metadata, orders_info, logs, products_map, final_snapshot } =
     historyDetail;
+
+  // Filtrar logs del sistema
+  const actionLogs = useMemo(
+    () => (logs || []).filter((l) => l.accion !== "auditoria_finalizada"),
+    [logs],
+  );
 
   const handleViewCertificate = () => {
     const mData = {
@@ -167,10 +329,12 @@ const HistoryDetailModal = ({ historyDetail, onClose, onViewManifest }) => {
       <div className="hdm-container" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="hdm-header">
-          <h2>
-            📋 Detalle — Sesión #
-            {metadata?.session_id || historyDetail.session?.id}
-          </h2>
+          <div className="hdm-header-info">
+            <h2>📋 Detalle de Sesión</h2>
+            <span className="hdm-header-session-id">
+              #{(metadata?.session_id || "").slice(0, 8)}
+            </span>
+          </div>
           <button className="hdm-close-btn" onClick={onClose}>
             &times;
           </button>
@@ -179,9 +343,9 @@ const HistoryDetailModal = ({ historyDetail, onClose, onViewManifest }) => {
         {/* Banner auditado */}
         {final_snapshot && (
           <div className="hdm-banner">
-            <FaCheckCircle color="#16a34a" />
+            <FaCheckCircle color="#16a34a" size={18} />
             <span className="hdm-banner-text">
-              Sesión Auditada y Completada.
+              Sesión Auditada y Completada
             </span>
             <button
               className="hdm-btn-certificate"
@@ -197,6 +361,9 @@ const HistoryDetailModal = ({ historyDetail, onClose, onViewManifest }) => {
           {/* Resumen */}
           {metadata && <SessionSummary metadata={metadata} />}
 
+          {/* Stats */}
+          {actionLogs.length > 0 && <StatsBar logs={actionLogs} />}
+
           {/* Sección por pedido */}
           {orders_info && orders_info.length > 0 ? (
             <>
@@ -207,35 +374,15 @@ const HistoryDetailModal = ({ historyDetail, onClose, onViewManifest }) => {
                 <OrderCard
                   key={oi.id}
                   orderInfo={oi}
-                  logs={logs || []}
+                  logs={actionLogs}
                   productsMap={products_map}
                 />
               ))}
             </>
           ) : (
-            /* Fallback: timeline clásico */
-            <div className="audit-timeline">
-              {(logs || []).map((log) => (
-                <div
-                  key={log.id}
-                  className={`audit-item ${log.es_sustituto ? "sub" : ""}`}
-                >
-                  <div className="audit-time">
-                    {new Date(log.fecha_registro).toLocaleTimeString()}
-                  </div>
-                  <div className="audit-content">
-                    <div className="audit-title">
-                      {getLogLabel(log)}: <strong>{log.nombre_producto}</strong>
-                    </div>
-                    {log.es_sustituto && (
-                      <div className="audit-sub-detail">
-                        Por: {log.nombre_sustituto} (
-                        {formatPrice(log.precio_nuevo)})
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className="hdm-empty-state">
+              <FaBoxOpen size={40} color="#cbd5e1" />
+              <p>No hay datos de pedidos disponibles</p>
             </div>
           )}
         </div>

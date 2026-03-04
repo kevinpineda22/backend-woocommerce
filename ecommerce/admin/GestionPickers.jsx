@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { supabase } from "../../../supabaseClient";
 import { UserForm } from "../../admin/UserForm";
+import { useSedeContext } from "../shared/SedeContext";
 import "../../admin/AdminUsuarios.css";
 import "./GestionPickers.css";
 import {
@@ -11,9 +12,11 @@ import {
   FaEdit,
   FaBan,
   FaBoxes,
+  FaMapMarkerAlt,
 } from "react-icons/fa";
 
 export const GestionPickers = () => {
+  const { sedeId, sedes, getSedeParam, isSuperAdmin } = useSedeContext();
   const [pickers, setPickers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -30,17 +33,27 @@ export const GestionPickers = () => {
 
       if (profilesError) throw profilesError;
 
-      // 2. Obtener estado operativo + SESIÓN ACTUAL
-      // Usamos la relación definida en Supabase para traer los ids_pedidos reales de la sesión
-      const { data: wcData, error: wcError } = await supabase.from("wc_pickers")
-        .select(`
+      // 2. Obtener estado operativo + SESIÓN ACTUAL + SEDE
+      let wcQuery = supabase.from("wc_pickers").select(`
             *,
             wc_picking_sessions!wc_pickers_id_sesion_actual_fkey (
                 id,
                 ids_pedidos,
                 fecha_inicio
+            ),
+            wc_sedes (
+                id,
+                nombre,
+                slug
             )
         `);
+
+      // Filtrar por sede si no es super admin o si hay una sede seleccionada
+      if (sedeId) {
+        wcQuery = wcQuery.eq("sede_id", sedeId);
+      }
+
+      const { data: wcData, error: wcError } = await wcQuery;
 
       if (wcError) throw wcError;
 
@@ -60,6 +73,8 @@ export const GestionPickers = () => {
           active_orders_count: activeOrders.length,
           active_orders_ids: activeOrders,
           session_start: sessionInfo?.fecha_inicio,
+          sede_nombre: operativo?.wc_sedes?.nombre || "Sin sede",
+          sede_id_picker: operativo?.sede_id || null,
         };
       });
 
@@ -73,7 +88,7 @@ export const GestionPickers = () => {
 
   useEffect(() => {
     fetchPickers();
-  }, []);
+  }, [sedeId]); // Re-fetch when sede changes
 
   // --- HANDLERS ---
   const handleCreateClick = () => {
@@ -102,7 +117,7 @@ export const GestionPickers = () => {
 
     try {
       await axios.post(
-        "https://backend-woocommerce.vercel.app/api/orders/cancelar-asignacion",
+        `https://backend-woocommerce.vercel.app/api/orders/cancelar-asignacion?${getSedeParam()}`,
         { id_picker: picker.wc_id },
       );
       alert("✅ Sesión cancelada. El picker y los pedidos han sido liberados.");
@@ -153,6 +168,7 @@ export const GestionPickers = () => {
               <tr>
                 <th>Nombre</th>
                 <th>Email</th>
+                <th>Sede</th>
                 <th>Estado</th>
                 <th>Carga Actual</th>
                 <th>Acciones</th>
@@ -161,13 +177,13 @@ export const GestionPickers = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="gp-table-message">
+                  <td colSpan="6" className="gp-table-message">
                     Cargando equipo...
                   </td>
                 </tr>
               ) : pickers.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="gp-table-message">
+                  <td colSpan="6" className="gp-table-message">
                     No hay pickers registrados
                   </td>
                 </tr>
@@ -185,6 +201,36 @@ export const GestionPickers = () => {
                       </div>
                     </td>
                     <td>{r.email}</td>
+                    <td>
+                      <span className="gp-sede-badge">
+                        <FaMapMarkerAlt /> {r.sede_nombre}
+                      </span>
+                      {isSuperAdmin && r.wc_id && (
+                        <select
+                          className="gp-sede-select"
+                          value={r.sede_id_picker || ""}
+                          onChange={async (e) => {
+                            const newSedeId = e.target.value || null;
+                            try {
+                              await axios.post(
+                                "https://backend-woocommerce.vercel.app/api/orders/sedes/asignar-picker",
+                                { picker_id: r.wc_id, sede_id: newSedeId },
+                              );
+                              fetchPickers();
+                            } catch (err) {
+                              alert("Error asignando sede: " + err.message);
+                            }
+                          }}
+                        >
+                          <option value="">Sin sede</option>
+                          {sedes.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </td>
                     <td>
                       {r.estado_picker === "picking" ? (
                         <span className="gp-badge gp-busy">En Ruta</span>

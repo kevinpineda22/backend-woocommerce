@@ -1,8 +1,11 @@
+@import url("https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
 
 .analitica-container {
   padding: 24px;
   background: #f8f9fa;
   min-height: 100vh;
+  font-family: "Cabin", Helvetica, sans-serif;
+  font-size: 16px;
 }
 
 .analitica-header {
@@ -293,11 +296,15 @@
   height: 10px;
   border-radius: 2px;
 }
-.analitica-legend-box.low { background: #e0f2fe; }
-.analitica-legend-box.high { background: #0284c7; }
-.analitica-legend-box.issue { 
-  border: 2px solid #ef4444; 
-  background: #fef2f2; 
+.analitica-legend-box.low {
+  background: #e0f2fe;
+}
+.analitica-legend-box.high {
+  background: #0284c7;
+}
+.analitica-legend-box.issue {
+  border: 2px solid #ef4444;
+  background: #fef2f2;
 }
 
 /* --- Aisle Grid & Map --- */
@@ -316,14 +323,14 @@
   align-items: center;
   justify-content: center;
   min-height: 80px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
   position: relative;
   transition: transform 0.2s;
 }
 
 .analitica-aisle-cell:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
 }
 
 .analitica-aisle-warning-icon {
@@ -371,27 +378,27 @@
 }
 
 /* --- Migrated Grid/KPI Styles --- */
-.kpi-card { 
-  flex: 1; 
-  padding: 20px; 
-  display: flex; 
-  align-items: center; 
-  justify-content: space-between; 
+.kpi-card {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
-.kpi-label { 
-  font-size: 0.85rem; 
-  color: #7f8c8d; 
-  margin-bottom: 5px; 
-  text-transform: uppercase; 
-  letter-spacing: 0.5px; 
+.kpi-label {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
-.kpi-value { 
-  font-size: 2rem; 
-  font-weight: 700; 
-  color: #2c3e50; 
+.kpi-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #2c3e50;
 }
-.picker-row-interactive:hover { 
-  background: #f8f9fa; 
+.picker-row-interactive:hover {
+  background: #f8f9fa;
 }
 
 /* --- AnaliticaPickers Modal (Unique Classes) --- */
@@ -461,7 +468,7 @@
   border-radius: 12px;
   padding: 24px;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .ap-metric-card {
@@ -470,7 +477,7 @@
   border-radius: 12px;
   text-align: center;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   transition: transform 0.2s;
 }
 .ap-metric-card:hover {
@@ -499,7 +506,7 @@
   display: inline-flex;
   align-items: center;
   background: #fff8e1; /* Light Amber */
-  color: #b45309;      /* Dark Amber */
+  color: #b45309; /* Dark Amber */
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 0.85rem;
@@ -615,11 +622,21 @@
 
 /* Animations */
 @keyframes apFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes apSlideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

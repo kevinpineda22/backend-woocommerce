@@ -37,6 +37,8 @@ const VistaPicker = () => {
   const {
     loading,
     sessionData,
+    pickerSedeId,
+    sedeParam,
     showSuccessQR,
     completedSessionId,
     resetSesionLocal,
@@ -246,7 +248,7 @@ const VistaPicker = () => {
     if (!currentItem) return;
     try {
       const res = await axios.post(
-        "https://backend-woocommerce.vercel.app/api/orders/validar-codigo",
+        `https://backend-woocommerce.vercel.app/api/orders/validar-codigo${sedeParam ? "?" + sedeParam : ""}`,
         { input_code: inputCode, expected_sku: currentItem.sku },
       );
       if (res.data.valid) {

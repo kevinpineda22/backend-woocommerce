@@ -1,7 +1,7 @@
 import React from "react";
 import QRCode from "react-qr-code";
 import { getAssetUrl } from "../../../config/storage";
-import { checkSiesaBarcodes } from "../../services/siesaService";
+import { checkSiesaBarcodes } from "../../../services/siesaService";
 import "./ManifestSheet.css";
 
 /**
@@ -128,7 +128,7 @@ const ManifestSheet = ({
         </div>
       </div>
 
-      {/* Products Table — SIN columna de barcode para ahorrar espacio */}
+      {/* Products Table */}
       <table className="manifest-table">
         <thead>
           <tr>
@@ -149,36 +149,85 @@ const ManifestSheet = ({
                 : item.barcode || item.sku || "";
 
             return (
-              <tr key={idx}>
-                <td className="cell-num">{idx + 1}</td>
-                <td className="cell-qty">{qty}</td>
-                <td className="cell-item">
-                  <span className="item-name">{item.name}</span>
-                  {isSub && (
-                    <span className="item-substitute-badge">🔄 SUST.</span>
-                  )}
-                </td>
-                <td className="cell-ref">
-                  {displayCode}
-                  {rawCode && correctedCodes[rawCode] && (
-                    <span
-                      style={{
-                        color: "#16a34a",
-                        marginLeft: "4px",
-                        fontWeight: "bold",
-                        fontSize: "0.8em",
-                      }}
-                      title="Código ajustado (+)"
-                    >
-                      ●
-                    </span>
-                  )}
-                </td>
-              </tr>
+              <React.Fragment key={idx}>
+                {/* Si es sustituto, mostramos primero la fila del original tachado */}
+                {isSub && item.original_name && (
+                  <tr className="manifest-row-original-replaced">
+                    <td className="cell-num"></td>
+                    <td className="cell-qty">
+                      <span className="original-qty-badge">−{qty}</span>
+                    </td>
+                    <td className="cell-item" colSpan={2}>
+                      <div className="original-replaced-info">
+                        <span className="original-icon">✕</span>
+                        <span className="original-name-strikethrough">
+                          {item.original_name}
+                        </span>
+                        <span className="original-replaced-label">
+                          PRODUCTO ORIGINAL RETIRADO
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {/* Fila del producto (normal o sustituto) */}
+                <tr className={isSub ? "manifest-row-substitute" : ""}>
+                  <td className="cell-num">{idx + 1}</td>
+                  <td className="cell-qty">{qty}</td>
+                  <td className="cell-item">
+                    <span className="item-name">{item.name}</span>
+                    {isSub && (
+                      <span className="item-substitute-badge">↳ SUSTITUTO</span>
+                    )}
+                  </td>
+                  <td className="cell-ref">
+                    {displayCode}
+                    {rawCode && correctedCodes[rawCode] && (
+                      <span
+                        style={{
+                          color: "#16a34a",
+                          marginLeft: "4px",
+                          fontWeight: "bold",
+                          fontSize: "0.8em",
+                        }}
+                        title="Código ajustado (+)"
+                      >
+                        ●
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              </React.Fragment>
             );
           })}
         </tbody>
       </table>
+
+      {/* Resumen de sustituciones */}
+      {items.some((i) => i.is_sub || i.type === "sustituido") && (
+        <div className="manifest-substitutions-summary">
+          <div className="substitutions-summary-title">
+            ⚠ RESUMEN DE SUSTITUCIONES
+          </div>
+          <div className="substitutions-summary-list">
+            {items
+              .filter((i) => i.is_sub || i.type === "sustituido")
+              .map((item, idx) => (
+                <div key={idx} className="substitution-summary-row">
+                  <span className="sub-summary-original">
+                    {item.original_name || "Producto original"}
+                  </span>
+                  <span className="sub-summary-arrow">→</span>
+                  <span className="sub-summary-new">{item.name}</span>
+                  <span className="sub-summary-qty">
+                    ×{item.qty || item.count || 1}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Grid de Códigos de Barras — layout horizontal compacto */}
       <div className="manifest-barcodes-section">

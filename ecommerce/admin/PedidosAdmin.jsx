@@ -28,6 +28,10 @@ import PendingPaymentView from "./PendingPaymentView";
 import HistoryDetailModal from "./HistoryDetailModal";
 import ManifestInvoiceModal from "../shared/ManifestInvoiceModal";
 
+// --- MULTI-SEDE ---
+import { useSedeContext } from "../shared/SedeContext";
+import { SedeSelector } from "../shared/SedeSelector";
+
 import "./PedidosAdmin.css";
 
 const formatPrice = (amount) =>
@@ -38,6 +42,16 @@ const formatPrice = (amount) =>
   }).format(amount);
 
 const PedidosAdmin = () => {
+  // --- MULTI-SEDE ---
+  const {
+    sedeId,
+    sedeName,
+    getSedeParam,
+    isSuperAdmin,
+    isMultiSede,
+    sedeActual,
+  } = useSedeContext();
+
   // --- ESTADOS GLOBALES ---
   const [currentView, setCurrentView] = useState("pending");
   const [loading, setLoading] = useState(true);
@@ -71,48 +85,52 @@ const PedidosAdmin = () => {
   const [filterZone, setFilterZone] = useState("");
 
   // --- DATA FETCHING ---
-  const fetchData = useCallback(async (isBackground = false) => {
-    if (!isBackground) setLoading(true);
-    try {
-      // 1. Pedidos Pendientes
-      const resPending = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/pendientes?t=${Date.now()}`,
-      );
-      const listPending = resPending.data.filter((o) => !o.is_assigned);
-      setOrders(listPending);
+  const fetchData = useCallback(
+    async (isBackground = false) => {
+      if (!isBackground) setLoading(true);
+      const sedeParam = getSedeParam();
+      try {
+        // 1. Pedidos Pendientes
+        const resPending = await axios.get(
+          `https://backend-woocommerce.vercel.app/api/orders/pendientes?t=${Date.now()}&${sedeParam}`,
+        );
+        const listPending = resPending.data.filter((o) => !o.is_assigned);
+        setOrders(listPending);
 
-      // 2. Sesiones Activas
-      const resActive = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/dashboard-activo?t=${Date.now()}`,
-      );
-      setActiveSessions(resActive.data);
+        // 2. Sesiones Activas
+        const resActive = await axios.get(
+          `https://backend-woocommerce.vercel.app/api/orders/dashboard-activo?t=${Date.now()}&${sedeParam}`,
+        );
+        setActiveSessions(resActive.data);
 
-      const resAuditPending = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/pendientes-auditoria?t=${Date.now()}`,
-      );
-      setPendingAuditOrders(resAuditPending.data || []);
+        const resAuditPending = await axios.get(
+          `https://backend-woocommerce.vercel.app/api/orders/pendientes-auditoria?t=${Date.now()}&${sedeParam}`,
+        );
+        setPendingAuditOrders(resAuditPending.data || []);
 
-      const resPaymentPending = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/pendientes-pago?t=${Date.now()}`,
-      );
-      setPaymentPendingOrders(resPaymentPending.data || []);
+        const resPaymentPending = await axios.get(
+          `https://backend-woocommerce.vercel.app/api/orders/pendientes-pago?t=${Date.now()}&${sedeParam}`,
+        );
+        setPaymentPendingOrders(resPaymentPending.data || []);
 
-      const totalProcessOrders = resActive.data.reduce(
-        (sum, s) => sum + (s.orders_count || 0),
-        0,
-      );
-      setStats({
-        pending: listPending.length,
-        process: totalProcessOrders,
-        auditPending: resAuditPending.data?.length || 0,
-        paymentPending: resPaymentPending.data?.length || 0,
-      });
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      if (!isBackground) setLoading(false);
-    }
-  }, []);
+        const totalProcessOrders = resActive.data.reduce(
+          (sum, s) => sum + (s.orders_count || 0),
+          0,
+        );
+        setStats({
+          pending: listPending.length,
+          process: totalProcessOrders,
+          auditPending: resAuditPending.data?.length || 0,
+          paymentPending: resPaymentPending.data?.length || 0,
+        });
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        if (!isBackground) setLoading(false);
+      }
+    },
+    [getSedeParam],
+  );
 
   // Refresco automático + Realtime
   useEffect(() => {
@@ -140,14 +158,14 @@ const PedidosAdmin = () => {
       clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [fetchData]);
+  }, [fetchData, sedeId]); // Re-fetch when sede changes
 
   // --- HANDLERS: ASIGNACIÓN DE PICKERS ---
   const handleOpenAssignModal = async () => {
     if (selectedIds.size === 0) return;
     try {
       const res = await axios.get(
-        "https://backend-woocommerce.vercel.app/api/orders/pickers",
+        `https://backend-woocommerce.vercel.app/api/orders/pickers?${getSedeParam()}`,
       );
       setPickers(res.data);
       setShowAssignModal(true);
@@ -160,7 +178,7 @@ const PedidosAdmin = () => {
     setSelectedIds(new Set([order.id]));
     try {
       const res = await axios.get(
-        "https://backend-woocommerce.vercel.app/api/orders/pickers",
+        `https://backend-woocommerce.vercel.app/api/orders/pickers?${getSedeParam()}`,
       );
       setPickers(res.data);
       setShowAssignModal(true);
@@ -172,7 +190,7 @@ const PedidosAdmin = () => {
   const handleConfirmAssignment = async (picker) => {
     try {
       await axios.post(
-        "https://backend-woocommerce.vercel.app/api/orders/crear-sesion",
+        `https://backend-woocommerce.vercel.app/api/orders/crear-sesion?${getSedeParam()}`,
         {
           id_picker: picker.id,
           ids_pedidos: Array.from(selectedIds),
@@ -194,7 +212,7 @@ const PedidosAdmin = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        "https://backend-woocommerce.vercel.app/api/orders/historial",
+        `https://backend-woocommerce.vercel.app/api/orders/historial?${getSedeParam()}`,
       );
       setHistoryOrders(res.data);
     } catch (e) {
@@ -208,7 +226,7 @@ const PedidosAdmin = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        "https://backend-woocommerce.vercel.app/api/orders/pendientes-auditoria",
+        `https://backend-woocommerce.vercel.app/api/orders/pendientes-auditoria?${getSedeParam()}`,
       );
       setPendingAuditOrders(res.data || []);
       setStats((prev) => ({ ...prev, auditPending: res.data?.length || 0 }));
@@ -223,7 +241,7 @@ const PedidosAdmin = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        "https://backend-woocommerce.vercel.app/api/orders/pendientes-pago",
+        `https://backend-woocommerce.vercel.app/api/orders/pendientes-pago?${getSedeParam()}`,
       );
       setPaymentPendingOrders(res.data || []);
       setStats((prev) => ({ ...prev, paymentPending: res.data?.length || 0 }));
@@ -244,7 +262,7 @@ const PedidosAdmin = () => {
 
     try {
       await axios.post(
-        "https://backend-woocommerce.vercel.app/api/orders/marcar-pagado",
+        `https://backend-woocommerce.vercel.app/api/orders/marcar-pagado?${getSedeParam()}`,
         { session_id: session.id },
       );
       alert("✅ Pago registrado con éxito.");
@@ -258,7 +276,7 @@ const PedidosAdmin = () => {
   const handleViewLiveDetail = async (session) => {
     try {
       const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}&include_removed=true`,
+        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}&include_removed=true&${getSedeParam()}`,
       );
       setLiveSessionDetail({ sessionInfo: session, routeData: res.data });
       setShowLiveModal(true);
@@ -273,7 +291,7 @@ const PedidosAdmin = () => {
   const handleViewHistoryDetail = async (session) => {
     try {
       const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}`,
+        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}&${getSedeParam()}`,
       );
       setHistoryDetail({
         session,
@@ -289,7 +307,7 @@ const PedidosAdmin = () => {
   const handleViewManifestDirect = async (session) => {
     try {
       const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}`,
+        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}&${getSedeParam()}`,
       );
 
       const { final_snapshot, metadata, products_map } = res.data;
@@ -337,6 +355,10 @@ const PedidosAdmin = () => {
           </Link>
           <div className="pedidos-layout-logo">MK</div>
           <h2 className="pedidos-layout-sidebar-title">Admin Center</h2>
+        </div>
+        {/* SELECTOR DE SEDE */}
+        <div className="pedidos-sede-selector-wrapper">
+          <SedeSelector compact />
         </div>
         <nav className="pedidos-layout-sidebar-nav">
           <div className="pedidos-nav-label">OPERACIÓN</div>

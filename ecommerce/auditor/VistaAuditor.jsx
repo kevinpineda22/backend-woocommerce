@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import ManifestSheet from "../shared/ManifestSheet";
+import { useSedeContext } from "../shared/SedeContext";
 import {
   FaClipboardCheck,
   FaSearch,
@@ -24,6 +25,7 @@ import {
 import "./VistaAuditor.css";
 
 const VistaAuditor = () => {
+  const { getSedeParam } = useSedeContext();
   const [sessionId, setSessionId] = useState("");
   const [auditData, setAuditData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -170,7 +172,7 @@ const VistaAuditor = () => {
 
     try {
       const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${id}`,
+        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${id}&${getSedeParam()}`,
       );
       const { metadata, logs, orders_info, products_map, final_snapshot } =
         res.data;
@@ -332,10 +334,11 @@ const VistaAuditor = () => {
         id: i.id,
         sku: i.sku || i.id,
         name: i.name,
+        original_name: i.original_name || null,
         qty: i.count,
         price: i.price,
         is_sub: i.is_sub,
-        barcode: i.barcode || i.sku || i.id, // ✅ Incluir código de barras de SIESA
+        barcode: i.barcode || i.sku || i.id,
       })),
     }));
   };
@@ -377,7 +380,7 @@ const VistaAuditor = () => {
 
       // Llamamos al nuevo endpoint que genera el QR en backend
       const response = await fetch(
-        "https://backend-woocommerce.vercel.app/api/orders/auditor/finalizar",
+        `https://backend-woocommerce.vercel.app/api/orders/auditor/finalizar?${getSedeParam()}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -471,8 +474,9 @@ const VistaAuditor = () => {
           const normalizedItems = (order.items || []).map((i) => ({
             id: i.id || i.sku,
             name: i.name,
-            sku: i.barcode || i.sku || "", // ✅ Preferir barcode, luego sku, nunca ID de Woo
-            barcode: i.barcode || i.sku || i.id, // ✅ Usa barcode de SIESA
+            original_name: i.original_name || null,
+            sku: i.barcode || i.sku || "",
+            barcode: i.barcode || i.sku || i.id,
             qty: i.qty || i.count || 1,
             is_sub: i.type === "sustituido" || i.is_sub,
           }));

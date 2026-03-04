@@ -1,9 +1,11 @@
 /* VistaAuditor.css - Versión FINAL con Historial Corregido */
+@import url("https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
 
 .auditor-layout {
   background: #f8fafc;
   min-height: 100vh;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: "Cabin", Helvetica, sans-serif;
+  font-size: 16px;
   padding-bottom: 140px;
 }
 
@@ -736,7 +738,7 @@
   padding: 40px;
   border-radius: 4px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-  font-family: "Arial", sans-serif;
+  font-family: "Cabin", Helvetica, sans-serif;
   color: #000;
   page-break-after: always;
 }

@@ -1,10 +1,13 @@
 /* GestionPickers.css */
+@import url("https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
 
 .gestion-pickers-container {
   padding: 20px;
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  font-family: "Cabin", Helvetica, sans-serif;
+  font-size: 16px;
 }
 
 .gestion-pickers-header {
@@ -91,37 +94,44 @@
 
 /* --- ESTILOS NUEVOS: CARGA DE TRABAJO --- */
 .gp-avatar-small {
-    width: 32px; height: 32px;
-    background: #e2e8f0; color: #64748b;
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: 0.8rem;
+  width: 32px;
+  height: 32px;
+  background: #e2e8f0;
+  color: #64748b;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.8rem;
 }
 
 .gp-load-info {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .gp-load-badge {
-    background: #e0f2fe;
-    color: #0284c7;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    display: flex; align-items: center; gap: 5px;
+  background: #e0f2fe;
+  color: #0284c7;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .gp-load-ids {
-    font-size: 0.75rem;
-    color: #94a3b8;
-    max-width: 150px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  font-size: 0.75rem;
+  color: #94a3b8;
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gp-text-muted {
@@ -159,4 +169,33 @@
 
 .gp-btn-icon.danger {
   color: #e74c3c;
+}
+
+/* Sede column styles */
+.gp-sede-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #eef2ff;
+  color: #4f46e5;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.gp-sede-select {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  padding: 2px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #f9fafb;
+  color: #374151;
+  cursor: pointer;
+  max-width: 160px;
+}
+.gp-sede-select:hover {
+  border-color: #6366f1;
 }

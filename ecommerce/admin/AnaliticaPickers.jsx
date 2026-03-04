@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import { useSedeContext } from "../shared/SedeContext";
 import {
   FaChartLine,
   FaChartPie,
@@ -20,7 +21,7 @@ import {
 import "./AnaliticaPickers.css";
 import WarehouseMap from "./WarehouseMap";
 
-const RouteSelectionView = ({ fetchPickerRoute, dateRange }) => {
+const RouteSelectionView = ({ fetchPickerRoute, dateRange, getSedeParam }) => {
   // [MOD]: Recibe dateRange
   const [routesHistory, setRoutesHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,9 +31,10 @@ const RouteSelectionView = ({ fetchPickerRoute, dateRange }) => {
       setLoading(true);
       try {
         const BASE_URL = "https://backend-woocommerce.vercel.app/api";
+        const sp = getSedeParam ? getSedeParam() : "";
         // Pasamos el filtro de rango al backend tambien
         const { data: rawRoutes } = await axios.get(
-          `${BASE_URL}/analytics/routes-history?range=${dateRange}`,
+          `${BASE_URL}/analytics/routes-history?range=${dateRange}&${sp}`,
         );
 
         let processedRoutes = Array.isArray(rawRoutes) ? rawRoutes : [];
@@ -246,6 +248,7 @@ const RouteSelectionView = ({ fetchPickerRoute, dateRange }) => {
 };
 
 const AnaliticaPickers = () => {
+  const { getSedeParam, sedeId } = useSedeContext();
   const [activeTab, setActiveTab] = useState("dashboard"); // dashboard | logs
   const [performanceData, setPerformanceData] = useState([]);
   const [globalStats, setGlobalStats] = useState(null);
@@ -265,11 +268,12 @@ const AnaliticaPickers = () => {
     try {
       // Ajuste de URLs para entorno local vs producción
       const BASE_URL = "https://backend-woocommerce.vercel.app/api";
+      const sp = getSedeParam();
 
       const [perfRes, heatRes, auditRes] = await Promise.all([
-        axios.get(`${BASE_URL}/analytics/performance?range=${dateRange}`),
-        axios.get(`${BASE_URL}/analytics/heatmap`),
-        axios.get(`${BASE_URL}/analytics/audit`),
+        axios.get(`${BASE_URL}/analytics/performance?range=${dateRange}&${sp}`),
+        axios.get(`${BASE_URL}/analytics/heatmap?${sp}`),
+        axios.get(`${BASE_URL}/analytics/audit?${sp}`),
       ]);
 
       // Nueva Respuesta de Performance: { pickers, hourlyActivity, globalStats }
@@ -298,15 +302,16 @@ const AnaliticaPickers = () => {
 
   useEffect(() => {
     fetchData();
-  }, [dateRange]); // Recargar cuando cambia el filtro
+  }, [dateRange, sedeId]); // Recargar cuando cambia el filtro o la sede
 
   const fetchPickerRoute = async (pickerId, orderId = null) => {
     setLoadingRoute(true);
     try {
       const BASE_URL = "https://backend-woocommerce.vercel.app/api";
+      const sp = getSedeParam();
       const query = orderId
-        ? `?id_picker=${pickerId}&id_pedido=${orderId}`
-        : `?id_picker=${pickerId}`;
+        ? `?id_picker=${pickerId}&id_pedido=${orderId}&${sp}`
+        : `?id_picker=${pickerId}&${sp}`;
       const res = await axios.get(`${BASE_URL}/analytics/route${query}`);
       setRouteData(res.data);
       setSelectedPickerRoute(pickerId);
@@ -1082,6 +1087,7 @@ const AnaliticaPickers = () => {
         <RouteSelectionView
           fetchPickerRoute={fetchPickerRoute}
           dateRange={dateRange}
+          getSedeParam={getSedeParam}
         />
       )}
 
