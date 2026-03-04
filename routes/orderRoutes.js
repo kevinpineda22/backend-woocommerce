@@ -57,4 +57,6 @@ router.post("/admin-force-pick", adminCtrl.forcePickItemToSession);
 
 // Ruta temporal para espiar metadatos (mejorada con detección de sede)
 router.get("/espiar-pedido/:id", dashboardCtrl.espiarPedido);
+// Diagnóstico: listar pedidos recientes de WooCommerce
+router.get("/diagnostico-woo", dashboardCtrl.diagnosticoWoo);
 module.exports = router;

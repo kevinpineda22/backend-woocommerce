@@ -98,6 +98,111 @@
   justify-content: center;
 }
 
+/* ─── Role & Sede Indicator ─── */
+.pedidos-role-indicator {
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pedidos-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  width: fit-content;
+  backdrop-filter: blur(4px);
+  transition: transform 0.15s ease;
+}
+.pedidos-role-badge:hover {
+  transform: scale(1.03);
+}
+
+.pedidos-role-badge-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.pedidos-role-badge-text {
+  white-space: nowrap;
+}
+
+/* Role-specific colors */
+.pedidos-role-badge--ecommerce_admin_global {
+  background: linear-gradient(
+    135deg,
+    rgba(168, 85, 247, 0.35),
+    rgba(139, 92, 246, 0.25)
+  );
+  color: #e0d4fc;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+.pedidos-role-badge--ecommerce_admin_sede {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.35),
+    rgba(37, 99, 235, 0.25)
+  );
+  color: #bfdbfe;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+}
+.pedidos-role-badge--ecommerce_picker {
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.35),
+    rgba(5, 150, 105, 0.25)
+  );
+  color: #a7f3d0;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+.pedidos-role-badge--ecommerce_auditor {
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.35),
+    rgba(217, 119, 6, 0.25)
+  );
+  color: #fde68a;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+/* Sede mini indicator */
+.pedidos-sede-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-left: 4px;
+}
+.pedidos-sede-indicator-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pa-accent-green);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+  flex-shrink: 0;
+  animation: sedePulse 2s ease-in-out infinite;
+}
+.pedidos-sede-indicator-text {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+@keyframes sedePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
 .pedidos-nav-label {
   padding: 0 20px;
   font-size: 0.7rem;

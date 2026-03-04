@@ -41,6 +41,8 @@ export const useSedeContext = () => {
       loading: false,
       isSuperAdmin: false,
       isMultiSede: false,
+      ecommerceRol: null,
+      ecommerceRolLabel: "",
       cambiarSede: () => {},
       getSedeParam: () => "",
       getSedeHeader: () => ({}),
@@ -54,6 +56,15 @@ export const SedeProvider = ({ children }) => {
   const [sedeActual, setSedeActual] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [ecommerceRol, setEcommerceRol] = useState(null);
+
+  // Mapa de labels para ecommerce_rol
+  const ECOM_ROL_LABELS = {
+    ecommerce_admin_global: "Admin Global",
+    ecommerce_admin_sede: "Admin de Sede",
+    ecommerce_picker: "Picker",
+    ecommerce_auditor: "Auditor",
+  };
 
   // Cargar sedes y determinar la sede del usuario
   useEffect(() => {
@@ -69,9 +80,14 @@ export const SedeProvider = ({ children }) => {
 
         // 3. Determinar si es super admin
         const role = empleado.role || "";
+        const ecomRol = empleado.ecommerce_rol || null;
+        setEcommerceRol(ecomRol);
+
         const esSuperAdmin =
-          ["super_admin", "admin"].includes(role) ||
-          (empleado.personal_routes &&
+          ["super_admin"].includes(role) ||
+          ecomRol === "ecommerce_admin_global" ||
+          (["admin"].includes(role) &&
+            empleado.personal_routes &&
             empleado.personal_routes.some(
               (r) =>
                 r.path?.includes("gestion-pedidos") ||
@@ -182,6 +198,8 @@ export const SedeProvider = ({ children }) => {
     loading,
     isSuperAdmin,
     isMultiSede: sedes.length > 1,
+    ecommerceRol,
+    ecommerceRolLabel: ECOM_ROL_LABELS[ecommerceRol] || "",
     cambiarSede,
     getSedeParam,
     getSedeHeader,

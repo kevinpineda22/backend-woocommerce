@@ -777,3 +777,41 @@ exports.espiarPedido = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// =========================================================
+// DIAGNÓSTICO: Listar pedidos recientes de WooCommerce (cualquier estado)
+// =========================================================
+exports.diagnosticoWoo = async (req, res) => {
+  try {
+    const status = req.query.status || "any";
+    const perPage = parseInt(req.query.per_page) || 10;
+
+    const params = { per_page: perPage, orderby: "date", order: "desc" };
+    if (status !== "any") params.status = status;
+
+    const { data: orders } = await WooCommerce.get("orders", params);
+
+    const resumen = orders.map((o) => {
+      const sedeRaw = extractSedeFromOrder(o);
+      return {
+        id: o.id,
+        number: o.number,
+        status: o.status,
+        date_created: o.date_created,
+        total: o.total,
+        billing_name: `${o.billing?.first_name || ""} ${o.billing?.last_name || ""}`.trim(),
+        sede_raw: sedeRaw || "❌ Sin sede detectada",
+        meta_keys: (o.meta_data || []).map((m) => `${m.key} = ${String(m.value).substring(0, 80)}`),
+        shipping_methods: (o.shipping_lines || []).map((s) => `${s.method_title} (${s.method_id})`),
+      };
+    });
+
+    res.status(200).json({
+      total_encontrados: orders.length,
+      filtro_status: status,
+      pedidos: resumen,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

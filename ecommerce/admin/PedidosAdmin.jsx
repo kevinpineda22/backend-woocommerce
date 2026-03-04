@@ -50,6 +50,8 @@ const PedidosAdmin = () => {
     isSuperAdmin,
     isMultiSede,
     sedeActual,
+    ecommerceRol,
+    ecommerceRolLabel,
   } = useSedeContext();
 
   // --- ESTADOS GLOBALES ---
@@ -359,6 +361,34 @@ const PedidosAdmin = () => {
         {/* SELECTOR DE SEDE */}
         <div className="pedidos-sede-selector-wrapper">
           <SedeSelector compact />
+        </div>
+
+        {/* INDICADOR DE ROL Y SEDE */}
+        <div className="pedidos-role-indicator">
+          {ecommerceRolLabel && (
+            <div
+              className={`pedidos-role-badge pedidos-role-badge--${ecommerceRol}`}
+            >
+              <span className="pedidos-role-badge-icon">
+                {ecommerceRol === "ecommerce_admin_global"
+                  ? "👑"
+                  : ecommerceRol === "ecommerce_admin_sede"
+                    ? "🏪"
+                    : ecommerceRol === "ecommerce_picker"
+                      ? "📦"
+                      : ecommerceRol === "ecommerce_auditor"
+                        ? "🔍"
+                        : "👤"}
+              </span>
+              <span className="pedidos-role-badge-text">
+                {ecommerceRolLabel}
+              </span>
+            </div>
+          )}
+          <div className="pedidos-sede-indicator">
+            <span className="pedidos-sede-indicator-dot" />
+            <span className="pedidos-sede-indicator-text">{sedeName}</span>
+          </div>
         </div>
         <nav className="pedidos-layout-sidebar-nav">
           <div className="pedidos-nav-label">OPERACIÓN</div>
