@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import axios from "axios";
+import { ecommerceApi } from "../../shared/ecommerceApi";
 import { supabase } from "../../../../supabaseClient"; 
 
 export const useOfflineQueue = (resetSesionLocal) => {
@@ -47,8 +47,8 @@ export const useOfflineQueue = (resetSesionLocal) => {
           
           try {
             console.log("📤 Subiendo acción:", item.accion);
-            await axios.post(
-              "https://backend-woocommerce.vercel.app/api/orders/registrar-accion",
+            await ecommerceApi.post(
+              "/registrar-accion",
               item
             );
 

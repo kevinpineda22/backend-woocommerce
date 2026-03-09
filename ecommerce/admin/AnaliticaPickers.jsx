@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import { analyticsApi } from "../shared/ecommerceApi";
 import { useSedeContext } from "../shared/SedeContext";
 import {
   FaChartLine,
@@ -30,11 +30,10 @@ const RouteSelectionView = ({ fetchPickerRoute, dateRange, getSedeParam }) => {
     const fetchHistory = async () => {
       setLoading(true);
       try {
-        const BASE_URL = "https://backend-woocommerce.vercel.app/api";
         const sp = getSedeParam ? getSedeParam() : "";
-        // Pasamos el filtro de rango al backend tambien
-        const { data: rawRoutes } = await axios.get(
-          `${BASE_URL}/analytics/routes-history?range=${dateRange}&${sp}`,
+        const { data: rawRoutes } = await analyticsApi.get(
+          `/routes-history`,
+          { params: { range: dateRange, ...Object.fromEntries(new URLSearchParams(sp)) } },
         );
 
         let processedRoutes = Array.isArray(rawRoutes) ? rawRoutes : [];
@@ -266,14 +265,12 @@ const AnaliticaPickers = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Ajuste de URLs para entorno local vs producción
-      const BASE_URL = "https://backend-woocommerce.vercel.app/api";
       const sp = getSedeParam();
 
       const [perfRes, heatRes, auditRes] = await Promise.all([
-        axios.get(`${BASE_URL}/analytics/performance?range=${dateRange}&${sp}`),
-        axios.get(`${BASE_URL}/analytics/heatmap?${sp}`),
-        axios.get(`${BASE_URL}/analytics/audit?${sp}`),
+        analyticsApi.get(`/performance`, { params: { range: dateRange, ...Object.fromEntries(new URLSearchParams(sp)) } }),
+        analyticsApi.get(`/heatmap`, { params: Object.fromEntries(new URLSearchParams(sp)) }),
+        analyticsApi.get(`/audit`, { params: Object.fromEntries(new URLSearchParams(sp)) }),
       ]);
 
       // Nueva Respuesta de Performance: { pickers, hourlyActivity, globalStats }
@@ -307,12 +304,10 @@ const AnaliticaPickers = () => {
   const fetchPickerRoute = async (pickerId, orderId = null) => {
     setLoadingRoute(true);
     try {
-      const BASE_URL = "https://backend-woocommerce.vercel.app/api";
       const sp = getSedeParam();
-      const query = orderId
-        ? `?id_picker=${pickerId}&id_pedido=${orderId}&${sp}`
-        : `?id_picker=${pickerId}&${sp}`;
-      const res = await axios.get(`${BASE_URL}/analytics/route${query}`);
+      const params = { id_picker: pickerId, ...Object.fromEntries(new URLSearchParams(sp)) };
+      if (orderId) params.id_pedido = orderId;
+      const res = await analyticsApi.get(`/route`, { params });
       setRouteData(res.data);
       setSelectedPickerRoute(pickerId);
     } catch (error) {

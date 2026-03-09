@@ -12,8 +12,18 @@ import {
   FaBoxOpen,
   FaPhone,
   FaWalking,
+  FaStoreAlt,
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
+
+const PA_VIEW_QUOTES = [
+  { text: "Puede que no controles los hechos que ocurren, pero puedes decidir no dejarte derrotar por ellos.", author: "Maya Angelou" },
+  { text: "La innovación diferencia a un líder de un seguidor.", author: "Steve Jobs" },
+  { text: "Aquel que se exige mucho a sí mismo y espera poco de los demás, mantendrá lejos el resentimiento.", author: "Confucio" },
+  { text: "Si hacemos el bien por interés, seremos astutos, pero nunca buenos.", author: "Cicerón" },
+  { text: "Sé un criterio de calidad. Algunas personas no están acostumbradas a un ambiente donde se espera la excelencia.", author: "Steve Jobs" },
+  { text: "La paciencia es amarga, pero sus frutos son dulces.", author: "Aristóteles" },
+];
 
 const formatPrice = (amount) =>
   new Intl.NumberFormat("es-CO", {
@@ -36,6 +46,11 @@ const PendingOrdersView = ({
   onAssignClick,
   onAssignSingleDirect,
 }) => {
+  const emptyQuote = useMemo(() => {
+    const idx = Math.floor(Math.random() * PA_VIEW_QUOTES.length);
+    return PA_VIEW_QUOTES[idx];
+  }, []);
+
   const displayedOrders = useMemo(() => {
     return orders.filter((order) => {
       const sLower = searchTerm.toLowerCase();
@@ -133,6 +148,9 @@ const PendingOrdersView = ({
           </button>
         </div>
       </div>
+      <div className="pedidos-filter-results">
+        Mostrando <strong>{displayedOrders.length}</strong> de <strong>{orders.length}</strong> pedidos
+      </div>
 
       {loading && orders.length === 0 ? (
         <div className="pedidos-main-loading">
@@ -143,7 +161,11 @@ const PendingOrdersView = ({
         <div className="pedidos-admin-orders-grid">
           {displayedOrders.length === 0 ? (
             <div className="pedidos-empty-list-container">
+              <div className="pa-empty-icon">📦</div>
               <h3>No hay pedidos pendientes que coincidan.</h3>
+              <p className="pa-empty-quote">
+                «{emptyQuote.text}» — {emptyQuote.author}
+              </p>
             </div>
           ) : (
             displayedOrders.map((order) => {
@@ -174,29 +196,21 @@ const PendingOrdersView = ({
                     onClick={() => setLocalSelectedOrder(order)}
                   >
                     <div className="pa-ticket-header">
-                      <div>
+                      <div className="pa-ticket-tags-row">
                         <span className="pa-ticket-id">#{order.id}</span>
+                        {order.sede_detected && (
+                          <span className="pa-ticket-sede-tag">
+                            <FaStoreAlt size={9} /> {order.sede_detected}
+                          </span>
+                        )}
                         {isPickup && (
-                          <span
-                            style={{
-                              background: "#d946ef",
-                              color: "white",
-                              padding: "2px 6px",
-                              borderRadius: "4px",
-                              fontSize: "0.7rem",
-                              fontWeight: "bold",
-                              marginLeft: "5px",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: "3px",
-                            }}
-                          >
+                          <span className="pa-ticket-pickup-tag">
                             <FaWalking /> RECOGIDA
                           </span>
                         )}
                       </div>
                       <span className="pa-ticket-date">
-                        <FaClock size={12} style={{ marginRight: 4 }} />
+                        <FaClock size={11} />
                         {new Date(order.date_created).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -217,9 +231,7 @@ const PendingOrdersView = ({
                       </div>
                       <div className="pa-ticket-address">
                         {isPickup ? (
-                          <span
-                            style={{ color: "#a21caf", fontWeight: "bold" }}
-                          >
+                          <span className="pa-ticket-address-pickup">
                             Retira el cliente en sede
                           </span>
                         ) : (
@@ -301,10 +313,7 @@ const PendingOrdersView = ({
                     <FaMapMarkerAlt /> Entrega
                   </h4>
                   {isPickupOrder(localSelectedOrder) ? (
-                    <p
-                      className="pa-info-main-text"
-                      style={{ color: "#a21caf" }}
-                    >
+                    <p className="pa-info-main-text pa-ticket-address-pickup">
                       🚶‍♂️ Recogida en Sede
                     </p>
                   ) : (
@@ -358,18 +367,8 @@ const PendingOrdersView = ({
                               {formatPrice(item.total)}
                             </span>
                           </div>
-                          {/* Mostramos nota del producto en admin también */}
                           {noteMeta && (
-                            <div
-                              style={{
-                                marginTop: "5px",
-                                fontSize: "0.8rem",
-                                color: "#b45309",
-                                background: "#fffbeb",
-                                padding: "4px 8px",
-                                borderRadius: "4px",
-                              }}
-                            >
+                            <div className="pa-prod-note-box">
                               <strong>Nota:</strong> {noteMeta.value}
                             </div>
                           )}
@@ -423,7 +422,7 @@ const PendingOrdersView = ({
           <div className="batch-info">
             <strong>{selectedIds.size}</strong> seleccionados
           </div>
-          <div style={{ display: "flex", gap: 15 }}>
+          <div className="pa-batch-buttons">
             <button
               className="batch-btn cancel"
               onClick={() => setSelectedIds(new Set())}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import axios from "axios";
+import { ecommerceApi } from "../shared/ecommerceApi";
 import { supabase } from "../../../supabaseClient";
 import {
   FaLayerGroup,
@@ -13,6 +13,7 @@ import {
   FaTrash,
   FaTrashRestore,
   FaSync,
+  FaStoreAlt,
 } from "react-icons/fa";
 import "./LiveSessionModal.css";
 
@@ -38,8 +39,8 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
   const refreshRouteData = useCallback(async () => {
     if (!sessionDetail?.sessionInfo?.picker_id) return;
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${sessionDetail.sessionInfo.picker_id}&include_removed=true`,
+      const res = await ecommerceApi.get(
+        `/sesion-activa?id_picker=${sessionDetail.sessionInfo.picker_id}&include_removed=true`,
       );
       if (res.data) {
         setLocalRouteData(res.data);
@@ -110,8 +111,8 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
     if (!window.confirm(`¿ANULAR "${item.name}"?`)) return;
     setIsProcessing(true);
     try {
-      await axios.post(
-        "https://backend-woocommerce.vercel.app/api/orders/admin-remove-item",
+      await ecommerceApi.post(
+        "/admin-remove-item",
         {
           id_sesion: sessionInfo.session_id,
           id_producto: item.product_id,
@@ -130,8 +131,8 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
     if (!window.confirm(`¿RESTAURAR "${item.name}"?`)) return;
     setIsProcessing(true);
     try {
-      await axios.post(
-        "https://backend-woocommerce.vercel.app/api/orders/admin-restore-item",
+      await ecommerceApi.post(
+        "/admin-restore-item",
         {
           id_sesion: sessionInfo.session_id,
           id_producto: item.product_id,
@@ -155,8 +156,8 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
       return;
     setIsProcessing(true);
     try {
-      await axios.post(
-        "https://backend-woocommerce.vercel.app/api/orders/admin-force-pick",
+      await ecommerceApi.post(
+        "/admin-force-pick",
         {
           id_sesion: sessionInfo.session_id,
           id_producto: item.product_id,
@@ -224,6 +225,23 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                     minute: "2-digit",
                   })}
                 </span>
+                {sessionInfo.sede_nombre && (
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "2px 8px",
+                      borderRadius: 5,
+                      background: "rgba(99,102,241,0.15)",
+                      fontSize: "0.72rem",
+                      fontWeight: 600,
+                      color: "#a5b4fc",
+                    }}
+                  >
+                    <FaStoreAlt size={10} /> {sessionInfo.sede_nombre}
+                  </span>
+                )}
                 <span style={{ fontSize: "0.7rem", opacity: 0.6 }}>
                   <FaSync className="ec-spin" /> Live
                 </span>

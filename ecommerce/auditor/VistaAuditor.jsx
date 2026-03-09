@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import axios from "axios";
-import { Html5QrcodeScanner } from "html5-qrcode";
+import { ecommerceApi } from "../shared/ecommerceApi";
+import EscanerBarras from "../../DesarrolloSurtido_API/EscanerBarras";
 import ManifestSheet from "../shared/ManifestSheet";
 import { useSedeContext } from "../shared/SedeContext";
 import {
@@ -21,11 +21,14 @@ import {
   FaArrowRight,
   FaPrint,
   FaFileInvoice,
+  FaShieldAlt,
+  FaSearchPlus,
+  FaInfoCircle,
 } from "react-icons/fa";
 import "./VistaAuditor.css";
 
 const VistaAuditor = () => {
-  const { getSedeParam } = useSedeContext();
+  const { sedeName } = useSedeContext();
   const [sessionId, setSessionId] = useState("");
   const [auditData, setAuditData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -38,6 +41,19 @@ const VistaAuditor = () => {
   const [verifiedItems, setVerifiedItems] = useState(new Set());
   const [manualVerifyCode, setManualVerifyCode] = useState("");
   const [showInvoices, setShowInvoices] = useState(false);
+  const [scanFeedback, setScanFeedback] = useState(null);
+
+  const showFeedback = (type, message) => {
+    if (navigator.vibrate) {
+      if (type === "success") navigator.vibrate([50, 50]);
+      if (type === "warning") navigator.vibrate([100]);
+      if (type === "error") navigator.vibrate([200, 100, 200]);
+    }
+    setScanFeedback({ type, message });
+    setTimeout(() => {
+      setScanFeedback((prev) => (prev?.message === message ? null : prev));
+    }, 4000);
+  };
 
   useEffect(() => {
     const storedSession = localStorage.getItem("auditor_session_id");
@@ -58,21 +74,6 @@ const VistaAuditor = () => {
     }
   }, [requiredItems, verifiedItems, auditData]);
 
-  useEffect(() => {
-    let scanner = null;
-    if (scannerMode) {
-      scanner = new Html5QrcodeScanner(
-        "reader",
-        { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 },
-        false,
-      );
-      scanner.render(handleScanSuccess, (err) => {});
-    }
-    return () => {
-      if (scanner) scanner.clear().catch(console.error);
-    };
-  }, [scannerMode]);
-
   const handleScanSuccess = (decodedText) => {
     if (navigator.vibrate) navigator.vibrate(100);
     setTimeout(() => {
@@ -82,34 +83,27 @@ const VistaAuditor = () => {
       } else if (scannerMode === "product" && auditData) {
         verifyProductScan(decodedText);
       }
+      setScannerMode(null);
     }, 200);
   };
 
   const verifyProductScan = (code) => {
     const cleanCode = code.trim().toUpperCase();
     let matchId = null;
+    let foundInOrder = false;
+    let matchedName = "";
 
     auditData.items.forEach((item) => {
-      if (requiredItems.has(item.id)) {
-        // ✅ PRIORIDAD 1: Códigos de barras escaneados durante el picking
-        const scannedBarcodes = auditData.scannedBarcodes?.[item.id];
-        if (scannedBarcodes && scannedBarcodes.has(cleanCode)) {
-          matchId = item.id;
-          return;
-        }
+      const scannedBarcodes = auditData.scannedBarcodes?.[item.id];
+      const hasScannedBarcode = scannedBarcodes && scannedBarcodes.has(cleanCode);
+      const hasSiesaBarcode = item.barcode && item.barcode.trim().toUpperCase() === cleanCode;
+      const itemSku = (item.id || "").toString().toUpperCase();
+      const hasSkuMatch = itemSku === cleanCode || (item.sku && item.sku.toUpperCase() === cleanCode);
 
-        // ✅ PRIORIDAD 2: Código de barras de SIESA (backup)
-        if (item.barcode && item.barcode.trim().toUpperCase() === cleanCode) {
-          matchId = item.id;
-          return;
-        }
-
-        // ✅ PRIORIDAD 3: SKU o ID (fallback)
-        const itemSku = (item.id || "").toString().toUpperCase();
-        if (
-          itemSku === cleanCode ||
-          (item.sku && item.sku.toUpperCase() === cleanCode)
-        ) {
+      if (hasScannedBarcode || hasSiesaBarcode || hasSkuMatch) {
+        foundInOrder = true;
+        matchedName = item.name;
+        if (requiredItems.has(item.id)) {
           matchId = item.id;
         }
       }
@@ -118,13 +112,22 @@ const VistaAuditor = () => {
     if (matchId) {
       if (!verifiedItems.has(matchId)) {
         setVerifiedItems((prev) => new Set(prev).add(matchId));
-        if (navigator.vibrate) navigator.vibrate([50, 50]);
+        showFeedback("success", `Producto verificado: ${matchedName}`);
+      } else {
+        showFeedback("warning", "El producto ya había sido verificado.");
       }
+    } else if (foundInOrder) {
+      showFeedback("info", "El producto pertenece al pedido, pero no requiere validación (fuera de muestra).");
+    } else {
+      showFeedback("error", `El código "${cleanCode}" no pertenece a este pedido.`);
     }
   };
 
   const handleManualVerify = () => {
-    if (!manualVerifyCode.trim()) return;
+    if (!manualVerifyCode.trim()) {
+      showFeedback("warning", "Por favor ingresa un código manualmente.");
+      return;
+    }
     verifyProductScan(manualVerifyCode);
     setManualVerifyCode("");
   };
@@ -171,8 +174,8 @@ const VistaAuditor = () => {
     setScannerMode(null);
 
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${id}&${getSedeParam()}`,
+      const res = await ecommerceApi.get(
+        `/historial-detalle?session_id=${id}`,
       );
       const { metadata, logs, orders_info, products_map, final_snapshot } =
         res.data;
@@ -379,20 +382,16 @@ const VistaAuditor = () => {
       };
 
       // Llamamos al nuevo endpoint que genera el QR en backend
-      const response = await fetch(
-        `https://backend-woocommerce.vercel.app/api/orders/auditor/finalizar?${getSedeParam()}`,
+      const response = await ecommerceApi.post(
+        `/auditor/finalizar`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            session_id: auditData.meta.session_id,
-            datos_salida: snapshotPayload, // ✅ ENVIAMOS LOS DATOS
-          }),
+          session_id: auditData.meta.session_id,
+          datos_salida: snapshotPayload,
         },
       );
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Error al finalizar");
+      const data = response.data;
+      if (response.status !== 200) throw new Error(data.error || "Error al finalizar");
 
       // 1. Inyectamos el QR generado por el servidor en el estado
       const newAuditData = { ...auditData };
@@ -488,6 +487,7 @@ const VistaAuditor = () => {
               timestamp={qrData.timestamp}
               pickerName={auditData.meta.picker_name}
               orderIndex={orderIndex}
+              sedeName={sedeName}
             />
           );
         })}
@@ -498,53 +498,84 @@ const VistaAuditor = () => {
   return (
     <div className="auditor-layout">
       <header className="auditor-header">
+        <div className="aud-header-spacer"></div>
         <h1>
           <FaClipboardCheck /> Auditoría
         </h1>
+        <div className="aud-header-right">
+        </div>
       </header>
 
-      {scannerMode && (
-        <div className="scanner-overlay">
-          <div className="scanner-box">
-            <h3>{scannerMode === "session" ? "QR Ruta" : "Verificando"}</h3>
-            <div id="reader"></div>
-            <button
-              className="close-scanner-btn"
-              onClick={() => setScannerMode(null)}
-            >
-              <FaTimes /> Cerrar
-            </button>
-          </div>
-        </div>
-      )}
+      <EscanerBarras 
+        isScanning={!!scannerMode} 
+        setIsScanning={(val) => setScannerMode(val ? scannerMode : null)} 
+        onScan={handleScanSuccess} 
+      />
 
       <div className="auditor-body">
         {!auditData && (
-          <div className="auditor-controls">
-            <div className="scan-bar-container">
-              <button
-                className="auditor-scan-btn"
-                onClick={() => setScannerMode("session")}
-              >
-                <FaCamera />
-              </button>
-              <input
-                className="auditor-input"
-                placeholder="ID Sesión..."
-                value={sessionId}
-                onChange={(e) => setSessionId(e.target.value)}
-                onKeyDown={handleManualSubmit}
-                autoFocus
-              />
-              <button
-                className="auditor-search-btn"
-                onClick={() => fetchAuditData(sessionId)}
-              >
-                <FaSearch />
-              </button>
+          <div className="aud-dashboard animate-fade-in">
+            {/* HER0 SECCTION / BUSCADOR */}
+            <div className="aud-hero">
+              <FaShieldAlt className="aud-hero-icon" />
+              <h2>Centro de Auditoría</h2>
+              <p>Escanea el Código QR de la canasta o ingresa el ID de sesión manualmente para iniciar la validación del pedido.</p>
+              
+              <div className="scan-bar-container">
+                <button
+                  className="auditor-scan-btn"
+                  title="Escanear QR de Sesión"
+                  onClick={() => setScannerMode("session")}
+                >
+                  <FaCamera />
+                </button>
+                <input
+                  className="auditor-input"
+                  placeholder="Ej: d7a1b3f9..."
+                  value={sessionId}
+                  onChange={(e) => setSessionId(e.target.value)}
+                  onKeyDown={handleManualSubmit}
+                  autoFocus
+                />
+                <button
+                  className="auditor-search-btn"
+                  title="Buscar Sesión"
+                  onClick={() => fetchAuditData(sessionId)}
+                  disabled={loading || !sessionId}
+                  style={{ opacity: loading || !sessionId ? 0.7 : 1 }}
+                >
+                  <FaSearch />
+                </button>
+              </div>
+
+              {errorMsg && <div className="auditor-error" style={{ marginTop: '20px' }}>{errorMsg}</div>}
+              {loading && <div className="auditor-loading" style={{ marginTop: '20px' }}>Obteniendo datos de sesión...</div>}
             </div>
-            {errorMsg && <div className="auditor-error">{errorMsg}</div>}
-            {loading && <div className="auditor-loading">Cargando...</div>}
+
+            {/* TARJETAS EDUCATIVAS - GUÍA PARA EL AUDITOR */}
+            <div className="aud-info-cards">
+              <div className="aud-info-card">
+                <div className="aud-info-icon">
+                  <FaSearchPlus />
+                </div>
+                <h3>Validación Rigurosa</h3>
+                <p>Verifica que los productos físicos coincidan exactamente con el pedido escaneando sus códigos de barras de forma aleatoria.</p>
+              </div>
+              <div className="aud-info-card">
+                <div className="aud-info-icon">
+                  <FaCheckDouble />
+                </div>
+                <h3>Control de Sustitutos</h3>
+                <p>Presta especial atención a los productos sustituidos. Garantiza que el cliente reciba un producto de igual o mejor calidad.</p>
+              </div>
+              <div className="aud-info-card">
+                <div className="aud-info-icon">
+                  <FaShieldAlt />
+                </div>
+                <h3>Garantía de Calidad</h3>
+                <p>Tu rol es la última línea de defensa. Una vez aprobada la salida, generas el código QR maestro para facturación y despacho.</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -576,8 +607,7 @@ const VistaAuditor = () => {
                 {/* ✅ BOTÓN DE HISTORIAL DE QR */}
                 {auditData.finalSnapshot && (
                   <button
-                    className="audit-act-btn approve"
-                    style={{ padding: "5px 15px", fontSize: "0.8rem" }}
+                    className="audit-act-btn approve aud-qr-history-btn"
                     onClick={handleViewHistorical}
                   >
                     <FaFileInvoice /> Ver QR Original
@@ -609,11 +639,11 @@ const VistaAuditor = () => {
                       className="start-verify-btn"
                       onClick={() => setScannerMode("product")}
                     >
-                      <FaBarcode /> Escanear
+                      <FaBarcode /> Escanear Producto
                     </button>
                     <div className="manual-verify-box">
                       <input
-                        placeholder="Código..."
+                        placeholder="Código manual..."
                         value={manualVerifyCode}
                         onChange={(e) => setManualVerifyCode(e.target.value)}
                         onKeyDown={(e) =>
@@ -678,17 +708,8 @@ const VistaAuditor = () => {
                                   {isRequired &&
                                     !isVerified &&
                                     auditData.scannedBarcodes?.[item.id] && (
-                                      <div
-                                        style={{
-                                          fontSize: "0.7rem",
-                                          color: "#059669",
-                                          marginTop: "4px",
-                                          fontWeight: "600",
-                                        }}
-                                      >
-                                        <FaBarcode
-                                          style={{ marginRight: "4px" }}
-                                        />
+                                      <div className="aud-barcode-hint">
+                                        <FaBarcode />
                                         {Array.from(
                                           auditData.scannedBarcodes[item.id],
                                         ).join(", ")}
@@ -732,30 +753,11 @@ const VistaAuditor = () => {
                         <div className="tl-title">{log.accion}</div>
                         <div className="tl-desc">
                           {log.accion === "sustituido" ? (
-                            <div
-                              style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 4,
-                              }}
-                            >
-                              <span
-                                style={{
-                                  textDecoration: "line-through",
-                                  color: "#94a3b8",
-                                }}
-                              >
+                            <div className="aud-timeline-sub-layout">
+                              <span className="aud-timeline-sub-original">
                                 {log.nombre_producto}
                               </span>
-                              <span
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 5,
-                                  color: "#d97706",
-                                  fontWeight: "bold",
-                                }}
-                              >
+                              <span className="aud-timeline-sub-replacement">
                                 <FaArrowRight size={12} />{" "}
                                 {log.nombre_sustituto}
                               </span>
@@ -792,6 +794,18 @@ const VistaAuditor = () => {
           </div>
         )}
       </div>
+
+      {scanFeedback && (
+        <div className="aud-toast-container">
+          <div className={`aud-toast ${scanFeedback.type}`}>
+            {scanFeedback.type === "success" && <FaCheck />}
+            {scanFeedback.type === "error" && <FaTimes />}
+            {scanFeedback.type === "warning" && <FaExclamationTriangle />}
+            {scanFeedback.type === "info" && <FaInfoCircle />}
+            <span>{scanFeedback.message}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

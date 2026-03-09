@@ -1,24 +1,24 @@
-/* VistaPicker.css - Versión FINAL, Limpia y Completa */
+/* VistaPicker.css - Módulo Picker
+   Prefijo: ec- (Ecommerce Picker)
+   Variables con scope local al layout raíz */
 @import url("https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
 
-:root {
-  --ec-bg: #f1f5f9;
-  --ec-text: #0f172a;
-  --ec-text-secondary: #64748b;
-  --ec-primary: #2563eb;
-  --ec-success: #22c55e;
-  --ec-warning: #f59e0b;
-  --ec-danger: #ef4444;
-  --ec-white: #ffffff;
-  --ec-border: #e2e8f0;
-}
-
 .ec-picker-main-layout {
-  background-color: var(--ec-bg);
+  --ec-picker-bg: #f1f5f9;
+  --ec-picker-text: #0f172a;
+  --ec-picker-text-secondary: #64748b;
+  --ec-picker-accent: #2563eb;
+  --ec-picker-success: #22c55e;
+  --ec-picker-warning: #f59e0b;
+  --ec-picker-danger: #ef4444;
+  --ec-picker-white: #ffffff;
+  --ec-picker-border: #e2e8f0;
+
+  background-color: var(--ec-picker-bg);
   min-height: 100vh;
   font-family: "Cabin", Helvetica, sans-serif;
   font-size: 16px;
-  color: var(--ec-text);
+  color: var(--ec-picker-text);
   padding-bottom: 140px;
 }
 
@@ -27,7 +27,7 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  background: var(--ec-white);
+  background: var(--ec-picker-white);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
@@ -131,8 +131,8 @@
   font-size: 0.9rem;
 }
 .ec-zone-tab.active {
-  color: var(--ec-primary);
-  border-bottom-color: var(--ec-primary);
+  color: var(--ec-picker-accent);
+  border-bottom-color: var(--ec-picker-accent);
   background: linear-gradient(to top, #eff6ff, transparent);
 }
 
@@ -152,7 +152,7 @@
 
 /* PRODUCT CARD */
 .ec-product-card {
-  background: var(--ec-white);
+  background: var(--ec-picker-white);
   border-radius: 16px;
   padding: 16px;
   margin-bottom: 16px;
@@ -234,7 +234,7 @@
 .ec-prod-name {
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--ec-text);
+  color: var(--ec-picker-text);
   margin: 0;
   line-height: 1.25;
 }
@@ -341,7 +341,7 @@
   border-radius: 14px;
   border: none;
   background: #dbeafe;
-  color: var(--ec-primary);
+  color: var(--ec-picker-accent);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -430,7 +430,7 @@
   font-size: 1.1rem;
 }
 .ec-fab-arrow {
-  background: var(--ec-success);
+  background: var(--ec-picker-success);
   width: 54px;
   height: 54px;
   border-radius: 50%;
@@ -454,7 +454,7 @@
   width: 40px;
   height: 40px;
   border: 4px solid #e2e8f0;
-  border-top-color: var(--ec-primary);
+  border-top-color: var(--ec-picker-accent);
   border-radius: 50%;
   animation: spin 1s infinite linear;
   margin-bottom: 20px;
@@ -467,8 +467,10 @@
 
 /* BARRA ESTADO */
 .ec-status-bar {
-  text-align: center;
-  padding: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 12px;
   font-size: 0.75rem;
   font-weight: 700;
   color: white;
@@ -561,10 +563,10 @@
   outline: none;
 }
 .ec-search-input:focus {
-  border-color: var(--ec-primary);
+  border-color: var(--ec-picker-accent);
 }
 .ec-search-btn {
-  background: var(--ec-primary);
+  background: var(--ec-picker-accent);
   color: white;
   border: none;
   padding: 0 20px;
@@ -626,7 +628,7 @@
   margin-bottom: 2px;
 }
 .ec-res-price {
-  color: var(--ec-primary);
+  color: var(--ec-picker-accent);
   font-weight: 800;
 }
 .ec-res-stock {
@@ -637,7 +639,7 @@
 }
 
 .ec-select-btn {
-  background: var(--ec-primary);
+  background: var(--ec-picker-accent);
   color: white;
   border: none;
   padding: 8px 15px;
@@ -681,7 +683,7 @@
   padding: 12px;
   border-radius: 12px;
   font-weight: 600;
-  color: var(--ec-text);
+  color: var(--ec-picker-text);
   cursor: pointer;
 }
 .ec-reason-btn {
@@ -733,4 +735,84 @@
   border-radius: 4px;
   width: fit-content;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* ─── Success / QR Screen ─── */
+.ec-success-screen {
+  background: #10b981;
+  color: white;
+}
+
+.ec-success-qr-box {
+  background: white;
+  padding: 20px;
+  border-radius: 16px;
+  margin: 30px 0;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.ec-success-session-id {
+  font-size: 0.9rem;
+  font-weight: bold;
+  font-family: monospace;
+  background: rgba(0, 0, 0, 0.1);
+  padding: 5px 10px;
+  border-radius: 8px;
+}
+
+.ec-success-lock-section {
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.ec-success-lock-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.ec-success-lock-waiting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+/* ─── Header Row Helpers ─── */
+.ec-header-session-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ec-header-actions {
+  text-align: right;
+}
+
+.ec-header-item-count {
+  font-weight: bold;
+  margin-top: 5px;
+}
+
+/* ─── No Assignment Screen ─── */
+.ec-no-assignment-icon {
+  margin-bottom: 20px;
+}
+
+.ec-no-assignment-refresh {
+  width: auto;
+  padding: 10px 30px;
+}
+
+/* ─── Status Bar Sede Label ─── */
+.ec-status-bar-sede {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }

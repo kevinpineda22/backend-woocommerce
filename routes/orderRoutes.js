@@ -37,6 +37,7 @@ router.post("/validar-codigo", actionCtrl.validateManualCode);
 
 // Rutas de Producto
 router.get("/buscar-producto", productCtrl.searchProduct);
+router.get("/producto/base-ean-fruver/:sku", productCtrl.getBaseEanFruver);
 
 // Rutas Dashboard/Admin
 router.get("/dashboard-activo", dashboardCtrl.getActiveSessionsDashboard);

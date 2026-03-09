@@ -112,6 +112,7 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
               pickerName={manifestData.picker || "Sistema WMS"}
               orderIndex={selectedOrderIndex}
               densityClass={densityClass}
+              sedeName={manifestData.sede_nombre || null}
             />
           );
         })()}

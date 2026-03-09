@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import axios from "axios";
+import { ecommerceApi } from "../shared/ecommerceApi";
 import QRCode from "react-qr-code";
 import { AnimatePresence } from "framer-motion";
 import {
@@ -13,6 +13,7 @@ import {
   FaCheckCircle,
   FaLock,
   FaSpinner,
+  FaStoreAlt,
 } from "react-icons/fa";
 
 // Componentes y Constantes
@@ -31,6 +32,7 @@ import { getOrderStyle } from "./utils/pickerConstants";
 // Hooks (El Cerebro)
 import { useOfflineQueue } from "./hooks/useOfflineQueue";
 import { usePickerSession } from "./hooks/usePickerSession";
+import { useSedeContext } from "../shared/SedeContext";
 
 const VistaPicker = () => {
   // 1. Cargamos el cerebro (Lógica central y BD)
@@ -45,6 +47,9 @@ const VistaPicker = () => {
     updateLocalSessionState,
     handleFinish,
   } = usePickerSession();
+
+  // Sede del picker
+  const { sedeName } = useSedeContext();
 
   // 2. Cargamos el manejador Offline (Cola de acciones)
   const { isOnline, pendingSync, queueAction } =
@@ -210,7 +215,7 @@ const VistaPicker = () => {
     setLastScannedBarcode(null); // Limpiamos el buffer
   };
 
-  const confirmSubstitution = (newItem, qty) => {
+  const confirmSubstitution = (newItem, qty, finalBarcode = null) => {
     queueAction({
       id_sesion: sessionData.session_id,
       id_producto_original: currentItem.product_id,
@@ -223,7 +228,7 @@ const VistaPicker = () => {
       },
       cantidad_afectada: qty || 1,
       pasillo: currentItem.pasillo,
-      codigo_barras_escaneado: newItem.barcode || newItem.sku,
+      codigo_barras_escaneado: finalBarcode || newItem.barcode || newItem.sku,
     });
     updateLocalSessionState(
       currentItem.product_id,
@@ -247,8 +252,8 @@ const VistaPicker = () => {
     }
     if (!currentItem) return;
     try {
-      const res = await axios.post(
-        `https://backend-woocommerce.vercel.app/api/orders/validar-codigo${sedeParam ? "?" + sedeParam : ""}`,
+      const res = await ecommerceApi.post(
+        `/validar-codigo${sedeParam ? "?" + sedeParam : ""}`,
         { input_code: inputCode, expected_sku: currentItem.sku },
       );
       if (res.data.valid) {
@@ -318,64 +323,22 @@ const VistaPicker = () => {
   if (showSuccessQR && completedSessionId) {
     return (
       <div
-        className="ec-picker-centered"
-        style={{ background: "#10b981", color: "white" }}
+        className="ec-picker-centered ec-success-screen"
       >
-        <FaCheckCircle size={60} style={{ marginBottom: 20 }} />
+        <FaCheckCircle size={60} className="ec-no-assignment-icon" />
         <h2>¡Ruta Finalizada!</h2>
         <p>Muestra este código al auditor.</p>
-        <div
-          style={{
-            background: "white",
-            padding: 20,
-            borderRadius: 16,
-            margin: "30px 0",
-            boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
-          }}
-        >
+        <div className="ec-success-qr-box">
           <QRCode value={completedSessionId} size={220} />
         </div>
-        <p
-          style={{
-            fontSize: "0.9rem",
-            fontWeight: "bold",
-            fontFamily: "monospace",
-            background: "rgba(0,0,0,0.1)",
-            padding: "5px 10px",
-            borderRadius: 8,
-          }}
-        >
+        <p className="ec-success-session-id">
           ID: {completedSessionId.slice(0, 8)}
         </p>
-        <div
-          style={{
-            marginTop: 40,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              fontSize: "1.1rem",
-              fontWeight: "bold",
-            }}
-          >
+        <div className="ec-success-lock-section">
+          <div className="ec-success-lock-title">
             <FaLock /> <span>Bloqueado por seguridad</span>
           </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontSize: "0.9rem",
-              opacity: 0.9,
-            }}
-          >
+          <div className="ec-success-lock-waiting">
             <FaSpinner className="ec-spin" /> Esperando aprobación de salida...
           </div>
         </div>
@@ -389,13 +352,12 @@ const VistaPicker = () => {
         <FaShoppingBasket
           size={50}
           color="#cbd5e1"
-          style={{ marginBottom: 20 }}
+          className="ec-no-assignment-icon"
         />
         <h3>Sin asignación</h3>
         <button
           onClick={() => window.location.reload()}
-          className="ec-scan-btn"
-          style={{ width: "auto", padding: "10px 30px" }}
+          className="ec-scan-btn ec-no-assignment-refresh"
         >
           Actualizar
         </button>
@@ -407,6 +369,9 @@ const VistaPicker = () => {
     <div className="ec-picker-main-layout">
       {/* STATUS BAR */}
       <div className={`ec-status-bar ${isOnline ? "online" : "offline"}`}>
+        <span className="ec-status-bar-sede">
+          <FaStoreAlt size={11} /> {sedeName || "Sin sede"}
+        </span>
         {isOnline ? (
           <span>
             {pendingSync > 0 ? (
@@ -431,21 +396,21 @@ const VistaPicker = () => {
         <div className="ec-header-top">
           <div className="ec-order-info">
             <span className="ec-label-sm">Ruta Activa</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="ec-header-session-row">
               <span className="ec-order-id">
                 #{sessionData.session_id.slice(0, 6)}
               </span>
               <SessionTimer startDate={sessionData.fecha_inicio} />
             </div>
           </div>
-          <div style={{ textAlign: "right" }}>
+          <div className="ec-header-actions">
             <button
               className="ec-contacts-btn"
               onClick={() => setShowClientsModal(true)}
             >
               <FaPhone /> Clientes
             </button>
-            <div style={{ fontWeight: "bold", marginTop: 5 }}>
+            <div className="ec-header-item-count">
               {doneItems.length} / {sessionData.items.length} Items
             </div>
           </div>

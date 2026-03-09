@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import { ecommerceApi } from "../shared/ecommerceApi";
 import { Link } from "react-router-dom";
 import {
   FaBox,
@@ -34,6 +34,22 @@ import { SedeSelector } from "../shared/SedeSelector";
 
 import "./PedidosAdmin.css";
 
+const PA_QUOTES = [
+  { text: "Puede que no controles los hechos que ocurren, pero puedes decidir no dejarte derrotar por ellos.", author: "Maya Angelou" },
+  { text: "La innovación diferencia a un líder de un seguidor.", author: "Steve Jobs" },
+  { text: "Aquel que se exige mucho a sí mismo y espera poco de los demás, mantendrá lejos el resentimiento.", author: "Confucio" },
+  { text: "Si hacemos el bien por interés, seremos astutos, pero nunca buenos.", author: "Cicerón" },
+  { text: "Sé un criterio de calidad. Algunas personas no están acostumbradas a un ambiente donde se espera la excelencia.", author: "Steve Jobs" },
+  { text: "Somos lo que hacemos repetidamente. La excelencia, entonces, no es un acto, sino un hábito.", author: "Aristóteles" },
+  { text: "El principio de la sabiduría es la definición de los términos.", author: "Aristóteles" },
+  { text: "La calidad no es un acto, es un hábito.", author: "Aristóteles" },
+  { text: "Conocerse a uno mismo es el principio de toda sabiduría.", author: "Aristóteles" },
+  { text: "La paciencia es amarga, pero sus frutos son dulces.", author: "Aristóteles" },
+];
+
+/** Devuelve una cita diferente según un índice offset (para evitar repetir la misma en todas las zonas) */
+const getQuote = (shuffled, offset = 0) => shuffled[offset % shuffled.length];
+
 const formatPrice = (amount) =>
   new Intl.NumberFormat("es-CO", {
     style: "currency",
@@ -43,16 +59,12 @@ const formatPrice = (amount) =>
 
 const PedidosAdmin = () => {
   // --- MULTI-SEDE ---
-  const {
-    sedeId,
-    sedeName,
-    getSedeParam,
-    isSuperAdmin,
-    isMultiSede,
-    sedeActual,
-    ecommerceRol,
-    ecommerceRolLabel,
-  } = useSedeContext();
+  const { sedeId, getSedeParam } = useSedeContext();
+
+  // --- FRASES ROTATIVAS (cambian en cada carga del componente) ---
+  const shuffledQuotes = React.useMemo(() => {
+    return [...PA_QUOTES].sort(() => Math.random() - 0.5);
+  }, []);
 
   // --- ESTADOS GLOBALES ---
   const [currentView, setCurrentView] = useState("pending");
@@ -93,25 +105,29 @@ const PedidosAdmin = () => {
       const sedeParam = getSedeParam();
       try {
         // 1. Pedidos Pendientes
-        const resPending = await axios.get(
-          `https://backend-woocommerce.vercel.app/api/orders/pendientes?t=${Date.now()}&${sedeParam}`,
+        const resPending = await ecommerceApi.get(
+          `/pendientes`,
+          { params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) } },
         );
         const listPending = resPending.data.filter((o) => !o.is_assigned);
         setOrders(listPending);
 
         // 2. Sesiones Activas
-        const resActive = await axios.get(
-          `https://backend-woocommerce.vercel.app/api/orders/dashboard-activo?t=${Date.now()}&${sedeParam}`,
+        const resActive = await ecommerceApi.get(
+          `/dashboard-activo`,
+          { params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) } },
         );
         setActiveSessions(resActive.data);
 
-        const resAuditPending = await axios.get(
-          `https://backend-woocommerce.vercel.app/api/orders/pendientes-auditoria?t=${Date.now()}&${sedeParam}`,
+        const resAuditPending = await ecommerceApi.get(
+          `/pendientes-auditoria`,
+          { params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) } },
         );
         setPendingAuditOrders(resAuditPending.data || []);
 
-        const resPaymentPending = await axios.get(
-          `https://backend-woocommerce.vercel.app/api/orders/pendientes-pago?t=${Date.now()}&${sedeParam}`,
+        const resPaymentPending = await ecommerceApi.get(
+          `/pendientes-pago`,
+          { params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) } },
         );
         setPaymentPendingOrders(resPaymentPending.data || []);
 
@@ -166,8 +182,8 @@ const PedidosAdmin = () => {
   const handleOpenAssignModal = async () => {
     if (selectedIds.size === 0) return;
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/pickers?${getSedeParam()}`,
+      const res = await ecommerceApi.get(
+        `/pickers?${getSedeParam()}`,
       );
       setPickers(res.data);
       setShowAssignModal(true);
@@ -179,8 +195,8 @@ const PedidosAdmin = () => {
   const handleAssignSingleOrder = async (order) => {
     setSelectedIds(new Set([order.id]));
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/pickers?${getSedeParam()}`,
+      const res = await ecommerceApi.get(
+        `/pickers?${getSedeParam()}`,
       );
       setPickers(res.data);
       setShowAssignModal(true);
@@ -191,8 +207,8 @@ const PedidosAdmin = () => {
 
   const handleConfirmAssignment = async (picker) => {
     try {
-      await axios.post(
-        `https://backend-woocommerce.vercel.app/api/orders/crear-sesion?${getSedeParam()}`,
+      await ecommerceApi.post(
+        `/crear-sesion?${getSedeParam()}`,
         {
           id_picker: picker.id,
           ids_pedidos: Array.from(selectedIds),
@@ -213,8 +229,8 @@ const PedidosAdmin = () => {
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/historial?${getSedeParam()}`,
+      const res = await ecommerceApi.get(
+        `/historial?${getSedeParam()}`,
       );
       setHistoryOrders(res.data);
     } catch (e) {
@@ -227,8 +243,8 @@ const PedidosAdmin = () => {
   const fetchPendingAudit = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/pendientes-auditoria?${getSedeParam()}`,
+      const res = await ecommerceApi.get(
+        `/pendientes-auditoria?${getSedeParam()}`,
       );
       setPendingAuditOrders(res.data || []);
       setStats((prev) => ({ ...prev, auditPending: res.data?.length || 0 }));
@@ -242,8 +258,8 @@ const PedidosAdmin = () => {
   const fetchPaymentPending = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/pendientes-pago?${getSedeParam()}`,
+      const res = await ecommerceApi.get(
+        `/pendientes-pago?${getSedeParam()}`,
       );
       setPaymentPendingOrders(res.data || []);
       setStats((prev) => ({ ...prev, paymentPending: res.data?.length || 0 }));
@@ -263,8 +279,8 @@ const PedidosAdmin = () => {
       return;
 
     try {
-      await axios.post(
-        `https://backend-woocommerce.vercel.app/api/orders/marcar-pagado?${getSedeParam()}`,
+      await ecommerceApi.post(
+        `/marcar-pagado?${getSedeParam()}`,
         { session_id: session.id },
       );
       alert("✅ Pago registrado con éxito.");
@@ -277,8 +293,8 @@ const PedidosAdmin = () => {
 
   const handleViewLiveDetail = async (session) => {
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${session.picker_id}&include_removed=true&${getSedeParam()}`,
+      const res = await ecommerceApi.get(
+        `/sesion-activa?id_picker=${session.picker_id}&include_removed=true&${getSedeParam()}`,
       );
       setLiveSessionDetail({ sessionInfo: session, routeData: res.data });
       setShowLiveModal(true);
@@ -292,8 +308,8 @@ const PedidosAdmin = () => {
 
   const handleViewHistoryDetail = async (session) => {
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}&${getSedeParam()}`,
+      const res = await ecommerceApi.get(
+        `/historial-detalle?session_id=${session.id}&${getSedeParam()}`,
       );
       setHistoryDetail({
         session,
@@ -308,8 +324,8 @@ const PedidosAdmin = () => {
 
   const handleViewManifestDirect = async (session) => {
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/historial-detalle?session_id=${session.id}&${getSedeParam()}`,
+      const res = await ecommerceApi.get(
+        `/historial-detalle?session_id=${session.id}&${getSedeParam()}`,
       );
 
       const { final_snapshot, metadata, products_map } = res.data;
@@ -340,6 +356,7 @@ const PedidosAdmin = () => {
         ...enrichedSnapshot,
         session_id: metadata.session_id,
         picker: metadata.picker_name || "Desconocido",
+        sede_nombre: session.sede_nombre || null,
       });
       setShowQrManifest(true);
     } catch (e) {
@@ -358,38 +375,11 @@ const PedidosAdmin = () => {
           <div className="pedidos-layout-logo">MK</div>
           <h2 className="pedidos-layout-sidebar-title">Admin Center</h2>
         </div>
-        {/* SELECTOR DE SEDE */}
+        {/* SELECTOR DE SEDE (integra rol + sede) */}
         <div className="pedidos-sede-selector-wrapper">
           <SedeSelector compact />
         </div>
 
-        {/* INDICADOR DE ROL Y SEDE */}
-        <div className="pedidos-role-indicator">
-          {ecommerceRolLabel && (
-            <div
-              className={`pedidos-role-badge pedidos-role-badge--${ecommerceRol}`}
-            >
-              <span className="pedidos-role-badge-icon">
-                {ecommerceRol === "ecommerce_admin_global"
-                  ? "👑"
-                  : ecommerceRol === "ecommerce_admin_sede"
-                    ? "🏪"
-                    : ecommerceRol === "ecommerce_picker"
-                      ? "📦"
-                      : ecommerceRol === "ecommerce_auditor"
-                        ? "🔍"
-                        : "👤"}
-              </span>
-              <span className="pedidos-role-badge-text">
-                {ecommerceRolLabel}
-              </span>
-            </div>
-          )}
-          <div className="pedidos-sede-indicator">
-            <span className="pedidos-sede-indicator-dot" />
-            <span className="pedidos-sede-indicator-text">{sedeName}</span>
-          </div>
-        </div>
         <nav className="pedidos-layout-sidebar-nav">
           <div className="pedidos-nav-label">OPERACIÓN</div>
           <button
@@ -456,6 +446,10 @@ const PedidosAdmin = () => {
             <FaUserTag /> <span>Pickers</span>
           </button>
         </nav>
+        <div className="pedidos-sidebar-footer">
+          «{getQuote(shuffledQuotes, 0).text}»
+          <strong>— {getQuote(shuffledQuotes, 0).author}</strong>
+        </div>
       </aside>
 
       {/* CONTENIDO PRINCIPAL */}
@@ -487,7 +481,12 @@ const PedidosAdmin = () => {
           /* VISTA DE HISTORIAL */
           <>
             <header className="pedidos-layout-header">
-              <h1>📜 Historial de Sesiones</h1>
+              <div>
+                <h1>📜 Historial de Sesiones</h1>
+                <div className="pedidos-header-quote">
+                  «{getQuote(shuffledQuotes, 3).text}» — {getQuote(shuffledQuotes, 3).author}
+                </div>
+              </div>
               <button
                 onClick={fetchHistory}
                 className="pedidos-admin-refresh-btn"
@@ -508,11 +507,18 @@ const PedidosAdmin = () => {
           /* VISTAS OPERATIVAS */
           <>
             <header className="pedidos-layout-header">
-              <h1>
-                {currentView === "pending"
-                  ? "📦 Pedidos Pendientes"
-                  : "🚀 Centro de Comando"}
-              </h1>
+              <div>
+                <h1>
+                  {currentView === "pending"
+                    ? "📦 Pedidos Pendientes"
+                    : "🚀 Centro de Comando"}
+                </h1>
+                <div className="pedidos-header-quote">
+                  {currentView === "pending"
+                    ? `«${getQuote(shuffledQuotes, 1).text}» — ${getQuote(shuffledQuotes, 1).author}`
+                    : `«${getQuote(shuffledQuotes, 2).text}» — ${getQuote(shuffledQuotes, 2).author}`}
+                </div>
+              </div>
             </header>
             <div className="pedidos-layout-body">
               {currentView === "pending" ? (

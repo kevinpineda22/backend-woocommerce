@@ -1,15 +1,7 @@
-/* LiveSessionModal.css - Versión DEFINITIVA y Reparada */
+/* LiveSessionModal.css — Modal de Sesión en Vivo
+   Prefijo: lsm- (Live Session Modal)
+   Variables con scope local al contenedor raíz */
 @import url("https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
-
-:root {
-  --lsm-bg: #f8fafc;
-  --lsm-border: #e2e8f0;
-  --lsm-primary: #1e293b;
-  --lsm-accent: #3b82f6;
-  --lsm-success: #10b981;
-  --lsm-warning: #f59e0b;
-  --lsm-danger: #ef4444;
-}
 
 /* =========================================
    1. OVERLAY Y CONTENEDOR PRINCIPAL
@@ -29,6 +21,14 @@
 }
 
 .lsm-content {
+  --lsm-modal-bg: #f8fafc;
+  --lsm-modal-border: #e2e8f0;
+  --lsm-modal-dark: #1e293b;
+  --lsm-modal-accent: #3b82f6;
+  --lsm-modal-success: #10b981;
+  --lsm-modal-warning: #f59e0b;
+  --lsm-modal-danger: #ef4444;
+
   background: white;
   width: 95%;
   max-width: 1100px;
@@ -58,12 +58,12 @@
    2. HEADER Y CONTROLES
    ========================================= */
 .lsm-header {
-  background: var(--lsm-primary);
+  background: var(--lsm-modal-dark);
   padding: 15px 30px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 4px solid var(--lsm-accent);
+  border-bottom: 4px solid var(--lsm-modal-accent);
   color: white;
   flex-shrink: 0;
 }
@@ -126,7 +126,7 @@
 }
 
 .lsm-toggle-btn.active {
-  background: var(--lsm-accent);
+  background: var(--lsm-modal-accent);
   color: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
@@ -150,9 +150,9 @@
   color: white;
 }
 .lsm-trash-toggle.active {
-  background: var(--lsm-danger);
+  background: var(--lsm-modal-danger);
   color: white;
-  border-color: var(--lsm-danger);
+  border-color: var(--lsm-modal-danger);
   box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
 }
 
@@ -175,7 +175,7 @@
    3. CUERPO (SCROLL AREA)
    ========================================= */
 .lsm-body {
-  background: var(--lsm-bg);
+  background: var(--lsm-modal-bg);
   flex: 1;
   overflow-y: auto;
   padding: 25px;
@@ -198,7 +198,7 @@
    ========================================= */
 .lsm-item-card {
   background: white;
-  border: 1px solid var(--lsm-border);
+  border: 1px solid var(--lsm-modal-border);
   border-radius: 12px;
   padding: 15px;
   display: flex;
@@ -210,11 +210,11 @@
 
 /* Estados de colores */
 .lsm-item-card.recolectado {
-  border-left: 5px solid var(--lsm-success);
+  border-left: 5px solid var(--lsm-modal-success);
   background: #f0fdf4;
 }
 .lsm-item-card.sustituido {
-  border-left: 5px solid var(--lsm-warning);
+  border-left: 5px solid var(--lsm-modal-warning);
   background: #fffbeb;
 }
 .lsm-item-card.pendiente {
@@ -224,7 +224,7 @@
   background: #fff5f5;
   border-color: #feb2b2;
   opacity: 0.8;
-  border-left: 5px solid var(--lsm-danger);
+  border-left: 5px solid var(--lsm-modal-danger);
 }
 
 .lsm-item-img {
@@ -313,15 +313,15 @@
 }
 .lsm-status-badge.removed {
   background: #fee2e2;
-  color: var(--lsm-danger);
+  color: var(--lsm-modal-danger);
   border: 1px solid #fca5a5;
 }
 
 /* Botones Acción Batch */
 .lsm-delete-btn {
   background: white;
-  border: 1px solid var(--lsm-danger);
-  color: var(--lsm-danger);
+  border: 1px solid var(--lsm-modal-danger);
+  color: var(--lsm-modal-danger);
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -350,8 +350,8 @@
 /* Botón Verde (Forzar a Canasta) */
 .lsm-pick-btn {
   background: white;
-  border: 1px solid var(--lsm-success);
-  color: var(--lsm-success);
+  border: 1px solid var(--lsm-modal-success);
+  color: var(--lsm-modal-success);
   width: 32px;
   height: 32px;
   border-radius: 8px;
@@ -408,7 +408,7 @@
 .lsm-order-group {
   background: white;
   border-radius: 12px;
-  border: 1px solid var(--lsm-border);
+  border: 1px solid var(--lsm-modal-border);
   overflow: hidden;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
   flex-shrink: 0;

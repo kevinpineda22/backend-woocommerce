@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
+import { ecommerceApi } from "../../shared/ecommerceApi";
 import { supabase } from "../../../../supabaseClient";
 
 export const usePickerSession = () => {
@@ -25,8 +25,8 @@ export const usePickerSession = () => {
       const sp =
         sedeId || pickerSedeId ? `&sede_id=${sedeId || pickerSedeId}` : "";
       try {
-        const res = await axios.get(
-          `https://backend-woocommerce.vercel.app/api/orders/sesion-activa?id_picker=${idPicker}&t=${Date.now()}${sp}`,
+        const res = await ecommerceApi.get(
+          `/sesion-activa?id_picker=${idPicker}${sp}`,
         );
         const data = res.data;
 
@@ -76,8 +76,8 @@ export const usePickerSession = () => {
           "juan@test.com";
         let me = null;
         try {
-          const { data: pickers } = await axios.get(
-            `https://backend-woocommerce.vercel.app/api/orders/pickers?email=${email}&sede_id=todas`,
+          const { data: pickers } = await ecommerceApi.get(
+            `/pickers?email=${email}&sede_id=todas`,
           );
           if (pickers && pickers.length > 0) {
             me = pickers[0];
@@ -299,8 +299,8 @@ export const usePickerSession = () => {
     setCompletedSessionId(finalId);
 
     try {
-      await axios.post(
-        `https://backend-woocommerce.vercel.app/api/orders/finalizar-sesion${sedeParam ? "?" + sedeParam : ""}`,
+      await ecommerceApi.post(
+        `/finalizar-sesion${sedeParam ? "?" + sedeParam : ""}`,
         { id_sesion: finalId, id_picker: pickerInfo.id },
       );
       localStorage.removeItem("session_active_cache");

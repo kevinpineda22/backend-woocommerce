@@ -6,10 +6,12 @@ import {
   FaClock,
   FaLayerGroup,
   FaSync,
+  FaStoreAlt,
 } from "react-icons/fa";
 import { supabase } from "../../../supabaseClient";
-import axios from "axios";
-import "./PedidosAdmin.css";
+import { useSedeContext } from "../shared/SedeContext";
+import { ecommerceApi } from "../shared/ecommerceApi";
+import "./ActiveSessionsView.css";
 
 const SessionTimer = ({ startTime }) => {
   const [elapsed, setElapsed] = useState("00:00:00");
@@ -40,14 +42,17 @@ const SessionTimer = ({ startTime }) => {
 };
 
 const ActiveSessionsView = ({ onViewDetail }) => {
+  const { getSedeParam, isSuperAdmin } = useSedeContext();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Función de recarga (Con Cache Busting)
+  // Función de recarga (Con Cache Busting + Sede)
   const fetchSessions = useCallback(async () => {
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/dashboard-activo?t=${Date.now()}`,
+      const sp = getSedeParam ? getSedeParam() : "";
+      const res = await ecommerceApi.get(
+        `/dashboard-activo`,
+        { params: { ...Object.fromEntries(new URLSearchParams(sp)) } },
       );
       setSessions(res.data);
     } catch (e) {
@@ -55,7 +60,7 @@ const ActiveSessionsView = ({ onViewDetail }) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getSedeParam]);
 
   useEffect(() => {
     fetchSessions();
@@ -160,21 +165,9 @@ const ActiveSessionsView = ({ onViewDetail }) => {
 
   return (
     <div className="pa-dashboard-grid">
-      <div
-        style={{
-          gridColumn: "1 / -1",
-          display: "flex",
-          justifyContent: "flex-end",
-          marginBottom: 10,
-        }}
-      >
+      <div className="pa-dashboard-refresh-bar">
         <button
           className="pa-view-detail-btn"
-          style={{
-            background: "transparent",
-            color: "#64748b",
-            border: "1px solid #cbd5e1",
-          }}
           onClick={handleManualRefresh}
         >
           <FaSync className={loading ? "ec-spin" : ""} /> Refrescar Datos
@@ -207,11 +200,8 @@ const ActiveSessionsView = ({ onViewDetail }) => {
             </div>
             <div className="pa-progress-bar-bg">
               <div
-                className="pa-progress-bar-fill"
-                style={{
-                  width: `${session.progress}%`,
-                  background: session.progress === 100 ? "#10b981" : "#3b82f6",
-                }}
+                className={`pa-progress-bar-fill ${session.progress === 100 ? "pa-progress-complete" : ""}`}
+                style={{ width: `${session.progress}%` }}
               ></div>
             </div>
           </div>
@@ -251,6 +241,12 @@ const ActiveSessionsView = ({ onViewDetail }) => {
           <div className="pa-location-badge">
             <FaMapMarkerAlt /> {session.current_location}
           </div>
+
+          {isSuperAdmin && session.sede_nombre && (
+            <div className="pa-dashboard-card-sede">
+              <FaStoreAlt size={12} /> {session.sede_nombre}
+            </div>
+          )}
 
           <button
             className="pa-view-detail-btn"

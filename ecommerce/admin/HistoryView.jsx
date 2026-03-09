@@ -1,5 +1,5 @@
 import React from "react";
-import { FaFileAlt, FaQrcode } from "react-icons/fa";
+import { FaFileAlt, FaQrcode, FaStoreAlt } from "react-icons/fa";
 import "./HistoryView.css";
 
 /* ─── Helpers ─── */
@@ -51,6 +51,7 @@ const HistoryView = ({
           <tr>
             <th>Fecha</th>
             <th>Picker</th>
+            <th>Sede</th>
             <th>Pedidos</th>
             <th>Estado</th>
             <th>Duración</th>
@@ -65,6 +66,31 @@ const HistoryView = ({
                 <small>{sess.hora_fin}</small>
               </td>
               <td>{sess.picker}</td>
+              <td>
+                {sess.sede_nombre ? (
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      padding: "3px 8px",
+                      borderRadius: 5,
+                      background: "#f0f4ff",
+                      border: "1px solid #c7d2fe",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      color: "#4338ca",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <FaStoreAlt size={10} /> {sess.sede_nombre}
+                  </span>
+                ) : (
+                  <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>
+                    —
+                  </span>
+                )}
+              </td>
               <td>{sess.pedidos.join(", ")}</td>
               <td className="hv-cell-estado">{getEstadoBadge(sess.estado)}</td>
               <td>

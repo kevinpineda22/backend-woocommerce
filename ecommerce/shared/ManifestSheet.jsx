@@ -16,6 +16,7 @@ const ManifestSheet = ({
   pickerName = "Personal WMS",
   orderIndex = 0,
   densityClass = "",
+  sedeName = null,
 }) => {
   const items = order.items || [];
   const orderId = order.id;
@@ -78,41 +79,41 @@ const ManifestSheet = ({
           <span className="manifest-title">MANIFIESTO DE SALIDA</span>
         </div>
         <div className="manifest-info">
-          <h2>Orden #{orderId?.toString().slice(0, 6)}</h2>
+          <h2>Pedido #{orderId?.toString().slice(0, 6)}</h2>
           <p>{new Date(timestamp).toLocaleString()}</p>
         </div>
       </div>
 
       {/* Customer & Shipping Info */}
       <div className="manifest-customer">
-        <div className="customer-row">
-          <div className="customer-field">
-            <span className="label">Cliente:</span>
-            <span className="value">{customerName}</span>
+        <div className="manifest-customer-row">
+          <div className="manifest-customer-field">
+            <span className="manifest-field-label">Cliente:</span>
+            <span className="manifest-field-value">{customerName}</span>
           </div>
           {billing.phone && (
-            <div className="customer-field">
-              <span className="label">Tel:</span>
-              <span className="value">{billing.phone}</span>
+            <div className="manifest-customer-field">
+              <span className="manifest-field-label">Tel:</span>
+              <span className="manifest-field-value">{billing.phone}</span>
             </div>
           )}
           {billing.email && (
-            <div className="customer-field">
-              <span className="label">Email:</span>
-              <span className="value">{billing.email}</span>
+            <div className="manifest-customer-field">
+              <span className="manifest-field-label">Email:</span>
+              <span className="manifest-field-value">{billing.email}</span>
             </div>
           )}
         </div>
-        <div className="customer-row">
+        <div className="manifest-customer-row">
           {fullAddress && (
-            <div className="customer-field">
-              <span className="label">Dirección:</span>
-              <span className="value">{fullAddress}</span>
+            <div className="manifest-customer-field">
+              <span className="manifest-field-label">Dirección:</span>
+              <span className="manifest-field-value">{fullAddress}</span>
             </div>
           )}
-          <div className="customer-field">
-            <span className="label">Picker:</span>
-            <span className="value">{pickerName}</span>
+          <div className="manifest-customer-field">
+            <span className="manifest-field-label">Picker:</span>
+            <span className="manifest-field-value">{pickerName}</span>
           </div>
         </div>
       </div>
@@ -185,12 +186,7 @@ const ManifestSheet = ({
                     {displayCode}
                     {rawCode && correctedCodes[rawCode] && (
                       <span
-                        style={{
-                          color: "#16a34a",
-                          marginLeft: "4px",
-                          fontWeight: "bold",
-                          fontSize: "0.8em",
-                        }}
+                        className="manifest-code-corrected-dot"
                         title="Código ajustado (+)"
                       >
                         ●

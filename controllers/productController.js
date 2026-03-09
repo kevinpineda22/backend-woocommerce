@@ -64,6 +64,39 @@ async function getBarcodesFromSiesa(productIds) {
   }
 }
 
+// ✅ NUEVO: Endpoint estricto para recuperar la base EAN de Fruver (ej: 2900002)
+exports.getBaseEanFruver = async (req, res) => {
+  const { sku } = req.params;
+  if (!sku) return res.status(400).json({ error: "SKU requerido" });
+
+  try {
+    const { data: barcodes, error } = await supabase
+      .from("siesa_codigos_barras")
+      .select("codigo_barras")
+      .eq("f120_id", sku)
+      .like("codigo_barras", "29%");
+
+    if (error) throw error;
+    if (!barcodes || barcodes.length === 0) {
+      return res.status(404).json({ error: "No se encontró base EAN para este producto Fruver." });
+    }
+
+    // Filtramos estrictamente los códigos que tienen exactamente 7 dígitos y empiezan en 29
+    const validBase = barcodes.find(
+      (b) => b.codigo_barras && b.codigo_barras.trim().length === 7 && /^\d+$/.test(b.codigo_barras.trim())
+    );
+
+    if (validBase) {
+      return res.status(200).json({ baseEAN: validBase.codigo_barras.trim() });
+    } else {
+      return res.status(404).json({ error: "Se encontraron códigos 29, pero ninguno de exactamente 7 dígitos." });
+    }
+  } catch (error) {
+    console.error("Error obteniendo base EAN Fruver:", error);
+    res.status(500).json({ error: "Error interno" });
+  }
+};
+
 exports.searchProduct = async (req, res) => {
   const { query, original_id } = req.query;
   try {

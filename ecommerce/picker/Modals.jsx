@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import axios from "axios";
+import { ecommerceApi } from "../shared/ecommerceApi";
 import {
   FaWeightHanging,
   FaExchangeAlt,
@@ -15,6 +15,7 @@ import {
   FaWhatsapp,
   FaExclamationCircle,
   FaExclamationTriangle,
+  FaSpinner,
 } from "react-icons/fa";
 
 // --- MODAL DE INGRESO MANUAL ---
@@ -79,9 +80,31 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
   const [weight, setWeight] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
+  const [meatLabel, setMeatLabel] = useState(""); // ✅ NUEVO: Para código final de la báscula de carnes
 
   const inputRefWeight = useRef(null);
   const inputRefCode = useRef(null);
+  const inputRefMeatLabel = useRef(null); // ✅ NUEVO
+
+  // Estados para validación estricta y Fruver
+  const [isCodeValidated, setIsCodeValidated] = useState(false);
+  const [baseEanFruver, setBaseEanFruver] = useState(null);
+  const [loadingBaseEan, setLoadingBaseEan] = useState(false);
+
+  // Algoritmo EAN-13
+  const calcularDigitoVerificador = (codigo12) => {
+    if (codigo12.length !== 12) return null;
+    let sumaImpares = 0; 
+    let sumaPares = 0;   
+    for (let i = 0; i < 12; i++) {
+      const digito = parseInt(codigo12[i]);
+      if ((i + 1) % 2 !== 0) sumaImpares += digito; // Impar
+      else sumaPares += digito; // Par
+    }
+    const total = sumaImpares + (sumaPares * 3);
+    const siguienteDecena = Math.ceil(total / 10) * 10;
+    return (siguienteDecena - total).toString();
+  };
 
   // 🧠 LÓGICA A PRUEBA DE BALAS: Detecta cárnicos por nombre o por categoría futura
   const isMeat = useMemo(() => {
@@ -129,14 +152,32 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
     return meatKeywords.some((kw) => fullText.includes(kw));
   }, [item]);
 
+  // Detección de Fruver
+  const isFruver = useMemo(() => {
+    if (!item || isMeat) return false;
+    const name = (item.name || "").toLowerCase();
+    const isWeighableUnit = item.unidad_medida && ["kl", "kg", "kilo", "lb", "libra"].includes(item.unidad_medida.toLowerCase());
+    return isWeighableUnit || name.includes("fruver");
+  }, [item, isMeat]);
+
   // ✅ CÁLCULO DEL PRECIO EN TIEMPO REAL
   const calculatedPrice = useMemo(() => {
-    if (!item || !weight || isNaN(parseFloat(weight))) return 0;
-    // PUM: Precio por Unidad de Medida
+    if (!item) return 0;
     const pum = parseFloat(item.price || 0);
-    const currentWeight = parseFloat(weight);
-    return pum * currentWeight;
-  }, [item, weight]);
+
+    if (isFruver) {
+       if (!weight || isNaN(parseFloat(weight))) return 0;
+       return pum * parseFloat(weight);
+    } else if (isMeat) {
+       // Extraer peso solo si es un código EAN-13 de peso variable (empieza por 2)
+       if (meatLabel && meatLabel.length === 13 && /^\d+$/.test(meatLabel) && meatLabel.startsWith("2")) {
+          const pesoGramos = parseInt(meatLabel.substring(7, 12));
+          if (!isNaN(pesoGramos)) return pum * (pesoGramos / 1000);
+       }
+       return pum * (parseFloat(item.quantity_total) || 1); // Base si no ha escaneado la etiqueta
+    }
+    return 0;
+  }, [item, weight, meatLabel, isFruver, isMeat]);
 
   // Formateador de moneda (Pesos Colombianos)
   const formatPrice = (p) =>
@@ -146,70 +187,145 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
       maximumFractionDigits: 0,
     }).format(p);
 
-  // Auto-focus inteligente al abrir el modal
+  // Auto-focus inteligente al abrir el modal y carga EAN Base Fruver
   useEffect(() => {
     if (isOpen) {
       setWeight("");
       setCode("");
       setError("");
+      setIsCodeValidated(false);
+      setBaseEanFruver(null);
+      setMeatLabel(""); // ✅ LIMPIAMOS
+
+      // Si es Fruver, buscamos su código base EAN en BD
+      if (isFruver && item?.sku) {
+        setLoadingBaseEan(true);
+        ecommerceApi.get(`/producto/base-ean-fruver/${item.sku}`)
+          .then(res => {
+            if (res.data && res.data.baseEAN) {
+              setBaseEanFruver(res.data.baseEAN);
+            }
+          })
+          .catch(err => {
+            setError(`❌ No se encontró Código Base EAN para este Fruver (SKU: ${item.sku})`);
+          })
+          .finally(() => {
+            setLoadingBaseEan(false);
+          });
+      }
+
       setTimeout(() => {
-        if (isMeat && inputRefCode.current) inputRefCode.current.focus();
-        else if (inputRefWeight.current) inputRefWeight.current.focus();
+        // Ahora TODOS (Carnes y Fruver) deben validar código primero
+        if (inputRefCode.current) inputRefCode.current.focus();
       }, 100);
     }
-  }, [isOpen, isMeat, item]);
+  }, [isOpen, isMeat, isFruver, item]);
 
-  // Validaciones antes de enviar a canasta
+  // Validación INICIAL del SKU/EAN antes de permitir pesar
+  const handleValidateCode = () => {
+    if (!item) return;
+    const cleanCode = code.trim().toUpperCase();
+    const expectedSku = (item.sku || "").toUpperCase();
+    const expectedBarcode = (item.barcode || "").toUpperCase();
+
+    const isValidCode =
+      cleanCode === expectedSku ||
+      cleanCode === expectedBarcode ||
+      (expectedBarcode && expectedBarcode.endsWith(cleanCode));
+
+    if (!cleanCode) {
+      setError(`❌ Digita el código o ítem del producto.`);
+      inputRefCode.current?.focus();
+      return;
+    }
+    
+    if (isValidCode) {
+      setError("");
+      setIsCodeValidated(true);
+      setTimeout(() => {
+        if (isFruver) inputRefWeight.current?.focus();
+        else if (isMeat) inputRefMeatLabel.current?.focus();
+      }, 100);
+    } else {
+      setError(`❌ Código incorrecto. Verifica el ítem.`);
+      setIsCodeValidated(false);
+      inputRefCode.current?.focus();
+    }
+  };
+
+  // Validaciones FINALES antes de enviar a canasta
   const validateAndConfirm = () => {
-    // 1. VALIDACIÓN DE CÓDIGO (Solo exigido para Carnes)
-    if (isMeat) {
-      const cleanCode = code.trim().toUpperCase();
-      const expectedSku = (item.sku || "").toUpperCase();
-      const expectedBarcode = (item.barcode || "").toUpperCase();
+    if (!isCodeValidated) {
+      setError(`❌ Primero debes validar el código del producto.`);
+      inputRefCode.current?.focus();
+      return;
+    }
 
-      const isValidCode =
-        cleanCode === expectedSku ||
-        cleanCode === expectedBarcode ||
-        (expectedBarcode && expectedBarcode.endsWith(cleanCode));
+    if (isFruver && !baseEanFruver) {
+      setError(`❌ Bloqueado: No se encontró Base EAN para este producto.`);
+      return;
+    }
 
-      if (!cleanCode) {
-        setError(`❌ Debes digitar el código del producto.`);
-        inputRefCode.current?.focus();
+    let finalCodeToSave = code.trim().toUpperCase();
+    let finalWeight = 0;
+
+    // --- RAMA FRUVER ---
+    if (isFruver) {
+      const val = parseFloat(weight);
+      const requested = parseFloat(item.quantity_total);
+
+      if (!val || isNaN(val)) {
+        setError(`❌ Ingresa un peso válido.`);
+        inputRefWeight.current?.focus();
         return;
       }
-      if (!isValidCode) {
-        setError(
-          `❌ Código incorrecto. Esperado: ${expectedBarcode || expectedSku}`,
-        );
-        inputRefCode.current?.focus();
+      if (val < requested) {
+        setError(`❌ Mínimo requerido: ${requested} Kg`);
+        inputRefWeight.current?.focus();
         return;
+      }
+
+      const maxAllowed = requested + 0.05; // Tolerancia +50g
+      if (val > maxAllowed) {
+        setError(`❌ Excede tolerancia. Máx: ${maxAllowed.toFixed(3)} Kg`);
+        inputRefWeight.current?.focus();
+        return;
+      }
+
+      finalWeight = val;
+      if (baseEanFruver) {
+        const pesoGramos = Math.round(val * 1000).toString().padStart(5, '0');
+        const codigoSinCheck = `${baseEanFruver}${pesoGramos}`;
+        const checkDigit = calcularDigitoVerificador(codigoSinCheck);
+        if (checkDigit) {
+           finalCodeToSave = `${codigoSinCheck}${checkDigit}`;
+           console.log("🍏 EAN Fruver Generado Exitosamente:", finalCodeToSave);
+        }
+      }
+    } 
+    // --- RAMA CARNICERÍA ---
+    else if (isMeat) {
+      if (!meatLabel || meatLabel.length < 8) {
+        setError("❌ Debes escanear la etiqueta generada por la báscula de carnicería.");
+        inputRefMeatLabel.current?.focus();
+        return;
+      }
+      finalCodeToSave = meatLabel.trim().toUpperCase();
+      
+      // Intentar extraer el peso del EAN-13 (los últimos 5 dígitos antes del verificador), SIEMPRE QUE sea EAN de peso variable (inicia con 2)
+      if (finalCodeToSave.length === 13 && /^\d+$/.test(finalCodeToSave) && finalCodeToSave.startsWith("2")) {
+         const pesoGramos = parseInt(finalCodeToSave.substring(7, 12));
+         if (!isNaN(pesoGramos) && pesoGramos > 0) {
+            finalWeight = pesoGramos / 1000;
+         } else {
+            finalWeight = parseFloat(item.quantity_total) || 1;
+         }
+      } else {
+         finalWeight = parseFloat(item.quantity_total) || 1;
       }
     }
 
-    // 2. VALIDACIÓN DE PESO (Exigido para Carnes y Fruver)
-    const val = parseFloat(weight);
-    const requested = parseFloat(item.quantity_total);
-
-    if (!val || isNaN(val)) {
-      setError(`❌ Ingresa un peso válido.`);
-      inputRefWeight.current?.focus();
-      return;
-    }
-    if (val < requested) {
-      setError(`❌ Mínimo requerido: ${requested} Kg`);
-      inputRefWeight.current?.focus();
-      return;
-    }
-
-    const maxAllowed = requested + 0.05; // Tolerancia +50g
-    if (val > maxAllowed) {
-      setError(`❌ Excede tolerancia. Máx: ${maxAllowed.toFixed(3)} Kg`);
-      inputRefWeight.current?.focus();
-      return;
-    }
-
-    // Si pasa todas las validaciones, enviamos (Peso, Código)
-    onConfirm(val, isMeat ? code.trim().toUpperCase() : null);
+    onConfirm(finalWeight, finalCodeToSave);
   };
 
   if (!isOpen || !item) return null;
@@ -241,61 +357,108 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
             <br />
             <small style={{ color: "#15803d" }}>Margen permitido: +50g</small>
           </div>
+          
+          {loadingBaseEan && <p style={{color: '#3b82f6', fontSize: '0.85rem'}}><FaSpinner className="ec-spin" /> Buscando configuración EAN Fruver...</p>}
+          {isFruver && baseEanFruver && <p style={{color: '#16a34a', fontSize: '0.85rem'}}>✅ EAN Base Cargado: {baseEanFruver}X...</p>}
+
         </div>
 
-        {/* INPUT DE CÓDIGO (Visible ÚNICAMENTE si es Carne) */}
-        {isMeat && (
-          <div className="ec-input-wrapper" style={{ marginBottom: 10 }}>
-            <input
-              ref={inputRefCode}
-              type="text"
-              className="ec-manual-input"
-              style={{
-                background: "#f8fafc",
-                color: "#0f172a",
-                border: "2px solid #cbd5e1",
-                fontSize: "1.2rem",
-              }}
-              placeholder="Digita el código / SKU..."
-              value={code}
-              onChange={(e) => {
-                setCode(e.target.value);
-                setError("");
-              }}
-              onKeyDown={(e) =>
-                e.key === "Enter" && inputRefWeight.current?.focus()
-              }
-            />
-          </div>
-        )}
-
-        {/* INPUT DE PESO (Visible siempre) */}
-        <div className="ec-input-wrapper">
+        {/* INPUT DE CÓDIGO (Requerido para AMBOS ahora) */}
+        <div className="ec-input-wrapper" style={{ marginBottom: 10 }}>
           <input
-            ref={inputRefWeight}
-            type="number"
+            ref={inputRefCode}
+            type="text"
             className="ec-manual-input"
-            placeholder="0.000"
-            step="0.001"
-            value={weight}
+            style={{
+              background: isCodeValidated ? "#f0fdf4" : "#f8fafc",
+              color: isCodeValidated ? "#16a34a" : "#0f172a",
+              border: isCodeValidated ? "2px solid #22c55e" : "2px solid #cbd5e1",
+              fontSize: "1.2rem",
+            }}
+            placeholder="Paso 1: Digitar SKU o escanear"
+            value={code}
+            disabled={isCodeValidated}
             onChange={(e) => {
-              setWeight(e.target.value);
+              setCode(e.target.value);
               setError("");
             }}
-            onKeyDown={(e) =>
-              e.key === "Enter" && weight && validateAndConfirm()
-            }
-          />
-          <span
-            style={{
-              position: "absolute",
-              right: 20,
-              fontWeight: "bold",
-              color: "#94a3b8",
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                if (!isCodeValidated) handleValidateCode();
+                // Si el item ya estaba validado o se validó recién, enfocar el peso
+              }
             }}
-          >
-            {item.unidad_medida?.toUpperCase() || "KG"}
-          </span>
+          />
+          {!isCodeValidated && code.length > 0 && (
+            <button 
+              onClick={handleValidateCode}
+              style={{
+                position: "absolute",
+                right: 5,
+                top: "50%",
+                transform: "translateY(-50%)",
+                background: "#3b82f6",
+                color: "white",
+                border: "none",
+                borderRadius: 4,
+                padding: "5px 10px",
+                cursor: "pointer"
+              }}
+            >
+              Validar
+            </button>
+          )}
+        </div>
+
+        {/* PASO 2: INPUT DE PESO (Fruver) o ETIQUETA (Carnes) */}
+        <div className="ec-input-wrapper" style={{ opacity: isCodeValidated ? 1 : 0.5 }}>
+          {isFruver ? (
+             <>
+              <input
+                ref={inputRefWeight}
+                type="number"
+                className="ec-manual-input"
+                placeholder="Paso 2: Digilar Peso (Kg)"
+                step="0.001"
+                value={weight}
+                disabled={!isCodeValidated}
+                onChange={(e) => {
+                  setWeight(e.target.value);
+                  setError("");
+                }}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && weight && validateAndConfirm()
+                }
+              />
+              <span
+                style={{
+                  position: "absolute",
+                  right: 20,
+                  fontWeight: "bold",
+                  color: "#94a3b8",
+                }}
+              >
+                {item.unidad_medida?.toUpperCase() || "KG"}
+              </span>
+             </>
+          ) : (
+             <input
+               ref={inputRefMeatLabel}
+               type="text"
+               className="ec-manual-input"
+               placeholder="Paso 2: Escanear Etiqueta de Báscula"
+               style={{ background: "#f8fafc", border: "2px solid #3b82f6" }}
+               value={meatLabel}
+               disabled={!isCodeValidated}
+               onChange={(e) => {
+                 setMeatLabel(e.target.value);
+                 setError("");
+               }}
+               onKeyDown={(e) =>
+                 e.key === "Enter" && meatLabel && validateAndConfirm()
+               }
+             />
+          )}
         </div>
 
         {/* ✅ DISPLAY DEL PRECIO CALCULADO EN TIEMPO REAL */}
@@ -355,7 +518,7 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
             className="ec-reason-btn"
             style={{ background: "#22c55e", color: "white", width: "100%" }}
             onClick={validateAndConfirm}
-            disabled={!weight || (isMeat && !code)}
+            disabled={!isCodeValidated || (isFruver && !weight) || (isMeat && !meatLabel)}
           >
             Confirmar
           </button>
@@ -383,6 +546,29 @@ export const SubstituteModal = ({
   const [verifyCode, setVerifyCode] = useState("");
   const verifyInputRef = useRef(null);
 
+  // ✅ NUEVOS ESTADOS PARA FRUVER Y CARNES
+  const [subWeight, setSubWeight] = useState("");
+  const [subMeatLabel, setSubMeatLabel] = useState("");
+  const [isSubCodeValidated, setIsSubCodeValidated] = useState(false);
+  const [baseEanFruver, setBaseEanFruver] = useState(null);
+  const [subError, setSubError] = useState("");
+
+  const inputRefWeight = useRef(null);
+  const inputRefMeatLabel = useRef(null);
+
+  const isFruver = useMemo(() => {
+    if (!pendingSub) return false;
+    const nameCat = (pendingSub.name + " " + (pendingSub.categories?.[0]?.name || "")).toLowerCase();
+    const isUnitKg = pendingSub.unidad_medida && ["kl", "kg", "kilo", "lb", "libra"].includes(pendingSub.unidad_medida.toLowerCase());
+    return isUnitKg || nameCat.includes("kg") || nameCat.includes("gramos") || nameCat.includes("fruver");
+  }, [pendingSub]);
+
+  const isMeat = useMemo(() => {
+    if (!pendingSub || isFruver) return false;
+    const nameCat = (pendingSub.name + " " + (pendingSub.categories?.[0]?.name || "")).toLowerCase();
+    return nameCat.includes("carne") || nameCat.includes("res") || nameCat.includes("cerdo") || nameCat.includes("pollo") || nameCat.includes("carniceria");
+  }, [pendingSub, isFruver]);
+
   useEffect(() => {
     if (isOpen && originalItem) {
       fetchSuggestions();
@@ -390,14 +576,19 @@ export const SubstituteModal = ({
       setVerifyCode("");
       setIsManualSearch(false);
       setQuery("");
+      setSubWeight("");
+      setSubMeatLabel("");
+      setIsSubCodeValidated(false);
+      setBaseEanFruver(null);
+      setSubError("");
     }
   }, [isOpen, originalItem]);
 
   const fetchSuggestions = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/buscar-producto?original_id=${originalItem.product_id}`,
+      const res = await ecommerceApi.get(
+        `/buscar-producto?original_id=${originalItem.product_id}`,
       );
       setSuggestions(res.data);
     } catch (error) {
@@ -413,8 +604,8 @@ export const SubstituteModal = ({
     setLoading(true);
     setIsManualSearch(true);
     try {
-      const res = await axios.get(
-        `https://backend-woocommerce.vercel.app/api/orders/buscar-producto?query=${query}`,
+      const res = await ecommerceApi.get(
+        `/buscar-producto?query=${query}`,
       );
       setSuggestions(res.data);
     } catch (error) {
@@ -442,20 +633,76 @@ export const SubstituteModal = ({
     );
   };
 
-  const handleVerify = (manualInput = null) => {
+  const handleVerify = async (manualInput = null) => {
     if (!pendingSub) return;
     const code = manualInput || verifyCode;
 
     if (validateCode(code, pendingSub)) {
-      onConfirmSubstitute(pendingSub, missingQty); // Pasamos cantidad faltante
+      setSubError("");
+      setIsSubCodeValidated(true);
+
+      // Si es Normal, terminar directamente
+      if (!isFruver && !isMeat) {
+         onConfirmSubstitute(pendingSub, missingQty, pendingSub.barcode || pendingSub.sku);
+         return;
+      }
+
+      // Si es Fruver, traer base EAN
+      if (isFruver && pendingSub.sku) {
+        try {
+          const res = await ecommerceApi.get(`/producto/base-ean-fruver/${pendingSub.sku}`);
+          if (res.data?.baseEAN) {
+            setBaseEanFruver(res.data.baseEAN);
+          }
+        } catch (e) {
+          console.error("Error trayendo EAN Fruver Sustituto", e);
+        }
+        setTimeout(() => inputRefWeight.current?.focus(), 100);
+      } else if (isMeat) {
+        setTimeout(() => inputRefMeatLabel.current?.focus(), 100);
+      }
     } else {
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-      alert(
-        `❌ Código incorrecto.\nEscaneado: ${code}\nEsperado SKU: ${pendingSub.sku}`,
+      setSubError(
+        `❌ Código incorrecto.\nEscaneado: ${code}\nEsperado SKU: ${pendingSub.sku}`
       );
+      setIsSubCodeValidated(false);
       setVerifyCode("");
       verifyInputRef.current?.focus();
     }
+  };
+
+  const validateAndConfirmSub = () => {
+    if (!isSubCodeValidated) return;
+    let finalCodeToSave = pendingSub.barcode || pendingSub.sku;
+
+    if (isFruver) {
+      const val = parseFloat(subWeight);
+      if (!val || isNaN(val)) {
+        setSubError("❌ Ingresa un peso válido.");
+        inputRefWeight.current?.focus();
+        return;
+      }
+      if (!baseEanFruver) {
+        setSubError("❌ No se encontró Base EAN para este producto Fruver.");
+        return;
+      }
+      const pesoGramos = Math.round(val * 1000).toString().padStart(5, '0');
+      const codigoSinCheck = `${baseEanFruver}${pesoGramos}`;
+      const checkDigit = calcularDigitoVerificador(codigoSinCheck);
+      if (checkDigit) {
+         finalCodeToSave = `${codigoSinCheck}${checkDigit}`;
+      }
+    } else if (isMeat) {
+      if (!subMeatLabel || subMeatLabel.length < 8) {
+        setSubError("❌ Escanea la etiqueta de la báscula de carnicería.");
+        inputRefMeatLabel.current?.focus();
+        return;
+      }
+      finalCodeToSave = subMeatLabel.trim().toUpperCase();
+    }
+
+    onConfirmSubstitute(pendingSub, missingQty, finalCodeToSave);
   };
 
   const handleCameraClick = () => {
@@ -530,39 +777,87 @@ export const SubstituteModal = ({
             </p>
           </div>
 
-          <div
-            className="ec-input-wrapper"
-            style={{ marginBottom: 20, gap: 10 }}
-          >
-            <button
-              className="ec-reason-btn"
+          {subError && (
+            <div
               style={{
-                background: "#1e293b",
-                width: 60,
-                height: 60,
-                borderRadius: 12,
-                flexShrink: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
+                background: "#fee2e2",
+                color: "#b91c1c",
+                padding: "10px",
+                borderRadius: "8px",
+                marginBottom: "15px",
+                fontSize: "0.85rem",
+                fontWeight: "bold",
+                textAlign: "center"
               }}
-              onClick={handleCameraClick}
-              title="Abrir Cámara"
             >
-              <FaCamera size={24} />
-            </button>
+              {subError}
+            </div>
+          )}
 
-            <input
-              ref={verifyInputRef}
-              type="text"
-              className="ec-manual-input"
-              placeholder="Escribe SKU..."
-              style={{ flex: 1, fontSize: "1.1rem" }}
-              value={verifyCode}
-              onChange={(e) => setVerifyCode(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleVerify()}
-            />
-          </div>
+          {!isSubCodeValidated ? (
+            <div
+              className="ec-input-wrapper"
+              style={{ marginBottom: 20, gap: 10 }}
+            >
+              <button
+                className="ec-reason-btn"
+                style={{
+                  background: "#1e293b",
+                  width: 60,
+                  height: 60,
+                  borderRadius: 12,
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onClick={handleCameraClick}
+                title="Abrir Cámara"
+              >
+                <FaCamera size={24} />
+              </button>
+
+              <input
+                ref={verifyInputRef}
+                type="text"
+                className="ec-manual-input"
+                placeholder="Paso 1: Valida SKU..."
+                style={{ flex: 1, fontSize: "1.1rem" }}
+                value={verifyCode}
+                onChange={(e) => {
+                  setVerifyCode(e.target.value);
+                  setSubError("");
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleVerify()}
+              />
+            </div>
+          ) : (
+            <div className="ec-input-wrapper" style={{ marginBottom: 20 }}>
+             {isFruver ? (
+               <input
+                 ref={inputRefWeight}
+                 type="number"
+                 className="ec-manual-input"
+                 placeholder="Paso 2: Digitar Peso (Kg)"
+                 step="0.001"
+                 value={subWeight}
+                 onChange={(e) => { setSubWeight(e.target.value); setSubError(""); }}
+                 onKeyDown={(e) => e.key === "Enter" && subWeight && validateAndConfirmSub()}
+               />
+             ) : (
+               <input
+                 ref={inputRefMeatLabel}
+                 type="text"
+                 className="ec-manual-input"
+                 placeholder="Paso 2: Escanear Etiqueta"
+                 style={{ background: "#f8fafc", border: "2px solid #3b82f6" }}
+                 value={subMeatLabel}
+                 onChange={(e) => { setSubMeatLabel(e.target.value); setSubError(""); }}
+                 onKeyDown={(e) => e.key === "Enter" && subMeatLabel && validateAndConfirmSub()}
+               />
+             )}
+            </div>
+          )}
 
           <div className="ec-modal-grid">
             <button
@@ -574,7 +869,8 @@ export const SubstituteModal = ({
             <button
               className="ec-reason-btn"
               style={{ background: "#f59e0b", color: "white" }}
-              onClick={() => handleVerify()}
+              onClick={!isSubCodeValidated ? () => handleVerify() : validateAndConfirmSub}
+              disabled={isSubCodeValidated && (isFruver ? !subWeight : !subMeatLabel)}
             >
               Confirmar
             </button>

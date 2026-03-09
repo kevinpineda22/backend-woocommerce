@@ -82,25 +82,25 @@
   gap: 3px;
 }
 
-.customer-row {
+.manifest-customer-row {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
 }
 
-.customer-field {
+.manifest-customer-field {
   display: flex;
   gap: 5px;
   align-items: baseline;
 }
 
-.customer-field .label {
+.manifest-customer-field .manifest-field-label {
   font-weight: 700;
   color: #475569;
   white-space: nowrap;
 }
 
-.customer-field .value {
+.manifest-customer-field .manifest-field-value {
   font-weight: 500;
   color: #64748b;
 }
@@ -826,4 +826,22 @@
   .manifest-sheet.ultra-compact .cell-qty {
     font-size: 0.7rem !important;
   }
+}
+
+/* ─── Sede Label (Header) ─── */
+.manifest-sede-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #4338ca;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Corrected Code Indicator ─── */
+.manifest-code-corrected-dot {
+  color: #16a34a;
+  margin-left: 4px;
+  font-weight: bold;
+  font-size: 0.8em;
 }
