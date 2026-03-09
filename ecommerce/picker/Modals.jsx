@@ -17,6 +17,7 @@ import {
   FaExclamationTriangle,
   FaSpinner,
 } from "react-icons/fa";
+import "./Modals.css";
 
 // --- MODAL DE INGRESO MANUAL ---
 export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
@@ -76,7 +77,7 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
 };
 
 // --- MODAL DE PESO INTELIGENTE (CARNES VS FRUVER CON PRECIO EN VIVO) ---
-export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
+export const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
   const [weight, setWeight] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -164,19 +165,32 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
   const calculatedPrice = useMemo(() => {
     if (!item) return 0;
     const pum = parseFloat(item.price || 0);
+    const unidad = (item.unidad_medida || "KG").toUpperCase();
+
+    // Multiplicador base (ej: si piden libras, hay que convertir porque la báscula siempre pesa en KG/Gramos nativos)
+    let weightInDisplayUnits = 0;
 
     if (isFruver) {
        if (!weight || isNaN(parseFloat(weight))) return 0;
-       return pum * parseFloat(weight);
+       weightInDisplayUnits = parseFloat(weight); // Fruver digita kilos, asumimos que eso quiere la app.
     } else if (isMeat) {
-       // Extraer peso solo si es un código EAN-13 de peso variable (empieza por 2)
-       if (meatLabel && meatLabel.length === 13 && /^\d+$/.test(meatLabel) && meatLabel.startsWith("2")) {
-          const pesoGramos = parseInt(meatLabel.substring(7, 12));
-          if (!isNaN(pesoGramos)) return pum * (pesoGramos / 1000);
+       // Extraer peso solo si es un código GS1 de peso variable (empieza por 2 y tiene 13 o 14 dígitos)
+       if (meatLabel && (meatLabel.length === 13 || meatLabel.length === 14) && /^\d+$/.test(meatLabel) && meatLabel.startsWith("2")) {
+          // El peso siempre son los 5 dígitos antes del dígito verificador final
+          const startIdx = meatLabel.length === 13 ? 7 : 8;
+          const endIdx = meatLabel.length === 13 ? 12 : 13;
+          const pesoGramos = parseInt(meatLabel.substring(startIdx, endIdx));
+          if (!isNaN(pesoGramos)) {
+             const weightInKg = pesoGramos / 1000;
+             // Si en Siesa el precio está por LIBRA (LB), convertimos los KG de la báscula a Libras (1KG = 2 Libras colombianas)
+             weightInDisplayUnits = (unidad === "LB" || unidad === "LIBRA") ? weightInKg * 2 : weightInKg;
+          }
+       } else {
+          weightInDisplayUnits = parseFloat(item.quantity_total) || 1; // Base si no ha escaneado la etiqueta o es unidad
        }
-       return pum * (parseFloat(item.quantity_total) || 1); // Base si no ha escaneado la etiqueta
     }
-    return 0;
+
+    return pum * weightInDisplayUnits;
   }, [item, weight, meatLabel, isFruver, isMeat]);
 
   // Formateador de moneda (Pesos Colombianos)
@@ -222,30 +236,99 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
   }, [isOpen, isMeat, isFruver, item]);
 
   // Validación INICIAL del SKU/EAN antes de permitir pesar
-  const handleValidateCode = () => {
+  const handleValidateCode = (scannedCode = null) => {
     if (!item) return;
-    const cleanCode = code.trim().toUpperCase();
+    const actualCode = typeof scannedCode === "string" ? scannedCode : code;
+    const rawCode = actualCode.trim().toUpperCase();
+    let cleanCode = rawCode;
     const expectedSku = (item.sku || "").toUpperCase();
     const expectedBarcode = (item.barcode || "").toUpperCase();
+    const unidad = (item.unidad_medida || "").toUpperCase();
 
-    const isValidCode =
-      cleanCode === expectedSku ||
-      cleanCode === expectedBarcode ||
-      (expectedBarcode && expectedBarcode.endsWith(cleanCode));
+    // Si digitan el código corto (ej. 12345), le agregamos el sufijo esperado para compararlo con el SKU real (ej. 12345-LB)
+    if (unidad === "LB" || unidad === "LIBRA") {
+      if (!cleanCode.endsWith("-LB")) cleanCode += "-LB";
+    } else if (unidad === "KL" || unidad === "KILO" || unidad === "KG") {
+      if (!cleanCode.endsWith("-KL")) cleanCode += "-KL";
+    }
 
-    if (!cleanCode) {
+    let isValidCode = false;
+    let isFastPass = false;
+
+    if (isMeat) {
+      if ((rawCode.length === 13 || rawCode.length === 14) && /^\d+$/.test(rawCode) && rawCode.startsWith("2")) {
+          const gs1Sku = rawCode.length === 13 ? rawCode.substring(1, 6) : rawCode.substring(2, 7);
+          if (
+              gs1Sku === expectedSku || 
+              parseInt(gs1Sku).toString() === expectedSku || 
+              gs1Sku === expectedSku.split('-')[0] || 
+              parseInt(gs1Sku).toString() === expectedSku.split('-')[0]
+          ) {
+              const startIdx = rawCode.length === 13 ? 7 : 8;
+              const endIdx = rawCode.length === 13 ? 12 : 13;
+              const pesoGramos = parseInt(rawCode.substring(startIdx, endIdx));
+              const extractedWeight = (!isNaN(pesoGramos) && pesoGramos > 0) ? pesoGramos / 1000 : 0;
+
+              const requested = parseFloat(item.quantity_total);
+              const unidad = (item.unidad_medida || "KG").toUpperCase();
+              const requestedInKgForValidation = (unidad === "LB" || unidad === "LIBRA") ? requested / 2 : requested;
+
+              const minAllowed = requestedInKgForValidation - 0.05;
+              const maxAllowed = requestedInKgForValidation + 0.05;
+
+              if (extractedWeight < minAllowed) {
+                  setError(`❌ Mínimo permitido: ${minAllowed.toFixed(3)} Kg (Etiqueta escaneada indica: ${extractedWeight.toFixed(3)} Kg)`);
+                  setIsCodeValidated(false);
+                  if (inputRefCode.current) inputRefCode.current.focus();
+                  return;
+              }
+              if (extractedWeight > maxAllowed) {
+                  setError(`❌ Máximo permitido: ${maxAllowed.toFixed(3)} Kg (Excedido por ${((extractedWeight - maxAllowed)*1000).toFixed(0)}g)`);
+                  setIsCodeValidated(false);
+                  if (inputRefCode.current) inputRefCode.current.focus();
+                  return;
+              }
+
+              isValidCode = true;
+              isFastPass = true;
+          }
+      }
+      
+      if (!isFastPass) {
+          setError(`❌ Debes escanear o digitar la etiqueta GS1 completa (13 o 14 dígitos).`);
+          setIsCodeValidated(false);
+          if (inputRefCode.current) inputRefCode.current.focus();
+          return;
+      }
+    } else {
+      isValidCode =
+        rawCode === expectedSku ||
+        cleanCode === expectedSku ||
+        rawCode === expectedBarcode ||
+        cleanCode === expectedBarcode ||
+        (expectedBarcode && expectedBarcode.endsWith(rawCode));
+    }
+
+    if (!rawCode) {
       setError(`❌ Digita el código o ítem del producto.`);
       inputRefCode.current?.focus();
       return;
     }
     
     if (isValidCode) {
+      if (cleanCode !== rawCode && cleanCode === expectedSku) setCode(cleanCode); // Si uso el sufijo para emparejar el SKU, actualizamos el texto de input
+      
       setError("");
       setIsCodeValidated(true);
-      setTimeout(() => {
-        if (isFruver) inputRefWeight.current?.focus();
-        else if (isMeat) inputRefMeatLabel.current?.focus();
-      }, 100);
+
+      if (isFastPass) {
+         setMeatLabel(rawCode); // Guardamos la etiqueta completa para extraer el peso
+         // No avanzamos el focus a ningún lado, ya tiene todo para enviar.
+      } else {
+         setTimeout(() => {
+           if (isFruver) inputRefWeight.current?.focus();
+         }, 100);
+      }
     } else {
       setError(`❌ Código incorrecto. Verifica el ítem.`);
       setIsCodeValidated(false);
@@ -272,22 +355,9 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
     // --- RAMA FRUVER ---
     if (isFruver) {
       const val = parseFloat(weight);
-      const requested = parseFloat(item.quantity_total);
 
       if (!val || isNaN(val)) {
         setError(`❌ Ingresa un peso válido.`);
-        inputRefWeight.current?.focus();
-        return;
-      }
-      if (val < requested) {
-        setError(`❌ Mínimo requerido: ${requested} Kg`);
-        inputRefWeight.current?.focus();
-        return;
-      }
-
-      const maxAllowed = requested + 0.05; // Tolerancia +50g
-      if (val > maxAllowed) {
-        setError(`❌ Excede tolerancia. Máx: ${maxAllowed.toFixed(3)} Kg`);
         inputRefWeight.current?.focus();
         return;
       }
@@ -312,9 +382,11 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
       }
       finalCodeToSave = meatLabel.trim().toUpperCase();
       
-      // Intentar extraer el peso del EAN-13 (los últimos 5 dígitos antes del verificador), SIEMPRE QUE sea EAN de peso variable (inicia con 2)
-      if (finalCodeToSave.length === 13 && /^\d+$/.test(finalCodeToSave) && finalCodeToSave.startsWith("2")) {
-         const pesoGramos = parseInt(finalCodeToSave.substring(7, 12));
+      // Intentar extraer el peso (los últimos 5 dígitos antes del verificador), SIEMPRE QUE sea EAN GS1 de peso variable (inicia con 2)
+      if ((finalCodeToSave.length === 13 || finalCodeToSave.length === 14) && /^\d+$/.test(finalCodeToSave) && finalCodeToSave.startsWith("2")) {
+         const startIdx = finalCodeToSave.length === 13 ? 7 : 8;
+         const endIdx = finalCodeToSave.length === 13 ? 12 : 13;
+         const pesoGramos = parseInt(finalCodeToSave.substring(startIdx, endIdx));
          if (!isNaN(pesoGramos) && pesoGramos > 0) {
             finalWeight = pesoGramos / 1000;
          } else {
@@ -325,198 +397,148 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm }) => {
       }
     }
 
+    // --- VALIDACIÓN GLOBAL DE TOLERANCIAS DE PESO (Aplica a Fruver y Cárnicos) ---
+    const requested = parseFloat(item.quantity_total);
+    // Si el item se mide en Libras, la cantidad solicitada (ej. 1 LB) en realidad pesa 0.5 Kg para la báscula.
+    // Debemos convertir 'requested' a Kilos para compararlo justamente contra el finalWeight (que siempre está en Kg sacados de la etiqueta)
+    const unidad = (item.unidad_medida || "KG").toUpperCase();
+    const requestedInKgForValidation = (unidad === "LB" || unidad === "LIBRA") ? requested / 2 : requested;
+
+    const minAllowed = requestedInKgForValidation - 0.05; // Tolerancia -50g
+    const maxAllowed = requestedInKgForValidation + 0.05; // Tolerancia +50g
+
+    if (finalWeight < minAllowed) {
+      setError(`❌ Mínimo permitido: ${minAllowed.toFixed(3)} Kg`);
+      if (isFruver) inputRefWeight.current?.focus();
+      else if (isMeat) inputRefMeatLabel.current?.focus();
+      return;
+    }
+    if (finalWeight > maxAllowed) {
+      setError(`❌ Máximo permitido: ${maxAllowed.toFixed(3)} Kg (Excedido por ${((finalWeight - maxAllowed)*1000).toFixed(0)}g)`);
+      if (isFruver) inputRefWeight.current?.focus();
+      else if (isMeat) inputRefMeatLabel.current?.focus();
+      return;
+    }
+
     onConfirm(finalWeight, finalCodeToSave);
   };
 
   if (!isOpen || !item) return null;
 
   return (
-    <div className="ec-modal-overlay">
+    <div className="ec-modal-overlay wm-modal">
       <div className="ec-modal-content">
-        <div style={{ textAlign: "center", marginBottom: 15 }}>
-          <FaWeightHanging size={30} color="#22c55e" />
-          <h3 style={{ marginTop: 10 }}>
-            {isMeat ? "Validar y Pesar Cárnico" : "Ingresar Peso Fruver"}
-          </h3>
-          <p style={{ fontSize: "1.1rem", margin: "10px 0" }}>
-            <strong>{item.name}</strong>
-          </p>
-          <div
-            style={{
-              fontSize: "0.9rem",
-              background: "#f0fdf4",
-              padding: 10,
-              borderRadius: 8,
-              border: "1px solid #bbf7d0",
-            }}
-          >
-            Solicitado:{" "}
-            <strong>
-              {item.quantity_total} {item.unidad_medida || "Kg"}
-            </strong>
-            <br />
-            <small style={{ color: "#15803d" }}>Margen permitido: +50g</small>
+        {/* HEADER */}
+        <div className="wm-header">
+          <FaWeightHanging size={30} className="wm-header-icon" />
+          <h3>{isMeat ? "Validar y Pesar Cárnico" : "Ingresar Peso Fruver"}</h3>
+          <p className="wm-product-name">{item.name}</p>
+          <div className="wm-request-badge">
+            Solicitado: <strong>{item.quantity_total} {item.unidad_medida || "Kg"}</strong>
+            <small>Margen permitido: ±50g</small>
           </div>
-          
-          {loadingBaseEan && <p style={{color: '#3b82f6', fontSize: '0.85rem'}}><FaSpinner className="ec-spin" /> Buscando configuración EAN Fruver...</p>}
-          {isFruver && baseEanFruver && <p style={{color: '#16a34a', fontSize: '0.85rem'}}>✅ EAN Base Cargado: {baseEanFruver}X...</p>}
-
-        </div>
-
-        {/* INPUT DE CÓDIGO (Requerido para AMBOS ahora) */}
-        <div className="ec-input-wrapper" style={{ marginBottom: 10 }}>
-          <input
-            ref={inputRefCode}
-            type="text"
-            className="ec-manual-input"
-            style={{
-              background: isCodeValidated ? "#f0fdf4" : "#f8fafc",
-              color: isCodeValidated ? "#16a34a" : "#0f172a",
-              border: isCodeValidated ? "2px solid #22c55e" : "2px solid #cbd5e1",
-              fontSize: "1.2rem",
-            }}
-            placeholder="Paso 1: Digitar SKU o escanear"
-            value={code}
-            disabled={isCodeValidated}
-            onChange={(e) => {
-              setCode(e.target.value);
-              setError("");
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                if (!isCodeValidated) handleValidateCode();
-                // Si el item ya estaba validado o se validó recién, enfocar el peso
-              }
-            }}
-          />
-          {!isCodeValidated && code.length > 0 && (
-            <button 
-              onClick={handleValidateCode}
-              style={{
-                position: "absolute",
-                right: 5,
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "#3b82f6",
-                color: "white",
-                border: "none",
-                borderRadius: 4,
-                padding: "5px 10px",
-                cursor: "pointer"
-              }}
-            >
-              Validar
-            </button>
+          {loadingBaseEan && (
+            <p className="wm-info-loading"><FaSpinner className="ec-spin" /> Buscando configuración EAN Fruver...</p>
+          )}
+          {isFruver && baseEanFruver && (
+            <p className="wm-info-success">✅ EAN Base Cargado: {baseEanFruver}X...</p>
           )}
         </div>
 
-        {/* PASO 2: INPUT DE PESO (Fruver) o ETIQUETA (Carnes) */}
-        <div className="ec-input-wrapper" style={{ opacity: isCodeValidated ? 1 : 0.5 }}>
-          {isFruver ? (
-             <>
+        {/* PASO 1 / PASO ÚNICO: INPUT DE CÓDIGO */}
+        <div className="wm-step-section">
+          <label className="wm-step-label">
+            {isMeat ? "Paso Único: Escanear o Digitar Etiqueta GS1" : "Paso 1: Digitar SKU"}
+          </label>
+          <div className="wm-input-row">
+            {isMeat && (
+              <button
+                className="wm-camera-btn"
+                disabled={isCodeValidated}
+                onClick={() => {
+                  if (!isCodeValidated && onRequestScan) {
+                    onRequestScan((scannedVal) => {
+                      setCode(scannedVal);
+                      setTimeout(() => handleValidateCode(scannedVal), 150);
+                    });
+                  }
+                }}
+                title="Abrir Cámara"
+              >
+                <FaCamera size={22} />
+              </button>
+            )}
+            <input
+              ref={inputRefCode}
+              type="text"
+              className={`wm-code-input ${isCodeValidated ? "validated" : ""} ${!isCodeValidated && code.length > 0 ? "has-button" : ""}`}
+              placeholder={isMeat ? "Ej: 2915132001000" : "Ej: 12345"}
+              value={code}
+              disabled={isCodeValidated}
+              onChange={(e) => { setCode(e.target.value); setError(""); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !isCodeValidated) handleValidateCode();
+              }}
+            />
+            {!isCodeValidated && code.length > 0 && (
+              <button className="wm-validate-btn" onClick={handleValidateCode}>
+                Validar
+              </button>
+            )}
+          </div>
+          {meatLabel && meatLabel.length >= 13 && calculatedPrice > 0 && (
+            <div className="wm-fastpass-price">
+              💰 Total a cobrar: <strong>{formatPrice(calculatedPrice)}</strong>
+            </div>
+          )}
+        </div>
+
+        {/* PASO 2: INPUT DE PESO (Solo Fruver) */}
+        {isFruver && (
+          <div className={`wm-step-section ${!isCodeValidated ? "disabled" : ""}`}>
+            <label className="wm-step-label">Paso 2: Digitar Peso (Kg)</label>
+            <div className="wm-input-row">
               <input
                 ref={inputRefWeight}
                 type="number"
-                className="ec-manual-input"
-                placeholder="Paso 2: Digilar Peso (Kg)"
+                className="wm-weight-input"
+                placeholder="Ej: 0.500"
                 step="0.001"
                 value={weight}
                 disabled={!isCodeValidated}
-                onChange={(e) => {
-                  setWeight(e.target.value);
-                  setError("");
-                }}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && weight && validateAndConfirm()
-                }
+                onChange={(e) => { setWeight(e.target.value); setError(""); }}
+                onKeyDown={(e) => e.key === "Enter" && weight && validateAndConfirm()}
               />
-              <span
-                style={{
-                  position: "absolute",
-                  right: 20,
-                  fontWeight: "bold",
-                  color: "#94a3b8",
-                }}
-              >
+              <span className="wm-weight-unit">
                 {item.unidad_medida?.toUpperCase() || "KG"}
               </span>
-             </>
-          ) : (
-             <input
-               ref={inputRefMeatLabel}
-               type="text"
-               className="ec-manual-input"
-               placeholder="Paso 2: Escanear Etiqueta de Báscula"
-               style={{ background: "#f8fafc", border: "2px solid #3b82f6" }}
-               value={meatLabel}
-               disabled={!isCodeValidated}
-               onChange={(e) => {
-                 setMeatLabel(e.target.value);
-                 setError("");
-               }}
-               onKeyDown={(e) =>
-                 e.key === "Enter" && meatLabel && validateAndConfirm()
-               }
-             />
-          )}
-        </div>
+            </div>
+          </div>
+        )}
 
-        {/* ✅ DISPLAY DEL PRECIO CALCULADO EN TIEMPO REAL */}
-        <div
-          style={{
-            marginTop: 15,
-            padding: "10px",
-            background: "#eff6ff",
-            border: "1px solid #bfdbfe",
-            borderRadius: "8px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "0.8rem",
-              color: "#3b82f6",
-              fontWeight: "bold",
-              textTransform: "uppercase",
-            }}
-          >
-            Total a cobrar:
-          </span>
-          <span
-            style={{ fontSize: "1.3rem", fontWeight: "900", color: "#1e40af" }}
-          >
+        {/* PRECIO CALCULADO */}
+        <div className="wm-price-box">
+          <span className="wm-price-label">Total a cobrar:</span>
+          <span className="wm-price-value">
             {calculatedPrice > 0 ? formatPrice(calculatedPrice) : "$0"}
           </span>
         </div>
 
-        {/* MENSAJES DE ERROR */}
+        {/* ERROR */}
         {error && (
-          <div
-            style={{
-              color: "#ef4444",
-              marginTop: 10,
-              fontWeight: "bold",
-              fontSize: "0.85rem",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 5,
-            }}
-          >
-            <FaExclamationTriangle /> {error}
+          <div className="wm-error-alert">
+            <div className="wm-error-icon"><FaExclamationTriangle /></div>
+            <div>{error}</div>
           </div>
         )}
 
         {/* BOTONES */}
-        <div className="ec-modal-grid">
-          <button className="ec-modal-cancel" onClick={onClose}>
+        <div className="wm-action-grid">
+          <button className="wm-btn-cancel" onClick={onClose}>
             Cancelar
           </button>
           <button
-            className="ec-reason-btn"
-            style={{ background: "#22c55e", color: "white", width: "100%" }}
+            className="wm-btn-confirm"
             onClick={validateAndConfirm}
             disabled={!isCodeValidated || (isFruver && !weight) || (isMeat && !meatLabel)}
           >
@@ -622,14 +644,26 @@ export const SubstituteModal = ({
   };
 
   const validateCode = (codeToCheck, product) => {
-    const cleanInput = codeToCheck.trim().toUpperCase();
+    const rawInput = codeToCheck.trim().toUpperCase();
+    let cleanInput = rawInput;
     const sku = (product.sku || "").toUpperCase();
+    const unidad = (product.unidad_medida || "").toUpperCase();
+
+    if (unidad === "LB" || unidad === "LIBRA") {
+      if (!cleanInput.endsWith("-LB")) cleanInput += "-LB";
+    } else if (unidad === "KL" || unidad === "KILO" || unidad === "KG") {
+      if (!cleanInput.endsWith("-KL")) cleanInput += "-KL";
+    }
+
     return (
+      rawInput === sku ||
       cleanInput === sku ||
+      rawInput.includes(sku) ||
+      sku.includes(rawInput) ||
       cleanInput.includes(sku) ||
       sku.includes(cleanInput) ||
-      cleanInput === "OK" ||
-      cleanInput.length > 4
+      rawInput === "OK" ||
+      rawInput.length > 4
     );
   };
 
@@ -637,9 +671,84 @@ export const SubstituteModal = ({
     if (!pendingSub) return;
     const code = manualInput || verifyCode;
 
-    if (validateCode(code, pendingSub)) {
+    let isValid = false;
+    let isFastPass = false;
+    let cleanCode = code.trim().toUpperCase();
+    const expectedSku = (pendingSub.sku || "").toUpperCase();
+
+    // FAST-PASS PARA SUSTITUTOS CÁRNICOS:
+    if (isMeat) {
+       if ((cleanCode.length === 13 || cleanCode.length === 14) && /^\d+$/.test(cleanCode) && cleanCode.startsWith("2")) {
+           const gs1Sku = cleanCode.length === 13 ? cleanCode.substring(1, 6) : cleanCode.substring(2, 7);
+           if (
+               gs1Sku === expectedSku || 
+               parseInt(gs1Sku).toString() === expectedSku || 
+               gs1Sku === expectedSku.split('-')[0] || 
+               parseInt(gs1Sku).toString() === expectedSku.split('-')[0]
+           ) {
+               const startIdx = cleanCode.length === 13 ? 7 : 8;
+               const endIdx = cleanCode.length === 13 ? 12 : 13;
+               const pesoGramos = parseInt(cleanCode.substring(startIdx, endIdx));
+               const extractedWeight = (!isNaN(pesoGramos) && pesoGramos > 0) ? pesoGramos / 1000 : 0;
+
+               const requested = parseFloat(missingQty);
+               const unidad = (pendingSub.unidad_medida || "KG").toUpperCase();
+               const requestedInKgForValidation = (unidad === "LB" || unidad === "LIBRA") ? requested / 2 : requested;
+
+               const minAllowed = requestedInKgForValidation - 0.05;
+               const maxAllowed = requestedInKgForValidation + 0.05;
+
+               if (extractedWeight < minAllowed) {
+                   setSubError(`❌ Mínimo permitido: ${minAllowed.toFixed(3)} Kg (Etiqueta indica: ${extractedWeight.toFixed(3)} Kg)`);
+                   setIsSubCodeValidated(false);
+                   setVerifyCode("");
+                   setTimeout(() => verifyInputRef.current?.focus(), 100);
+                   return;
+               }
+               if (extractedWeight > maxAllowed) {
+                   setSubError(`❌ Máximo permitido: ${maxAllowed.toFixed(3)} Kg (Excedido por ${((extractedWeight - maxAllowed)*1000).toFixed(0)}g)`);
+                   setIsSubCodeValidated(false);
+                   setVerifyCode("");
+                   setTimeout(() => verifyInputRef.current?.focus(), 100);
+                   return;
+               }
+
+               isValid = true;
+               isFastPass = true;
+           }
+       }
+       if (!isFastPass) {
+           if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+           setSubError(`❌ Escanea o digita la etiqueta GS1 completa para el cárnico.`);
+           setIsSubCodeValidated(false);
+           setVerifyCode("");
+           verifyInputRef.current?.focus();
+           return;
+       }
+    } else {
+       isValid = validateCode(code, pendingSub);
+    }
+
+    if (isValid) {
       setSubError("");
       setIsSubCodeValidated(true);
+
+      const unidad = (pendingSub.unidad_medida || "").toUpperCase();
+      let expectedSuffixCode = cleanCode;
+      if (unidad === "LB" || unidad === "LIBRA") {
+        if (!expectedSuffixCode.endsWith("-LB")) expectedSuffixCode += "-LB";
+      } else if (unidad === "KL" || unidad === "KILO" || unidad === "KG") {
+        if (!expectedSuffixCode.endsWith("-KL")) expectedSuffixCode += "-KL";
+      }
+      
+      if (!isFastPass && expectedSuffixCode !== cleanCode && expectedSuffixCode === expectedSku) {
+           setVerifyCode(expectedSuffixCode); // Feedback visual
+      }
+
+      if (isFastPass) {
+          setVerifyCode(cleanCode);
+          setSubMeatLabel(cleanCode); // Alimentamos directamente el Paso 2 invisible
+      }
 
       // Si es Normal, terminar directamente
       if (!isFruver && !isMeat) {
@@ -647,8 +756,9 @@ export const SubstituteModal = ({
          return;
       }
 
-      // Si es Fruver, traer base EAN
-      if (isFruver && pendingSub.sku) {
+      if (isFastPass) {
+         // No hacer focus a nada, está listo para enviar
+      } else if (isFruver && pendingSub.sku) {
         try {
           const res = await ecommerceApi.get(`/producto/base-ean-fruver/${pendingSub.sku}`);
           if (res.data?.baseEAN) {
@@ -658,8 +768,6 @@ export const SubstituteModal = ({
           console.error("Error trayendo EAN Fruver Sustituto", e);
         }
         setTimeout(() => inputRefWeight.current?.focus(), 100);
-      } else if (isMeat) {
-        setTimeout(() => inputRefMeatLabel.current?.focus(), 100);
       }
     } else {
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
@@ -720,155 +828,77 @@ export const SubstituteModal = ({
 
   if (pendingSub) {
     return (
-      <div className="ec-modal-overlay high-z">
+      <div className="ec-modal-overlay high-z wm-modal">
         <div className="ec-modal-content">
-          <div
-            style={{
-              background: "#f59e0b",
-              padding: "20px",
-              margin: "-25px -25px 20px",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexDirection: "column",
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-            }}
-          >
+          <div className="wm-sub-header">
             <FaBarcode size={40} style={{ marginBottom: 10 }} />
-            <h3 style={{ margin: 0 }}>Validar Sustituto</h3>
-            <p style={{ margin: 0, opacity: 0.9, fontSize: "0.9rem" }}>
-              Cantidad a sustituir: <strong>{missingQty}</strong>
-            </p>
+            <h3>Validar Sustituto</h3>
+            <p>Cantidad a sustituir: <strong>{missingQty}</strong></p>
           </div>
 
-          <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <p
-              style={{
-                fontSize: "0.9rem",
-                color: "#64748b",
-                textTransform: "uppercase",
-                fontWeight: 700,
-              }}
-            >
-              Vas a llevar:
-            </p>
-            <h3
-              style={{
-                color: "#1e293b",
-                margin: "10px 0",
-                fontSize: "1.2rem",
-                lineHeight: 1.3,
-              }}
-            >
-              {pendingSub.name}
-            </h3>
-            <p
-              className="ec-text-secondary"
-              style={{
-                fontSize: "0.85rem",
-                background: "#f1f5f9",
-                padding: 10,
-                borderRadius: 8,
-              }}
-            >
-              Escanea el código de barras del producto físico.
+          <div className="wm-sub-product-info">
+            <p className="wm-sub-product-label">Vas a llevar:</p>
+            <h3 className="wm-sub-product-name">{pendingSub.name}</h3>
+            <p className="wm-sub-product-hint">
+              {isMeat
+                ? "Escanea la etiqueta GS1 del producto."
+                : "Escanea el código de barras del producto físico."}
             </p>
           </div>
 
           {subError && (
-            <div
-              style={{
-                background: "#fee2e2",
-                color: "#b91c1c",
-                padding: "10px",
-                borderRadius: "8px",
-                marginBottom: "15px",
-                fontSize: "0.85rem",
-                fontWeight: "bold",
-                textAlign: "center"
-              }}
-            >
-              {subError}
+            <div className="wm-error-alert">
+              <div className="wm-error-icon"><FaExclamationTriangle /></div>
+              <div>{subError}</div>
             </div>
           )}
 
           {!isSubCodeValidated ? (
-            <div
-              className="ec-input-wrapper"
-              style={{ marginBottom: 20, gap: 10 }}
-            >
+            <div className="wm-verify-row">
               <button
-                className="ec-reason-btn"
-                style={{
-                  background: "#1e293b",
-                  width: 60,
-                  height: 60,
-                  borderRadius: 12,
-                  flexShrink: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
+                className="wm-camera-btn"
                 onClick={handleCameraClick}
                 title="Abrir Cámara"
               >
                 <FaCamera size={24} />
               </button>
-
               <input
                 ref={verifyInputRef}
                 type="text"
-                className="ec-manual-input"
-                placeholder="Paso 1: Valida SKU..."
-                style={{ flex: 1, fontSize: "1.1rem" }}
+                className="wm-verify-input"
+                placeholder={isMeat ? "Escanear Etiqueta GS1" : "Digitar SKU..."}
                 value={verifyCode}
-                onChange={(e) => {
-                  setVerifyCode(e.target.value);
-                  setSubError("");
-                }}
+                onChange={(e) => { setVerifyCode(e.target.value); setSubError(""); }}
                 onKeyDown={(e) => e.key === "Enter" && handleVerify()}
               />
             </div>
           ) : (
-            <div className="ec-input-wrapper" style={{ marginBottom: 20 }}>
-             {isFruver ? (
-               <input
-                 ref={inputRefWeight}
-                 type="number"
-                 className="ec-manual-input"
-                 placeholder="Paso 2: Digitar Peso (Kg)"
-                 step="0.001"
-                 value={subWeight}
-                 onChange={(e) => { setSubWeight(e.target.value); setSubError(""); }}
-                 onKeyDown={(e) => e.key === "Enter" && subWeight && validateAndConfirmSub()}
-               />
-             ) : (
-               <input
-                 ref={inputRefMeatLabel}
-                 type="text"
-                 className="ec-manual-input"
-                 placeholder="Paso 2: Escanear Etiqueta"
-                 style={{ background: "#f8fafc", border: "2px solid #3b82f6" }}
-                 value={subMeatLabel}
-                 onChange={(e) => { setSubMeatLabel(e.target.value); setSubError(""); }}
-                 onKeyDown={(e) => e.key === "Enter" && subMeatLabel && validateAndConfirmSub()}
-               />
-             )}
-            </div>
+            isFruver && (
+              <div className="wm-step-section">
+                <label className="wm-step-label">Paso 2: Digitar Peso (Kg)</label>
+                <div className="wm-input-row">
+                  <input
+                    ref={inputRefWeight}
+                    type="number"
+                    className="wm-weight-input"
+                    placeholder="Ej: 0.500"
+                    step="0.001"
+                    value={subWeight}
+                    onChange={(e) => { setSubWeight(e.target.value); setSubError(""); }}
+                    onKeyDown={(e) => e.key === "Enter" && subWeight && validateAndConfirmSub()}
+                  />
+                </div>
+              </div>
+            )
           )}
 
-          <div className="ec-modal-grid">
-            <button
-              className="ec-modal-cancel"
-              onClick={() => setPendingSub(null)}
-            >
+          <div className="wm-action-grid">
+            <button className="wm-btn-cancel" onClick={() => setPendingSub(null)}>
               <FaArrowLeft /> Atrás
             </button>
             <button
-              className="ec-reason-btn"
-              style={{ background: "#f59e0b", color: "white" }}
+              className="wm-btn-confirm"
+              style={{ background: "#f59e0b", boxShadow: "0 2px 8px rgba(245,158,11,0.3)" }}
               onClick={!isSubCodeValidated ? () => handleVerify() : validateAndConfirmSub}
               disabled={isSubCodeValidated && (isFruver ? !subWeight : !subMeatLabel)}
             >

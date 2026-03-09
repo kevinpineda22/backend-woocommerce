@@ -625,6 +625,8 @@ exports.getSessionLogsDetail = async (req, res) => {
           shipping: o.shipping,
           total_items:
             o.line_items?.reduce((acc, i) => acc + i.quantity, 0) || 0,
+          date_created: o.date_created,
+          customer_note: o.customer_note,
         };
       });
     };

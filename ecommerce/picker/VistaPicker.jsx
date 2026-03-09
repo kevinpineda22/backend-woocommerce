@@ -513,6 +513,10 @@ const VistaPicker = () => {
           setCurrentItem(null);
         }}
         onConfirm={confirmPicking}
+        onRequestScan={(cb) => {
+          setScanOverrideCallback(() => cb);
+          setIsScanning(true);
+        }}
       />
       <SubstituteModal
         isOpen={showSubModal}
