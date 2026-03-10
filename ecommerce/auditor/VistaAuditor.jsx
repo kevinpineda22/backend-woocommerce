@@ -381,16 +381,24 @@ const VistaAuditor = () => {
       customer: group.customer,
       billing: group.billing,
       shipping: group.shipping,
-      items: group.items.map((i) => ({
-        id: i.id,
-        sku: i.sku || i.id,
-        name: i.name,
-        original_name: i.original_name || null,
-        qty: i.count,
-        price: i.price,
-        is_sub: i.is_sub,
-        barcode: i.barcode || i.sku || i.id,
-      })),
+      items: group.items.map((i) => {
+        // Encontrar los códigos exactos escaneados para este producto
+        const scannedSet = auditData.scannedBarcodes[i.id];
+        const exactScannedBarcode = scannedSet && scannedSet.size > 0 
+          ? Array.from(scannedSet).join(",") 
+          : i.barcode || i.sku || i.id;
+
+        return {
+          id: i.id,
+          sku: i.sku || i.id,
+          name: i.name,
+          original_name: i.original_name || null,
+          qty: i.count,
+          price: i.price,
+          is_sub: i.is_sub,
+          barcode: exactScannedBarcode, // ✅ El código EXACTO GS1 capturado en el picker
+        };
+      }),
     }));
   };
 

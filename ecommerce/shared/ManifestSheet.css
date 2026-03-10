@@ -10,12 +10,18 @@
   width: 100%;
   max-width: 800px;
   padding: 12mm 10mm;
-  border-radius: 4px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); /* Sombra estilo "papel flotante" */
   font-family: "Cabin", Helvetica, sans-serif;
   font-size: 16px;
   color: #1e293b;
-  margin: 0 auto 20px;
+  margin: 0 auto 30px; /* Margen amplio para separar hojas en pantalla */
+  page-break-after: always;
+}
+
+.manifest-sheet:last-of-type {
+  margin-bottom: 0px;
+  page-break-after: auto;
 }
 
 /* =========================================
@@ -606,6 +612,12 @@
     padding: 15mm 12mm !important;
     border: none !important;
     border-radius: 0 !important;
+    page-break-after: always !important;
+  }
+
+  /* El último manifiesto no rompe página para no dejar una hoja en blanco al final */
+  .manifest-sheet:last-of-type {
+    page-break-after: auto !important;
   }
 
   .manifest-header {

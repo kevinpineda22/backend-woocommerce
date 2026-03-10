@@ -524,6 +524,48 @@
   font-size: 1rem;
 }
 
+/* ─── INVOICE BUTTONS ─── */
+.invoice-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+  justify-content: center;
+}
+
+.audit-act-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+  color: white;
+}
+
+.audit-act-btn.approve {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.audit-act-btn.reject {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.audit-act-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+  filter: brightness(1.1);
+}
+
+.audit-act-btn:active {
+  transform: translateY(0);
+}
+
 /* ─── PROGRESS BAR ─── */
 .aud-progress-section {
   background: white;

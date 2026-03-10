@@ -38,9 +38,10 @@ const ManifestSheet = ({
   const [correctedCodes, setCorrectedCodes] = React.useState({});
 
   React.useEffect(() => {
+    // Solo consultar SIESA para códigos cortos (no GS1) que necesiten mapeo
     const codes = items
-      .map((item) => item.barcode || item.sku || item.name)
-      .filter((c) => c && c !== "N/A");
+      .map((item) => item.sku || item.name)
+      .filter((c) => c && c !== "N/A" && c.length < 10);
 
     if (codes.length > 0) {
       checkSiesaBarcodes(codes).then((map) => {
@@ -55,10 +56,13 @@ const ManifestSheet = ({
   const qrValue = items
     .map((item) => {
       const qty = item.qty || item.count || 1;
+      
+      // PRIORIDAD ABSOLUTA: El código ingresado/escaneado provisto por el padre (Ej: GS1 Pesable)
+      // Si no existe, intenta el SKU. Si el SKU está corregido por SIESA, usa eso.
       let code = item.barcode || item.sku || item.name || "N/A";
 
-      // Aplicar corrección de Siesa (si existe)
-      if (correctedCodes[code]) {
+      // Aplicar corrección de Siesa (solo si el barcode actual no parece ser un pesado GS1 de 13+ chars)
+      if (correctedCodes[code] && code.length < 13) {
         code = correctedCodes[code];
       }
 
