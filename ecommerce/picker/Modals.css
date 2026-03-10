@@ -1,0 +1,524 @@
+/* ================================================================
+   Modals.css – WeightModal & SubstituteModal
+   Prefijo: wm-  (Weight Modal)
+   Mobile-first, responsive, profesional.
+   ================================================================ */
+
+/* ─── OVERRIDE: Modal más amplio para Peso/Sustitutos ─── */
+.wm-modal .ec-modal-content {
+  width: 95%;
+  max-width: 480px;
+  padding: 20px 24px 24px;
+  box-sizing: border-box;
+}
+
+/* ─── HEADER ─── */
+.wm-header {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.wm-header-icon {
+  color: #22c55e;
+}
+
+.wm-header h3 {
+  margin: 10px 0 0;
+  font-size: 1.15rem;
+  color: #1e293b;
+}
+
+.wm-product-name {
+  font-size: 1.05rem;
+  margin: 8px 0;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* ─── BADGE DE SOLICITUD ─── */
+.wm-request-badge {
+  font-size: 0.95rem;
+  background: #f0fdf4;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid #bbf7d0;
+  line-height: 1.5;
+}
+
+.wm-request-badge strong {
+  color: #15803d;
+}
+
+.wm-request-badge small {
+  color: #15803d;
+  display: block;
+  margin-top: 4px;
+}
+
+/* ─── INFO MESSAGES ─── */
+.wm-info-loading {
+  color: #3b82f6;
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.wm-info-success {
+  color: #16a34a;
+  font-size: 0.88rem;
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* ─── STEP SECTION ─── */
+.wm-step-section {
+  text-align: left;
+  margin-bottom: 16px;
+}
+
+.wm-step-section.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.wm-step-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+/* ─── INPUT ROW (camera + input + validate button) ─── */
+.wm-input-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ─── CAMERA BUTTON ─── */
+.wm-camera-btn {
+  background: #1e293b;
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  color: white;
+  transition: opacity 0.15s;
+}
+
+.wm-camera-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── CODE INPUT (overrides .ec-manual-input dark styling) ─── */
+.wm-code-input {
+  width: 100%;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border: 2px solid #cbd5e1 !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  font-size: 1.2rem !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  outline: none;
+  height: 52px;
+  box-sizing: border-box;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.wm-code-input::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.wm-code-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.wm-code-input.validated {
+  background: #f0fdf4 !important;
+  color: #16a34a !important;
+  border-color: #22c55e !important;
+}
+
+.wm-code-input.has-button {
+  padding-right: 110px !important;
+}
+
+/* ─── VALIDATE BUTTON (floating inside input) ─── */
+.wm-validate-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.wm-validate-btn:active {
+  background: #2563eb;
+}
+
+/* ─── WEIGHT INPUT (Fruver) ─── */
+.wm-weight-input {
+  width: 100%;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border: 2px solid #cbd5e1 !important;
+  border-radius: 12px !important;
+  padding: 14px 60px 14px 16px !important;
+  font-size: 1.2rem !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  outline: none;
+  height: 52px;
+  box-sizing: border-box;
+}
+
+.wm-weight-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.wm-weight-unit {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: 700;
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+/* ─── FAST-PASS PRICE INLINE ─── */
+.wm-fastpass-price {
+  margin-top: 10px;
+  font-size: 1.1rem;
+  color: #334155;
+}
+
+.wm-fastpass-price strong {
+  color: #16a34a;
+}
+
+/* ─── PRICE BOX ─── */
+.wm-price-box {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wm-price-label {
+  font-size: 0.85rem;
+  color: #3b82f6;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.wm-price-value {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #1e40af;
+}
+
+/* ─── ERROR ALERT ─── */
+.wm-error-alert {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.wm-error-icon {
+  flex-shrink: 0;
+  margin-top: 3px;
+  font-size: 1.1rem;
+}
+
+/* ─── ACTION BUTTONS ─── */
+.wm-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.wm-btn-cancel {
+  background: white;
+  border: 2px solid #e2e8f0;
+  padding: 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.wm-btn-cancel:active {
+  background: #f1f5f9;
+}
+
+.wm-btn-confirm {
+  background: #22c55e;
+  border: none;
+  padding: 14px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  color: white;
+  cursor: pointer;
+  transition: background 0.15s;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+}
+
+.wm-btn-confirm:active {
+  background: #16a34a;
+}
+
+.wm-btn-confirm:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ─── SUBSTITUTE MODAL HEADER ─── */
+.wm-sub-header {
+  background: #f59e0b;
+  padding: 20px;
+  margin: -20px -24px 20px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+}
+
+.wm-sub-header h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.wm-sub-header p {
+  margin: 4px 0 0;
+  opacity: 0.9;
+  font-size: 0.95rem;
+}
+
+/* ─── SUBSTITUTE PRODUCT INFO ─── */
+.wm-sub-product-info {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.wm-sub-product-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin: 0;
+}
+
+.wm-sub-product-name {
+  color: #1e293b;
+  margin: 8px 0;
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+
+.wm-sub-product-hint {
+  font-size: 0.9rem;
+  background: #f1f5f9;
+  padding: 12px;
+  border-radius: 10px;
+  color: #475569;
+  margin: 0;
+}
+
+/* ─── SUBSTITUTE VERIFY INPUT ─── */
+.wm-verify-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.wm-verify-input {
+  flex: 1;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border: 2px solid #cbd5e1 !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  height: 52px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.wm-verify-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.wm-verify-input.validated {
+  background: #f0fdf4 !important;
+  color: #16a34a !important;
+  border-color: #22c55e !important;
+}
+
+/* ─── FEEDBACK GS1 CÁRNICOS ─── */
+.wm-gs1-success-feedback {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #f0fdfa, #ccfbf1);
+  border: 1.5px solid #5eead4;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-top: 12px;
+  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.15);
+  animation: slideInDown 0.3s ease-out;
+}
+
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.wm-gs1-icon {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.wm-gs1-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wm-gs1-title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #0d9488;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wm-gs1-code {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #115e59;
+  background: rgba(255,255,255,0.6);
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  align-self: flex-start;
+  margin-bottom: 2px;
+}
+
+.wm-gs1-extracted-weight {
+  font-size: 0.8rem;
+  color: #0f766e;
+}
+
+.wm-gs1-extracted-weight strong {
+  font-size: 0.9rem;
+  color: #134e4a;
+}
+
+/* ─── RESPONSIVE TWEAKS ─── */
+@media (max-width: 400px) {
+  .wm-modal .ec-modal-content {
+    padding: 16px 18px 20px;
+    border-radius: 20px;
+  }
+
+  .wm-header h3 {
+    font-size: 1.05rem;
+  }
+
+  .wm-code-input,
+  .wm-weight-input,
+  .wm-verify-input {
+    font-size: 1.05rem !important;
+    padding: 12px 14px !important;
+    height: 48px;
+  }
+
+  .wm-code-input.has-button {
+    padding-right: 100px !important;
+  }
+
+  .wm-validate-btn {
+    padding: 8px 14px;
+    font-size: 0.88rem;
+  }
+
+  .wm-camera-btn {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+  }
+
+  .wm-price-value {
+    font-size: 1.2rem;
+  }
+
+  .wm-btn-cancel,
+  .wm-btn-confirm {
+    padding: 12px;
+    font-size: 0.95rem;
+  }
+}
+
+@media (min-width: 600px) {
+  .wm-modal .ec-modal-content {
+    max-width: 520px;
+    padding: 28px 32px 32px;
+  }
+}

@@ -81,23 +81,32 @@ exports.createPickingSession = async (req, res) => {
       .single();
     const nombrePicker = pickerData ? pickerData.nombre_completo : "Picker";
 
-    // Multi-Sede: La sede de la sesión viene del picker, del request, o del pedido
+// Multi-Sede: La sede de la sesión viene del picker, o del request
     let sedeId = req.sedeId || pickerData?.sede_id || null;
 
-    // 2. Obtener datos para Snapshot (Multi-sede: usar cliente WC de la sede)
-    const sessClient = await getWooClient(sedeId || req.sedeId);
-    const pedidosPromesas = ids_pedidos.map((id) =>
-      sessClient.get(`orders/${id}`),
-    );
-    const responses = await Promise.all(pedidosPromesas);
+    let sessClient;
+    let responses;
 
-    // Si no tenemos sede del picker, intentar sacarla del primer pedido
-    if (!sedeId && responses.length > 0) {
-      const { sede_id: orderSedeId } = await getSedeFromWooOrder(
-        responses[0].data,
-      );
-      if (orderSedeId) sedeId = orderSedeId;
+    // Si no tenemos sede desde el picker/request, buscamos en qué sede existe el primer pedido
+    if (!sedeId && ids_pedidos.length > 0) {
+      const { getOrderFromAnySede } = require("../services/wooMultiService");
+      const foundSede = await getOrderFromAnySede(ids_pedidos[0]);
+      if (foundSede && foundSede.sedeId) {
+        sedeId = foundSede.sedeId;
+      }
     }
+
+    // 2. Obtener datos para Snapshot (Multi-sede: usar cliente WC de la sede)
+    sessClient = await getWooClient(sedeId);
+    
+    const pedidosPromesas = ids_pedidos.map((id) =>
+      sessClient.get(`orders/${id}`).catch(err => {
+        console.error(`Error buscando pedido ${id} en sede ${sedeId}:`, err.message);
+        throw new Error(`El pedido ${id} no existe o no se pudo cargar desde WooCommerce.`);
+      })
+    );
+    
+    responses = await Promise.all(pedidosPromesas);
 
     const snapshotPedidos = responses.map((r) => {
       const o = r.data;

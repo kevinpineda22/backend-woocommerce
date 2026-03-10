@@ -1,0 +1,859 @@
+/* ManifestSheet.css - Componente Reutilizable de Manifiesto */
+@import url("https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Libre+Barcode+39+Text&display=swap");
+
+/* =========================================
+   HOJA DE MANIFIESTO
+   ========================================= */
+.manifest-sheet {
+  background: white;
+  width: 100%;
+  max-width: 800px;
+  padding: 12mm 10mm;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); /* Sombra estilo "papel flotante" */
+  font-family: "Cabin", Helvetica, sans-serif;
+  font-size: 16px;
+  color: #1e293b;
+  margin: 0 auto 30px; /* Margen amplio para separar hojas en pantalla */
+  page-break-after: always;
+}
+
+.manifest-sheet:last-of-type {
+  margin-bottom: 0px;
+  page-break-after: auto;
+}
+
+/* =========================================
+   HEADER
+   ========================================= */
+.manifest-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1.5px solid #cbd5e1;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.manifest-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manifest-logo-img {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+
+.manifest-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: -0.5px;
+}
+
+.manifest-info {
+  text-align: right;
+}
+
+.manifest-info h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.manifest-info p {
+  margin: 2px 0 0 0;
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 0.7rem;
+}
+
+/* =========================================
+   INFORMACIÓN DEL CLIENTE Y ENVÍO
+   ========================================= */
+.manifest-customer {
+  margin-bottom: 10px;
+  font-size: 0.72rem;
+  color: #334155;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.manifest-customer-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.manifest-customer-field {
+  display: flex;
+  gap: 5px;
+  align-items: baseline;
+}
+
+.manifest-customer-field .manifest-field-label {
+  font-weight: 700;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.manifest-customer-field .manifest-field-value {
+  font-weight: 500;
+  color: #64748b;
+}
+
+/* =========================================
+   SECCIÓN QR CODE
+   ========================================= */
+.manifest-qr-section {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border: 1.5px solid #e2e8f0;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  page-break-inside: avoid;
+  background: #fff;
+}
+
+.qr-wrapper {
+  background: white;
+  padding: 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+}
+
+.qr-info h4 {
+  margin: 0 0 4px 0;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.qr-info p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+/* =========================================
+   TABLA DE PRODUCTOS (compacta, sin barcodes)
+   ========================================= */
+.manifest-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+  font-size: 0.75rem;
+}
+
+.manifest-table thead {
+  background: #f1f5f9;
+}
+
+.manifest-table th {
+  color: #475569;
+  padding: 5px 8px;
+  text-transform: uppercase;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-align: left;
+  border-bottom: 1.5px solid #cbd5e1;
+}
+
+.manifest-table th.col-num {
+  text-align: center;
+  width: 28px;
+}
+
+.manifest-table th.col-qty {
+  text-align: center;
+  width: 40px;
+}
+
+.manifest-table th.col-ref {
+  text-align: right;
+  width: 100px;
+}
+
+.manifest-table tbody tr:nth-child(even) {
+  background-color: #fafbfc;
+}
+
+.manifest-table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+/* Celda numeración */
+.cell-num {
+  text-align: center;
+  font-size: 0.6rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Celda de Cantidad */
+.cell-qty {
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #1e293b;
+}
+
+/* Celda de Item */
+.cell-item {
+  vertical-align: middle;
+}
+
+.item-name {
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: #1e293b;
+  line-height: 1.2;
+}
+
+.item-substitute-badge {
+  font-size: 0.55rem;
+  color: #b45309;
+  font-weight: 800;
+  display: inline-block;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+  border: 1px solid #fbbf24;
+  letter-spacing: 0.3px;
+}
+
+/* =========================================
+   FILAS DE SUSTITUCIÓN EN TABLA
+   ========================================= */
+
+/* Fila del producto original retirado (tachado) */
+.manifest-row-original-replaced {
+  background: #fef2f2 !important;
+}
+
+.manifest-row-original-replaced td {
+  border-bottom: none !important;
+  padding-top: 6px !important;
+  padding-bottom: 2px !important;
+}
+
+.original-replaced-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.original-icon {
+  color: #dc2626;
+  font-weight: 900;
+  font-size: 0.7rem;
+}
+
+.original-name-strikethrough {
+  text-decoration: line-through;
+  color: #9ca3af;
+  font-size: 0.68rem;
+  font-weight: 500;
+}
+
+.original-replaced-label {
+  font-size: 0.5rem;
+  font-weight: 800;
+  color: #dc2626;
+  background: #fee2e2;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+  border: 1px solid #fca5a5;
+}
+
+.original-qty-badge {
+  font-size: 0.65rem;
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/* Fila del producto sustituto (nuevo) */
+.manifest-row-substitute {
+  background: #fffbeb !important;
+}
+
+.manifest-row-substitute td {
+  border-bottom: 1.5px solid #fde68a !important;
+  padding-bottom: 5px !important;
+}
+
+/* =========================================
+   RESUMEN DE SUSTITUCIONES
+   ========================================= */
+.manifest-substitutions-summary {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  border: 1.5px solid #fbbf24;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: linear-gradient(135deg, #fffbeb, #fef3c7);
+  page-break-inside: avoid;
+}
+
+.substitutions-summary-title {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #fde68a;
+}
+
+.substitutions-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.substitution-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.65rem;
+  padding: 3px 0;
+}
+
+.sub-summary-original {
+  color: #9ca3af;
+  text-decoration: line-through;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub-summary-arrow {
+  color: #d97706;
+  font-weight: 900;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.sub-summary-new {
+  color: #92400e;
+  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub-summary-qty {
+  color: #b45309;
+  font-weight: 800;
+  font-size: 0.6rem;
+  flex-shrink: 0;
+}
+
+/* Celda de Item (ref) */
+.cell-ref {
+  text-align: right;
+  font-family: monospace;
+  font-size: 0.6rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* =========================================
+   GRID DE CÓDIGOS DE BARRAS (horizontal)
+   ========================================= */
+.manifest-barcodes-section {
+  margin-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 6px;
+  page-break-inside: avoid;
+}
+
+.manifest-barcodes-title {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.manifest-barcodes-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px 8px;
+}
+
+.manifest-barcode-cell {
+  text-align: center;
+  padding: 4px 2px 2px;
+  border-bottom: 1px solid #e2e8f0;
+  overflow: visible;
+}
+
+.manifest-barcode-font {
+  font-family: "Libre Barcode 39 Text", cursive;
+  font-size: 1.5rem;
+  color: #000;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.manifest-barcode-label {
+  font-family: monospace;
+  font-size: 0.55rem;
+  color: #64748b;
+  font-weight: 600;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.manifest-barcode-num {
+  font-family: "Cabin", Helvetica, sans-serif;
+  font-size: 0.5rem;
+  font-weight: 800;
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.manifest-barcode-qty {
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+/* =========================================
+   MODOS DE DENSIDAD
+   ========================================= */
+
+/* COMPACT: 16-25 productos */
+.manifest-sheet.compact {
+  padding: 6mm 10mm;
+}
+
+.manifest-sheet.compact .manifest-header {
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.manifest-sheet.compact .manifest-logo-img {
+  height: 36px;
+}
+
+.manifest-sheet.compact .manifest-title {
+  font-size: 1.1rem;
+}
+
+.manifest-sheet.compact .manifest-barcodes-grid {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.manifest-sheet.compact .manifest-barcode-font {
+  font-size: 1.3rem;
+}
+
+/* VERY COMPACT: 26-40 productos */
+.manifest-sheet.very-compact {
+  padding: 5mm 8mm;
+}
+
+.manifest-sheet.very-compact .manifest-header {
+  padding-bottom: 5px;
+  margin-bottom: 6px;
+}
+
+.manifest-sheet.very-compact .manifest-logo-img {
+  height: 32px;
+}
+
+.manifest-sheet.very-compact .manifest-title {
+  font-size: 1rem;
+}
+
+.manifest-sheet.very-compact .manifest-table {
+  font-size: 0.7rem;
+}
+
+.manifest-sheet.very-compact .manifest-table td {
+  padding: 2px 6px;
+}
+
+.manifest-sheet.very-compact .manifest-barcodes-grid {
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px 6px;
+}
+
+.manifest-sheet.very-compact .manifest-barcode-font {
+  font-size: 1.1rem;
+}
+
+.manifest-sheet.very-compact .manifest-barcode-label {
+  font-size: 0.5rem;
+}
+
+/* ULTRA COMPACT: 40+ productos */
+.manifest-sheet.ultra-compact {
+  padding: 4mm 6mm;
+}
+
+.manifest-sheet.ultra-compact .manifest-header {
+  padding-bottom: 4px;
+  margin-bottom: 5px;
+}
+
+.manifest-sheet.ultra-compact .manifest-logo-img {
+  height: 28px;
+}
+
+.manifest-sheet.ultra-compact .manifest-title {
+  font-size: 0.95rem;
+}
+
+.manifest-sheet.ultra-compact .manifest-table {
+  font-size: 0.65rem;
+}
+
+.manifest-sheet.ultra-compact .manifest-table td {
+  padding: 1px 4px;
+}
+
+.manifest-sheet.ultra-compact .item-name {
+  font-size: 0.62rem;
+}
+
+.manifest-sheet.ultra-compact .manifest-qr-section {
+  padding: 8px;
+  gap: 10px;
+}
+
+.manifest-sheet.ultra-compact .qr-wrapper svg {
+  width: 70px !important;
+  height: 70px !important;
+}
+
+.manifest-sheet.ultra-compact .manifest-barcodes-grid {
+  grid-template-columns: repeat(6, 1fr);
+  gap: 2px 4px;
+}
+
+.manifest-sheet.ultra-compact .manifest-barcode-cell {
+  padding: 2px 1px;
+}
+
+.manifest-sheet.ultra-compact .manifest-barcode-font {
+  font-size: 0.95rem;
+}
+
+.manifest-sheet.ultra-compact .manifest-barcode-label {
+  font-size: 0.45rem;
+}
+
+/* =========================================
+   ESTILOS DE IMPRESIÓN
+   ========================================= */
+@media print {
+  .pedidos-layout-sidebar,
+  .pedidos-layout-content,
+  .history-table-container,
+  .hv-table,
+  .pedidos-table-container,
+  table:not(.manifest-table),
+  .admin-sidebar,
+  nav,
+  .navbar,
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  body,
+  html {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .manifest-sheet {
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 210mm !important;
+    min-height: auto !important;
+    padding: 15mm 12mm !important;
+    border: none !important;
+    border-radius: 0 !important;
+    page-break-after: always !important;
+  }
+
+  /* El último manifiesto no rompe página para no dejar una hoja en blanco al final */
+  .manifest-sheet:last-of-type {
+    page-break-after: auto !important;
+  }
+
+  .manifest-header {
+    padding-bottom: 10px !important;
+    margin-bottom: 15px !important;
+    border-bottom: 1.5px solid #999 !important;
+  }
+
+  .manifest-logo-img {
+    height: 40px !important;
+  }
+
+  .manifest-title {
+    font-size: 1.2rem !important;
+    font-weight: 800 !important;
+  }
+
+  .manifest-info h2 {
+    font-size: 1rem !important;
+  }
+
+  .manifest-info p {
+    font-size: 0.75rem !important;
+  }
+
+  .manifest-customer {
+    margin-bottom: 12px !important;
+    padding-bottom: 10px !important;
+    font-size: 0.8rem !important;
+    gap: 20px !important;
+    border-bottom: 1px solid #ddd !important;
+  }
+
+  .manifest-qr-section {
+    margin-bottom: 15px !important;
+    padding: 10px !important;
+    border: 1px solid #ccc !important;
+    background: white !important;
+    gap: 18px !important;
+  }
+
+  .qr-wrapper {
+    padding: 6px !important;
+    border: 1px solid #999 !important;
+  }
+
+  .qr-wrapper svg {
+    width: 110px !important;
+    height: 110px !important;
+  }
+
+  .qr-info h4 {
+    font-size: 0.85rem !important;
+    font-weight: 800 !important;
+  }
+
+  .qr-info p {
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+  }
+
+  /* Tabla */
+  .manifest-table {
+    margin-bottom: 0 !important;
+    font-size: 0.75rem !important;
+  }
+
+  .manifest-table thead {
+    background: #f1f5f9 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-table th {
+    padding: 4px 6px !important;
+    font-size: 0.6rem !important;
+    color: #475569 !important;
+    border-bottom: 1.5px solid #999 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-table td {
+    padding: 2px 6px !important;
+    border-bottom: 1px solid #eee !important;
+  }
+
+  .manifest-table tbody tr:nth-child(even) {
+    background-color: #fafafa !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .cell-qty {
+    font-size: 0.85rem !important;
+  }
+
+  .item-name {
+    font-size: 0.7rem !important;
+  }
+
+  .item-substitute-badge {
+    font-size: 0.55rem !important;
+    background: #fef3c7 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-row-original-replaced {
+    background: #fef2f2 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-row-substitute {
+    background: #fffbeb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-substitutions-summary {
+    background: #fffbeb !important;
+    border-color: #fbbf24 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .original-replaced-label {
+    background: #fee2e2 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Grid de barcodes */
+  .manifest-barcodes-section {
+    margin-top: 6px !important;
+    border-top: 1px solid #ccc !important;
+    page-break-inside: avoid !important;
+  }
+
+  .manifest-barcodes-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 3px 6px !important;
+  }
+
+  .manifest-barcode-cell {
+    border-bottom: 1px solid #ddd !important;
+    padding: 3px 2px !important;
+  }
+
+  .manifest-barcode-num {
+    color: #2563eb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-barcode-font {
+    font-size: 1.4rem !important;
+  }
+
+  .manifest-barcode-label {
+    font-size: 0.55rem !important;
+  }
+
+  /* Saltos de página */
+  .manifest-table {
+    page-break-inside: auto;
+  }
+
+  .manifest-table tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .manifest-table thead {
+    display: table-header-group;
+  }
+
+  .manifest-header,
+  .manifest-qr-section,
+  .manifest-customer {
+    page-break-inside: avoid;
+  }
+
+  /* Densidades en impresión */
+  .manifest-sheet.compact .manifest-barcodes-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+  }
+
+  .manifest-sheet.very-compact .manifest-barcodes-grid {
+    grid-template-columns: repeat(5, 1fr) !important;
+  }
+
+  .manifest-sheet.very-compact .manifest-barcode-font {
+    font-size: 1.1rem !important;
+  }
+
+  .manifest-sheet.ultra-compact .manifest-barcodes-grid {
+    grid-template-columns: repeat(6, 1fr) !important;
+  }
+
+  .manifest-sheet.ultra-compact .manifest-barcode-font {
+    font-size: 0.9rem !important;
+  }
+
+  .manifest-sheet.ultra-compact .manifest-barcode-label {
+    font-size: 0.45rem !important;
+  }
+
+  .manifest-sheet.ultra-compact .manifest-table td {
+    padding: 1px 3px !important;
+  }
+
+  .manifest-sheet.ultra-compact .item-name {
+    font-size: 0.55rem !important;
+  }
+
+  .manifest-sheet.ultra-compact .cell-qty {
+    font-size: 0.7rem !important;
+  }
+}
+
+/* ─── Sede Label (Header) ─── */
+.manifest-sede-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #4338ca;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+}
+
+/* ─── Corrected Code Indicator ─── */
+.manifest-code-corrected-dot {
+  color: #16a34a;
+  margin-left: 4px;
+  font-weight: bold;
+  font-size: 0.8em;
+}
