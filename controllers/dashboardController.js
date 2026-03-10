@@ -235,11 +235,13 @@ exports.getPendingOrders = async (req, res) => {
       });
     }
 
-    // Obtener asignaciones activas
+    // Obtener asignaciones activas o en proceso de auditoría
+    // NOTA: "completado" significa que el picker terminó, pero el auditor no (pedido sigue processing en Woo)
     let assignQuery = supabase
       .from("wc_asignaciones_pedidos")
       .select("id_pedido")
-      .eq("estado_asignacion", "en_proceso");
+      .in("estado_asignacion", ["en_proceso", "completado"]);
+      
     if (req.sedeId) {
       assignQuery = assignQuery.eq("sede_id", req.sedeId);
     }
