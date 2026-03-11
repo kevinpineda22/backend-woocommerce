@@ -254,7 +254,7 @@ const VistaPicker = () => {
     try {
       const res = await ecommerceApi.post(
         `/validar-codigo${sedeParam ? "?" + sedeParam : ""}`,
-        { input_code: inputCode, expected_sku: currentItem.sku },
+        { input_code: inputCode, expected_sku: currentItem.sku, expected_barcode: currentItem.barcode },
       );
       if (res.data.valid) {
         setLastScannedBarcode(null);
@@ -277,9 +277,19 @@ const VistaPicker = () => {
     if (!currentItem) return;
     const c = code.trim().toUpperCase();
     const sku = (currentItem.sku || "").trim().toUpperCase();
-    const ean = (currentItem.barcode || "").trim().toUpperCase();
 
-    if (c === sku || c === ean || (ean && ean.endsWith(c))) {
+    let isBarcodeMatch = false;
+    if (Array.isArray(currentItem.barcode)) {
+      isBarcodeMatch = currentItem.barcode.some(b => {
+        const str = (b || "").toString().toUpperCase();
+        return c === str || str.endsWith(c);
+      });
+    } else {
+      const ean = (currentItem.barcode || "").toString().trim().toUpperCase();
+      isBarcodeMatch = c === ean || (ean && ean.endsWith(c));
+    }
+
+    if (c === sku || isBarcodeMatch) {
       setLastScannedBarcode(c);
       confirmPicking();
     } else {

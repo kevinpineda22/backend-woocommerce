@@ -130,9 +130,25 @@ exports.registerAction = async (req, res) => {
 };
 
 exports.validateManualCode = async (req, res) => {
-  const { input_code, expected_sku } = req.body;
-  const isValid =
-    input_code.trim().toUpperCase() === expected_sku.trim().toUpperCase() ||
-    expected_sku.includes(input_code);
-  res.json({ valid: isValid });
+  const { input_code, expected_sku, expected_barcode } = req.body;
+  if (!input_code) return res.json({ valid: false });
+  
+  const code = input_code.trim().toUpperCase();
+  
+  // 1. Validar contra el SKU
+  const skuMatch = expected_sku && (code === expected_sku.trim().toUpperCase() || expected_sku.toUpperCase().includes(code));
+  
+  // 2. Validar contra la Lista de Códigos de Barras (Si la manda el frontend)
+  let barcodeMatch = false;
+  if (Array.isArray(expected_barcode)) {
+    barcodeMatch = expected_barcode.some(b => {
+      const str = (b || "").toString().toUpperCase();
+      return code === str || str.endsWith(code);
+    });
+  } else if (expected_barcode) {
+    const ean = expected_barcode.toString().trim().toUpperCase();
+    barcodeMatch = code === ean || ean.endsWith(code);
+  }
+
+  res.json({ valid: skuMatch || barcodeMatch });
 };

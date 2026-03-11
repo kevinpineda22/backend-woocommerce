@@ -242,7 +242,7 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan })
     const rawCode = actualCode.trim().toUpperCase();
     let cleanCode = rawCode;
     const expectedSku = (item.sku || "").toUpperCase();
-    const expectedBarcode = (item.barcode || "").toUpperCase();
+    const expectedBarcode = item.barcode || "";
     const unidad = (item.unidad_medida || "").toUpperCase();
 
     // Si digitan el código corto (ej. 12345), le agregamos el sufijo esperado para compararlo con el SKU real (ej. 12345-LB)
@@ -301,12 +301,21 @@ export const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan })
           return;
       }
     } else {
+      // ✅ NUEVO: Soporte robusto paramétrico (Array o String) desde SIESA
+      const checkBarcodeMath = (barcode) => {
+        if (!barcode) return false;
+        const b = barcode.toString().toUpperCase();
+        return rawCode === b || cleanCode === b || b.endsWith(rawCode);
+      };
+
+      const barcodeMatches = Array.isArray(expectedBarcode) 
+          ? expectedBarcode.some(checkBarcodeMath)
+          : checkBarcodeMath(expectedBarcode);
+
       isValidCode =
         rawCode === expectedSku ||
         cleanCode === expectedSku ||
-        rawCode === expectedBarcode ||
-        cleanCode === expectedBarcode ||
-        (expectedBarcode && expectedBarcode.endsWith(rawCode));
+        barcodeMatches;
     }
 
     if (!rawCode) {
