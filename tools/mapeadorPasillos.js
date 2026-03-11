@@ -142,12 +142,38 @@ const matchesKey = (text, key) => {
 const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
   // 1. Estrategia Principal: Búsqueda por NOMBRE DE CATEGORÍA
   if (categoriasWC && categoriasWC.length > 0) {
-    // FILTRO: Ignoramos la categoría genérica "Despensa"
-    const categoriasValidas = categoriasWC.filter((c) => {
+    // FILTRO: Ignoramos categorías genéricas o ruidosas que causan conflictos
+    let categoriasValidas = categoriasWC.filter((c) => {
       if (!c.name) return false;
       const nombreNormalizado = removeAccents(c.name).toLowerCase().trim();
-      return !nombreNormalizado.includes("despensa");
+      // Ignorar "despensa" y la categoría conflictiva dada por el usuario
+      if (nombreNormalizado.includes("despensa")) return false;
+      if (nombreNormalizado.includes("lacteos, huevos y refrigerados")) return false;
+      return true;
     });
+
+    // JERARQUÍA OFICIAL (Nuevo método):
+    // Si WooCommerce nos devolvió la estructura de padre-hijo (propiedad parent),
+    // nos quedamos EXCLUSIVAMENTE con las categorías hoja (subcategorías, cuyo parent NO es 0).
+    const tieneDataDeJerarquia = categoriasValidas.some((c) => c.hasOwnProperty("parent"));
+    
+    if (tieneDataDeJerarquia && categoriasValidas.length > 1) {
+      const subcategoriasOficiales = categoriasValidas.filter((c) => c.parent > 0);
+      if (subcategoriasOficiales.length > 0) {
+        categoriasValidas = subcategoriasOficiales;
+      }
+    } 
+    // HEURÍSTICA DE SUBCATEGORÍAS (Antiguo método preventivo si falla la API):
+    else if (categoriasValidas.length > 1) {
+      const subcategorias = categoriasValidas.filter(c => {
+        const n = removeAccents(c.name).toLowerCase();
+        return !n.includes(" y ") && !n.includes(",");
+      });
+      // Si logramos identificar al menos una subcategoría limpia, utilizamos solo esa
+      if (subcategorias.length > 0) {
+        categoriasValidas = subcategorias;
+      }
+    }
 
     const nombresCategorias = categoriasValidas.map((c) => c.name || "").join(" ");
 

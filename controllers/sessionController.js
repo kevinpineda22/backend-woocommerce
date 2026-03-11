@@ -237,7 +237,7 @@ exports.getSessionActive = async (req, res) => {
       )
       .in("id_asignacion", assignIds);
 
-    // 2. MAPEO DE CATEGORÍAS
+    // 2. MAPEO DE CATEGORÍAS (CON JERARQUÍA)
     const productIds = itemsAgrupados.map((i) => i.product_id);
     const mapaCategoriasReales = {};
     if (productIds.length > 0) {
@@ -249,10 +249,42 @@ exports.getSessionActive = async (req, res) => {
           per_page: 100,
           _fields: "id,categories",
         });
+
+        // Extraer todos los IDs de categorías para buscar su jerarquía
+        const categoryIdsToFetch = new Set();
         productsData.forEach((p) => {
-          mapaCategoriasReales[p.id] = p.categories || [];
+          if (p.categories) {
+            p.categories.forEach((c) => categoryIdsToFetch.add(c.id));
+          }
         });
-      } catch (err) {}
+
+        const categoryHierarchyMap = {};
+        if (categoryIdsToFetch.size > 0) {
+          // Obtener los datos completos de las categorías (incluyendo 'parent')
+          const { data: categoriesData } = await catClient.get("products/categories", {
+            include: Array.from(categoryIdsToFetch).join(","),
+            per_page: 100,
+            _fields: "id,name,parent",
+          });
+          categoriesData.forEach(c => {
+             categoryHierarchyMap[c.id] = c;
+          });
+        }
+
+        // Enriquecer las categorías del producto con la bandera 'parent'
+        productsData.forEach((p) => {
+          if (p.categories) {
+            mapaCategoriasReales[p.id] = p.categories.map(c => ({
+               ...c,
+               parent: categoryHierarchyMap[c.id] ? categoryHierarchyMap[c.id].parent : 0
+            }));
+          } else {
+             mapaCategoriasReales[p.id] = [];
+          }
+        });
+      } catch (err) {
+         console.error("Error obteniendo categorías/productos de WC:", err.message);
+      }
     }
 
     // ✅ 2B. OBTENER CÓDIGOS DE BARRAS DE SIESA (por SKU, no por product_id)
