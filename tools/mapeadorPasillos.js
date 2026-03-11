@@ -32,9 +32,14 @@ const DEFINICION_PASILLOS = [
     categorias: ["cafe", "chocolate", "pan", "tostada", "cafe molido", "cafe premium", "cafe soluble"],
   },
   {
+    pasillo: "7",
+    nombre: "Bebé y Adulto",
+    categorias: ["adulto", "incontinencia", "pañal adulto", "pañitos humedos", "pañales", "cereales", "granola", "leche en polvo", "bebe", "pañal"],
+  },
+  {
     pasillo: "8",
     nombre: "Cuidado Personal",
-    categorias: ["cuidado personal", "aseo personal", "higiene", "oral", "capilar", "corporal", "femenina", "bebe", "desodorante", "shampoo", "jabon de baño", "crema dental", "cremas corporales", "higiene capilar", "cremas detales"],
+    categorias: ["cuidado personal", "aseo personal", "higiene", "oral", "capilar", "corporal", "femenina", "desodorante", "shampoo", "jabon de baño", "crema dental", "cremas corporales", "higiene capilar", "cremas detales"],
   },
   {
     pasillo: "9",
@@ -75,11 +80,6 @@ const DEFINICION_PASILLOS = [
   },
 
   // --- OTROS ---
-  {
-    pasillo: "7",
-    nombre: "Bebé y Adulto",
-    categorias: ["adulto", "incontinencia", "pañal adulto", "pañitos humedos", "pañales", "cereales", "granola", "leche en polvo", "bebe", "pañal"],
-  },
   {
     pasillo: "11",
     nombre: "Mascotas y Cocina",
