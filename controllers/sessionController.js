@@ -56,11 +56,8 @@ async function getBarcodesFromSiesa(productIds) {
           return /^\d+\+?$/.test(cleaned);
         });
 
-      // Priorizar EAN-13 (parte numérica = 13 dígitos), luego cualquier código válido
-      const ean13 = validCodes.find((c) => c.replace(/\+$/, "").length === 13);
-      const firstValid = validCodes[0];
-
-      barcodeMap[productId] = ean13 || firstValid || null;
+      // Devolver todos los códigos válidos en un array, en lugar de solo uno
+      barcodeMap[productId] = validCodes.length > 0 ? validCodes : null;
     });
 
     return barcodeMap;
@@ -352,9 +349,9 @@ exports.getSessionActive = async (req, res) => {
         // El frontend calculará (Total - Originales) para saber cuántos son sustitutos
         qty_scanned: qtyPicked,
 
-        // ✅ CÓDIGO DE BARRAS: Prioridad SIESA (por SKU) > WooCommerce > SKU
+        // ✅ CÓDIGOS DE BARRAS: Prioridad SIESA (Array) > WooCommerce (Array[1]) > SKU (Array[1])
         barcode:
-          barcodeMapSiesa[parseInt(item.sku)] || item.barcode || item.sku,
+          barcodeMapSiesa[parseInt(item.sku)] || [item.barcode || item.sku],
 
         sustituto: lastSub
           ? {
