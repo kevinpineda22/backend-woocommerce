@@ -40,10 +40,6 @@ const VistaAuditor = () => {
   const [errorMsg, setErrorMsg] = useState("");
   const [activeTab, setActiveTab] = useState("inventory");
 
-  // -- NUEVO: Panel de Auditorías Pendientes --
-  const [pendingAudits, setPendingAudits] = useState([]);
-  const [loadingPending, setLoadingPending] = useState(true);
-
   const [requiredItems, setRequiredItems] = useState(new Set());
   const [verifiedItems, setVerifiedItems] = useState(new Set());
   const [manualVerifyCode, setManualVerifyCode] = useState("");
@@ -65,11 +61,32 @@ const VistaAuditor = () => {
 
   // ─── DETECCIÓN DE TIPO DE PRODUCTO ───
   const MEAT_KEYWORDS = [
-    "carne", "pollo", "pescado", "res", "cerdo", "carnicería", "carniceria",
-    "embutido", "chorizo", "pezuña", "costilla", "chuleta", "lomo",
-    "tocino", "morrillo", "pechuga", "alas", "salchicha",
-    "pescaderia", "pescadería", "marisco", "camaron", "bagre", "mojarra",
-    "kilo", "libra",
+    "carne",
+    "pollo",
+    "pescado",
+    "res",
+    "cerdo",
+    "carnicería",
+    "carniceria",
+    "embutido",
+    "chorizo",
+    "pezuña",
+    "costilla",
+    "chuleta",
+    "lomo",
+    "tocino",
+    "morrillo",
+    "pechuga",
+    "alas",
+    "salchicha",
+    "pescaderia",
+    "pescadería",
+    "marisco",
+    "camaron",
+    "bagre",
+    "mojarra",
+    "kilo",
+    "libra",
   ];
 
   const isMeatItem = (itemName) => {
@@ -78,9 +95,23 @@ const VistaAuditor = () => {
   };
 
   const FRUVER_KEYWORDS = [
-    "fruver", "fruta", "verdura", "manzana", "banano", "tomate",
-    "cebolla", "papa", "zanahoria", "limón", "limon", "naranja",
-    "aguacate", "lechuga", "pepino", "pimentón", "pimenton",
+    "fruver",
+    "fruta",
+    "verdura",
+    "manzana",
+    "banano",
+    "tomate",
+    "cebolla",
+    "papa",
+    "zanahoria",
+    "limón",
+    "limon",
+    "naranja",
+    "aguacate",
+    "lechuga",
+    "pepino",
+    "pimentón",
+    "pimenton",
   ];
 
   const isFruverItem = (itemName) => {
@@ -88,44 +119,6 @@ const VistaAuditor = () => {
     const name = (itemName || "").toLowerCase();
     return FRUVER_KEYWORDS.some((kw) => name.includes(kw));
   };
-
-  // --- 1. Historial de Sesiones Pendientes de Auditoría ---
-  const fetchPendingAudits = React.useCallback(async () => {
-    try {
-      setLoadingPending(true);
-      const { data, error } = await supabase
-        .from("wc_picking_sessions")
-        .select("id, status, end_time, auth_users(raw_user_meta_data)")
-        .eq("status", "completado")
-        .order("end_time", { ascending: false });
-
-      if (error) throw error;
-      setPendingAudits(data || []);
-    } catch (err) {
-      console.error("Error fetching pending audits:", err);
-    } finally {
-      setLoadingPending(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchPendingAudits();
-    
-    const channel = supabase
-      .channel("auditor-pending-updates")
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "wc_picking_sessions", filter: "status=eq.completado" },
-        () => fetchPendingAudits()
-      )
-      .subscribe();
-
-    return () => supabase.removeChannel(channel);
-  }, [fetchPendingAudits]);
-
-  // --- Uso de refs para no recargar el sonido ---
-  const successSoundRef = useRef(new Audio(successSoundSrc));
-  const errorSoundRef = useRef(new Audio(errorSoundSrc));
 
   useEffect(() => {
     const storedSession = localStorage.getItem("auditor_session_id");
@@ -167,14 +160,19 @@ const VistaAuditor = () => {
 
     auditData.items.forEach((item) => {
       const scannedBarcodes = auditData.scannedBarcodes?.[item.id];
-      const hasScannedBarcode = scannedBarcodes && scannedBarcodes.has(cleanCode);
-      const hasSiesaBarcode = item.barcode && item.barcode.trim().toUpperCase() === cleanCode;
+      const hasScannedBarcode =
+        scannedBarcodes && scannedBarcodes.has(cleanCode);
+      const hasSiesaBarcode =
+        item.barcode && item.barcode.trim().toUpperCase() === cleanCode;
       const itemSku = (item.id || "").toString().toUpperCase();
-      const hasSkuMatch = itemSku === cleanCode || (item.sku && item.sku.toUpperCase() === cleanCode);
+      const hasSkuMatch =
+        itemSku === cleanCode ||
+        (item.sku && item.sku.toUpperCase() === cleanCode);
 
       // ─── CARNES: Solo aceptar GS1 completo (13-14 dígitos, empieza con "2") ───
       if (isMeatItem(item.name) && requiredItems.has(item.id)) {
-        const isGS1 = /^\d{13,14}$/.test(cleanCode) && cleanCode.startsWith("2");
+        const isGS1 =
+          /^\d{13,14}$/.test(cleanCode) && cleanCode.startsWith("2");
         if (!isGS1) return; // Ignorar coincidencias por SKU corto para carnes
         if (hasScannedBarcode) {
           foundInOrder = true;
@@ -201,16 +199,28 @@ const VistaAuditor = () => {
         showFeedback("warning", "El producto ya había sido verificado.");
       }
     } else if (foundInOrder) {
-      showFeedback("info", "El producto pertenece al pedido, pero no requiere validación (fuera de muestra).");
+      showFeedback(
+        "info",
+        "El producto pertenece al pedido, pero no requiere validación (fuera de muestra).",
+      );
     } else {
       // Check if the rejected code was a short code for a meat item
       const meatItemInSample = auditData.items.find(
-        (item) => isMeatItem(item.name) && requiredItems.has(item.id) && !verifiedItems.has(item.id)
+        (item) =>
+          isMeatItem(item.name) &&
+          requiredItems.has(item.id) &&
+          !verifiedItems.has(item.id),
       );
       if (meatItemInSample) {
-        showFeedback("error", `🥩 Producto cárnico detectado. Debes escanear la etiqueta GS1 completa (13-14 dígitos) de la bandeja de carnicería.`);
+        showFeedback(
+          "error",
+          `🥩 Producto cárnico detectado. Debes escanear la etiqueta GS1 completa (13-14 dígitos) de la bandeja de carnicería.`,
+        );
       } else {
-        showFeedback("error", `El código "${cleanCode}" no pertenece a este pedido.`);
+        showFeedback(
+          "error",
+          `El código "${cleanCode}" no pertenece a este pedido.`,
+        );
       }
     }
   };
@@ -266,9 +276,7 @@ const VistaAuditor = () => {
     setScannerMode(null);
 
     try {
-      const res = await ecommerceApi.get(
-        `/historial-detalle?session_id=${id}`,
-      );
+      const res = await ecommerceApi.get(`/historial-detalle?session_id=${id}`);
       const { metadata, logs, orders_info, products_map, final_snapshot } =
         res.data;
 
@@ -428,9 +436,10 @@ const VistaAuditor = () => {
       items: group.items.map((i) => {
         // Encontrar los códigos exactos escaneados para este producto
         const scannedSet = auditData.scannedBarcodes[i.id];
-        const exactScannedBarcode = scannedSet && scannedSet.size > 0 
-          ? Array.from(scannedSet).join(",") 
-          : i.barcode || i.sku || i.id;
+        const exactScannedBarcode =
+          scannedSet && scannedSet.size > 0
+            ? Array.from(scannedSet).join(",")
+            : i.barcode || i.sku || i.id;
 
         return {
           id: i.id,
@@ -482,16 +491,14 @@ const VistaAuditor = () => {
       };
 
       // Llamamos al nuevo endpoint que genera el QR en backend
-      const response = await ecommerceApi.post(
-        `/auditor/finalizar`,
-        {
-          session_id: auditData.meta.session_id,
-          datos_salida: snapshotPayload,
-        },
-      );
+      const response = await ecommerceApi.post(`/auditor/finalizar`, {
+        session_id: auditData.meta.session_id,
+        datos_salida: snapshotPayload,
+      });
 
       const data = response.data;
-      if (response.status !== 200) throw new Error(data.error || "Error al finalizar");
+      if (response.status !== 200)
+        throw new Error(data.error || "Error al finalizar");
 
       // 1. Inyectamos el QR generado por el servidor en el estado
       const newAuditData = { ...auditData };
@@ -602,14 +609,13 @@ const VistaAuditor = () => {
         <h1>
           <FaClipboardCheck /> Auditoría
         </h1>
-        <div className="aud-header-right">
-        </div>
+        <div className="aud-header-right"></div>
       </header>
 
-      <EscanerBarras 
-        isScanning={!!scannerMode} 
-        setIsScanning={(val) => setScannerMode(val ? scannerMode : null)} 
-        onScan={handleScanSuccess} 
+      <EscanerBarras
+        isScanning={!!scannerMode}
+        setIsScanning={(val) => setScannerMode(val ? scannerMode : null)}
+        onScan={handleScanSuccess}
       />
 
       <div className="auditor-body">
@@ -619,8 +625,11 @@ const VistaAuditor = () => {
             <div className="aud-hero">
               <FaShieldAlt className="aud-hero-icon" />
               <h2>Centro de Auditoría</h2>
-              <p>Escanea el Código QR de la canasta o ingresa el ID de sesión manualmente para iniciar la validación del pedido.</p>
-              
+              <p>
+                Escanea el Código QR de la canasta o ingresa el ID de sesión
+                manualmente para iniciar la validación del pedido.
+              </p>
+
               <div className="scan-bar-container">
                 <button
                   className="auditor-scan-btn"
@@ -648,44 +657,16 @@ const VistaAuditor = () => {
                 </button>
               </div>
 
-              {errorMsg && <div className="auditor-error" style={{ marginTop: '20px' }}>{errorMsg}</div>}
-              {loading && <div className="auditor-loading" style={{ marginTop: '20px' }}>Obteniendo datos de sesión...</div>}
-              {/* LISTA EN VIVO DE PENDIENTES */}
-              <div className="aud-pending-list-container">
-                <h3 className="aud-pending-title">
-                  <FaListOl style={{ marginRight: 8, color: "#3b82f6" }} /> 
-                  Rutas Listas para Auditoría ({pendingAudits.length})
-                </h3>
-                {loadingPending ? (
-                  <div className="auditor-loading">Cargando rutas...</div>
-                ) : pendingAudits.length === 0 ? (
-                  <div className="aud-pending-empty">No hay rutas esperando revisión.</div>
-                ) : (
-                  <div className="aud-pending-grid">
-                    {pendingAudits.map(session => (
-                      <div 
-                        key={session.id} 
-                        className="aud-pending-card"
-                        onClick={() => {
-                          setSessionId(session.id);
-                          fetchAuditData(session.id);
-                        }}
-                      >
-                        <div className="aud-pc-header">
-                          <span className="aud-pc-id">#{session.id.split("-")[0]}</span>
-                          <span className="aud-pc-time">
-                            {new Date(session.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <div className="aud-pc-name">
-                          👤 {session.auth_users?.raw_user_meta_data?.full_name || "Desconocido"}
-                        </div>
-                        <div className="aud-pc-action">Clic para auditar ➔</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {errorMsg && (
+                <div className="auditor-error" style={{ marginTop: "20px" }}>
+                  {errorMsg}
+                </div>
+              )}
+              {loading && (
+                <div className="auditor-loading" style={{ marginTop: "20px" }}>
+                  Obteniendo datos de sesión...
+                </div>
+              )}
             </div>
 
             {/* TARJETAS EDUCATIVAS - GUÍA PARA EL AUDITOR */}
@@ -695,376 +676,617 @@ const VistaAuditor = () => {
                   <FaSearchPlus />
                 </div>
                 <h3>Validación Rigurosa</h3>
-                <p>Verifica que los productos físicos coincidan exactamente con el pedido escaneando sus códigos de barras de forma aleatoria.</p>
+                <p>
+                  Verifica que los productos físicos coincidan exactamente con
+                  el pedido escaneando sus códigos de barras de forma aleatoria.
+                </p>
               </div>
               <div className="aud-info-card">
                 <div className="aud-info-icon">
                   <FaCheckDouble />
                 </div>
                 <h3>Control de Sustitutos</h3>
-                <p>Presta especial atención a los productos sustituidos. Garantiza que el cliente reciba un producto de igual o mejor calidad.</p>
+                <p>
+                  Presta especial atención a los productos sustituidos.
+                  Garantiza que el cliente reciba un producto de igual o mejor
+                  calidad.
+                </p>
               </div>
               <div className="aud-info-card">
                 <div className="aud-info-icon">
                   <FaShieldAlt />
                 </div>
                 <h3>Garantía de Calidad</h3>
-                <p>Tu rol es la última línea de defensa. Una vez aprobada la salida, generas el código QR maestro para facturación y despacho.</p>
+                <p>
+                  Tu rol es la última línea de defensa. Una vez aprobada la
+                  salida, generas el código QR maestro para facturación y
+                  despacho.
+                </p>
               </div>
             </div>
           </div>
         )}
 
-        {auditData && (() => {
-          // Compute sections
-          const allItems = auditData.groupedItems.flatMap(g => g.items.map(i => ({ ...i, orderCustomer: g.customer, orderId: g.id })));
-          const pendingItems = allItems.filter(i => requiredItems.has(i.id) && !verifiedItems.has(i.id));
-          const verifiedList = allItems.filter(i => requiredItems.has(i.id) && verifiedItems.has(i.id));
-          const trustedItems = allItems.filter(i => !requiredItems.has(i.id));
-          const progress = requiredItems.size > 0 ? Math.round((verifiedItems.size / requiredItems.size) * 100) : 0;
-          const allDone = isAuditComplete();
+        {auditData &&
+          (() => {
+            // Compute sections
+            const allItems = auditData.groupedItems.flatMap((g) =>
+              g.items.map((i) => ({
+                ...i,
+                orderCustomer: g.customer,
+                orderId: g.id,
+              })),
+            );
+            const pendingItems = allItems.filter(
+              (i) => requiredItems.has(i.id) && !verifiedItems.has(i.id),
+            );
+            const verifiedList = allItems.filter(
+              (i) => requiredItems.has(i.id) && verifiedItems.has(i.id),
+            );
+            const trustedItems = allItems.filter(
+              (i) => !requiredItems.has(i.id),
+            );
+            const progress =
+              requiredItems.size > 0
+                ? Math.round((verifiedItems.size / requiredItems.size) * 100)
+                : 0;
+            const allDone = isAuditComplete();
 
-          return (
-          <div className="aud-session animate-fade-in">
+            return (
+              <div className="aud-session animate-fade-in">
+                {/* ─── COMPACT META ─── */}
+                <div className="aud-compact-meta">
+                  <div className="aud-meta-left">
+                    <span className="aud-meta-session">
+                      #{auditData.meta.session_id.slice(0, 8)}
+                    </span>
+                    <span className="aud-meta-sep">•</span>
+                    <span className="aud-meta-picker">
+                      <FaUserCircle /> {auditData.meta.picker_name}
+                    </span>
+                  </div>
+                  <div className="aud-meta-right">
+                    {auditData.finalSnapshot && (
+                      <button
+                        className="aud-meta-qr-btn"
+                        onClick={handleViewHistorical}
+                        title="Ver QR Original"
+                      >
+                        <FaFileInvoice />
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-            {/* ─── COMPACT META ─── */}
-            <div className="aud-compact-meta">
-              <div className="aud-meta-left">
-                <span className="aud-meta-session">#{auditData.meta.session_id.slice(0, 8)}</span>
-                <span className="aud-meta-sep">•</span>
-                <span className="aud-meta-picker"><FaUserCircle /> {auditData.meta.picker_name}</span>
-              </div>
-              <div className="aud-meta-right">
-                {auditData.finalSnapshot && (
-                  <button className="aud-meta-qr-btn" onClick={handleViewHistorical} title="Ver QR Original">
-                    <FaFileInvoice />
-                  </button>
+                {/* ─── PROGRESS BAR ─── */}
+                <div className="aud-progress-section">
+                  <div className="aud-progress-text">
+                    <span>
+                      {allDone
+                        ? "✅ Auditoría completa"
+                        : `${verifiedItems.size} de ${requiredItems.size} verificados`}
+                    </span>
+                    <span className="aud-progress-pct">{progress}%</span>
+                  </div>
+                  <div className="aud-progress-track">
+                    <div
+                      className={`aud-progress-fill ${allDone ? "complete" : ""}`}
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* ─── STICKY SCANNER BAR ─── */}
+                {auditData.meta.status !== "auditado" && (
+                  <div className="aud-scanner-sticky">
+                    <button
+                      className="aud-scan-cam-btn"
+                      onClick={() => setScannerMode("product")}
+                      title="Escanear con Cámara"
+                    >
+                      <FaCamera size={20} />
+                    </button>
+                    <div className="aud-scan-input-wrap">
+                      <input
+                        className="aud-scan-input"
+                        placeholder="Digitar código de barras..."
+                        value={manualVerifyCode}
+                        onChange={(e) => setManualVerifyCode(e.target.value)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && handleManualVerify()
+                        }
+                      />
+                      {manualVerifyCode && (
+                        <button
+                          className="aud-scan-go-btn"
+                          onClick={handleManualVerify}
+                        >
+                          <FaCheck />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 )}
-              </div>
-            </div>
 
-            {/* ─── PROGRESS BAR ─── */}
-            <div className="aud-progress-section">
-              <div className="aud-progress-text">
-                <span>{allDone ? "✅ Auditoría completa" : `${verifiedItems.size} de ${requiredItems.size} verificados`}</span>
-                <span className="aud-progress-pct">{progress}%</span>
-              </div>
-              <div className="aud-progress-track">
+                {/* ─── COMPLETION BANNER ─── */}
+                {allDone && auditData.meta.status !== "auditado" && (
+                  <div className="aud-complete-banner">
+                    <FaCheckDouble size={20} />
+                    <span>
+                      ¡Todos los productos fueron verificados! Puedes aprobar la
+                      salida.
+                    </span>
+                  </div>
+                )}
+
+                {/* ─── ORDERS LIST ─── */}
                 <div
-                  className={`aud-progress-fill ${allDone ? "complete" : ""}`}
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
+                  className="aud-orders-container"
+                  style={{ marginTop: "20px" }}
+                >
+                  {auditData.groupedItems.map((group, orderIndex) => {
+                    const orderItems = group.items.map((i) => ({
+                      ...i,
+                      orderCustomer: group.customer,
+                      orderId: group.id,
+                    }));
+                    const pendingItems = orderItems.filter(
+                      (i) =>
+                        requiredItems.has(i.id) && !verifiedItems.has(i.id),
+                    );
+                    const verifiedList = orderItems.filter(
+                      (i) => requiredItems.has(i.id) && verifiedItems.has(i.id),
+                    );
+                    const trustedItems = orderItems.filter(
+                      (i) => !requiredItems.has(i.id),
+                    );
 
-            {/* ─── STICKY SCANNER BAR ─── */}
-            {auditData.meta.status !== "auditado" && (
-              <div className="aud-scanner-sticky">
-                <button className="aud-scan-cam-btn" onClick={() => setScannerMode("product")} title="Escanear con Cámara">
-                  <FaCamera size={20} />
-                </button>
-                <div className="aud-scan-input-wrap">
-                  <input
-                    className="aud-scan-input"
-                    placeholder="Digitar código de barras..."
-                    value={manualVerifyCode}
-                    onChange={(e) => setManualVerifyCode(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleManualVerify()}
-                  />
-                  {manualVerifyCode && (
-                    <button className="aud-scan-go-btn" onClick={handleManualVerify}>
-                      <FaCheck />
+                    // Progress calculations
+                    const requiredCount =
+                      pendingItems.length + verifiedList.length;
+                    const verifiedCount = verifiedList.length;
+                    const orderProgress =
+                      requiredCount > 0
+                        ? Math.round((verifiedCount / requiredCount) * 100)
+                        : 100;
+                    const isOrderComplete = requiredCount === verifiedCount;
+                    // Obtener datos del pedido original si existe la orden en el snapshot (o en la sesión)
+                    const orderData =
+                      auditData.orders_info?.find((o) => o.id === group.id) ||
+                      {};
+                    const phone =
+                      orderData.phone || orderData.billing?.phone || null;
+                    const address =
+                      orderData.shipping?.address_1 ||
+                      orderData.billing?.address_1 ||
+                      null;
+                    const city =
+                      orderData.shipping?.city ||
+                      orderData.billing?.city ||
+                      null;
+                    const email =
+                      orderData.email || orderData.billing?.email || null;
+                    const dateCreated = orderData.date_created
+                      ? new Date(orderData.date_created).toLocaleString(
+                          "es-CO",
+                          { dateStyle: "short", timeStyle: "short" },
+                        )
+                      : null;
+                    const customerNote = orderData.customer_note || null;
+
+                    return (
+                      <div
+                        key={group.id || orderIndex}
+                        className="aud-order-group"
+                      >
+                        {/* ORDER HEADER ENRIQUECIDO */}
+                        <div className="aud-order-header">
+                          <div className="aud-order-customer">
+                            <div className="aud-order-title-row">
+                              <span className="aud-order-customer-name">
+                                👤 {group.customer}
+                              </span>
+                              <span className="aud-order-id-badge">
+                                {group.id === "others"
+                                  ? "Ítems sin pedido"
+                                  : `Pedido: ${group.id}`}
+                              </span>
+                            </div>
+                            {(phone ||
+                              address ||
+                              email ||
+                              dateCreated ||
+                              customerNote) && (
+                              <div className="aud-order-customer-details">
+                                {dateCreated && (
+                                  <div
+                                    className="aud-order-detail-line"
+                                    style={{
+                                      color: "#3b82f6",
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    <span>📅 Fecha: {dateCreated}</span>
+                                  </div>
+                                )}
+                                {phone && (
+                                  <div className="aud-order-detail-line">
+                                    <span>📞 {phone}</span>
+                                  </div>
+                                )}
+                                {email && (
+                                  <div className="aud-order-detail-line">
+                                    <span>✉️ {email}</span>
+                                  </div>
+                                )}
+                                {address && (
+                                  <div className="aud-order-detail-line">
+                                    <span>
+                                      📍 {address}
+                                      {city ? `, ${city}` : ""}
+                                    </span>
+                                  </div>
+                                )}
+                                {customerNote && (
+                                  <div
+                                    className="aud-order-detail-line"
+                                    style={{
+                                      marginTop: "4px",
+                                      background: "#fef9c3",
+                                      padding: "6px 10px",
+                                      borderRadius: "6px",
+                                      color: "#854d0e",
+                                      fontSize: "0.8rem",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    <span>
+                                      📝 Nota del Cliente: {customerNote}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="aud-order-progress">
+                            <div className="aud-order-progress-text">
+                              {isOrderComplete
+                                ? "✅ Todo verificado"
+                                : `${verifiedCount} de ${requiredCount} verificados`}
+                            </div>
+                            <div className="aud-order-progress-bar">
+                              <div
+                                className={`aud-order-progress-fill ${isOrderComplete ? "complete" : ""}`}
+                                style={{ width: `${orderProgress}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* ORDER BODY WITH SECTIONS */}
+                        <div className="aud-order-body">
+                          {/* 1. Pendientes */}
+                          {pendingItems.length > 0 && (
+                            <div className="aud-section">
+                              <div
+                                className="aud-section-header pending"
+                                style={{
+                                  background: "#fef3c7",
+                                  padding: "8px 12px",
+                                  marginBottom: "8px",
+                                }}
+                              >
+                                <FaExclamationCircle />
+                                <span>
+                                  Pendientes de verificar ({pendingItems.length}
+                                  )
+                                </span>
+                              </div>
+                              <div className="aud-items-list compact">
+                                {pendingItems.map((item, idx) => (
+                                  <div
+                                    key={idx}
+                                    className={`aud-item-card pending ${item.is_sub ? "sub" : ""}`}
+                                  >
+                                    {/* COLUMNA 1: IMAGEN */}
+                                    <div className="aud-item-img-col">
+                                      <div className="aud-item-img">
+                                        {item.image ? (
+                                          <img src={item.image} alt="" />
+                                        ) : (
+                                          <FaBoxOpen className="aud-item-placeholder" />
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* COLUMNA 2: INFO CENTRAL */}
+                                    <div className="aud-item-info">
+                                      <div className="aud-item-name">
+                                        {item.name}
+                                      </div>
+                                      {item.is_sub && (
+                                        <div className="aud-sub-details">
+                                          <div className="aud-sub-original">
+                                            <span className="aud-label-tiny">
+                                              PIDIÓ:
+                                            </span>{" "}
+                                            {item.original_name}
+                                          </div>
+                                          <div className="aud-sub-replacement">
+                                            <span className="aud-label-tiny">
+                                              LLEVAS:
+                                            </span>{" "}
+                                            {item.name}
+                                          </div>
+                                        </div>
+                                      )}
+                                      <div className="aud-item-action">
+                                        {isMeatItem(item.name) ? (
+                                          <span className="aud-type-badge meat">
+                                            🥩 Escanear etiqueta GS1
+                                          </span>
+                                        ) : isFruverItem(item.name) ? (
+                                          <button
+                                            className="aud-visual-approve-btn"
+                                            onClick={() => {
+                                              setVerifiedItems((prev) =>
+                                                new Set(prev).add(item.id),
+                                              );
+                                              showFeedback(
+                                                "success",
+                                                `✅ Fruver aprobado: ${item.name}`,
+                                              );
+                                            }}
+                                          >
+                                            👁️ Aprobar Visual
+                                          </button>
+                                        ) : (
+                                          <span className="aud-type-badge normal">
+                                            🔒 Requerido
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* COLUMNA 3: ACCIONES / CANTIDAD */}
+                                    <div className="aud-item-action-col">
+                                      <div className="aud-massive-qty-badge">
+                                        <span className="aud-massive-qty-num">
+                                          {item.count}
+                                        </span>
+                                        <span className="aud-massive-qty-unit">
+                                          UN.
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 2. Verificados */}
+                          {verifiedList.length > 0 && (
+                            <div
+                              className="aud-section"
+                              style={{
+                                marginTop: pendingItems.length > 0 ? "16px" : 0,
+                              }}
+                            >
+                              <div className="aud-items-list compact">
+                                {verifiedList.map((item, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="aud-item-card verified"
+                                  >
+                                    {/* COLUMNA 1: IMAGEN */}
+                                    <div className="aud-item-img-col">
+                                      <div className="aud-item-img small">
+                                        {item.image ? (
+                                          <img src={item.image} alt="" />
+                                        ) : (
+                                          <FaBoxOpen className="aud-item-placeholder" />
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* COLUMNA 2: INFO CENTRAL */}
+                                    <div className="aud-item-info">
+                                      <div className="aud-item-name">
+                                        {item.name}
+                                      </div>
+                                      <div className="aud-item-verified-tag">
+                                        ✅ Verificado exitosamente
+                                      </div>
+                                    </div>
+
+                                    {/* COLUMNA 3: ACCIONES / CANTIDAD */}
+                                    <div className="aud-item-action-col">
+                                      <div
+                                        className="aud-massive-qty-badge"
+                                        style={{ background: "#16a34a" }}
+                                      >
+                                        <span className="aud-massive-qty-num">
+                                          {item.count}
+                                        </span>
+                                        <span className="aud-massive-qty-unit">
+                                          UN.
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 3. Confiables */}
+                          {trustedItems.length > 0 && (
+                            <div
+                              className="aud-section"
+                              style={{ marginTop: "16px", marginBottom: 0 }}
+                            >
+                              <button
+                                className="aud-section-header trusted collapsible"
+                                style={{
+                                  background: "#f1f5f9",
+                                  padding: "8px 12px",
+                                }}
+                                onClick={() => {
+                                  const elId = `trusted-collapse-${group.id}`;
+                                  const el = document.getElementById(elId);
+                                  if (el)
+                                    el.style.display =
+                                      el.style.display === "none"
+                                        ? "block"
+                                        : "none";
+                                }}
+                              >
+                                <FaShieldAlt />
+                                <span>
+                                  Productos confiables ({trustedItems.length})
+                                </span>
+                                <FaArrowRight className="aud-collapse-arrow" />
+                              </button>
+                              <div
+                                id={`trusted-collapse-${group.id}`}
+                                style={{ display: "none", marginTop: "8px" }}
+                              >
+                                <div className="aud-items-list compact">
+                                  {trustedItems.map((item, idx) => (
+                                    <div
+                                      key={idx}
+                                      className={`aud-item-card trusted ${item.is_sub ? "sub" : ""}`}
+                                      style={{ opacity: 0.8 }}
+                                    >
+                                      {/* COLUMNA 1: IMAGEN */}
+                                      <div className="aud-item-img-col">
+                                        <div className="aud-item-img small">
+                                          {item.image ? (
+                                            <img src={item.image} alt="" />
+                                          ) : (
+                                            <FaBoxOpen className="aud-item-placeholder" />
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* COLUMNA 2: INFO CENTRAL */}
+                                      <div className="aud-item-info">
+                                        <div
+                                          className="aud-item-name"
+                                          style={{ fontSize: "0.95rem" }}
+                                        >
+                                          {item.name}
+                                        </div>
+                                      </div>
+
+                                      {/* COLUMNA 3: ACCIONES / CANTIDAD */}
+                                      <div className="aud-item-action-col">
+                                        <div
+                                          className="aud-massive-qty-badge"
+                                          style={{
+                                            padding: "4px 12px",
+                                            background: "#cbd5e1",
+                                            color: "#334155",
+                                          }}
+                                        >
+                                          <span
+                                            className="aud-massive-qty-num"
+                                            style={{ fontSize: "1.2rem" }}
+                                          >
+                                            {item.count}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* ─── TABS: HISTORIAL (moved below) ─── */}
+                <div className="aud-section">
+                  <button
+                    className="aud-section-header timeline collapsible"
+                    onClick={() =>
+                      setActiveTab(
+                        activeTab === "timeline" ? "inventory" : "timeline",
+                      )
+                    }
+                  >
+                    <FaHistory />
+                    <span>Historial de picking</span>
+                    <FaArrowRight
+                      className={`aud-collapse-arrow ${activeTab === "timeline" ? "open" : ""}`}
+                    />
+                  </button>
+                  {activeTab === "timeline" && (
+                    <div className="timeline-container">
+                      {auditData.rawLogs.map((log, idx) => (
+                        <div key={idx} className={`timeline-row ${log.accion}`}>
+                          <div className="tl-time">
+                            {formatTime(log.fecha_registro)}
+                          </div>
+                          <div className="tl-marker"></div>
+                          <div className="tl-content">
+                            <div className="tl-title">{log.accion}</div>
+                            <div className="tl-desc">
+                              {log.accion === "sustituido" ? (
+                                <div className="aud-timeline-sub-layout">
+                                  <span className="aud-timeline-sub-original">
+                                    {log.nombre_producto}
+                                  </span>
+                                  <span className="aud-timeline-sub-replacement">
+                                    <FaArrowRight size={12} />{" "}
+                                    {log.nombre_sustituto}
+                                  </span>
+                                </div>
+                              ) : (
+                                log.nombre_producto
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ─── FAB: FLOATING APPROVE BUTTON ─── */}
+                <div className="aud-fab-container">
+                  {auditData.meta.status === "auditado" ? (
+                    <button className="aud-fab-btn done" onClick={clearAudit}>
+                      🏠 Volver al Inicio
+                    </button>
+                  ) : (
+                    <button
+                      className={`aud-fab-btn ${allDone ? "ready" : "disabled"}`}
+                      onClick={handleFinishAudit}
+                      disabled={!allDone || loading}
+                    >
+                      {loading ? (
+                        <FaSpinner className="ec-spin" />
+                      ) : (
+                        <FaCheck />
+                      )}{" "}
+                      {loading
+                        ? "APROBANDO..."
+                        : allDone
+                          ? "APROBAR SALIDA"
+                          : `Faltan ${pendingItems.length} por verificar`}
                     </button>
                   )}
                 </div>
               </div>
-            )}
-
-            {/* ─── COMPLETION BANNER ─── */}
-            {allDone && auditData.meta.status !== "auditado" && (
-              <div className="aud-complete-banner">
-                <FaCheckDouble size={20} />
-                <span>¡Todos los productos fueron verificados! Puedes aprobar la salida.</span>
-              </div>
-            )}
-
-            {/* ─── ORDERS LIST ─── */}
-            <div className="aud-orders-container" style={{ marginTop: '20px' }}>
-              {auditData.groupedItems.map((group, orderIndex) => {
-                const orderItems = group.items.map(i => ({ ...i, orderCustomer: group.customer, orderId: group.id }));
-                const pendingItems = orderItems.filter(i => requiredItems.has(i.id) && !verifiedItems.has(i.id));
-                const verifiedList = orderItems.filter(i => requiredItems.has(i.id) && verifiedItems.has(i.id));
-                const trustedItems = orderItems.filter(i => !requiredItems.has(i.id));
-                
-                // Progress calculations
-                const requiredCount = pendingItems.length + verifiedList.length;
-                const verifiedCount = verifiedList.length;
-                const orderProgress = requiredCount > 0 ? Math.round((verifiedCount / requiredCount) * 100) : 100;
-                const isOrderComplete = requiredCount === verifiedCount;
-                // Obtener datos del pedido original si existe la orden en el snapshot (o en la sesión)
-                const orderData = auditData.orders_info?.find(o => o.id === group.id) || {};
-                const phone = orderData.phone || orderData.billing?.phone || null;
-                const address = orderData.shipping?.address_1 || orderData.billing?.address_1 || null;
-                const city = orderData.shipping?.city || orderData.billing?.city || null;
-                const email = orderData.email || orderData.billing?.email || null;
-                const dateCreated = orderData.date_created ? new Date(orderData.date_created).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : null;
-                const customerNote = orderData.customer_note || null;
-
-                return (
-                  <div key={group.id || orderIndex} className="aud-order-group">
-                    {/* ORDER HEADER ENRIQUECIDO */}
-                    <div className="aud-order-header">
-                      <div className="aud-order-customer">
-                        <div className="aud-order-title-row">
-                          <span className="aud-order-customer-name">👤 {group.customer}</span>
-                          <span className="aud-order-id-badge">{group.id === "others" ? "Ítems sin pedido" : `Pedido: ${group.id}`}</span>
-                        </div>
-                        {(phone || address || email || dateCreated || customerNote) && (
-                          <div className="aud-order-customer-details">
-                            {dateCreated && (
-                              <div className="aud-order-detail-line" style={{ color: '#3b82f6', fontWeight: 700 }}>
-                                <span>📅 Fecha: {dateCreated}</span>
-                              </div>
-                            )}
-                            {phone && (
-                              <div className="aud-order-detail-line">
-                                <span>📞 {phone}</span>
-                              </div>
-                            )}
-                            {email && (
-                              <div className="aud-order-detail-line">
-                                <span>✉️ {email}</span>
-                              </div>
-                            )}
-                            {address && (
-                              <div className="aud-order-detail-line">
-                                <span>📍 {address}{city ? `, ${city}` : ''}</span>
-                              </div>
-                            )}
-                            {customerNote && (
-                              <div className="aud-order-detail-line" style={{ marginTop: '4px', background: '#fef9c3', padding: '6px 10px', borderRadius: '6px', color: '#854d0e', fontSize: '0.8rem', fontWeight: 600 }}>
-                                <span>📝 Nota del Cliente: {customerNote}</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="aud-order-progress">
-                        <div className="aud-order-progress-text">
-                          {isOrderComplete ? "✅ Todo verificado" : `${verifiedCount} de ${requiredCount} verificados`}
-                        </div>
-                        <div className="aud-order-progress-bar">
-                          <div
-                            className={`aud-order-progress-fill ${isOrderComplete ? "complete" : ""}`}
-                            style={{ width: `${orderProgress}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* ORDER BODY WITH SECTIONS */}
-                    <div className="aud-order-body">
-                      {/* 1. Pendientes */}
-                      {pendingItems.length > 0 && (
-                        <div className="aud-section">
-                          <div className="aud-section-header pending" style={{ background: '#fef3c7', padding: '8px 12px', marginBottom: '8px' }}>
-                            <FaExclamationCircle />
-                            <span>Pendientes de verificar ({pendingItems.length})</span>
-                          </div>
-                          <div className="aud-items-list compact">
-                            {pendingItems.map((item, idx) => (
-                              <div key={idx} className={`aud-item-card pending ${item.is_sub ? "sub" : ""}`}>
-                                {/* COLUMNA 1: IMAGEN */}
-                                <div className="aud-item-img-col">
-                                  <div className="aud-item-img">
-                                    {item.image ? (
-                                      <img src={item.image} alt="" />
-                                    ) : (
-                                      <FaBoxOpen className="aud-item-placeholder" />
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {/* COLUMNA 2: INFO CENTRAL */}
-                                <div className="aud-item-info">
-                                  <div className="aud-item-name">{item.name}</div>
-                                  {item.is_sub && (
-                                    <div className="aud-sub-details">
-                                      <div className="aud-sub-original"><span className="aud-label-tiny">PIDIÓ:</span> {item.original_name}</div>
-                                      <div className="aud-sub-replacement"><span className="aud-label-tiny">LLEVAS:</span> {item.name}</div>
-                                    </div>
-                                  )}
-                                  <div className="aud-item-action">
-                                    {isMeatItem(item.name) ? (
-                                      <span className="aud-type-badge meat">🥩 Escanear etiqueta GS1</span>
-                                    ) : isFruverItem(item.name) ? (
-                                      <button
-                                        className="aud-visual-approve-btn"
-                                        onClick={() => {
-                                          setVerifiedItems((prev) => new Set(prev).add(item.id));
-                                          showFeedback("success", `✅ Fruver aprobado: ${item.name}`);
-                                        }}
-                                      >
-                                        👁️ Aprobar Visual
-                                      </button>
-                                    ) : (
-                                      <span className="aud-type-badge normal">🔒 Requerido</span>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* COLUMNA 3: ACCIONES / CANTIDAD */}
-                                <div className="aud-item-action-col">
-                                  <div className="aud-massive-qty-badge">
-                                    <span className="aud-massive-qty-num">{item.count}</span>
-                                    <span className="aud-massive-qty-unit">UN.</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 2. Verificados */}
-                      {verifiedList.length > 0 && (
-                        <div className="aud-section" style={{ marginTop: pendingItems.length > 0 ? '16px' : 0 }}>
-                          <div className="aud-items-list compact">
-                            {verifiedList.map((item, idx) => (
-                              <div key={idx} className="aud-item-card verified">
-                                {/* COLUMNA 1: IMAGEN */}
-                                <div className="aud-item-img-col">
-                                  <div className="aud-item-img small">
-                                    {item.image ? <img src={item.image} alt="" /> : <FaBoxOpen className="aud-item-placeholder" />}
-                                  </div>
-                                </div>
-
-                                {/* COLUMNA 2: INFO CENTRAL */}
-                                <div className="aud-item-info">
-                                  <div className="aud-item-name">{item.name}</div>
-                                  <div className="aud-item-verified-tag">✅ Verificado exitosamente</div>
-                                </div>
-
-                                {/* COLUMNA 3: ACCIONES / CANTIDAD */}
-                                <div className="aud-item-action-col">
-                                  <div className="aud-massive-qty-badge" style={{ background: '#16a34a' }}>
-                                    <span className="aud-massive-qty-num">{item.count}</span>
-                                    <span className="aud-massive-qty-unit">UN.</span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 3. Confiables */}
-                      {trustedItems.length > 0 && (
-                        <div className="aud-section" style={{ marginTop: '16px', marginBottom: 0 }}>
-                          <button
-                            className="aud-section-header trusted collapsible"
-                            style={{ background: '#f1f5f9', padding: '8px 12px' }}
-                            onClick={() => {
-                              const elId = `trusted-collapse-${group.id}`;
-                              const el = document.getElementById(elId);
-                              if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
-                            }}
-                          >
-                            <FaShieldAlt />
-                            <span>Productos confiables ({trustedItems.length})</span>
-                            <FaArrowRight className="aud-collapse-arrow" />
-                          </button>
-                          <div id={`trusted-collapse-${group.id}`} style={{ display: 'none', marginTop: '8px' }}>
-                            <div className="aud-items-list compact">
-                              {trustedItems.map((item, idx) => (
-                                <div key={idx} className={`aud-item-card trusted ${item.is_sub ? "sub" : ""}`} style={{ opacity: 0.8 }}>
-                                  {/* COLUMNA 1: IMAGEN */}
-                                  <div className="aud-item-img-col">
-                                    <div className="aud-item-img small">
-                                      {item.image ? <img src={item.image} alt="" /> : <FaBoxOpen className="aud-item-placeholder" />}
-                                    </div>
-                                  </div>
-
-                                  {/* COLUMNA 2: INFO CENTRAL */}
-                                  <div className="aud-item-info">
-                                    <div className="aud-item-name" style={{ fontSize: '0.95rem' }}>{item.name}</div>
-                                  </div>
-
-                                  {/* COLUMNA 3: ACCIONES / CANTIDAD */}
-                                  <div className="aud-item-action-col">
-                                    <div className="aud-massive-qty-badge" style={{ padding: '4px 12px', background: '#cbd5e1', color: '#334155' }}>
-                                      <span className="aud-massive-qty-num" style={{ fontSize: '1.2rem' }}>{item.count}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* ─── TABS: HISTORIAL (moved below) ─── */}
-            <div className="aud-section">
-              <button
-                className="aud-section-header timeline collapsible"
-                onClick={() => setActiveTab(activeTab === "timeline" ? "inventory" : "timeline")}
-              >
-                <FaHistory />
-                <span>Historial de picking</span>
-                <FaArrowRight className={`aud-collapse-arrow ${activeTab === "timeline" ? "open" : ""}`} />
-              </button>
-              {activeTab === "timeline" && (
-                <div className="timeline-container">
-                  {auditData.rawLogs.map((log, idx) => (
-                    <div key={idx} className={`timeline-row ${log.accion}`}>
-                      <div className="tl-time">{formatTime(log.fecha_registro)}</div>
-                      <div className="tl-marker"></div>
-                      <div className="tl-content">
-                        <div className="tl-title">{log.accion}</div>
-                        <div className="tl-desc">
-                          {log.accion === "sustituido" ? (
-                            <div className="aud-timeline-sub-layout">
-                              <span className="aud-timeline-sub-original">{log.nombre_producto}</span>
-                              <span className="aud-timeline-sub-replacement">
-                                <FaArrowRight size={12} /> {log.nombre_sustituto}
-                              </span>
-                            </div>
-                          ) : (
-                            log.nombre_producto
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* ─── FAB: FLOATING APPROVE BUTTON ─── */}
-            <div className="aud-fab-container">
-              {auditData.meta.status === "auditado" ? (
-                <button className="aud-fab-btn done" onClick={clearAudit}>
-                  🏠 Volver al Inicio
-                </button>
-              ) : (
-                <button
-                  className={`aud-fab-btn ${allDone ? "ready" : "disabled"}`}
-                  onClick={handleFinishAudit}
-                  disabled={!allDone || loading}
-                >
-                  {loading ? <FaSpinner className="ec-spin" /> : <FaCheck />} {loading ? "APROBANDO..." : allDone ? "APROBAR SALIDA" : `Faltan ${pendingItems.length} por verificar`}
-                </button>
-              )}
-            </div>
-          </div>
-          );
-        })()}
+            );
+          })()}
       </div>
 
       {scanFeedback && (

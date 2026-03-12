@@ -3,8 +3,13 @@
 
 .auditor-layout {
   background: #f8fafc;
+  color: #0f172a;
   min-height: 100vh;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   font-size: 15px;
   padding-bottom: 140px;
 }
@@ -76,7 +81,11 @@
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(255,255,255,0.03) 10%, transparent 10%);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.03) 10%,
+    transparent 10%
+  );
   background-size: 20px 20px;
   z-index: 1;
   pointer-events: none;
@@ -133,11 +142,14 @@
   font-size: 1.05rem;
   outline: none;
   background: white;
+  color: #0f172a;
   font-family: inherit;
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 .auditor-input:focus {
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05), 0 0 0 3px rgba(56, 189, 248, 0.3);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.05),
+    0 0 0 3px rgba(56, 189, 248, 0.3);
 }
 
 .auditor-scan-btn {
@@ -189,7 +201,9 @@
   border-radius: 14px;
   border: 1px solid #e2e8f0;
   box-shadow: 0 4px 15px rgba(15, 23, 42, 0.03);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .aud-info-card:hover {
@@ -363,7 +377,6 @@
   border: 1px solid #e2e8f0;
 }
 
-
 /* --- CLASES EXTRA: Inline Styles Migrados --- */
 .aud-qr-history-btn {
   padding: 5px 15px;
@@ -420,19 +433,33 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   animation: slideUpFade 0.3s ease forwards;
   pointer-events: auto;
 }
 
-.aud-toast.success { background: #10b981; }
-.aud-toast.error { background: #ef4444; }
-.aud-toast.warning { background: #f59e0b; }
-.aud-toast.info { background: #3b82f6; }
+.aud-toast.success {
+  background: #10b981;
+}
+.aud-toast.error {
+  background: #ef4444;
+}
+.aud-toast.warning {
+  background: #f59e0b;
+}
+.aud-toast.info {
+  background: #3b82f6;
+}
 
 @keyframes slideUpFade {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ─── BOTÓN APROBACIÓN VISUAL FRUVER ─── */
@@ -449,7 +476,9 @@
   align-items: center;
   gap: 4px;
   box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3);
-  transition: transform 0.1s, box-shadow 0.1s;
+  transition:
+    transform 0.1s,
+    box-shadow 0.1s;
 }
 
 .aud-visual-approve-btn:active {
@@ -489,14 +518,16 @@
 
 .aud-meta-session {
   font-family: "SF Mono", "Fira Code", monospace;
-  background: rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.12);
   padding: 3px 8px;
   border-radius: 6px;
   font-size: 0.8rem;
   white-space: nowrap;
 }
 
-.aud-meta-sep { opacity: 0.4; }
+.aud-meta-sep {
+  opacity: 0.4;
+}
 
 .aud-meta-picker {
   display: flex;
@@ -508,10 +539,12 @@
   text-overflow: ellipsis;
 }
 
-.aud-meta-right { flex-shrink: 0; }
+.aud-meta-right {
+  flex-shrink: 0;
+}
 
 .aud-meta-qr-btn {
-  background: rgba(255,255,255,0.15);
+  background: rgba(255, 255, 255, 0.15);
   border: none;
   color: white;
   width: 36px;
@@ -543,7 +576,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
   color: white;
 }
@@ -558,7 +591,7 @@
 
 .audit-act-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
   filter: brightness(1.1);
 }
 
@@ -572,7 +605,7 @@
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 12px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .aud-progress-text {
@@ -612,8 +645,13 @@
 }
 
 @keyframes progressPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.8; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
 /* ─── STICKY SCANNER BAR ─── */
@@ -625,7 +663,7 @@
   padding: 10px 14px;
   border-radius: 14px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   position: sticky;
   top: 60px;
   z-index: 90;
@@ -707,8 +745,14 @@
 }
 
 @keyframes bannerPop {
-  0% { transform: scale(0.95); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 /* ─── ORDER CARDS ─── */
@@ -874,23 +918,23 @@
 .aud-items-list {
   display: flex;
   flex-direction: column;
-  gap: 16px; 
+  gap: 16px;
   margin-top: 12px;
 }
 
 .aud-items-list.compact {
-  gap: 10px; 
+  gap: 10px;
 }
 
 .aud-item-card {
   display: flex;
   align-items: stretch;
-  gap: 16px; 
+  gap: 16px;
   background: white;
-  padding: 16px; 
+  padding: 16px;
   border-radius: 14px;
   border-left: 5px solid transparent;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   transition: all 0.2s;
   width: 100%;
 }
@@ -898,7 +942,7 @@
 @media (max-width: 600px) {
   .aud-item-card {
     flex-wrap: wrap; /* Permite que la columna de acciones baje si no hay espacio */
-    padding: 14px; 
+    padding: 14px;
     gap: 12px;
   }
 }
@@ -966,7 +1010,7 @@
 /* Columna 2: Información Central */
 .aud-item-info {
   flex: 1;
-  min-width: 0; 
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -974,8 +1018,8 @@
 
 .aud-item-name {
   font-weight: 800;
-  font-size: 1.1rem; 
-  color: #0f172a; 
+  font-size: 1.1rem;
+  color: #0f172a;
   line-height: 1.3;
   margin-bottom: 6px;
   display: -webkit-box;
@@ -983,11 +1027,11 @@
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  word-break: break-word; 
+  word-break: break-word;
 }
 
 .aud-item-order {
-  font-size: 0.85rem; 
+  font-size: 0.85rem;
   color: #475569;
   margin-top: 2px;
 }
@@ -1054,7 +1098,7 @@
 
 .aud-item-action {
   display: flex;
-  flex-wrap: wrap; 
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
 }
@@ -1062,7 +1106,7 @@
 .aud-item-verified-tag {
   color: #16a34a;
   font-weight: 800;
-  font-size: 0.95rem; 
+  font-size: 0.95rem;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1118,7 +1162,7 @@
   justify-content: center;
   gap: 10px;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -1130,8 +1174,13 @@
 }
 
 @keyframes fabReady {
-  0%, 100% { box-shadow: 0 4px 20px rgba(34,197,94,0.3); }
-  50% { box-shadow: 0 4px 30px rgba(34,197,94,0.5); }
+  0%,
+  100% {
+    box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 30px rgba(34, 197, 94, 0.5);
+  }
 }
 
 .aud-fab-btn.disabled {
@@ -1144,113 +1193,4 @@
 .aud-fab-btn.done {
   background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
-}
-
-/* ===============================================================
-   NUEVO: PANEL EN VIVO DE RUTAS PENDIENTES
-   =============================================================== */
-
-.aud-pending-list-container {
-  margin-top: 40px;
-  text-align: left;
-  width: 100%;
-  max-width: 800px;
-  animation: fadeIn 0.4s ease-out;
-}
-
-.aud-pending-title {
-  font-size: 1.25rem;
-  color: #1e293b;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
-  font-weight: 700;
-}
-
-.aud-pending-empty {
-  background: #f8fafc;
-  padding: 40px;
-  border-radius: 16px;
-  text-align: center;
-  color: #64748b;
-  border: 2px dashed #cbd5e1;
-  font-weight: 500;
-}
-
-.aud-pending-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.aud-pending-card {
-  background: white;
-  border-radius: 12px;
-  padding: 18px;
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
-  transition: all 0.25s ease;
-  border-left: 5px solid #10b981;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.aud-pending-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-  border-color: #cbd5e1;
-}
-
-.aud-pending-card:active {
-  transform: translateY(0);
-}
-
-.aud-pc-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.aud-pc-id {
-  font-weight: 800;
-  color: #10b981;
-  font-size: 1.1rem;
-  font-family: monospace;
-}
-
-.aud-pc-time {
-  font-size: 0.85rem;
-  color: #94a3b8;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #f1f5f9;
-  padding: 4px 8px;
-  border-radius: 20px;
-  font-weight: 600;
-}
-
-.aud-pc-name {
-  font-weight: 600;
-  color: #334155;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.95rem;
-}
-
-.aud-pc-action {
-  font-size: 0.8rem;
-  color: #3b82f6;
-  font-weight: 700;
-  text-align: right;
-  margin-top: 4px;
-  transition: transform 0.2s;
-}
-
-.aud-pending-card:hover .aud-pc-action {
-  transform: translateX(4px);
 }

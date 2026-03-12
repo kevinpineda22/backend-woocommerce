@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { ecommerceApi } from "../shared/ecommerceApi";
 import QRCode from "react-qr-code";
 import { AnimatePresence, motion } from "framer-motion";
@@ -270,7 +270,11 @@ const VistaPicker = () => {
     try {
       const res = await ecommerceApi.post(
         `/validar-codigo${sedeParam ? "?" + sedeParam : ""}`,
-        { input_code: inputCode, expected_sku: currentItem.sku, expected_barcode: currentItem.barcode },
+        {
+          input_code: inputCode,
+          expected_sku: currentItem.sku,
+          expected_barcode: currentItem.barcode,
+        },
       );
       if (res.data.valid) {
         setLastScannedBarcode(null);
@@ -296,7 +300,7 @@ const VistaPicker = () => {
 
     let isBarcodeMatch = false;
     if (Array.isArray(currentItem.barcode)) {
-      isBarcodeMatch = currentItem.barcode.some(b => {
+      isBarcodeMatch = currentItem.barcode.some((b) => {
         const str = (b || "").toString().toUpperCase();
         return c === str || str.endsWith(c);
       });
@@ -348,9 +352,7 @@ const VistaPicker = () => {
 
   if (showSuccessQR && completedSessionId) {
     return (
-      <div
-        className="ec-picker-centered ec-success-screen"
-      >
+      <div className="ec-picker-centered ec-success-screen">
         <FaCheckCircle size={60} className="ec-no-assignment-icon" />
         <h2>¡Ruta Finalizada!</h2>
         <p>Muestra este código al auditor.</p>
@@ -509,7 +511,10 @@ const VistaPicker = () => {
             className="ec-fab-finish"
             onClick={() => {
               if (pendingSync > 0) {
-                showToast(`⚠️ Tienes ${pendingSync} sincronizaciones pendientes. Conéctate a internet.`, "warning");
+                showToast(
+                  `⚠️ Tienes ${pendingSync} sincronizaciones pendientes. Conéctate a internet.`,
+                  "warning",
+                );
                 return;
               }
               setShowFinishConfirm(true);
@@ -517,7 +522,11 @@ const VistaPicker = () => {
             disabled={isFinishing}
           >
             <div className="ec-fab-content">
-              {isFinishing ? <FaSpinner className="ec-spin" size={24} /> : <FaCheck size={24} />}
+              {isFinishing ? (
+                <FaSpinner className="ec-spin" size={24} />
+              ) : (
+                <FaCheck size={24} />
+              )}
               <span>{isFinishing ? "FINALIZANDO..." : "TERMINAR RUTA"}</span>
             </div>
             <div className="ec-fab-arrow">

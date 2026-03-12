@@ -78,18 +78,28 @@ exports.getBaseEanFruver = async (req, res) => {
 
     if (error) throw error;
     if (!barcodes || barcodes.length === 0) {
-      return res.status(404).json({ error: "No se encontró base EAN para este producto Fruver." });
+      return res
+        .status(404)
+        .json({ error: "No se encontró base EAN para este producto Fruver." });
     }
 
     // Filtramos estrictamente los códigos que tienen exactamente 7 dígitos y empiezan en 29
     const validBase = barcodes.find(
-      (b) => b.codigo_barras && b.codigo_barras.trim().length === 7 && /^\d+$/.test(b.codigo_barras.trim())
+      (b) =>
+        b.codigo_barras &&
+        b.codigo_barras.trim().length === 7 &&
+        /^\d+$/.test(b.codigo_barras.trim()),
     );
 
     if (validBase) {
       return res.status(200).json({ baseEAN: validBase.codigo_barras.trim() });
     } else {
-      return res.status(404).json({ error: "Se encontraron códigos 29, pero ninguno de exactamente 7 dígitos." });
+      return res
+        .status(404)
+        .json({
+          error:
+            "Se encontraron códigos 29, pero ninguno de exactamente 7 dígitos.",
+        });
     }
   } catch (error) {
     console.error("Error obteniendo base EAN Fruver:", error);
@@ -156,13 +166,60 @@ exports.searchProduct = async (req, res) => {
           Math.abs(parseFloat(b.price || 0) - originalPrice),
       );
     } else if (query) {
-      const { data: searchResults } = await prodClient.get("products", {
-        search: query,
-        per_page: 20,
-        status: "publish",
-        stock_status: "instock",
-      });
-      products = searchResults;
+      let isBarcodeSearch = false;
+
+      // ✅ Si parece un código de barras (solo números y largo > 7), buscar en SIESA primero
+      if (/^\d{7,}$/.test(query)) {
+        try {
+          const { data: siesaBarcodes } = await supabase
+            .from("siesa_codigos_barras")
+            .select("f120_id")
+            .eq("codigo_barras", query)
+            .limit(1);
+
+          if (siesaBarcodes && siesaBarcodes.length > 0) {
+            // Encontramos el SKU en SIESA, consultamos Woo por ese SKU (o Sku list si hay varios, usando sku del primero)
+            const targetSku = siesaBarcodes[0].f120_id;
+            const { data: searchResults } = await prodClient.get("products", {
+              sku: targetSku,
+              status: "publish",
+              stock_status: "instock",
+            });
+            if (searchResults && searchResults.length > 0) {
+              products = searchResults;
+              isBarcodeSearch = true;
+            }
+          }
+        } catch (e) {
+          console.error("Error buscando por barcode en SIESA", e);
+        }
+      }
+
+      // Fallback a búsqueda normal por texto si no era código de barras o no se encontró
+      if (!isBarcodeSearch) {
+        const { data: searchResults } = await prodClient.get("products", {
+          search: query,
+          per_page: 20,
+          status: "publish",
+          stock_status: "instock",
+        });
+
+        // Si no se encontraron por `search`, y parece un código de producto exacto (SKU), intentamos exacto
+        if (searchResults.length === 0 && /^[a-zA-Z0-9]+$/.test(query)) {
+          const { data: skuResults } = await prodClient.get("products", {
+            sku: query,
+            status: "publish",
+            stock_status: "instock",
+          });
+          if (skuResults && skuResults.length > 0) {
+            products = skuResults;
+          } else {
+            products = [];
+          }
+        } else {
+          products = searchResults;
+        }
+      }
     }
 
     // ✅ OBTENER CÓDIGOS DE BARRAS DE SIESA (por SKU, no por product_id)
