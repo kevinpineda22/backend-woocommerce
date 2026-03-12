@@ -73,7 +73,11 @@ exports.handleWooWebhook = async (req, res) => {
           authenticated = verifyWooSignature(rawPayload, signature, secret);
         }
         if (!authenticated && req.body) {
-          authenticated = verifyWooSignature(JSON.stringify(req.body), signature, secret);
+          authenticated = verifyWooSignature(
+            JSON.stringify(req.body),
+            signature,
+            secret,
+          );
         }
       }
 
@@ -83,7 +87,9 @@ exports.handleWooWebhook = async (req, res) => {
       }
 
       if (!authenticated) {
-        console.warn("⚠️ [WEBHOOK] Autenticación fallida — ni token ni HMAC válidos");
+        console.warn(
+          "⚠️ [WEBHOOK] Autenticación fallida — ni token ni HMAC válidos",
+        );
         return res.status(401).json({ error: "No autorizado" });
       }
     }
@@ -113,7 +119,7 @@ exports.handleWooWebhook = async (req, res) => {
     let sedeId = null;
     try {
       const sedeInfo = await getSedeFromWooOrder(order);
-      sedeId = sedeInfo?.id || null;
+      sedeId = sedeInfo?.sede_id || null;
     } catch (_) {
       // Si falla la detección de sede, broadcast sin sede (global)
     }
