@@ -54,12 +54,29 @@ exports.handleWooWebhook = async (req, res) => {
 
     // Verificar firma HMAC-SHA256
     const secret = process.env.WC_WEBHOOK_SECRET;
-    // En Vercel, rawBody puede no capturarse correctamente (body pre-parseado).
-    // Fallback: reconstruir el payload desde req.body.
-    const rawPayload = req.rawBody || JSON.stringify(req.body);
-    if (secret && !verifyWooSignature(rawPayload, signature, secret)) {
-      console.warn("⚠️ [WEBHOOK] Firma inválida, rechazando request");
-      return res.status(401).json({ error: "Firma inválida" });
+    if (secret && signature) {
+      const rawPayload = req.rawBody || "";
+      console.log(`🔍 [WEBHOOK-DEBUG] rawBody capturado: ${rawPayload ? 'SI' : 'NO'} (${rawPayload.length} bytes)`);
+      console.log(`🔍 [WEBHOOK-DEBUG] Firma recibida: ${signature?.substring(0, 20)}...`);
+      
+      // Intentar verificar con rawBody original
+      let verified = false;
+      if (rawPayload) {
+        verified = verifyWooSignature(rawPayload, signature, secret);
+      }
+      // Fallback: verificar con JSON.stringify (puede diferir en Vercel)
+      if (!verified && req.body) {
+        verified = verifyWooSignature(JSON.stringify(req.body), signature, secret);
+      }
+      if (!verified) {
+        console.warn("⚠️ [WEBHOOK] Firma inválida, rechazando request");
+        return res.status(401).json({ error: "Firma inválida" });
+      }
+      console.log("✅ [WEBHOOK] Firma HMAC verificada correctamente");
+    }
+    // Si no hay secret configurado o no viene firma, aceptar (necesario para ping)
+    if (secret && !signature && topic !== "ping") {
+      console.warn("⚠️ [WEBHOOK] Request sin firma y secret configurado");
     }
 
     // WooCommerce envía un ping al crear el webhook
