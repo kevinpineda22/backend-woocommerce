@@ -23,6 +23,29 @@ const { getAllSedes } = require("./sedeConfig");
 // Cache de clientes WooCommerce por URL (evita recrear instancias)
 const clientCache = new Map();
 
+// Cache de respuestas WooCommerce (TTL corto para evitar llamadas redundantes)
+const responseCache = new Map();
+const RESPONSE_CACHE_TTL = 15_000; // 15 segundos
+
+function getCachedResponse(key) {
+  const cached = responseCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.timestamp > RESPONSE_CACHE_TTL) {
+    responseCache.delete(key);
+    return null;
+  }
+  return cached.data;
+}
+
+function setCachedResponse(key, data) {
+  responseCache.set(key, { data, timestamp: Date.now() });
+}
+
+/** Invalida toda la caché de respuestas (llamar tras recibir webhook) */
+function invalidateResponseCache() {
+  responseCache.clear();
+}
+
 // ============================================================
 // FACTORY: Crear/obtener cliente WooCommerce para una URL
 // ============================================================
@@ -81,6 +104,20 @@ async function getWooClient(sedeId) {
 }
 
 // ============================================================
+// FETCH CACHEADO PARA UNA SEDE ESPECÍFICA
+// ============================================================
+async function fetchFromSede(sedeId, endpoint, params = {}) {
+  const cacheKey = `sede:${sedeId || "default"}:${endpoint}:${JSON.stringify(params)}`;
+  const cached = getCachedResponse(cacheKey);
+  if (cached) return cached;
+
+  const client = await getWooClient(sedeId);
+  const { data } = await client.get(endpoint, params);
+  setCachedResponse(cacheKey, data);
+  return data;
+}
+
+// ============================================================
 // TODOS LOS CLIENTES (para modo "todas las sedes")
 // ============================================================
 /**
@@ -114,6 +151,11 @@ async function getAllWooClients() {
  * @returns {Promise<Array>} - Resultados combinados de todas las sedes
  */
 async function fetchFromAllSedes(endpoint, params = {}) {
+  // Cache check
+  const cacheKey = `all:${endpoint}:${JSON.stringify(params)}`;
+  const cached = getCachedResponse(cacheKey);
+  if (cached) return cached;
+
   const clients = await getAllWooClients();
 
   if (clients.length === 0) {
@@ -147,9 +189,12 @@ async function fetchFromAllSedes(endpoint, params = {}) {
     }),
   );
 
-  return results
+  const combined = results
     .filter((r) => r.status === "fulfilled")
     .flatMap((r) => r.value);
+
+  setCachedResponse(cacheKey, combined);
+  return combined;
 }
 
 // ============================================================
@@ -202,7 +247,9 @@ module.exports = {
   getDefaultClient,
   getAllWooClients,
   fetchFromAllSedes,
+  fetchFromSede,
   getOrderFromAnySede,
   getProductFromSede,
   getOrCreateClient,
+  invalidateResponseCache,
 };

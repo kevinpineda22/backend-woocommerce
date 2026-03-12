@@ -51,10 +51,9 @@ const ActiveSessionsView = ({ onViewDetail, loadingDetailId }) => {
   const fetchSessions = useCallback(async () => {
     try {
       const sp = getSedeParam ? getSedeParam() : "";
-      const res = await ecommerceApi.get(
-        `/dashboard-activo`,
-        { params: { ...Object.fromEntries(new URLSearchParams(sp)) } },
-      );
+      const res = await ecommerceApi.get(`/dashboard-activo`, {
+        params: { ...Object.fromEntries(new URLSearchParams(sp)) },
+      });
       setSessions(res.data);
     } catch (e) {
       console.error("Error fetching sessions:", e);
@@ -143,6 +142,11 @@ const ActiveSessionsView = ({ onViewDetail, loadingDetailId }) => {
   if (loading && sessions.length === 0)
     return (
       <div className="pedidos-empty-list-container">
+        <FaSpinner
+          className="ec-spin"
+          size={30}
+          style={{ marginBottom: 12, opacity: 0.6 }}
+        />
         <p>Cargando rutas en vivo...</p>
       </div>
     );
@@ -167,10 +171,7 @@ const ActiveSessionsView = ({ onViewDetail, loadingDetailId }) => {
   return (
     <div className="pa-dashboard-grid">
       <div className="pa-dashboard-refresh-bar">
-        <button
-          className="pa-view-detail-btn"
-          onClick={handleManualRefresh}
-        >
+        <button className="pa-view-detail-btn" onClick={handleManualRefresh}>
           <FaSync className={loading ? "ec-spin" : ""} /> Refrescar Datos
         </button>
       </div>
@@ -255,9 +256,13 @@ const ActiveSessionsView = ({ onViewDetail, loadingDetailId }) => {
             disabled={loadingDetailId === session.session_id}
           >
             {loadingDetailId === session.session_id ? (
-              <><FaSpinner className="ec-spin" /> Cargando...</>
+              <>
+                <FaSpinner className="ec-spin" /> Cargando...
+              </>
             ) : (
-              <><FaEye /> Ver Detalle en Vivo</>
+              <>
+                <FaEye /> Ver Detalle en Vivo
+              </>
             )}
           </button>
         </div>

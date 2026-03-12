@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { supabase } = require("../services/supabaseClient");
 const { getSedeFromWooOrder, getAllSedes } = require("../services/sedeConfig");
+const { invalidateResponseCache } = require("../services/wooMultiService");
 
 // =========================================================
 // HELPER: Verificar firma HMAC del webhook de WooCommerce
@@ -136,6 +137,9 @@ exports.handleWooWebhook = async (req, res) => {
         if (match) sedeId = match.id;
       } catch (_) {}
     }
+
+    // Invalidar caché de WooCommerce para que el próximo request traiga datos frescos
+    invalidateResponseCache();
 
     // Broadcast inmediato a todos los dashboards conectados
     await broadcastNewOrder({

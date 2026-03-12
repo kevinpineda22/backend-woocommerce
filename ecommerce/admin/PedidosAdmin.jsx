@@ -154,29 +154,21 @@ const PedidosAdmin = () => {
     async (isBackground = false) => {
       if (!isBackground) setLoading(true);
       const sedeParam = getSedeParam();
+      const params = { ...Object.fromEntries(new URLSearchParams(sedeParam)) };
       try {
-        // 1. Pedidos Pendientes
-        const resPending = await ecommerceApi.get(`/pendientes`, {
-          params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) },
-        });
+        // Todas las llamadas en PARALELO (antes eran secuenciales)
+        const [resPending, resActive, resAuditPending, resPaymentPending] =
+          await Promise.all([
+            ecommerceApi.get(`/pendientes`, { params }),
+            ecommerceApi.get(`/dashboard-activo`, { params }),
+            ecommerceApi.get(`/pendientes-auditoria`, { params }),
+            ecommerceApi.get(`/pendientes-pago`, { params }),
+          ]);
+
         const listPending = resPending.data.filter((o) => !o.is_assigned);
         setOrders(listPending);
-
-        // 2. Sesiones Activas
-        const resActive = await ecommerceApi.get(`/dashboard-activo`, {
-          params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) },
-        });
         setActiveSessions(resActive.data);
-
-        const resAuditPending = await ecommerceApi.get(
-          `/pendientes-auditoria`,
-          { params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) } },
-        );
         setPendingAuditOrders(resAuditPending.data || []);
-
-        const resPaymentPending = await ecommerceApi.get(`/pendientes-pago`, {
-          params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) },
-        });
         setPaymentPendingOrders(resPaymentPending.data || []);
 
         const totalProcessOrders = resActive.data.reduce(

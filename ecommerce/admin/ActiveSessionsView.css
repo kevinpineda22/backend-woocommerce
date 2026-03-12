@@ -139,6 +139,16 @@
   }
 }
 
+/* ─── Spinner animado ─── */
+.ec-spin {
+  animation: ec-spin-rotate 0.8s linear infinite;
+}
+@keyframes ec-spin-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ─── Progress Bar ─── */
 .pa-progress-section {
   display: flex;

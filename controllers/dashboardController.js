@@ -13,6 +13,7 @@ const {
 const {
   getWooClient,
   fetchFromAllSedes,
+  fetchFromSede,
   getOrderFromAnySede,
 } = require("../services/wooMultiService");
 
@@ -108,6 +109,46 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 
     if (error) throw error;
 
+    // ── BATCH: Obtener TODAS las asignaciones y logs de una vez ──
+    const sessionIds = sessions.map((s) => s.id);
+
+    // Una sola query para todas las asignaciones de todas las sesiones activas
+    const { data: allAssignments } =
+      sessionIds.length > 0
+        ? await supabase
+            .from("wc_asignaciones_pedidos")
+            .select("id, id_sesion")
+            .in("id_sesion", sessionIds)
+        : { data: [] };
+
+    const allAssignIds = (allAssignments || []).map((a) => a.id);
+
+    // Una sola query para todos los logs de todas las asignaciones
+    const { data: allLogs } =
+      allAssignIds.length > 0
+        ? await supabase
+            .from("wc_log_picking")
+            .select(
+              "id_asignacion, id_producto, id_producto_original, accion, es_sustituto, fecha_registro, nombre_producto, pasillo",
+            )
+            .in("id_asignacion", allAssignIds)
+        : { data: [] };
+
+    // Indexar para acceso rápido
+    const assignmentsBySession = {};
+    (allAssignments || []).forEach((a) => {
+      if (!assignmentsBySession[a.id_sesion])
+        assignmentsBySession[a.id_sesion] = [];
+      assignmentsBySession[a.id_sesion].push(a);
+    });
+
+    const logsByAssignment = {};
+    (allLogs || []).forEach((l) => {
+      if (!logsByAssignment[l.id_asignacion])
+        logsByAssignment[l.id_asignacion] = [];
+      logsByAssignment[l.id_asignacion].push(l);
+    });
+
     const dashboardData = await Promise.all(
       sessions.map(async (sess) => {
         // A. Obtener Pedidos (Snapshot o Woo)
@@ -126,21 +167,11 @@ exports.getActiveSessionsDashboard = async (req, res) => {
         // B. Calcular Universo de Items (Líneas únicas)
         const itemsUnificados = agruparItemsParaPicking(orders);
         const activeItems = itemsUnificados.filter((i) => !i.is_removed);
-        const totalItems = activeItems.length; // Total de tarjetas/líneas
+        const totalItems = activeItems.length;
 
-        // C. Obtener Logs de ESTA sesión (Vía Asignaciones)
-        const { data: assignments } = await supabase
-          .from("wc_asignaciones_pedidos")
-          .select("id")
-          .eq("id_sesion", sess.id);
-        const assignIds = assignments.map((a) => a.id);
-
-        const { data: logs } = await supabase
-          .from("wc_log_picking")
-          .select(
-            "id_producto, id_producto_original, accion, es_sustituto, fecha_registro, nombre_producto, pasillo",
-          )
-          .in("id_asignacion", assignIds);
+        // C. Obtener Logs de ESTA sesión (desde el batch pre-cargado)
+        const sessAssigns = assignmentsBySession[sess.id] || [];
+        const logs = sessAssigns.flatMap((a) => logsByAssignment[a.id] || []);
 
         // D. Matemática de Progreso (Item por Item)
         let completedLines = 0;
@@ -219,9 +250,8 @@ exports.getPendingOrders = async (req, res) => {
     // ── MULTI-SEDE (WordPress Multisite): Cada sede tiene su propio WooCommerce ──
     let wcOrders;
     if (req.sedeId) {
-      // Sede específica → usar su cliente WooCommerce
-      const client = await getWooClient(req.sedeId);
-      const { data } = await client.get("orders", {
+      // Sede específica → fetch cacheado
+      const data = await fetchFromSede(req.sedeId, "orders", {
         status: "processing",
         per_page: 50,
       });
@@ -241,7 +271,7 @@ exports.getPendingOrders = async (req, res) => {
       .from("wc_asignaciones_pedidos")
       .select("id_pedido")
       .in("estado_asignacion", ["en_proceso", "completado"]);
-      
+
     if (req.sedeId) {
       assignQuery = assignQuery.eq("sede_id", req.sedeId);
     }
