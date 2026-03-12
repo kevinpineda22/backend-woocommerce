@@ -11,10 +11,11 @@ function verifyWooSignature(payload, signature, secret) {
   const hmac = crypto.createHmac("sha256", secret);
   hmac.update(payload, "utf8");
   const expected = hmac.digest("base64");
-  return crypto.timingSafeEqual(
-    Buffer.from(signature, "base64"),
-    Buffer.from(expected, "base64"),
-  );
+  // timingSafeEqual requiere buffers del mismo largo
+  const sigBuf = Buffer.from(signature, "base64");
+  const expBuf = Buffer.from(expected, "base64");
+  if (sigBuf.length !== expBuf.length) return false;
+  return crypto.timingSafeEqual(sigBuf, expBuf);
 }
 
 // =========================================================
@@ -53,7 +54,10 @@ exports.handleWooWebhook = async (req, res) => {
 
     // Verificar firma HMAC-SHA256
     const secret = process.env.WC_WEBHOOK_SECRET;
-    if (secret && !verifyWooSignature(req.rawBody || "", signature, secret)) {
+    // En Vercel, rawBody puede no capturarse correctamente (body pre-parseado).
+    // Fallback: reconstruir el payload desde req.body.
+    const rawPayload = req.rawBody || JSON.stringify(req.body);
+    if (secret && !verifyWooSignature(rawPayload, signature, secret)) {
       console.warn("⚠️ [WEBHOOK] Firma inválida, rechazando request");
       return res.status(401).json({ error: "Firma inválida" });
     }

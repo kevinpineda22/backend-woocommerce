@@ -12,16 +12,23 @@ const app = express();
 // consuma los datos de los pedidos.
 app.use(cors());
 
-// Para webhooks: capturar rawBody (necesario para verificar firma HMAC)
+// Webhooks: capturar raw body ANTES del parse para verificación HMAC.
+// En Vercel, express.raw() garantiza acceso al payload original byte a byte.
 app.use(
-  express.json({
-    verify: (req, _res, buf) => {
-      if (req.originalUrl && req.originalUrl.startsWith("/api/webhooks")) {
-        req.rawBody = buf.toString("utf8");
-      }
-    },
-  }),
+  "/api/webhooks",
+  express.raw({ type: "application/json" }),
+  (req, _res, next) => {
+    // Guardar el buffer crudo antes de parsear
+    if (Buffer.isBuffer(req.body)) {
+      req.rawBody = req.body.toString("utf8");
+      req.body = JSON.parse(req.rawBody);
+    }
+    next();
+  },
 );
+
+// JSON parser para todo lo demás
+app.use(express.json());
 
 // Rutas
 app.use("/api/orders", orderRoutes);
