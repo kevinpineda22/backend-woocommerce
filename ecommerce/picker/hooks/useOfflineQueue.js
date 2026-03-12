@@ -52,7 +52,7 @@ export const useOfflineQueue = (resetSesionLocal) => {
               item
             );
 
-            // 📢 Avisar al Dashboard (Broadcast)
+            // 📢 Avisar al Dashboard (Broadcast Global)
             try {
               await supabase.channel("dashboard-updates").send({
                 type: "broadcast",
@@ -63,6 +63,13 @@ export const useOfflineQueue = (resetSesionLocal) => {
                   product_id: item.id_producto_original,
                   timestamp: Date.now(),
                 },
+              });
+              
+              // 📢 Avisar a los espectadores de la sesión (Broadcast Privado)
+              await supabase.channel(`session-${item.id_sesion}`).send({
+                type: "broadcast",
+                event: "picking_action",
+                payload: { timestamp: Date.now() },
               });
             } catch (broadcastErr) {
               console.warn("⚠️ Error enviando broadcast:", broadcastErr);

@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { ecommerceApi } from "../shared/ecommerceApi";
 import { supabase } from "../../../supabaseClient";
+import ConfirmModal from "../shared/ConfirmModal";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   FaLayerGroup,
   FaUserFriends,
@@ -14,6 +16,7 @@ import {
   FaTrashRestore,
   FaSync,
   FaStoreAlt,
+  FaSpinner,
 } from "react-icons/fa";
 import "./LiveSessionModal.css";
 
@@ -30,6 +33,18 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
   const [viewMode, setViewMode] = useState("batch");
   const [showTrash, setShowTrash] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // -- NUEVOS ESTADOS DE EXPERIENCIA UX --
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, type: null, item: null });
+  const [toasts, setToasts] = useState([]);
+
+  const showToast = useCallback((msg, type = "success") => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, msg, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3000);
+  }, []);
 
   const [localRouteData, setLocalRouteData] = useState(
     sessionDetail?.routeData,
@@ -55,12 +70,23 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
     if (!sessionDetail?.sessionInfo) return;
     refreshRouteData();
 
-    const channel = supabase
-      .channel(`live-session-admin-${sessionDetail.sessionInfo.session_id}`)
+    // --- 1. Eventos de la Base de Datos (Seguridad) ---
+    const dbChannel = supabase
+      .channel(`live-session-admin-db-${sessionDetail.sessionInfo.session_id}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "wc_log_picking" },
-        () => refreshRouteData(),
+        () => refreshRouteData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "wc_log_picking" },
+        () => refreshRouteData()
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "wc_log_picking" },
+        () => refreshRouteData()
       )
       .on(
         "postgres_changes",
@@ -70,12 +96,23 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
           table: "wc_picking_sessions",
           filter: `id=eq.${sessionDetail.sessionInfo.session_id}`,
         },
-        () => refreshRouteData(),
+        () => refreshRouteData()
       )
       .subscribe();
 
+    // --- 2. Eventos Broadcast (Velocidad Instantánea) ---
+    // Usamos el canal privado de la sesión para evitar colisiones con el global del Dashboard
+    const broadcastChannel = supabase
+      .channel(`session-${sessionDetail.sessionInfo.session_id}`)
+      .on("broadcast", { event: "picking_action" }, (payload) => {
+         // Se recibe la actividad fresca del picker al instante
+         refreshRouteData();
+      })
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(dbChannel);
+      supabase.removeChannel(broadcastChannel);
     };
   }, [sessionDetail, refreshRouteData]);
 
@@ -106,71 +143,35 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
     }
   };
 
-  // --- ACCIONES DEL ADMIN ---
-  const handleAdminDelete = async (item) => {
-    if (!window.confirm(`¿ANULAR "${item.name}"?`)) return;
+  // --- ACCIONES DEL ADMIN ENLAZADAS AL CONFIRM MODAL ---
+  const handleAdminActionExecute = async () => {
+    if (!confirmConfig.item || !confirmConfig.type) return;
+    const { type, item } = confirmConfig;
     setIsProcessing(true);
     try {
-      await ecommerceApi.post(
-        "/admin-remove-item",
-        {
-          id_sesion: sessionInfo.session_id,
-          id_producto: item.product_id,
-        },
-      );
+      if (type === "delete") {
+        await ecommerceApi.post("/admin-remove-item", { id_sesion: sessionInfo.session_id, id_producto: item.product_id });
+        showToast(`Anulado: ${item.name}`, "success");
+      } else if (type === "restore") {
+        await ecommerceApi.post("/admin-restore-item", { id_sesion: sessionInfo.session_id, id_producto: item.product_id });
+        showToast(`Restaurado: ${item.name}`, "info");
+      } else if (type === "pick") {
+        await ecommerceApi.post("/admin-force-pick", { id_sesion: sessionInfo.session_id, id_producto: item.product_id });
+        showToast(`Recolectado a la fuerza: ${item.name}`, "success");
+      }
       await refreshRouteData();
       await notifyPickerInstantly(); // ⚡ Disparo en tiempo real
     } catch (error) {
-      alert("Error: " + error.message);
+      showToast("Error: " + (error.response?.data?.error || error.message), "error");
     } finally {
       setIsProcessing(false);
+      setConfirmConfig({ isOpen: false, type: null, item: null });
     }
   };
 
-  const handleAdminRestore = async (item) => {
-    if (!window.confirm(`¿RESTAURAR "${item.name}"?`)) return;
-    setIsProcessing(true);
-    try {
-      await ecommerceApi.post(
-        "/admin-restore-item",
-        {
-          id_sesion: sessionInfo.session_id,
-          id_producto: item.product_id,
-        },
-      );
-      await refreshRouteData();
-      await notifyPickerInstantly(); // ⚡ Disparo en tiempo real
-    } catch (error) {
-      alert("Error: " + error.message);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleAdminPick = async (item) => {
-    if (
-      !window.confirm(
-        `¿FORZAR RECOLECCIÓN de "${item.name}" y enviarlo a canasta?`,
-      )
-    )
-      return;
-    setIsProcessing(true);
-    try {
-      await ecommerceApi.post(
-        "/admin-force-pick",
-        {
-          id_sesion: sessionInfo.session_id,
-          id_producto: item.product_id,
-        },
-      );
-      await refreshRouteData();
-      await notifyPickerInstantly(); // ⚡ Disparo en tiempo real
-    } catch (error) {
-      alert("Error: " + (error.response?.data?.error || error.message));
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  const handleAdminDelete = (item) => setConfirmConfig({ isOpen: true, type: "delete", item });
+  const handleAdminRestore = (item) => setConfirmConfig({ isOpen: true, type: "restore", item });
+  const handleAdminPick = (item) => setConfirmConfig({ isOpen: true, type: "pick", item });
 
   const getOrderColor = (id) =>
     ORDER_COLORS[
@@ -385,7 +386,7 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                         onClick={() => handleAdminRestore(item)}
                         disabled={isProcessing}
                       >
-                        <FaTrashRestore /> Restaurar
+                        {isProcessing ? <FaSpinner className="ec-spin" /> : <FaTrashRestore />} Restaurar
                       </button>
                     ) : (
                       <>
@@ -408,7 +409,7 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                               disabled={isProcessing}
                               title="Pasar a canasta (Forzar)"
                             >
-                              <FaCheck />
+                              {isProcessing ? <FaSpinner className="ec-spin" /> : <FaCheck />}
                             </button>
                             <button
                               className="lsm-delete-btn"
@@ -417,7 +418,7 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                               disabled={isProcessing}
                               title="Anular producto"
                             >
-                              <FaTrash />
+                              {isProcessing ? <FaSpinner className="ec-spin" /> : <FaTrash />}
                             </button>
                           </div>
                         )}
@@ -553,6 +554,49 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* MODAL DE CONFIRMACIÓN */}
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title={
+          confirmConfig.type === "delete" ? "⚠️ Anular Producto" :
+          confirmConfig.type === "restore" ? "🔄 Restaurar a Canasta" :
+          confirmConfig.type === "pick" ? "✅ Forzar Recolección" : ""
+        }
+        message={
+          confirmConfig.item ? `¿Estás completamente seguro que deseas realizar esta acción sobre "${confirmConfig.item.name}"?` : ""
+        }
+        isDanger={confirmConfig.type === "delete"}
+        onConfirm={handleAdminActionExecute}
+        onCancel={() => setConfirmConfig({ isOpen: false, type: null, item: null })}
+        confirmText={
+          confirmConfig.type === "delete" ? "Sí, Anular" :
+          confirmConfig.type === "restore" ? "Sí, Restaurar" :
+          confirmConfig.type === "pick" ? "Sí, Forzar y Recolectar" : "Confirmar"
+        }
+        isProcessing={isProcessing}
+      />
+
+      {/* NOTIFICACIONES TOAST */}
+      <div style={{ position: "fixed", bottom: "30px", left: "50%", transform: "translateX(-50%)", zIndex: 99999, display: "flex", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, y: 30, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              style={{
+                background: t.type === "success" ? "#10b981" : t.type === "error" ? "#ef4444" : "#3b82f6",
+                color: "#fff", padding: "8px 16px", borderRadius: "20px", fontSize: "14px", fontWeight: "600", boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              }}
+            >
+              {t.msg}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   );

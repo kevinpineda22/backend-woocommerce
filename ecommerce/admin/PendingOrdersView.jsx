@@ -13,6 +13,7 @@ import {
   FaPhone,
   FaWalking,
   FaStoreAlt,
+  FaSpinner,
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
 
@@ -45,6 +46,7 @@ const PendingOrdersView = ({
   setSelectedIds,
   onAssignClick,
   onAssignSingleDirect,
+  isFetchingPickers,
 }) => {
   const emptyQuote = useMemo(() => {
     const idx = Math.floor(Math.random() * PA_VIEW_QUOTES.length);
@@ -160,12 +162,21 @@ const PendingOrdersView = ({
       ) : (
         <div className="pedidos-admin-orders-grid">
           {displayedOrders.length === 0 ? (
-            <div className="pedidos-empty-list-container">
-              <div className="pa-empty-icon">📦</div>
-              <h3>No hay pedidos pendientes que coincidan.</h3>
-              <p className="pa-empty-quote">
-                «{emptyQuote.text}» — {emptyQuote.author}
+            <div className="pa-premium-empty-state">
+              <div className="pa-premium-empty-icon">
+                 <FaBoxOpen size={70} />
+              </div>
+              <h3 className="pa-premium-empty-title">
+                {orders.length === 0 ? "¡Todo al día! 🎉" : "Sin Coincidencias"}
+              </h3>
+              <p className="pa-premium-empty-text">
+                 {orders.length === 0 
+                   ? "No hay nuevos pedidos pendientes de preparar. ¡Excelente trabajo de campo!" 
+                   : "Ningún pedido coincide con tus términos de búsqueda."}
               </p>
+              <div className="pa-premium-empty-quote">
+                «{emptyQuote.text}» <br/> <strong>— {emptyQuote.author}</strong>
+              </div>
             </div>
           ) : (
             displayedOrders.map((order) => {
@@ -407,8 +418,9 @@ const PendingOrdersView = ({
                       setLocalSelectedOrder(null);
                       onAssignSingleDirect(localSelectedOrder);
                     }}
+                    disabled={isFetchingPickers}
                   >
-                    <FaCheckDouble /> Asignar Ahora
+                    {isFetchingPickers ? <FaSpinner className="ec-spin" /> : <FaCheckDouble />} Asignar Ahora
                   </button>
                 </div>
               </div>
@@ -426,11 +438,12 @@ const PendingOrdersView = ({
             <button
               className="batch-btn cancel"
               onClick={() => setSelectedIds(new Set())}
+              disabled={isFetchingPickers}
             >
               <FaTimes /> Cancelar
             </button>
-            <button className="batch-btn assign" onClick={onAssignClick}>
-              <FaCheckDouble /> Asignar a Picker
+            <button className="batch-btn assign" onClick={onAssignClick} disabled={isFetchingPickers}>
+              {isFetchingPickers ? <FaSpinner className="ec-spin" /> : <FaCheckDouble />} Asignar a Picker
             </button>
           </div>
         </div>

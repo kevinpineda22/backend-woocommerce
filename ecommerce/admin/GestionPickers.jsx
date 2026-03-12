@@ -3,6 +3,8 @@ import { ecommerceApi } from "../shared/ecommerceApi";
 import { supabase } from "../../../supabaseClient";
 import { UserForm } from "../../admin/UserForm";
 import { useSedeContext } from "../shared/SedeContext";
+import ConfirmModal from "../shared/ConfirmModal";
+import { AnimatePresence, motion } from "framer-motion";
 import "../../admin/AdminUsuarios.css";
 import "./GestionPickers.css";
 import {
@@ -27,6 +29,19 @@ export const GestionPickers = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+
+  // -- UI PREMIUM STATES --
+  const [confirmCancel, setConfirmCancel] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [toasts, setToasts] = useState([]);
+
+  const showToast = (msg, type = "success") => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, msg, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3000);
+  };
 
   const fetchPickers = async () => {
     setLoading(true);
@@ -99,6 +114,25 @@ export const GestionPickers = () => {
 
   useEffect(() => {
     fetchPickers();
+
+    // REALTIME SUPABASE
+    const channel = supabase
+      .channel("gestion-pickers-updates")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "wc_pickers" },
+        () => fetchPickers(),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "wc_picking_sessions" },
+        () => fetchPickers(),
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [sedeId]); // Re-fetch when sede changes
 
   // --- HANDLERS ---
@@ -117,25 +151,27 @@ export const GestionPickers = () => {
     setShowForm(false);
   };
 
-  // --- CANCELACIÓN DE SESIÓN COMPLETA ---
-  const handleCancelAssignment = async (picker) => {
-    const qty = picker.active_orders_count;
-    const ids = picker.active_orders_ids.join(", #");
+  // --- CANCELACIÓN DE SESIÓN COMPLETA (MODAL) ---
+  const handleCancelAssignmentRequested = (picker) => {
+    setConfirmCancel(picker);
+  };
 
-    const confirmMsg = `⚠️ ADVERTENCIA DE SEGURIDAD ⚠️\n\nEstás a punto de cancelar la sesión de ${picker.nombre_completo}.\n\nEsto liberará ${qty} pedido(s): #${ids}\nLos pedidos volverán a estar pendientes para asignación.\n\n¿Estás seguro?`;
-
-    if (!window.confirm(confirmMsg)) return;
-
+  const handleCancelAssignmentConfirm = async () => {
+    if (!confirmCancel) return;
+    setIsProcessing(true);
     try {
       await ecommerceApi.post(
         `/cancelar-asignacion?${getSedeParam()}`,
-        { id_picker: picker.wc_id },
+        { id_picker: confirmCancel.wc_id },
       );
-      alert("✅ Sesión cancelada. El picker y los pedidos han sido liberados.");
+      showToast(`Sesión de ${confirmCancel.nombre_completo} cancelada. Pedidos liberados.`, "success");
       fetchPickers(); // Recargar tabla
     } catch (error) {
       console.error("Error cancelando asignación:", error);
-      alert("Hubo un error al intentar cancelar. Verifica la consola.");
+      showToast("Hubo un error al intentar cancelar. Verifica la consola.", "error");
+    } finally {
+      setIsProcessing(false);
+      setConfirmCancel(null);
     }
   };
 
@@ -217,8 +253,12 @@ export const GestionPickers = () => {
                 </tr>
               ) : pickers.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="gp-table-message">
-                    No hay pickers registrados
+                  <td colSpan="6" className="gp-premium-empty-state">
+                    <div className="gp-premium-empty-icon">
+                       <FaUserPlus size={60} />
+                    </div>
+                    <h3 className="gp-premium-empty-title">Aún no hay operarios en esta sede</h3>
+                    <p className="gp-premium-empty-text">Crea tu primer Picker usando el botón superior para empezar a asignar recolecciones.</p>
                   </td>
                 </tr>
               ) : (
@@ -248,8 +288,9 @@ export const GestionPickers = () => {
                                 { picker_id: r.wc_id, sede_id: newSedeId },
                               );
                               fetchPickers();
+                              showToast("Sede asignada correctamente.", "success");
                             } catch (err) {
-                              alert("Error asignando sede: " + err.message);
+                              showToast("Error asignando sede: " + err.message, "error");
                             }
                           }}
                         >
@@ -301,7 +342,7 @@ export const GestionPickers = () => {
                         {r.estado_picker === "picking" && (
                           <button
                             className="gp-btn-icon danger"
-                            onClick={() => handleCancelAssignment(r)}
+                            onClick={() => handleCancelAssignmentRequested(r)}
                             title="Liberar Picker y Cancelar TODOS sus Pedidos"
                           >
                             <FaBan />
@@ -316,6 +357,41 @@ export const GestionPickers = () => {
           </table>
         </div>
       )}
+
+      {/* MODAL DE SEGURIDAD CANCELAR RUTA */}
+      <ConfirmModal
+        isOpen={!!confirmCancel}
+        title="⚠️ ADVERTENCIA LEGAL DE CANCELACIÓN"
+        message={
+          confirmCancel ? 
+          `Estás a punto de cancelar abruptamente la sesión activa de ${confirmCancel.nombre_completo}. Esto liberará de golpe ${confirmCancel.active_orders_count} pedido(s) de vuelta a la canasta general.\n\n¿Proceder de todas formas?` : ""
+        }
+        confirmText="Sí, Cancelar Ruta y Liberar Pedidos"
+        cancelText="Conservar Asignación"
+        isDanger={true}
+        onConfirm={handleCancelAssignmentConfirm}
+        onCancel={() => setConfirmCancel(null)}
+        isProcessing={isProcessing}
+      />
+
+      {/* NOTIFICACIONES TOAST */}
+      <div className="gp-toast-container">
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, x: 50, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, x: 30 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className={`gp-toast-item gp-toast-${t.type === "success" ? "success" : t.type === "error" ? "error" : "info"}`}
+            >
+              {t.msg}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
     </div>
   );
 };

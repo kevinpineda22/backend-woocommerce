@@ -9,6 +9,7 @@ export const usePickerSession = () => {
   const [pickerSedeId, setPickerSedeId] = useState(null);
   const [showSuccessQR, setShowSuccessQR] = useState(false);
   const [completedSessionId, setCompletedSessionId] = useState(null);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   // Helper: construir sede param para URLs
   const sedeParam = pickerSedeId ? `sede_id=${pickerSedeId}` : "";
@@ -94,9 +95,7 @@ export const usePickerSession = () => {
         }
 
         if (!me) {
-          alert("Usuario no encontrado.");
-          setLoading(false);
-          return;
+          throw new Error("Usuario no encontrado.");
         }
         setPickerInfo(me);
 
@@ -179,7 +178,6 @@ export const usePickerSession = () => {
             resetSesionLocal();
             window.location.reload();
           } else if (newState === "cancelado") {
-            alert("⛔ Ruta CANCELADA.");
             resetSesionLocal();
             window.location.reload();
           } else {
@@ -287,16 +285,12 @@ export const usePickerSession = () => {
     );
   };
 
-  const handleFinish = async (pendingSync) => {
-    if (pendingSync > 0) {
-      alert(`⚠️ Tienes ${pendingSync} acciones pendientes.`);
-      return;
-    }
-    if (!window.confirm("¿Finalizar sesión completa?")) return;
-
+  // Este método asume que la validación y confirmación previas ocurren en la UI (VistaPicker)
+  const handleFinish = async () => {
     const finalId = sessionData.session_id;
     localStorage.setItem("waiting_for_audit_id", finalId);
     setCompletedSessionId(finalId);
+    setIsFinishing(true);
 
     try {
       await ecommerceApi.post(
@@ -308,7 +302,9 @@ export const usePickerSession = () => {
       setSessionData(null);
       setShowSuccessQR(true);
     } catch (e) {
-      alert("Error al finalizar.");
+      throw e;
+    } finally {
+      setIsFinishing(false);
     }
   };
 
@@ -323,5 +319,6 @@ export const usePickerSession = () => {
     resetSesionLocal,
     updateLocalSessionState,
     handleFinish,
+    isFinishing,
   };
 };

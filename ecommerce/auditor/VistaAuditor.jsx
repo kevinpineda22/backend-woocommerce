@@ -3,6 +3,7 @@ import { ecommerceApi } from "../shared/ecommerceApi";
 import EscanerBarras from "../../DesarrolloSurtido_API/EscanerBarras";
 import ManifestSheet from "../shared/ManifestSheet";
 import { useSedeContext } from "../shared/SedeContext";
+import { supabase } from "../../../supabaseClient";
 import {
   FaClipboardCheck,
   FaSearch,
@@ -16,6 +17,7 @@ import {
   FaCheckDouble,
   FaKeyboard,
   FaExclamationTriangle,
+  FaSpinner,
   FaBarcode,
   FaBoxOpen,
   FaArrowRight,
@@ -37,6 +39,10 @@ const VistaAuditor = () => {
   const [scannerMode, setScannerMode] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [activeTab, setActiveTab] = useState("inventory");
+
+  // -- NUEVO: Panel de Auditorías Pendientes --
+  const [pendingAudits, setPendingAudits] = useState([]);
+  const [loadingPending, setLoadingPending] = useState(true);
 
   const [requiredItems, setRequiredItems] = useState(new Set());
   const [verifiedItems, setVerifiedItems] = useState(new Set());
@@ -82,6 +88,44 @@ const VistaAuditor = () => {
     const name = (itemName || "").toLowerCase();
     return FRUVER_KEYWORDS.some((kw) => name.includes(kw));
   };
+
+  // --- 1. Historial de Sesiones Pendientes de Auditoría ---
+  const fetchPendingAudits = React.useCallback(async () => {
+    try {
+      setLoadingPending(true);
+      const { data, error } = await supabase
+        .from("wc_picking_sessions")
+        .select("id, status, end_time, auth_users(raw_user_meta_data)")
+        .eq("status", "completado")
+        .order("end_time", { ascending: false });
+
+      if (error) throw error;
+      setPendingAudits(data || []);
+    } catch (err) {
+      console.error("Error fetching pending audits:", err);
+    } finally {
+      setLoadingPending(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPendingAudits();
+    
+    const channel = supabase
+      .channel("auditor-pending-updates")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "wc_picking_sessions", filter: "status=eq.completado" },
+        () => fetchPendingAudits()
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [fetchPendingAudits]);
+
+  // --- Uso de refs para no recargar el sonido ---
+  const successSoundRef = useRef(new Audio(successSoundSrc));
+  const errorSoundRef = useRef(new Audio(errorSoundSrc));
 
   useEffect(() => {
     const storedSession = localStorage.getItem("auditor_session_id");
@@ -606,6 +650,42 @@ const VistaAuditor = () => {
 
               {errorMsg && <div className="auditor-error" style={{ marginTop: '20px' }}>{errorMsg}</div>}
               {loading && <div className="auditor-loading" style={{ marginTop: '20px' }}>Obteniendo datos de sesión...</div>}
+              {/* LISTA EN VIVO DE PENDIENTES */}
+              <div className="aud-pending-list-container">
+                <h3 className="aud-pending-title">
+                  <FaListOl style={{ marginRight: 8, color: "#3b82f6" }} /> 
+                  Rutas Listas para Auditoría ({pendingAudits.length})
+                </h3>
+                {loadingPending ? (
+                  <div className="auditor-loading">Cargando rutas...</div>
+                ) : pendingAudits.length === 0 ? (
+                  <div className="aud-pending-empty">No hay rutas esperando revisión.</div>
+                ) : (
+                  <div className="aud-pending-grid">
+                    {pendingAudits.map(session => (
+                      <div 
+                        key={session.id} 
+                        className="aud-pending-card"
+                        onClick={() => {
+                          setSessionId(session.id);
+                          fetchAuditData(session.id);
+                        }}
+                      >
+                        <div className="aud-pc-header">
+                          <span className="aud-pc-id">#{session.id.split("-")[0]}</span>
+                          <span className="aud-pc-time">
+                            {new Date(session.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <div className="aud-pc-name">
+                          👤 {session.auth_users?.raw_user_meta_data?.full_name || "Desconocido"}
+                        </div>
+                        <div className="aud-pc-action">Clic para auditar ➔</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* TARJETAS EDUCATIVAS - GUÍA PARA EL AUDITOR */}
@@ -976,9 +1056,9 @@ const VistaAuditor = () => {
                 <button
                   className={`aud-fab-btn ${allDone ? "ready" : "disabled"}`}
                   onClick={handleFinishAudit}
-                  disabled={!allDone}
+                  disabled={!allDone || loading}
                 >
-                  <FaCheck /> {allDone ? "APROBAR SALIDA" : `Faltan ${pendingItems.length} por verificar`}
+                  {loading ? <FaSpinner className="ec-spin" /> : <FaCheck />} {loading ? "APROBANDO..." : allDone ? "APROBAR SALIDA" : `Faltan ${pendingItems.length} por verificar`}
                 </button>
               )}
             </div>

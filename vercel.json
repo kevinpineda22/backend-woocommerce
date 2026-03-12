@@ -16,6 +16,10 @@
       "dest": "/app.js"
     },
     {
+      "src": "/api/webhooks/(.*)",
+      "dest": "/app.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/app.js"
     }

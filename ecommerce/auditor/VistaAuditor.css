@@ -1145,3 +1145,112 @@
   background: linear-gradient(135deg, #3b82f6, #2563eb);
   color: white;
 }
+
+/* ===============================================================
+   NUEVO: PANEL EN VIVO DE RUTAS PENDIENTES
+   =============================================================== */
+
+.aud-pending-list-container {
+  margin-top: 40px;
+  text-align: left;
+  width: 100%;
+  max-width: 800px;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.aud-pending-title {
+  font-size: 1.25rem;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  font-weight: 700;
+}
+
+.aud-pending-empty {
+  background: #f8fafc;
+  padding: 40px;
+  border-radius: 16px;
+  text-align: center;
+  color: #64748b;
+  border: 2px dashed #cbd5e1;
+  font-weight: 500;
+}
+
+.aud-pending-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.aud-pending-card {
+  background: white;
+  border-radius: 12px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+  transition: all 0.25s ease;
+  border-left: 5px solid #10b981;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.aud-pending-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  border-color: #cbd5e1;
+}
+
+.aud-pending-card:active {
+  transform: translateY(0);
+}
+
+.aud-pc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.aud-pc-id {
+  font-weight: 800;
+  color: #10b981;
+  font-size: 1.1rem;
+  font-family: monospace;
+}
+
+.aud-pc-time {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.aud-pc-name {
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.aud-pc-action {
+  font-size: 0.8rem;
+  color: #3b82f6;
+  font-weight: 700;
+  text-align: right;
+  margin-top: 4px;
+  transition: transform 0.2s;
+}
+
+.aud-pending-card:hover .aud-pc-action {
+  transform: translateX(4px);
+}

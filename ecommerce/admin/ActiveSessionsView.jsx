@@ -7,6 +7,7 @@ import {
   FaLayerGroup,
   FaSync,
   FaStoreAlt,
+  FaSpinner,
 } from "react-icons/fa";
 import { supabase } from "../../../supabaseClient";
 import { useSedeContext } from "../shared/SedeContext";
@@ -41,7 +42,7 @@ const SessionTimer = ({ startTime }) => {
   );
 };
 
-const ActiveSessionsView = ({ onViewDetail }) => {
+const ActiveSessionsView = ({ onViewDetail, loadingDetailId }) => {
   const { getSedeParam, isSuperAdmin } = useSedeContext();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -251,8 +252,13 @@ const ActiveSessionsView = ({ onViewDetail }) => {
           <button
             className="pa-view-detail-btn"
             onClick={() => onViewDetail(session)}
+            disabled={loadingDetailId === session.session_id}
           >
-            <FaEye /> Ver Detalle en Vivo
+            {loadingDetailId === session.session_id ? (
+              <><FaSpinner className="ec-spin" /> Cargando...</>
+            ) : (
+              <><FaEye /> Ver Detalle en Vivo</>
+            )}
           </button>
         </div>
       ))}

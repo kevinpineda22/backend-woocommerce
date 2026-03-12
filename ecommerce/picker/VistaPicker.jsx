@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { ecommerceApi } from "../shared/ecommerceApi";
 import QRCode from "react-qr-code";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   FaCheck,
   FaArrowRight,
@@ -17,6 +17,7 @@ import {
 } from "react-icons/fa";
 
 // Componentes y Constantes
+import ConfirmModal from "../shared/ConfirmModal";
 import "./VistaPicker.css";
 import EscanerBarras from "../../DesarrolloSurtido_API/EscanerBarras";
 import {
@@ -46,6 +47,7 @@ const VistaPicker = () => {
     resetSesionLocal,
     updateLocalSessionState,
     handleFinish,
+    isFinishing,
   } = usePickerSession();
 
   // Sede del picker
@@ -68,6 +70,18 @@ const VistaPicker = () => {
   const [scanOverrideCallback, setScanOverrideCallback] = useState(null);
   const [missingQtyForSub, setMissingQtyForSub] = useState(0);
   const [lastScannedBarcode, setLastScannedBarcode] = useState(null);
+
+  // --- UI Toasts Feedback Mejorado ---
+  const [toasts, setToasts] = useState([]);
+  const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+
+  const showToast = useCallback((msg, type = "success") => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, msg, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3000);
+  }, []);
 
   // --- LÓGICA DE INTERACCIÓN (Botones y Acciones) ---
 
@@ -196,11 +210,13 @@ const VistaPicker = () => {
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
       closeAllModals();
       setCurrentItem(null);
+      showToast("¡Recolección completada! 🎉", "success");
     } else {
       if (navigator.vibrate) navigator.vibrate(100);
       setCurrentItem((prev) =>
         prev ? { ...prev, qty_scanned: currentScanned } : null,
       );
+      showToast("¡Código correcto! ✅", "success");
     }
 
     // ✅ Le pasamos el peso exacto para que lo muestre en pantalla
@@ -237,7 +253,7 @@ const VistaPicker = () => {
       { name: newItem.name, price: newItem.price },
     );
     closeAllModals();
-    alert("🔄 Sustitución registrada");
+    showToast("🔄 Sustitución registrada", "info");
   };
 
   const handleManualValidation = async (inputCode) => {
@@ -261,9 +277,9 @@ const VistaPicker = () => {
         setShowManualModal(false);
         if (isWeighable(currentItem)) setShowWeightModal(true);
         else confirmPicking();
-      } else alert("❌ Código incorrecto.");
+      } else showToast("❌ Código incorrecto.", "error");
     } catch (e) {
-      alert("Error de conexión");
+      showToast("❌ Error de conexión.", "error");
     }
   };
 
@@ -294,7 +310,7 @@ const VistaPicker = () => {
       confirmPicking();
     } else {
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-      alert(`Código ${c} no coincide.`);
+      showToast(`❌ Código ${c} no coincide.`, "error");
     }
   };
 
@@ -491,11 +507,18 @@ const VistaPicker = () => {
         <div className="ec-fab-container">
           <button
             className="ec-fab-finish"
-            onClick={() => handleFinish(pendingSync)}
+            onClick={() => {
+              if (pendingSync > 0) {
+                showToast(`⚠️ Tienes ${pendingSync} sincronizaciones pendientes. Conéctate a internet.`, "warning");
+                return;
+              }
+              setShowFinishConfirm(true);
+            }}
+            disabled={isFinishing}
           >
             <div className="ec-fab-content">
-              <FaCheck size={24} />
-              <span>TERMINAR RUTA</span>
+              {isFinishing ? <FaSpinner className="ec-spin" size={24} /> : <FaCheck size={24} />}
+              <span>{isFinishing ? "FINALIZANDO..." : "TERMINAR RUTA"}</span>
             </div>
             <div className="ec-fab-arrow">
               <FaArrowRight />
@@ -547,6 +570,72 @@ const VistaPicker = () => {
         orders={sessionData.orders_info}
         onClose={() => setShowClientsModal(false)}
       />
+
+      {/* --- CONFIRM MODAL FINALIZAR RUTA --- */}
+      <ConfirmModal
+        isOpen={showFinishConfirm}
+        title="¿Finalizar recorrido?"
+        message="¿Estás seguro de que deseas cerrar esta sesión de recolección y generar el código para auditoría?"
+        confirmText="Sí, Terminar"
+        cancelText="Volver a la canasta"
+        onConfirm={async () => {
+          try {
+            setShowFinishConfirm(false);
+            await handleFinish();
+          } catch (e) {
+            showToast("Error al finalizar la sesión.", "error");
+          }
+        }}
+        onCancel={() => setShowFinishConfirm(false)}
+        isProcessing={isFinishing}
+      />
+
+      {/* --- FLOATING TOASTS NOTIFICATIONS --- */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: "90px", // Just above the FAB
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 9999,
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+          alignItems: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, y: 30, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -20, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              style={{
+                background:
+                  t.type === "success"
+                    ? "#10b981"
+                    : t.type === "error"
+                      ? "#ef4444"
+                      : "#3b82f6",
+                color: "#fff",
+                padding: "8px 16px",
+                borderRadius: "20px",
+                fontSize: "14px",
+                fontWeight: "600",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              {t.msg}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };

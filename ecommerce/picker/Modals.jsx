@@ -50,9 +50,15 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
             className="ec-manual-input"
             placeholder="Ej: 770..."
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            // 🛡️ ANTI-BUG: Prevenir espacios fantasmas y saltos de línea al escribir o pegar
+            onChange={(e) => setCode(e.target.value.replace(/\s+/g, ""))}
+            onPaste={(e) => {
+              e.preventDefault();
+              const pastedText = e.clipboardData.getData("text").replace(/\s+/g, "");
+              setCode(pastedText);
+            }}
             onKeyDown={(e) =>
-              e.key === "Enter" && code.length > 0 && onConfirm(code)
+              e.key === "Enter" && code.trim().length > 0 && onConfirm(code.trim())
             }
           />
         </div>
@@ -64,9 +70,9 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
             className="ec-reason-btn"
             style={{ background: "#3b82f6", color: "white", width: "100%" }}
             onClick={() => {
-              if (code.length > 0) onConfirm(code);
+              if (code.trim().length > 0) onConfirm(code.trim());
             }}
-            disabled={!code}
+            disabled={!code.trim()}
           >
             Validar
           </button>

@@ -15,6 +15,9 @@ import {
 
 import { supabase } from "../../../supabaseClient";
 
+// --- REAL-TIME WEBHOOKS ---
+import { useRealtimeOrders } from "../shared/useRealtimeOrders";
+
 // --- COMPONENTES MODULARES ---
 import PendingOrdersView from "./PendingOrdersView";
 import ActiveSessionsView from "./ActiveSessionsView";
@@ -27,6 +30,8 @@ import PendingAuditView from "./PendingAuditView";
 import PendingPaymentView from "./PendingPaymentView";
 import HistoryDetailModal from "./HistoryDetailModal";
 import ManifestInvoiceModal from "../shared/ManifestInvoiceModal";
+import ConfirmModal from "../shared/ConfirmModal";
+import { AnimatePresence, motion } from "framer-motion";
 
 // --- MULTI-SEDE ---
 import { useSedeContext } from "../shared/SedeContext";
@@ -35,16 +40,43 @@ import { SedeSelector } from "../shared/SedeSelector";
 import "./PedidosAdmin.css";
 
 const PA_QUOTES = [
-  { text: "Puede que no controles los hechos que ocurren, pero puedes decidir no dejarte derrotar por ellos.", author: "Maya Angelou" },
-  { text: "La innovación diferencia a un líder de un seguidor.", author: "Steve Jobs" },
-  { text: "Aquel que se exige mucho a sí mismo y espera poco de los demás, mantendrá lejos el resentimiento.", author: "Confucio" },
-  { text: "Si hacemos el bien por interés, seremos astutos, pero nunca buenos.", author: "Cicerón" },
-  { text: "Sé un criterio de calidad. Algunas personas no están acostumbradas a un ambiente donde se espera la excelencia.", author: "Steve Jobs" },
-  { text: "Somos lo que hacemos repetidamente. La excelencia, entonces, no es un acto, sino un hábito.", author: "Aristóteles" },
-  { text: "El principio de la sabiduría es la definición de los términos.", author: "Aristóteles" },
+  {
+    text: "Puede que no controles los hechos que ocurren, pero puedes decidir no dejarte derrotar por ellos.",
+    author: "Maya Angelou",
+  },
+  {
+    text: "La innovación diferencia a un líder de un seguidor.",
+    author: "Steve Jobs",
+  },
+  {
+    text: "Aquel que se exige mucho a sí mismo y espera poco de los demás, mantendrá lejos el resentimiento.",
+    author: "Confucio",
+  },
+  {
+    text: "Si hacemos el bien por interés, seremos astutos, pero nunca buenos.",
+    author: "Cicerón",
+  },
+  {
+    text: "Sé un criterio de calidad. Algunas personas no están acostumbradas a un ambiente donde se espera la excelencia.",
+    author: "Steve Jobs",
+  },
+  {
+    text: "Somos lo que hacemos repetidamente. La excelencia, entonces, no es un acto, sino un hábito.",
+    author: "Aristóteles",
+  },
+  {
+    text: "El principio de la sabiduría es la definición de los términos.",
+    author: "Aristóteles",
+  },
   { text: "La calidad no es un acto, es un hábito.", author: "Aristóteles" },
-  { text: "Conocerse a uno mismo es el principio de toda sabiduría.", author: "Aristóteles" },
-  { text: "La paciencia es amarga, pero sus frutos son dulces.", author: "Aristóteles" },
+  {
+    text: "Conocerse a uno mismo es el principio de toda sabiduría.",
+    author: "Aristóteles",
+  },
+  {
+    text: "La paciencia es amarga, pero sus frutos son dulces.",
+    author: "Aristóteles",
+  },
 ];
 
 /** Devuelve una cita diferente según un índice offset (para evitar repetir la misma en todas las zonas) */
@@ -82,10 +114,14 @@ const PedidosAdmin = () => {
   // Modales de Gestión
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [isFetchingPickers, setIsFetchingPickers] = useState(false);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   // Modales de Detalle
   const [liveSessionDetail, setLiveSessionDetail] = useState(null);
   const [showLiveModal, setShowLiveModal] = useState(false);
+  const [loadingDetailId, setLoadingDetailId] = useState(null);
+
   const [historyDetail, setHistoryDetail] = useState(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
 
@@ -98,6 +134,21 @@ const PedidosAdmin = () => {
   const [filterDate, setFilterDate] = useState("");
   const [filterZone, setFilterZone] = useState("");
 
+  // UI Premium
+  const [toasts, setToasts] = useState([]);
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    session: null,
+  });
+
+  const showToast = useCallback((msg, type = "success") => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, msg, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3000);
+  }, []);
+
   // --- DATA FETCHING ---
   const fetchData = useCallback(
     async (isBackground = false) => {
@@ -105,18 +156,16 @@ const PedidosAdmin = () => {
       const sedeParam = getSedeParam();
       try {
         // 1. Pedidos Pendientes
-        const resPending = await ecommerceApi.get(
-          `/pendientes`,
-          { params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) } },
-        );
+        const resPending = await ecommerceApi.get(`/pendientes`, {
+          params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) },
+        });
         const listPending = resPending.data.filter((o) => !o.is_assigned);
         setOrders(listPending);
 
         // 2. Sesiones Activas
-        const resActive = await ecommerceApi.get(
-          `/dashboard-activo`,
-          { params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) } },
-        );
+        const resActive = await ecommerceApi.get(`/dashboard-activo`, {
+          params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) },
+        });
         setActiveSessions(resActive.data);
 
         const resAuditPending = await ecommerceApi.get(
@@ -125,10 +174,9 @@ const PedidosAdmin = () => {
         );
         setPendingAuditOrders(resAuditPending.data || []);
 
-        const resPaymentPending = await ecommerceApi.get(
-          `/pendientes-pago`,
-          { params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) } },
-        );
+        const resPaymentPending = await ecommerceApi.get(`/pendientes-pago`, {
+          params: { ...Object.fromEntries(new URLSearchParams(sedeParam)) },
+        });
         setPaymentPendingOrders(resPaymentPending.data || []);
 
         const totalProcessOrders = resActive.data.reduce(
@@ -157,7 +205,7 @@ const PedidosAdmin = () => {
     // Polling de respaldo (30s)
     const interval = setInterval(() => fetchData(true), 30000);
 
-    // REALTIME SUPABASE
+    // REALTIME SUPABASE (cambios en DB de sesiones/asignaciones)
     const channel = supabase
       .channel("admin-dashboard-updates")
       .on(
@@ -178,50 +226,61 @@ const PedidosAdmin = () => {
     };
   }, [fetchData, sedeId]); // Re-fetch when sede changes
 
+  // REAL-TIME WEBHOOKS: Refrescar al instante cuando WooCommerce envía un pedido nuevo
+  useRealtimeOrders(() => {
+    console.log(
+      "⚡ [WEBHOOK-RT] Nuevo pedido detectado, refrescando dashboard...",
+    );
+    fetchData(true);
+  }, sedeId);
+
   // --- HANDLERS: ASIGNACIÓN DE PICKERS ---
   const handleOpenAssignModal = async () => {
     if (selectedIds.size === 0) return;
+    setIsFetchingPickers(true);
     try {
-      const res = await ecommerceApi.get(
-        `/pickers?${getSedeParam()}`,
-      );
+      const res = await ecommerceApi.get(`/pickers?${getSedeParam()}`);
       setPickers(res.data);
       setShowAssignModal(true);
     } catch (e) {
-      alert("Error cargando lista de pickers.");
+      showToast("Error cargando lista de pickers.", "error");
+    } finally {
+      setIsFetchingPickers(false);
     }
   };
 
   const handleAssignSingleOrder = async (order) => {
     setSelectedIds(new Set([order.id]));
+    setIsFetchingPickers(true);
     try {
-      const res = await ecommerceApi.get(
-        `/pickers?${getSedeParam()}`,
-      );
+      const res = await ecommerceApi.get(`/pickers?${getSedeParam()}`);
       setPickers(res.data);
       setShowAssignModal(true);
     } catch (e) {
-      alert("Error cargando lista de pickers.");
+      showToast("Error cargando lista de pickers.", "error");
+    } finally {
+      setIsFetchingPickers(false);
     }
   };
 
   const handleConfirmAssignment = async (picker) => {
+    setIsAssigning(true);
     try {
-      await ecommerceApi.post(
-        `/crear-sesion?${getSedeParam()}`,
-        {
-          id_picker: picker.id,
-          ids_pedidos: Array.from(selectedIds),
-        },
-      );
-      alert(`✅ Misión asignada a ${picker.nombre_completo}`);
+      await ecommerceApi.post(`/crear-sesion?${getSedeParam()}`, {
+        id_picker: picker.id,
+        ids_pedidos: Array.from(selectedIds),
+      });
+      showToast(`✅ Misión asignada a ${picker.nombre_completo}`, "success");
       setShowAssignModal(false);
       setSelectedIds(new Set());
       fetchData();
     } catch (error) {
-      alert(
+      showToast(
         "Error al asignar: " + (error.response?.data?.error || error.message),
+        "error",
       );
+    } finally {
+      setIsAssigning(false);
     }
   };
 
@@ -229,9 +288,7 @@ const PedidosAdmin = () => {
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      const res = await ecommerceApi.get(
-        `/historial?${getSedeParam()}`,
-      );
+      const res = await ecommerceApi.get(`/historial?${getSedeParam()}`);
       setHistoryOrders(res.data);
     } catch (e) {
       console.error(e);
@@ -258,9 +315,7 @@ const PedidosAdmin = () => {
   const fetchPaymentPending = async () => {
     setLoading(true);
     try {
-      const res = await ecommerceApi.get(
-        `/pendientes-pago?${getSedeParam()}`,
-      );
+      const res = await ecommerceApi.get(`/pendientes-pago?${getSedeParam()}`);
       setPaymentPendingOrders(res.data || []);
       setStats((prev) => ({ ...prev, paymentPending: res.data?.length || 0 }));
     } catch (e) {
@@ -270,28 +325,29 @@ const PedidosAdmin = () => {
     }
   };
 
-  const handleMarkAsPaid = async (session) => {
-    if (
-      !window.confirm(
-        `¿Confirmar que el picker ${session.picker} entregó el dinero?\nLa sesión pasará a historial finalizado.`,
-      )
-    )
-      return;
+  // --- MARCAR COMO PAGADO (MODAL CONFIRMACIÓN) ---
+  const handleMarkAsPaidRequested = (session) => {
+    setConfirmConfig({ isOpen: true, session });
+  };
 
+  const handleMarkAsPaidConfirm = async () => {
+    if (!confirmConfig.session) return;
     try {
-      await ecommerceApi.post(
-        `/marcar-pagado?${getSedeParam()}`,
-        { session_id: session.id },
-      );
-      alert("✅ Pago registrado con éxito.");
+      await ecommerceApi.post(`/marcar-pagado?${getSedeParam()}`, {
+        session_id: confirmConfig.session.id,
+      });
+      showToast("✅ Pago registrado con éxito.", "success");
       fetchPaymentPending();
       fetchHistory(); // Actualizar historial
     } catch (error) {
-      alert("Error al registrar pago: " + error.message);
+      showToast("Error al registrar pago: " + error.message, "error");
+    } finally {
+      setConfirmConfig({ isOpen: false, session: null });
     }
   };
 
   const handleViewLiveDetail = async (session) => {
+    setLoadingDetailId(session.session_id);
     try {
       const res = await ecommerceApi.get(
         `/sesion-activa?id_picker=${session.picker_id}&include_removed=true&${getSedeParam()}`,
@@ -299,10 +355,13 @@ const PedidosAdmin = () => {
       setLiveSessionDetail({ sessionInfo: session, routeData: res.data });
       setShowLiveModal(true);
     } catch (e) {
-      alert(
+      showToast(
         "No se pudo cargar detalles. Es posible que la sesión haya finalizado.",
+        "error",
       );
       fetchData();
+    } finally {
+      setLoadingDetailId(null);
     }
   };
 
@@ -318,7 +377,7 @@ const PedidosAdmin = () => {
       });
       setShowHistoryModal(true);
     } catch (e) {
-      alert("Error cargando detalles del historial.");
+      showToast("Error cargando detalles del historial.", "error");
     }
   };
 
@@ -330,8 +389,9 @@ const PedidosAdmin = () => {
 
       const { final_snapshot, metadata, products_map } = res.data;
       if (!final_snapshot) {
-        alert(
+        showToast(
           "Esta sesión no tiene certificado de salida (no ha sido auditada o es antigua).",
+          "warning",
         );
         return;
       }
@@ -360,7 +420,7 @@ const PedidosAdmin = () => {
       });
       setShowQrManifest(true);
     } catch (e) {
-      alert("Error cargando certificado.");
+      showToast("Error cargando certificado.", "error");
     }
   };
 
@@ -475,7 +535,7 @@ const PedidosAdmin = () => {
             onRefresh={fetchPaymentPending}
             onViewDetail={handleViewHistoryDetail}
             onViewManifest={handleViewManifestDirect}
-            onMarkAsPaid={handleMarkAsPaid}
+            onMarkAsPaid={handleMarkAsPaidRequested}
           />
         ) : currentView === "history" ? (
           /* VISTA DE HISTORIAL */
@@ -484,7 +544,8 @@ const PedidosAdmin = () => {
               <div>
                 <h1>📜 Historial de Sesiones</h1>
                 <div className="pedidos-header-quote">
-                  «{getQuote(shuffledQuotes, 3).text}» — {getQuote(shuffledQuotes, 3).author}
+                  «{getQuote(shuffledQuotes, 3).text}» —{" "}
+                  {getQuote(shuffledQuotes, 3).author}
                 </div>
               </div>
               <button
@@ -535,11 +596,13 @@ const PedidosAdmin = () => {
                   setSelectedIds={setSelectedIds}
                   onAssignClick={handleOpenAssignModal}
                   onAssignSingleDirect={handleAssignSingleOrder}
+                  isFetchingPickers={isFetchingPickers}
                 />
               ) : (
                 <ActiveSessionsView
                   sessions={activeSessions}
                   onViewDetail={handleViewLiveDetail}
+                  loadingDetailId={loadingDetailId}
                 />
               )}
             </div>
@@ -551,8 +614,9 @@ const PedidosAdmin = () => {
       <AssignPickerModal
         isOpen={showAssignModal}
         pickers={pickers}
-        onClose={() => setShowAssignModal(false)}
+        onClose={() => !isAssigning && setShowAssignModal(false)}
         onConfirm={handleConfirmAssignment}
+        isAssigning={isAssigning}
       />
 
       {showLiveModal && liveSessionDetail && (
@@ -578,6 +642,39 @@ const PedidosAdmin = () => {
           onClose={() => setShowQrManifest(false)}
         />
       )}
+
+      {/* COMPONENTE DE CONFIRMACION */}
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title="💵 Confirmar Recepción de Pago"
+        message={
+          confirmConfig.session
+            ? `¿Confirmas físicamente haber recibido el dinero del picker ${confirmConfig.session.picker}? Una vez procesado, este registro pasará al Historial de Sesiones Finalizadas y no habrá vuelta atrás.`
+            : ""
+        }
+        confirmText="Confirmar Pago"
+        cancelText="Volver"
+        onConfirm={handleMarkAsPaidConfirm}
+        onCancel={() => setConfirmConfig({ isOpen: false, session: null })}
+      />
+
+      {/* TOAST ESTILO GLOBAL */}
+      <div className="pa-toast-container">
+        <AnimatePresence>
+          {toasts.map((t) => (
+            <motion.div
+              key={t.id}
+              initial={{ opacity: 0, x: 50, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, x: 30 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className={`pa-toast-item pa-toast-${t.type === "success" ? "success" : t.type === "error" ? "error" : "warning"}`}
+            >
+              {t.msg}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };

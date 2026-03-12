@@ -6,11 +6,12 @@ import {
   FaSearch,
   FaUserClock,
   FaStoreAlt,
+  FaSpinner,
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
 import "./AssignPickerModal.css";
 
-const AssignPickerModal = ({ isOpen, pickers, onClose, onConfirm }) => {
+const AssignPickerModal = ({ isOpen, pickers, onClose, onConfirm, isAssigning }) => {
   if (!isOpen) return null;
 
   // 1. Lógica de Ordenamiento: Disponibles primero, luego por nombre
@@ -66,8 +67,8 @@ const AssignPickerModal = ({ isOpen, pickers, onClose, onConfirm }) => {
               return (
                 <div
                   key={picker.id}
-                  className={`apm-picker-card ${isBusy ? "busy" : "available"}`}
-                  onClick={() => !isBusy && onConfirm(picker)}
+                  className={`apm-picker-card ${isBusy ? "busy" : "available"} ${isAssigning ? "disabled" : ""}`}
+                  onClick={() => !isBusy && !isAssigning && onConfirm(picker)}
                 >
                   {/* AVATAR */}
                   <div className="apm-avatar-wrapper">
@@ -98,6 +99,8 @@ const AssignPickerModal = ({ isOpen, pickers, onClose, onConfirm }) => {
                   <div className="apm-action">
                     {isBusy ? (
                       <span className="apm-badge busy">OCUPADO</span>
+                    ) : isAssigning ? (
+                      <span className="apm-badge loading"><FaSpinner className="ec-spin" /> ASIGNANDO</span>
                     ) : (
                       <span className="apm-badge available">ASIGNAR</span>
                     )}
@@ -112,6 +115,7 @@ const AssignPickerModal = ({ isOpen, pickers, onClose, onConfirm }) => {
             <button
               className="pa-btn-secondary apm-footer-cancel"
               onClick={onClose}
+              disabled={isAssigning}
             >
               Cancelar Operación
             </button>
