@@ -52,31 +52,40 @@ exports.handleWooWebhook = async (req, res) => {
     const topic = req.headers["x-wc-webhook-topic"];
     const source = req.headers["x-wc-webhook-source"];
 
-    // Verificar firma HMAC-SHA256
+    // ── VERIFICACIÓN DE AUTENTICIDAD ──
+    // Método 1: Token en query string (?token=SECRET) — funciona siempre en Vercel
+    // Método 2: HMAC-SHA256 del body — solo funciona si rawBody se captura correctamente
     const secret = process.env.WC_WEBHOOK_SECRET;
-    if (secret && signature) {
-      const rawPayload = req.rawBody || "";
-      console.log(`🔍 [WEBHOOK-DEBUG] rawBody capturado: ${rawPayload ? 'SI' : 'NO'} (${rawPayload.length} bytes)`);
-      console.log(`🔍 [WEBHOOK-DEBUG] Firma recibida: ${signature?.substring(0, 20)}...`);
-      
-      // Intentar verificar con rawBody original
-      let verified = false;
-      if (rawPayload) {
-        verified = verifyWooSignature(rawPayload, signature, secret);
+    const queryToken = req.query.token;
+
+    if (secret) {
+      let authenticated = false;
+
+      // Token en URL (recomendado para Vercel)
+      if (queryToken && queryToken === secret) {
+        authenticated = true;
       }
-      // Fallback: verificar con JSON.stringify (puede diferir en Vercel)
-      if (!verified && req.body) {
-        verified = verifyWooSignature(JSON.stringify(req.body), signature, secret);
+
+      // HMAC como fallback (si tenemos rawBody)
+      if (!authenticated && signature) {
+        const rawPayload = req.rawBody || "";
+        if (rawPayload) {
+          authenticated = verifyWooSignature(rawPayload, signature, secret);
+        }
+        if (!authenticated && req.body) {
+          authenticated = verifyWooSignature(JSON.stringify(req.body), signature, secret);
+        }
       }
-      if (!verified) {
-        console.warn("⚠️ [WEBHOOK] Firma inválida, rechazando request");
-        return res.status(401).json({ error: "Firma inválida" });
+
+      // Pings de WooCommerce se aceptan sin verificación
+      if (!authenticated && topic === "ping") {
+        authenticated = true;
       }
-      console.log("✅ [WEBHOOK] Firma HMAC verificada correctamente");
-    }
-    // Si no hay secret configurado o no viene firma, aceptar (necesario para ping)
-    if (secret && !signature && topic !== "ping") {
-      console.warn("⚠️ [WEBHOOK] Request sin firma y secret configurado");
+
+      if (!authenticated) {
+        console.warn("⚠️ [WEBHOOK] Autenticación fallida — ni token ni HMAC válidos");
+        return res.status(401).json({ error: "No autorizado" });
+      }
     }
 
     // WooCommerce envía un ping al crear el webhook
