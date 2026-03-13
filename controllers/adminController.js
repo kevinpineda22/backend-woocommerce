@@ -203,7 +203,7 @@ exports.forcePickItemToSession = async (req, res) => {
             fecha_registro: now,
             motivo: "Aprobado manualmente por Admin en Dashboard",
             pasillo: "Admin",
-            codigo_barras_escaneado: "ADMIN_OVERRIDE",
+            codigo_barras_escaneado: foundItem.sku || foundItem.barcode || null,
             sede_id: sedeIdForce, // ✅ MULTI-SEDE
           });
         }

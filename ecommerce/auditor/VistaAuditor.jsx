@@ -60,40 +60,6 @@ const VistaAuditor = () => {
   };
 
   // ─── DETECCIÓN DE TIPO DE PRODUCTO ───
-  const MEAT_KEYWORDS = [
-    "carne",
-    "pollo",
-    "pescado",
-    "res",
-    "cerdo",
-    "carnicería",
-    "carniceria",
-    "embutido",
-    "chorizo",
-    "pezuña",
-    "costilla",
-    "chuleta",
-    "lomo",
-    "tocino",
-    "morrillo",
-    "pechuga",
-    "alas",
-    "salchicha",
-    "pescaderia",
-    "pescadería",
-    "marisco",
-    "camaron",
-    "bagre",
-    "mojarra",
-    "kilo",
-    "libra",
-  ];
-
-  const isMeatItem = (itemName) => {
-    const name = (itemName || "").toLowerCase();
-    return MEAT_KEYWORDS.some((kw) => name.includes(kw));
-  };
-
   const FRUVER_KEYWORDS = [
     "fruver",
     "fruta",
@@ -115,9 +81,16 @@ const VistaAuditor = () => {
   ];
 
   const isFruverItem = (itemName) => {
-    if (isMeatItem(itemName)) return false; // Meat takes priority
     const name = (itemName || "").toLowerCase();
     return FRUVER_KEYWORDS.some((kw) => name.includes(kw));
+  };
+
+  const requiresGS1 = (itemId) => {
+    const scans = auditData?.scannedBarcodes?.[itemId];
+    if (!scans) return false;
+    return Array.from(scans).some(
+      (code) => /^\d{13,14}$/.test(code) && code.startsWith("2"),
+    );
   };
 
   useEffect(() => {
@@ -169,11 +142,24 @@ const VistaAuditor = () => {
         itemSku === cleanCode ||
         (item.sku && item.sku.toUpperCase() === cleanCode);
 
-      // ─── CARNES: Solo aceptar GS1 completo (13-14 dígitos, empieza con "2") ───
-      if (isMeatItem(item.name) && requiredItems.has(item.id)) {
+      // Comprobamos si el picker escaneó un código GS1 para este producto
+      let pickerScannedGS1 = false;
+      if (scannedBarcodes) {
+        for (const code of scannedBarcodes) {
+          if (/^\d{13,14}$/.test(code) && code.startsWith("2")) {
+            pickerScannedGS1 = true;
+            break;
+          }
+        }
+      }
+
+      // Si el picker escaneó un GS1 (ej. etiqueta de báscula de carnes),
+      // forzamos al auditor a escanear exactamente la misma etiqueta o al menos un GS1 válido.
+      if (pickerScannedGS1 && requiredItems.has(item.id)) {
         const isGS1 =
           /^\d{13,14}$/.test(cleanCode) && cleanCode.startsWith("2");
-        if (!isGS1) return; // Ignorar coincidencias por SKU corto para carnes
+        if (!isGS1) return; // Ignorar coincidencias si el auditor intenta escanear el SKU corto normal
+
         if (hasScannedBarcode) {
           foundInOrder = true;
           matchedName = item.name;
@@ -204,17 +190,23 @@ const VistaAuditor = () => {
         "El producto pertenece al pedido, pero no requiere validación (fuera de muestra).",
       );
     } else {
-      // Check if the rejected code was a short code for a meat item
-      const meatItemInSample = auditData.items.find(
-        (item) =>
-          isMeatItem(item.name) &&
-          requiredItems.has(item.id) &&
-          !verifiedItems.has(item.id),
-      );
-      if (meatItemInSample) {
+      // Check if the rejected code was a short code for a meat/weighable item
+      const itemRequiringGS1 = auditData.items.find((item) => {
+        if (!requiredItems.has(item.id) || verifiedItems.has(item.id))
+          return false;
+        const scans = auditData.scannedBarcodes?.[item.id];
+        if (scans) {
+          for (const code of scans) {
+            if (/^\d{13,14}$/.test(code) && code.startsWith("2")) return true;
+          }
+        }
+        return false;
+      });
+
+      if (itemRequiringGS1) {
         showFeedback(
           "error",
-          `🥩 Producto cárnico detectado. Debes escanear la etiqueta GS1 completa (13-14 dígitos) de la bandeja de carnicería.`,
+          `⚖️ Producto pesado detectado. Debes escanear la etiqueta GS1 completa que capturó el picker.`,
         );
       } else {
         showFeedback(
@@ -1022,9 +1014,9 @@ const VistaAuditor = () => {
                                         </div>
                                       )}
                                       <div className="aud-item-action">
-                                        {isMeatItem(item.name) ? (
+                                        {requiresGS1(item.id) ? (
                                           <span className="aud-type-badge meat">
-                                            🥩 Escanear etiqueta GS1
+                                            ⚖️ Escanear etiqueta GS1
                                           </span>
                                         ) : isFruverItem(item.name) ? (
                                           <button

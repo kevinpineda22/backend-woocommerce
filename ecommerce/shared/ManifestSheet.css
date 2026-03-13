@@ -404,35 +404,40 @@
 }
 
 .manifest-barcodes-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 4px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
 }
 
 .manifest-barcode-cell {
+  flex: 0 1 auto;
+  min-width: 110px;
+  max-width: 100%;
   text-align: center;
-  padding: 4px 2px 2px;
-  border-bottom: 1px solid #e2e8f0;
-  overflow: visible;
+  padding: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
 }
 
 .manifest-barcode-font {
   font-family: "Libre Barcode 39 Text", cursive;
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   color: #000;
   line-height: 1;
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
+  text-overflow: clip; /* It shouldn't clip because it can grow */
 }
 
 .manifest-barcode-label {
   font-family: monospace;
-  font-size: 0.55rem;
+  font-size: 0.6rem;
   color: #64748b;
   font-weight: 600;
-  margin-top: 2px;
+  margin-top: 4px;
   white-space: nowrap;
-  overflow: visible;
   display: flex;
   align-items: center;
   justify-content: center;

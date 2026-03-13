@@ -56,7 +56,7 @@ const ManifestSheet = ({
   const qrValue = items
     .map((item) => {
       const qty = item.qty || item.count || 1;
-      
+
       // PRIORIDAD ABSOLUTA: El código ingresado/escaneado provisto por el padre (Ej: GS1 Pesable)
       // Si no existe, intenta el SKU. Si el SKU está corregido por SIESA, usa eso.
       let code = item.barcode || item.sku || item.name || "N/A";
@@ -147,11 +147,16 @@ const ManifestSheet = ({
           {items.map((item, idx) => {
             const qty = item.qty || item.count || 1;
             const isSub = item.type === "sustituido" || item.is_sub;
-            const rawCode = item.barcode || item.sku;
+
+            let rawCode = item.barcode || item.sku || item.id || "";
+            if (rawCode === "ADMIN_OVERRIDE") {
+              rawCode = item.sku || item.id || "";
+            }
+
             const displayCode =
               rawCode && correctedCodes[rawCode]
                 ? correctedCodes[rawCode]
-                : item.barcode || item.sku || "";
+                : rawCode;
 
             return (
               <React.Fragment key={idx}>
@@ -234,7 +239,12 @@ const ManifestSheet = ({
         <div className="manifest-barcodes-title">CÓDIGOS DE BARRAS</div>
         <div className="manifest-barcodes-grid">
           {items.map((item, idx) => {
-            const barcode = item.barcode || item.sku || item.id;
+            // Evitar usar códigos genéricos o "ADMIN_OVERRIDE" y preferir el SKU o el ID
+            let barcode = item.barcode || item.sku || item.id || "";
+            if (barcode === "ADMIN_OVERRIDE") {
+              barcode = item.sku || item.id || "";
+            }
+
             const qty = item.qty || item.count || 1;
             return (
               <div key={idx} className="manifest-barcode-cell">
@@ -243,7 +253,12 @@ const ManifestSheet = ({
                 </div>
                 <div className="manifest-barcode-label">
                   <span className="manifest-barcode-num">#{idx + 1}</span>
-                  {barcode.toString()}{" "}
+                  <span
+                    className="manifest-barcode-text"
+                    title={barcode.toString()}
+                  >
+                    {barcode.toString()}
+                  </span>
                   <span className="manifest-barcode-qty">×{qty}</span>
                 </div>
               </div>
