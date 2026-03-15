@@ -554,11 +554,6 @@ export const WeightModal = ({
               Fruver...
             </p>
           )}
-          {isFruver && baseEanFruver && (
-            <p className="wm-info-success">
-              ✅ EAN Base Cargado: {baseEanFruver}X...
-            </p>
-          )}
         </div>
 
         {/* PASO 1 / PASO ÚNICO: INPUT DE CÓDIGO */}
@@ -639,7 +634,7 @@ export const WeightModal = ({
               </div>
             </div>
           )}
-          {meatLabel && meatLabel.length >= 13 && calculatedPrice > 0 && (
+          {meatLabel && meatLabel.length >= 13 && false && (
             <div className="wm-fastpass-price">
               💰 Total a cobrar: <strong>{formatPrice(calculatedPrice)}</strong>
             </div>
@@ -675,14 +670,6 @@ export const WeightModal = ({
             </div>
           </div>
         )}
-
-        {/* PRECIO CALCULADO */}
-        <div className="wm-price-box">
-          <span className="wm-price-label">Total a cobrar:</span>
-          <span className="wm-price-value">
-            {calculatedPrice > 0 ? formatPrice(calculatedPrice) : "$0"}
-          </span>
-        </div>
 
         {/* ERROR */}
         {error && (

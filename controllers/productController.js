@@ -69,11 +69,14 @@ exports.getBaseEanFruver = async (req, res) => {
   const { sku } = req.params;
   if (!sku) return res.status(400).json({ error: "SKU requerido" });
 
+  // Extraer solo la parte numérica del SKU (ej: "6857-LB" -> "6857")
+  const numericSku = sku.split("-")[0];
+
   try {
     const { data: barcodes, error } = await supabase
       .from("siesa_codigos_barras")
       .select("codigo_barras")
-      .eq("f120_id", sku)
+      .eq("f120_id", numericSku)
       .like("codigo_barras", "29%");
 
     if (error) throw error;
@@ -101,11 +104,9 @@ exports.getBaseEanFruver = async (req, res) => {
     }
   } catch (error) {
     console.error("Error obteniendo base EAN Fruver:", error);
-    res
-      .status(500)
-      .json({
-        error: `Error al buscar código EAN Fruver para SKU ${sku}: ${error.message || "Servicio no disponible"}`,
-      });
+    res.status(500).json({
+      error: `Error al buscar código EAN Fruver para SKU ${sku}: ${error.message || "Servicio no disponible"}`,
+    });
   }
 };
 
@@ -256,10 +257,8 @@ exports.searchProduct = async (req, res) => {
     res.status(200).json(results);
   } catch (error) {
     console.error("Error searchProduct:", error.message || error);
-    res
-      .status(500)
-      .json({
-        error: `Error al buscar productos: ${error.message || "Servicio no disponible"}`,
-      });
+    res.status(500).json({
+      error: `Error al buscar productos: ${error.message || "Servicio no disponible"}`,
+    });
   }
 };
