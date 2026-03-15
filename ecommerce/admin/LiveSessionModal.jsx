@@ -372,6 +372,36 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                       >
                         {item.name}
                       </div>
+                      {/* ✅ ALERTA MULTIPACK (P6, P3, etc.) */}
+                      {(() => {
+                        const uom = item.unidad_medida
+                          ? item.unidad_medida.toUpperCase()
+                          : "";
+                        const isPack =
+                          uom.startsWith("P") && !isNaN(uom.substring(1));
+                        const packQty = isPack
+                          ? parseInt(uom.substring(1)) || 0
+                          : 0;
+                        return isPack ? (
+                          <div
+                            style={{
+                              background: "#9333ea",
+                              color: "white",
+                              padding: "6px 10px",
+                              borderRadius: "6px",
+                              fontWeight: "900",
+                              fontSize: "0.85rem",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              marginTop: "4px",
+                              boxShadow: "0 2px 4px rgba(147,51,234,0.3)",
+                            }}
+                          >
+                            📦 EMPAQUE x{packQty}
+                          </div>
+                        ) : null;
+                      })()}
                       {/* ✅ PESO EN EL ADMIN BATCH */}
                       {item.peso_real > 0 && (
                         <div

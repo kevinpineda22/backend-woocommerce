@@ -36,10 +36,15 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
   return (
     <div className="ec-modal-overlay">
       <div className="ec-modal-content">
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <FaKeyboard size={40} color="#3b82f6" />
-          <h3>Digitar Código</h3>
-          <p className="ec-text-secondary">
+        <div style={{ textAlign: "center", marginBottom: 22 }}>
+          <FaKeyboard size={48} color="#3b82f6" />
+          <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginTop: 12 }}>
+            Digitar Código
+          </h3>
+          <p
+            className="ec-text-secondary"
+            style={{ fontSize: "1.05rem", lineHeight: 1.5 }}
+          >
             Si el escáner falla, ingresa el EAN/SKU manual.
           </p>
         </div>
@@ -68,17 +73,21 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
         </div>
         <div className="ec-modal-grid">
           <button className="ec-modal-cancel" onClick={onClose}>
-            Cancelar
+            ✕ Cancelar
           </button>
           <button
             className="ec-reason-btn"
-            style={{ background: "#3b82f6", color: "white", width: "100%" }}
+            style={{
+              background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+              color: "white",
+              width: "100%",
+            }}
             onClick={() => {
               if (code.trim().length > 0) onConfirm(code.trim());
             }}
             disabled={!code.trim()}
           >
-            Validar
+            ✅ Validar
           </button>
         </div>
       </div>
@@ -529,7 +538,7 @@ export const WeightModal = ({
       <div className="ec-modal-content">
         {/* HEADER */}
         <div className="wm-header">
-          <FaWeightHanging size={30} className="wm-header-icon" />
+          <FaWeightHanging size={40} className="wm-header-icon" />
           <h3>{isMeat ? "Validar y Pesar Cárnico" : "Ingresar Peso Fruver"}</h3>
           <p className="wm-product-name">{item.name}</p>
           <div className="wm-request-badge">
@@ -688,7 +697,7 @@ export const WeightModal = ({
         {/* BOTONES */}
         <div className="wm-action-grid">
           <button className="wm-btn-cancel" onClick={onClose}>
-            Cancelar
+            ✕ Cancelar
           </button>
           <button
             className="wm-btn-confirm"
@@ -699,7 +708,7 @@ export const WeightModal = ({
               (isMeat && !meatLabel)
             }
           >
-            Confirmar
+            ✅ Confirmar
           </button>
         </div>
       </div>
@@ -731,6 +740,7 @@ export const SubstituteModal = ({
   const [isSubCodeValidated, setIsSubCodeValidated] = useState(false);
   const [baseEanFruver, setBaseEanFruver] = useState(null);
   const [subError, setSubError] = useState("");
+  const [searchError, setSearchError] = useState("");
 
   const inputRefWeight = useRef(null);
   const inputRefMeatLabel = useRef(null);
@@ -825,18 +835,23 @@ export const SubstituteModal = ({
       setIsSubCodeValidated(false);
       setBaseEanFruver(null);
       setSubError("");
+      setSearchError("");
     }
   }, [isOpen, originalItem]);
 
   const fetchSuggestions = async () => {
     setLoading(true);
+    setSearchError("");
     try {
       const res = await ecommerceApi.get(
         `/buscar-producto?original_id=${originalItem.product_id}`,
       );
       setSuggestions(res.data);
     } catch (error) {
-      console.error("Error cargando sugerencias");
+      console.error("Error cargando sugerencias:", error.message || error);
+      setSearchError(
+        "No se pudieron cargar sugerencias. Intenta buscar manualmente.",
+      );
     } finally {
       setLoading(false);
     }
@@ -846,13 +861,17 @@ export const SubstituteModal = ({
     if (!searchQuery?.trim()) return;
     setLoading(true);
     setIsManualSearch(true);
+    setSearchError("");
     try {
       const res = await ecommerceApi.get(
         `/buscar-producto?query=${encodeURIComponent(searchQuery.trim())}`,
       );
       setSuggestions(res.data);
     } catch (error) {
-      alert("Error buscando");
+      const detail =
+        error.response?.data?.error || error.message || "Sin conexión";
+      setSearchError(`Error buscando productos: ${detail}`);
+      setSuggestions([]);
     } finally {
       setLoading(false);
     }
@@ -870,7 +889,7 @@ export const SubstituteModal = ({
         executeSearch(scannedCode);
       });
     } else {
-      alert("Función de cámara no disponible en este contexto.");
+      setSearchError("Cámara no disponible. Digita el código manualmente.");
     }
   };
 
@@ -1084,7 +1103,7 @@ export const SubstituteModal = ({
         handleVerify(scannedCode);
       });
     } else {
-      alert("Función de cámara no disponible en este contexto.");
+      setSubError("Cámara no disponible. Digita el código manualmente.");
     }
   };
 
@@ -1222,8 +1241,8 @@ export const SubstituteModal = ({
             <button
               className="wm-btn-confirm"
               style={{
-                background: "#f59e0b",
-                boxShadow: "0 2px 8px rgba(245,158,11,0.3)",
+                background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                boxShadow: "0 4px 16px rgba(245,158,11,0.35)",
               }}
               onClick={
                 !isSubCodeValidated
@@ -1234,7 +1253,7 @@ export const SubstituteModal = ({
                 isSubCodeValidated && (isFruver ? !subWeight : !subMeatLabel)
               }
             >
-              Confirmar
+              ✅ Confirmar
             </button>
           </div>
         </div>
@@ -1269,15 +1288,17 @@ export const SubstituteModal = ({
             onClick={handleCameraClickSearch}
             title="Escanear producto"
             style={{
-              borderRadius: "8px",
-              padding: "0 15px",
-              background: "#3b82f6",
+              borderRadius: "12px",
+              padding: "0 16px",
+              background: "linear-gradient(135deg, #3b82f6, #2563eb)",
               color: "white",
               border: "none",
               cursor: "pointer",
+              minWidth: "52px",
+              minHeight: "52px",
             }}
           >
-            <FaCamera size={20} />
+            <FaCamera size={22} />
           </button>
           <input
             type="text"
@@ -1310,6 +1331,14 @@ export const SubstituteModal = ({
         </div>
 
         <div className="ec-search-results">
+          {searchError && (
+            <div className="wm-error-alert" style={{ margin: "0 0 10px" }}>
+              <div className="wm-error-icon">
+                <FaExclamationTriangle />
+              </div>
+              <div>{searchError}</div>
+            </div>
+          )}
           {loading && (
             <div className="ec-picker-centered" style={{ height: "100px" }}>
               <div className="ec-spinner"></div>
@@ -1445,12 +1474,14 @@ export const ClientsModal = ({ isOpen, orders, onClose }) => {
 // --- MODAL DE CANTIDAD MASIVA ---
 export const BulkQtyModal = ({ isOpen, item, onClose, onConfirm }) => {
   const [qty, setQty] = useState("");
+  const [bulkError, setBulkError] = useState("");
   const inputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen && item) {
       const remaining = item.quantity_total - (item.qty_scanned || 0);
       setQty(remaining.toString());
+      setBulkError("");
       setTimeout(() => inputRef.current?.select(), 100);
     }
   }, [isOpen, item]);
@@ -1461,24 +1492,38 @@ export const BulkQtyModal = ({ isOpen, item, onClose, onConfirm }) => {
 
   const handleSubmit = () => {
     const val = parseInt(qty);
-    if (!isNaN(val) && val > 0 && val <= remaining) {
-      onConfirm(val);
-    } else {
-      alert(`Ingresa una cantidad válida (máximo ${remaining})`);
+    if (isNaN(val) || val <= 0) {
+      setBulkError("❌ Ingresa un número válido mayor a 0.");
+      inputRef.current?.focus();
+      return;
     }
+    if (val > remaining) {
+      setBulkError(
+        `❌ Máximo permitido: ${remaining} unidades. Ingresaste ${val}.`,
+      );
+      inputRef.current?.focus();
+      return;
+    }
+    setBulkError("");
+    onConfirm(val);
   };
 
   return (
     <div className="ec-modal-overlay">
-      <div className="ec-modal-content" style={{ maxWidth: 350 }}>
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <FaBoxOpen size={40} color="#f59e0b" />
-          <h3>¿Cuántas unidades encontraste?</h3>
-          <p className="ec-text-secondary">
+      <div className="ec-modal-content" style={{ maxWidth: 400 }}>
+        <div style={{ textAlign: "center", marginBottom: 22 }}>
+          <FaBoxOpen size={48} color="#f59e0b" />
+          <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginTop: 12 }}>
+            ¿Cuántas unidades encontraste?
+          </h3>
+          <p
+            className="ec-text-secondary"
+            style={{ fontSize: "1.05rem", lineHeight: 1.5 }}
+          >
             Múltiples unidades detectadas.
             <br />
             Llevas:{" "}
-            <strong>
+            <strong style={{ color: "#1e293b", fontSize: "1.15rem" }}>
               {item.qty_scanned || 0} / {item.quantity_total}
             </strong>
           </p>
@@ -1488,7 +1533,11 @@ export const BulkQtyModal = ({ isOpen, item, onClose, onConfirm }) => {
             ref={inputRef}
             type="number"
             className="ec-manual-input"
-            style={{ textAlign: "center", fontSize: "1.5rem" }}
+            style={{
+              textAlign: "center",
+              fontSize: "2rem",
+              letterSpacing: "2px",
+            }}
             value={qty}
             min={1}
             max={remaining}
@@ -1498,16 +1547,40 @@ export const BulkQtyModal = ({ isOpen, item, onClose, onConfirm }) => {
             }}
           />
         </div>
+        <p
+          style={{
+            textAlign: "center",
+            fontSize: "0.9rem",
+            color: "#64748b",
+            margin: "10px 0 0",
+            fontWeight: 600,
+          }}
+        >
+          Máximo permitido:{" "}
+          <strong style={{ color: "#f59e0b" }}>{remaining}</strong>
+        </p>
+        {bulkError && (
+          <div className="wm-error-alert" style={{ marginTop: 10 }}>
+            <div className="wm-error-icon">
+              <FaExclamationTriangle />
+            </div>
+            <div>{bulkError}</div>
+          </div>
+        )}
         <div className="ec-modal-grid">
           <button className="ec-modal-cancel" onClick={onClose}>
-            Cancelar
+            ✕ Cancelar
           </button>
           <button
             className="ec-reason-btn"
-            style={{ background: "#f59e0b", color: "white", width: "100%" }}
+            style={{
+              background: "linear-gradient(135deg, #f59e0b, #d97706)",
+              color: "white",
+              width: "100%",
+            }}
             onClick={handleSubmit}
           >
-            Confirmar
+            ✅ Confirmar
           </button>
         </div>
       </div>

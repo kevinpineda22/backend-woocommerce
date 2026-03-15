@@ -174,8 +174,10 @@ exports.createPickingSession = async (req, res) => {
       sede_id: sedeId,
     });
   } catch (error) {
-    console.error("Error createSession:", error);
-    res.status(500).json({ error: error.message });
+    console.error("Error createSession:", error.message || error);
+    res
+      .status(500)
+      .json({ error: `Error al crear sesión de picking: ${error.message}` });
   }
 };
 
@@ -402,8 +404,12 @@ exports.getSessionActive = async (req, res) => {
       items: itemsConRuta,
     });
   } catch (error) {
-    console.error("Error getSession:", error);
-    res.status(500).json({ error: "Error al cargar la sesión" });
+    console.error("Error getSession:", error.message || error);
+    res
+      .status(500)
+      .json({
+        error: `Error al cargar la sesión activa: ${error.message || "No se pudo recuperar la información"}`,
+      });
   }
 };
 
@@ -433,7 +439,10 @@ exports.completeSession = async (req, res) => {
       .status(200)
       .json({ message: "Sesión finalizada. Esperando auditoría." });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error completeSession:", error.message || error);
+    res
+      .status(500)
+      .json({ error: `Error al finalizar sesión: ${error.message}` });
   }
 };
 
@@ -470,6 +479,9 @@ exports.cancelAssignment = async (req, res) => {
 
     res.status(200).json({ message: "Sesión cancelada." });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error cancelAssignment:", error.message || error);
+    res
+      .status(500)
+      .json({ error: `Error al cancelar asignación: ${error.message}` });
   }
 };

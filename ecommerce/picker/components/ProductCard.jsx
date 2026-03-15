@@ -49,13 +49,32 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
     );
   }, [item]);
 
+  // Lógica para detectar si es un multipack (P6, P3, etc.)
+  const isMultipack = useMemo(() => {
+    if (!item) return false;
+    const uom = item.unidad_medida ? item.unidad_medida.toUpperCase() : "";
+    return uom.startsWith("P") && !isNaN(uom.substring(1));
+  }, [item]);
+
+  // Si es multipack, determinar la cantidad del paquete
+  const multipackQty = useMemo(() => {
+    if (!isMultipack) return 0;
+    const qtyStr = item.unidad_medida.toUpperCase().substring(1);
+    return parseInt(qtyStr) || 0;
+  }, [isMultipack, item]);
+
   return (
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`ec-product-card ${isCompleted ? "completed" : ""} ${isPartial ? "partial-scan" : ""} ${isFullySubstituted ? "sustituido-card" : ""} ${isMixed ? "mixed-card" : ""} ${isShortPick ? "short-pick-mode" : ""}`}
+      className={`ec-product-card ${isCompleted ? "completed" : ""} ${isPartial ? "partial-scan" : ""} ${isFullySubstituted ? "sustituido-card" : ""} ${isMixed ? "mixed-card" : ""} ${isShortPick ? "short-pick-mode" : ""} ${isMultipack && !isCompleted ? "multipack-card" : ""}`}
+      style={
+        isMultipack && !isCompleted
+          ? { border: "2px solid #9333ea", background: "#faf5ff" }
+          : {}
+      }
     >
       <div className="ec-img-wrapper">
         {item.image_src ? (
@@ -122,6 +141,29 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
             </span>
           </div>
         </div>
+
+        {/* ALERTA VISUAL DE EMPAQUE (MULTIPACK) */}
+        {isMultipack && !isCompleted && (
+          <div
+            style={{
+              background: "#9333ea",
+              color: "white",
+              padding: "8px 12px",
+              borderRadius: "8px",
+              fontWeight: "900",
+              fontSize: "1rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginBottom: "8px",
+              boxShadow: "0 4px 6px rgba(147, 51, 234, 0.3)",
+              textTransform: "uppercase",
+              animation: "pulse 2s infinite",
+            }}
+          >
+            📦 ATENCIÓN: LLEVAR EMPAKE x{multipackQty}
+          </div>
+        )}
 
         {isMixed ? (
           <div className="ec-sub-details">

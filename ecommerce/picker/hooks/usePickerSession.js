@@ -10,6 +10,7 @@ export const usePickerSession = () => {
   const [showSuccessQR, setShowSuccessQR] = useState(false);
   const [completedSessionId, setCompletedSessionId] = useState(null);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [initError, setInitError] = useState(null);
 
   // Helper: construir sede param para URLs
   const sedeParam = pickerSedeId ? `sede_id=${pickerSedeId}` : "";
@@ -108,6 +109,10 @@ export const usePickerSession = () => {
         }
         await refreshSessionData(me.id, me.sede_id);
       } catch (e) {
+        console.error("Error inicializando sesión picker:", e.message || e);
+        setInitError(
+          e.message || "Error desconocido al iniciar sesión de picking.",
+        );
         setLoading(false);
       }
     };
@@ -320,5 +325,6 @@ export const usePickerSession = () => {
     updateLocalSessionState,
     handleFinish,
     isFinishing,
+    initError,
   };
 };

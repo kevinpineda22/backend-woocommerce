@@ -239,7 +239,12 @@ exports.getActiveSessionsDashboard = async (req, res) => {
     );
     res.status(200).json(dashboardData);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error getActiveSessionsDashboard:", error.message);
+    res
+      .status(500)
+      .json({
+        error: `Error al cargar el dashboard de sesiones activas: ${error.message}`,
+      });
   }
 };
 
@@ -299,7 +304,9 @@ exports.getPendingOrders = async (req, res) => {
     res.status(200).json(cleanOrders);
   } catch (e) {
     console.error("Error getPendingOrders:", e.message);
-    res.status(500).json({ error: e.message });
+    res
+      .status(500)
+      .json({ error: `Error al cargar pedidos pendientes: ${e.message}` });
   }
 };
 
@@ -318,7 +325,10 @@ exports.getPickers = async (req, res) => {
     query = query.eq("sede_id", req.sedeId);
   }
   const { data, error } = await query;
-  if (error) return res.status(500).json({ error: error.message });
+  if (error)
+    return res
+      .status(500)
+      .json({ error: `Error al consultar pickers: ${error.message}` });
   res.status(200).json(data);
 };
 
@@ -372,7 +382,12 @@ exports.getPendingPaymentSessions = async (req, res) => {
     });
     res.status(200).json(pendingData);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error getPendingPaymentSessions:", error.message);
+    res
+      .status(500)
+      .json({
+        error: `Error al cargar sesiones pendientes de pago: ${error.message}`,
+      });
   }
 };
 
@@ -390,7 +405,10 @@ exports.markSessionAsPaid = async (req, res) => {
 
     res.status(200).json({ message: "Sesión marcada como pagada/finalizada." });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error markSessionAsPaid:", error.message);
+    res
+      .status(500)
+      .json({ error: `Error al marcar sesión como pagada: ${error.message}` });
   }
 };
 
@@ -442,7 +460,12 @@ exports.getHistorySessions = async (req, res) => {
     });
     res.status(200).json(historyData);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error getHistorySessions:", error.message);
+    res
+      .status(500)
+      .json({
+        error: `Error al cargar historial de sesiones: ${error.message}`,
+      });
   }
 };
 
@@ -499,7 +522,12 @@ exports.getPendingAuditSessions = async (req, res) => {
     });
     res.status(200).json(pendingData);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error getPendingAuditSessions:", error.message);
+    res
+      .status(500)
+      .json({
+        error: `Error al cargar sesiones pendientes de auditoría: ${error.message}`,
+      });
   }
 };
 
@@ -597,7 +625,9 @@ exports.completeAuditSession = async (req, res) => {
     });
   } catch (error) {
     console.error("Error finalizando auditoría:", error.message);
-    res.status(500).json({ error: error.message });
+    res
+      .status(500)
+      .json({ error: `Error al finalizar auditoría: ${error.message}` });
   }
 };
 
@@ -646,14 +676,20 @@ exports.getSessionLogsDetail = async (req, res) => {
             const imgUrl =
               item.image?.src ||
               (item.image && item.image.length > 0 ? item.image[0].src : null);
+            const unitMeta = item.meta_data?.find(
+              (m) => m.key === "pa_unidad-de-medida-aproximado",
+            );
+            const unitMeasure = unitMeta ? unitMeta.display_value : null;
             productDetailsMap[item.product_id] = {
               image: imgUrl,
               sku: item.sku,
+              unidad_medida: unitMeasure,
             };
             if (item.variation_id)
               productDetailsMap[item.variation_id] = {
                 image: imgUrl,
                 sku: item.sku,
+                unidad_medida: unitMeasure,
               };
           });
         }
@@ -743,34 +779,36 @@ exports.getSessionLogsDetail = async (req, res) => {
       } catch (e) {}
     }
 
-    // ✅ OBTENER CÓDIGOS DE BARRAS DESDE SIESA (por SKU, no por product_id)
-    const skuList = Array.from(
+    // ✅ OBTENER CÓDIGOS DE BARRAS DESDE SIESA (extrayendo el f120_id maestro numérico del SKU)
+    const f120IdList = Array.from(
       new Set(
         Object.values(productDetailsMap)
           .map((p) => p.sku)
           .filter(Boolean)
-          .map((sku) => parseInt(sku))
-          .filter((sku) => !isNaN(sku)),
+          .map((sku) => parseInt(sku)) // Extrae "188407" automáticamente desde "188407-P6"
+          .filter((id) => !isNaN(id)),
       ),
     );
 
     console.log(
-      `🔍 Buscando códigos de barras para ${skuList.length} SKUs:`,
-      skuList,
+      `🔍 Buscando códigos de barras para ${f120IdList.length} f120_ids:`,
+      f120IdList,
     );
-    const barcodeMapBySku = await getBarcodesFromSiesa(skuList);
-    console.log(`📦 Códigos encontrados:`, Object.keys(barcodeMapBySku).length);
+    const barcodeMapByF120Id = await getBarcodesFromSiesa(f120IdList);
+    console.log(
+      `📦 Códigos encontrados:`,
+      Object.keys(barcodeMapByF120Id).length,
+    );
 
-    // Agregar códigos de barras al productDetailsMap (mapear de SKU a product_id)
+    // Agregar códigos de barras al productDetailsMap cruzando el f120_id
     Object.keys(productDetailsMap).forEach((productId) => {
       const sku = productDetailsMap[productId].sku;
-      const skuAsNumber = parseInt(sku);
-      const barcode = barcodeMapBySku[skuAsNumber];
+      const f120_id = parseInt(sku);
 
-      if (barcode) {
-        productDetailsMap[productId].barcode = barcode;
+      if (!isNaN(f120_id) && barcodeMapByF120Id[f120_id]) {
+        productDetailsMap[productId].barcode = barcodeMapByF120Id[f120_id];
         console.log(
-          `✅ Producto ${productId} (SKU ${sku}): código = ${barcode}`,
+          `✅ Producto ${productId} (SKU ${sku} -> Maestro ${f120_id}): código = ${barcodeMapByF120Id[f120_id]}`,
         );
       } else {
         console.log(

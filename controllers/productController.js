@@ -94,16 +94,18 @@ exports.getBaseEanFruver = async (req, res) => {
     if (validBase) {
       return res.status(200).json({ baseEAN: validBase.codigo_barras.trim() });
     } else {
-      return res
-        .status(404)
-        .json({
-          error:
-            "Se encontraron códigos 29, pero ninguno de exactamente 7 dígitos.",
-        });
+      return res.status(404).json({
+        error:
+          "Se encontraron códigos 29, pero ninguno de exactamente 7 dígitos.",
+      });
     }
   } catch (error) {
     console.error("Error obteniendo base EAN Fruver:", error);
-    res.status(500).json({ error: "Error interno" });
+    res
+      .status(500)
+      .json({
+        error: `Error al buscar código EAN Fruver para SKU ${sku}: ${error.message || "Servicio no disponible"}`,
+      });
   }
 };
 
@@ -253,6 +255,11 @@ exports.searchProduct = async (req, res) => {
 
     res.status(200).json(results);
   } catch (error) {
-    res.status(500).json({ error: "Error búsqueda" });
+    console.error("Error searchProduct:", error.message || error);
+    res
+      .status(500)
+      .json({
+        error: `Error al buscar productos: ${error.message || "Servicio no disponible"}`,
+      });
   }
 };

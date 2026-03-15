@@ -49,6 +49,7 @@ const VistaPicker = () => {
     updateLocalSessionState,
     handleFinish,
     isFinishing,
+    initError,
   } = usePickerSession();
 
   // Sede del picker
@@ -80,9 +81,16 @@ const VistaPicker = () => {
   const showToast = useCallback((msg, type = "success") => {
     const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, msg, type }]);
+    // Haptic feedback para cada tipo de toast
+    if (navigator.vibrate) {
+      if (type === "success") navigator.vibrate([50, 30, 50]);
+      if (type === "error") navigator.vibrate([200, 100, 200]);
+      if (type === "warning") navigator.vibrate([100, 50, 100]);
+      if (type === "info") navigator.vibrate([40]);
+    }
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3000);
+    }, 3500);
   }, []);
 
   // --- LÓGICA DE INTERACCIÓN (Botones y Acciones) ---
@@ -298,7 +306,9 @@ const VistaPicker = () => {
         else confirmPicking();
       } else showToast("❌ Código incorrecto.", "error");
     } catch (e) {
-      showToast("❌ Error de conexión.", "error");
+      const detail =
+        e.response?.data?.error || e.message || "Sin conexión al servidor";
+      showToast(`❌ Error validando código: ${detail}`, "error");
     }
   };
 
@@ -374,6 +384,27 @@ const VistaPicker = () => {
       <div className="ec-picker-centered">
         <div className="ec-spinner"></div>
         <p>Conectando...</p>
+      </div>
+    );
+
+  if (initError)
+    return (
+      <div className="ec-picker-centered">
+        <FaExclamationTriangle
+          size={50}
+          color="#ef4444"
+          className="ec-no-assignment-icon"
+        />
+        <h3>Error al iniciar</h3>
+        <p style={{ color: "#64748b", textAlign: "center", padding: "0 1rem" }}>
+          {initError}
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="ec-scan-btn ec-no-assignment-refresh"
+        >
+          Reintentar
+        </button>
       </div>
     );
 
@@ -489,18 +520,44 @@ const VistaPicker = () => {
           })}
         </div>
 
+        {/* PROGRESS BAR */}
+        <div className="ec-progress-bar-container">
+          <div className="ec-progress-bar-track">
+            <div
+              className="ec-progress-bar-fill"
+              style={{
+                width: `${sessionData.items.length > 0 ? Math.round((doneItems.length / sessionData.items.length) * 100) : 0}%`,
+              }}
+            />
+          </div>
+          <div className="ec-progress-text">
+            <span>
+              {doneItems.length} de {sessionData.items.length} productos
+            </span>
+            <span className="ec-progress-pct">
+              {sessionData.items.length > 0
+                ? Math.round(
+                    (doneItems.length / sessionData.items.length) * 100,
+                  )
+                : 0}
+              %
+            </span>
+          </div>
+        </div>
+
         <div className="ec-zones-tabs">
           <div
             className={`ec-zone-tab ${activeZone === "pendientes" ? "active" : ""}`}
             onClick={() => setActiveZone("pendientes")}
           >
-            Pendientes ({pendingItems.length})
+            📋 Pendientes{" "}
+            <span className="ec-tab-count">{pendingItems.length}</span>
           </div>
           <div
             className={`ec-zone-tab ${activeZone === "canasta" ? "active" : ""}`}
             onClick={() => setActiveZone("canasta")}
           >
-            En Canasta ({doneItems.length})
+            🛒 Canasta <span className="ec-tab-count">{doneItems.length}</span>
           </div>
         </div>
       </header>
@@ -520,11 +577,23 @@ const VistaPicker = () => {
             ))
           ) : (
             <div className="ec-empty-state">
-              <p>
-                {activeZone === "pendientes"
-                  ? "¡Ruta Completada! 🎉"
-                  : "Tu canasta está vacía."}
-              </p>
+              {activeZone === "pendientes" ? (
+                <>
+                  <div className="ec-empty-icon">🎉</div>
+                  <p className="ec-empty-title">¡Ruta Completada!</p>
+                  <p className="ec-empty-subtitle">
+                    Todos los productos están en la canasta
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="ec-empty-icon">🛒</div>
+                  <p className="ec-empty-title">Canasta vacía</p>
+                  <p className="ec-empty-subtitle">
+                    Escanea productos para agregarlos aquí
+                  </p>
+                </>
+              )}
             </div>
           )}
         </AnimatePresence>
@@ -632,7 +701,9 @@ const VistaPicker = () => {
             setShowFinishConfirm(false);
             await handleFinish();
           } catch (e) {
-            showToast("Error al finalizar la sesión.", "error");
+            const detail =
+              e.response?.data?.error || e.message || "Error desconocido";
+            showToast(`Error al finalizar la sesión: ${detail}`, "error");
           }
         }}
         onCancel={() => setShowFinishConfirm(false)}
@@ -658,28 +729,16 @@ const VistaPicker = () => {
           {toasts.map((t) => (
             <motion.div
               key={t.id}
-              initial={{ opacity: 0, y: 30, scale: 0.8 }}
+              initial={{ opacity: 0, y: 40, scale: 0.8 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.9 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              style={{
-                background:
-                  t.type === "success"
-                    ? "#10b981"
-                    : t.type === "error"
-                      ? "#ef4444"
-                      : "#3b82f6",
-                color: "#fff",
-                padding: "8px 16px",
-                borderRadius: "20px",
-                fontSize: "14px",
-                fontWeight: "600",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
+              exit={{ opacity: 0, y: -30, scale: 0.85 }}
+              transition={{ type: "spring", stiffness: 400, damping: 28 }}
+              className={`ec-toast ${t.type}`}
             >
+              {t.type === "success" && "✅ "}
+              {t.type === "error" && "❌ "}
+              {t.type === "warning" && "⚠️ "}
+              {t.type === "info" && "ℹ️ "}
               {t.msg}
             </motion.div>
           ))}

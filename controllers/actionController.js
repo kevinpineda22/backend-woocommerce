@@ -124,24 +124,34 @@ exports.registerAction = async (req, res) => {
 
     res.status(200).json({ success: true, message: "Acción registrada" });
   } catch (error) {
-    console.error("Error registrando acción:", error.message);
-    res.status(500).json({ error: error.message });
+    console.error(
+      `Error registrando acción '${accion}' para producto ${id_producto_original}:`,
+      error.message,
+    );
+    res
+      .status(500)
+      .json({
+        error: `Error al registrar acción '${accion}': ${error.message}`,
+      });
   }
 };
 
 exports.validateManualCode = async (req, res) => {
   const { input_code, expected_sku, expected_barcode } = req.body;
   if (!input_code) return res.json({ valid: false });
-  
+
   const code = input_code.trim().toUpperCase();
-  
+
   // 1. Validar contra el SKU
-  const skuMatch = expected_sku && (code === expected_sku.trim().toUpperCase() || expected_sku.toUpperCase().includes(code));
-  
+  const skuMatch =
+    expected_sku &&
+    (code === expected_sku.trim().toUpperCase() ||
+      expected_sku.toUpperCase().includes(code));
+
   // 2. Validar contra la Lista de Códigos de Barras (Si la manda el frontend)
   let barcodeMatch = false;
   if (Array.isArray(expected_barcode)) {
-    barcodeMatch = expected_barcode.some(b => {
+    barcodeMatch = expected_barcode.some((b) => {
       const str = (b || "").toString().toUpperCase();
       return code === str || str.endsWith(code);
     });

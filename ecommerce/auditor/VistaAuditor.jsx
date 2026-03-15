@@ -313,6 +313,7 @@ const VistaAuditor = () => {
               image: prodDetail?.image || null,
               sku: prodDetail?.sku || null,
               barcode: prodDetail?.barcode || null, // ✅ Código de barras de SIESA
+              unidad_medida: prodDetail?.unidad_medida || null, // ⚖️ UOM (UND, P6, KL...)
             };
           }
           itemsMap[key].count += 1;
@@ -1043,12 +1044,41 @@ const VistaAuditor = () => {
 
                                     {/* COLUMNA 3: ACCIONES / CANTIDAD */}
                                     <div className="aud-item-action-col">
+                                      {(() => {
+                                        const uom = item.unidad_medida
+                                          ? item.unidad_medida.toUpperCase()
+                                          : "";
+                                        const isPack =
+                                          uom.startsWith("P") &&
+                                          !isNaN(uom.substring(1));
+                                        const packQty = isPack
+                                          ? parseInt(uom.substring(1)) || 0
+                                          : 0;
+                                        return isPack ? (
+                                          <div
+                                            style={{
+                                              background: "#9333ea",
+                                              color: "white",
+                                              padding: "4px 8px",
+                                              borderRadius: "6px",
+                                              fontWeight: "900",
+                                              fontSize: "0.7rem",
+                                              textAlign: "center",
+                                              marginBottom: "4px",
+                                            }}
+                                          >
+                                            📦 x{packQty}
+                                          </div>
+                                        ) : null;
+                                      })()}
                                       <div className="aud-massive-qty-badge">
                                         <span className="aud-massive-qty-num">
                                           {item.count}
                                         </span>
                                         <span className="aud-massive-qty-unit">
-                                          UN.
+                                          {item.unidad_medida
+                                            ? item.unidad_medida.toUpperCase()
+                                            : "UN."}
                                         </span>
                                       </div>
                                     </div>
@@ -1095,6 +1125,33 @@ const VistaAuditor = () => {
 
                                     {/* COLUMNA 3: ACCIONES / CANTIDAD */}
                                     <div className="aud-item-action-col">
+                                      {(() => {
+                                        const uom = item.unidad_medida
+                                          ? item.unidad_medida.toUpperCase()
+                                          : "";
+                                        const isPack =
+                                          uom.startsWith("P") &&
+                                          !isNaN(uom.substring(1));
+                                        const packQty = isPack
+                                          ? parseInt(uom.substring(1)) || 0
+                                          : 0;
+                                        return isPack ? (
+                                          <div
+                                            style={{
+                                              background: "#9333ea",
+                                              color: "white",
+                                              padding: "4px 8px",
+                                              borderRadius: "6px",
+                                              fontWeight: "900",
+                                              fontSize: "0.7rem",
+                                              textAlign: "center",
+                                              marginBottom: "4px",
+                                            }}
+                                          >
+                                            📦 x{packQty}
+                                          </div>
+                                        ) : null;
+                                      })()}
                                       <div
                                         className="aud-massive-qty-badge"
                                         style={{ background: "#16a34a" }}
@@ -1103,7 +1160,9 @@ const VistaAuditor = () => {
                                           {item.count}
                                         </span>
                                         <span className="aud-massive-qty-unit">
-                                          UN.
+                                          {item.unidad_medida
+                                            ? item.unidad_medida.toUpperCase()
+                                            : "UN."}
                                         </span>
                                       </div>
                                     </div>
@@ -1175,6 +1234,33 @@ const VistaAuditor = () => {
 
                                       {/* COLUMNA 3: ACCIONES / CANTIDAD */}
                                       <div className="aud-item-action-col">
+                                        {(() => {
+                                          const uom = item.unidad_medida
+                                            ? item.unidad_medida.toUpperCase()
+                                            : "";
+                                          const isPack =
+                                            uom.startsWith("P") &&
+                                            !isNaN(uom.substring(1));
+                                          const packQty = isPack
+                                            ? parseInt(uom.substring(1)) || 0
+                                            : 0;
+                                          return isPack ? (
+                                            <div
+                                              style={{
+                                                background: "#9333ea",
+                                                color: "white",
+                                                padding: "3px 6px",
+                                                borderRadius: "6px",
+                                                fontWeight: "900",
+                                                fontSize: "0.65rem",
+                                                textAlign: "center",
+                                                marginBottom: "3px",
+                                              }}
+                                            >
+                                              📦 x{packQty}
+                                            </div>
+                                          ) : null;
+                                        })()}
                                         <div
                                           className="aud-massive-qty-badge"
                                           style={{
@@ -1188,6 +1274,14 @@ const VistaAuditor = () => {
                                             style={{ fontSize: "1.2rem" }}
                                           >
                                             {item.count}
+                                          </span>
+                                          <span
+                                            className="aud-massive-qty-unit"
+                                            style={{ fontSize: "0.7rem" }}
+                                          >
+                                            {item.unidad_medida
+                                              ? item.unidad_medida.toUpperCase()
+                                              : ""}
                                           </span>
                                         </div>
                                       </div>
