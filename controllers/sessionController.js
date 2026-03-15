@@ -400,16 +400,15 @@ exports.getSessionActive = async (req, res) => {
         billing: o.billing,
         shipping: o.shipping,
         total: o.total,
+        customer_note: o.customer_note || null,
       })),
       items: itemsConRuta,
     });
   } catch (error) {
     console.error("Error getSession:", error.message || error);
-    res
-      .status(500)
-      .json({
-        error: `Error al cargar la sesión activa: ${error.message || "No se pudo recuperar la información"}`,
-      });
+    res.status(500).json({
+      error: `Error al cargar la sesión activa: ${error.message || "No se pudo recuperar la información"}`,
+    });
   }
 };
 

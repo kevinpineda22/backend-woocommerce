@@ -242,13 +242,13 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
               </div>
             )}
 
-            {/* NOTAS DEL CLIENTE */}
+            {/* NOTAS ESPECÍFICAS DEL PRODUCTO (instrucciones de preparación) */}
             {item.notas_cliente && item.notas_cliente.length > 0 && (
               <div
                 style={{
                   background: "#fef08a",
                   borderLeft: "4px solid #eab308",
-                  padding: "6px 10px",
+                  padding: "8px 10px",
                   marginTop: "8px",
                   borderRadius: "6px",
                   fontSize: "0.85rem",
@@ -258,16 +258,20 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
                 <strong
                   style={{
                     display: "block",
-                    marginBottom: "3px",
+                    marginBottom: "4px",
                     textTransform: "uppercase",
                     fontSize: "0.7rem",
                   }}
                 >
                   📝 Instrucción Especial:
                 </strong>
-                {item.notas_cliente.map((nota, i) => (
-                  <div key={i} style={{ marginBottom: "3px" }}>
-                    {nota}
+                {item.notas_cliente.map((n, i) => (
+                  <div key={i} style={{ marginBottom: "4px" }}>
+                    <strong>
+                      El cliente {typeof n === "object" ? n.cliente : ""}{" "}
+                      indicó:
+                    </strong>{" "}
+                    {typeof n === "object" ? n.nota : n}
                   </div>
                 ))}
               </div>

@@ -545,6 +545,49 @@ const VistaPicker = () => {
           </div>
         </div>
 
+        {/* NOTAS GENERALES DE CLIENTES (order-level customer_note) */}
+        {sessionData.orders_info.some((o) => o.customer_note) && (
+          <div
+            style={{
+              background: "#fffbeb",
+              border: "1px solid #f59e0b",
+              borderLeft: "4px solid #f59e0b",
+              borderRadius: "8px",
+              padding: "8px 12px",
+              margin: "6px 0 2px",
+            }}
+          >
+            <strong
+              style={{
+                display: "block",
+                fontSize: "0.7rem",
+                textTransform: "uppercase",
+                color: "#92400e",
+                marginBottom: "4px",
+                letterSpacing: "0.5px",
+              }}
+            >
+              📝 Notas de los Clientes
+            </strong>
+            {sessionData.orders_info
+              .filter((o) => o.customer_note)
+              .map((ord) => (
+                <div
+                  key={ord.id}
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "#854d0e",
+                    padding: "4px 0",
+                    borderBottom: "1px dashed #fcd34d",
+                  }}
+                >
+                  <strong>{ord.customer.split(" ")[0]} indicó:</strong>{" "}
+                  {ord.customer_note}
+                </div>
+              ))}
+          </div>
+        )}
+
         <div className="ec-zones-tabs">
           <div
             className={`ec-zone-tab ${activeZone === "pendientes" ? "active" : ""}`}
