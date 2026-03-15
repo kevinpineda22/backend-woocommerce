@@ -10,6 +10,39 @@ async function getSessionSedeId(sessionId) {
   return data?.sede_id || null;
 }
 
+// Helper: Buscar el mejor código de barras desde SIESA para un SKU
+async function getBarcodeFromSiesa(sku) {
+  try {
+    const f120Id = parseInt(sku);
+    if (isNaN(f120Id)) return null;
+
+    const { data: barcodes } = await supabase
+      .from("siesa_codigos_barras")
+      .select("codigo_barras")
+      .eq("f120_id", f120Id);
+
+    if (!barcodes || barcodes.length === 0) return null;
+
+    const validCodes = barcodes
+      .map((bc) => (bc.codigo_barras || "").toString().trim())
+      .filter((cleaned) => {
+        if (!cleaned || cleaned.replace(/\+$/, "").length < 8) return false;
+        if (
+          cleaned.toUpperCase().startsWith("M") ||
+          cleaned.toUpperCase().startsWith("N")
+        )
+          return false;
+        return /^\d+\+?$/.test(cleaned);
+      });
+
+    const ean13 = validCodes.find((c) => c.replace(/\+$/, "").length === 13);
+    return ean13 || validCodes[0] || null;
+  } catch (e) {
+    console.error("Error buscando barcode SIESA para SKU", sku, e.message);
+    return null;
+  }
+}
+
 exports.removeItemFromSession = async (req, res) => {
   const { id_sesion, id_producto } = req.body;
 
@@ -171,6 +204,9 @@ exports.forcePickItemToSession = async (req, res) => {
 
     const logsToInsert = [];
 
+    // 2.5 Buscar código de barras real desde SIESA para el producto
+    let resolvedBarcode = null;
+
     // 3. Revisar cada pedido y agregar lo que falte
     for (let assign of assignments) {
       const items = assign.reporte_snapshot?.line_items || [];
@@ -180,6 +216,16 @@ exports.forcePickItemToSession = async (req, res) => {
       );
 
       if (foundItem) {
+        // Buscar barcode SIESA solo una vez (el SKU es el mismo para el mismo producto)
+        if (resolvedBarcode === null && foundItem.sku) {
+          resolvedBarcode = await getBarcodeFromSiesa(foundItem.sku);
+          if (!resolvedBarcode) {
+            console.warn(
+              `⚠️ Admin force-pick: No se encontró barcode SIESA para SKU ${foundItem.sku} (producto ${id_producto})`,
+            );
+          }
+        }
+
         const requiredQty = foundItem.quantity;
 
         // Contar cuántos ya están listos en este pedido
@@ -203,7 +249,7 @@ exports.forcePickItemToSession = async (req, res) => {
             fecha_registro: now,
             motivo: "Aprobado manualmente por Admin en Dashboard",
             pasillo: "Admin",
-            codigo_barras_escaneado: foundItem.sku || foundItem.barcode || null,
+            codigo_barras_escaneado: resolvedBarcode || null, // Solo código de barras SIESA, nunca SKU
             sede_id: sedeIdForce, // ✅ MULTI-SEDE
           });
         }

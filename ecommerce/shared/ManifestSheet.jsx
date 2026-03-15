@@ -53,22 +53,37 @@ const ManifestSheet = ({
     }
   }, [items]);
 
-  // Generar QR Value: Cantidad * Código (separado por salto de línea \r\n para simular ENTER)
+  // Helper: Validar si un código es un barcode real (8+ dígitos numéricos, opcionalmente con '+' al final)
+  const isValidBarcode = (code) => {
+    if (!code || code === "N/A" || code === "ADMIN_OVERRIDE") return false;
+    const cleaned = code.toString().trim().replace(/\+$/, "");
+    return /^\d+$/.test(cleaned) && cleaned.length >= 8;
+  };
+
+  // Generar QR Value: Cantidad * Código de Barras (separado por salto de línea \r\n para simular ENTER)
+  // SOLO códigos de barras válidos — nunca SKUs ni nombres de producto
   const qrValue = items
     .map((item) => {
       const qty = item.qty || item.count || 1;
 
-      // PRIORIDAD ABSOLUTA: El código ingresado/escaneado provisto por el padre (Ej: GS1 Pesable)
-      // Si no existe, intenta el SKU. Si el SKU está corregido por SIESA, usa eso.
-      let code = item.barcode || item.sku || item.name || "N/A";
+      // PRIORIDAD: barcode escaneado > corrección SIESA > nada
+      let code = item.barcode || "";
 
-      // Aplicar corrección de Siesa (solo si el barcode actual no parece ser un pesado GS1 de 13+ chars)
+      // Aplicar corrección de Siesa si el barcode actual no parece ser un pesado GS1 de 13+ chars
       if (correctedCodes[code] && code.length < 13) {
         code = correctedCodes[code];
       }
+      // Si el barcode no es válido, intentar corregir el SKU vía SIESA
+      if (!isValidBarcode(code) && item.sku && correctedCodes[item.sku]) {
+        code = correctedCodes[item.sku];
+      }
+
+      // Solo incluir si es un código de barras válido
+      if (!isValidBarcode(code)) return null;
 
       return `${qty}*${code}`;
     })
+    .filter(Boolean)
     .join("\r\n");
 
   return (
@@ -195,7 +210,7 @@ const ManifestSheet = ({
                 const qty = item.qty || item.count || 1;
                 const isSub = item.type === "sustituido" || item.is_sub;
 
-                // Función para extraer un código válido (evitando ADMIN_OVERRIDE si está propagado al sku)
+                // En la tabla SÍ mostramos el item (SKU/ID) como referencia visual
                 const getValidCode = () => {
                   if (item.barcode && item.barcode !== "ADMIN_OVERRIDE")
                     return item.barcode;
@@ -295,7 +310,7 @@ const ManifestSheet = ({
             <div className="manifest-barcodes-title">CÓDIGOS DE BARRAS</div>
             <div className="manifest-barcodes-grid">
               {items.map((item, idx) => {
-                // Evitar usar códigos genéricos o "ADMIN_OVERRIDE" y preferir el SKU o el ID
+                // Mostrar item (SKU/ID) en la grilla visual
                 const getValidCode = () => {
                   if (item.barcode && item.barcode !== "ADMIN_OVERRIDE")
                     return item.barcode;

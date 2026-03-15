@@ -70,11 +70,19 @@ const agruparItemsParaPicking = (orders) => {
           is_pickup: isPickup,
         });
 
-        // Si hay nota, la guardamos indicando de qué pedido es
+        // Si hay nota del item (meta_data: _wcfx_item_note), la guardamos
         if (itemNote) {
           mapaProductos[key].notas_cliente.push(
             `Pedido #${order.id}: ${itemNote}`,
           );
+        }
+
+        // Si hay nota general del cliente en el pedido (customer_note), la agregamos una sola vez por pedido
+        if (order.customer_note && order.customer_note.trim()) {
+          const notaPedido = `Nota del cliente (Pedido #${order.id}): ${order.customer_note.trim()}`;
+          if (!mapaProductos[key].notas_cliente.includes(notaPedido)) {
+            mapaProductos[key].notas_cliente.push(notaPedido);
+          }
         }
       }
     });

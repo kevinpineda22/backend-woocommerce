@@ -574,8 +574,8 @@ const VistaAuditor = () => {
             id: i.id || i.sku,
             name: i.name,
             original_name: i.original_name || null,
-            sku: i.barcode || i.sku || "",
-            barcode: i.barcode || i.sku || i.id,
+            sku: i.sku || "",
+            barcode: i.barcode || "", // Solo barcode real, nunca SKU ni ID
             qty: i.qty || i.count || 1,
             is_sub: i.type === "sustituido" || i.is_sub,
           }));

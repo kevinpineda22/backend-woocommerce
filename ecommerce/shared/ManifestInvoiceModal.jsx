@@ -91,7 +91,7 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
             name: item.name,
             original_name: item.original_name || null,
             sku: item.sku || item.id,
-            barcode: item.barcode || item.sku || item.id,
+            barcode: item.barcode || "", // Solo barcode real, nunca SKU ni ID
             qty: item.qty || item.count || 0,
             count: item.count,
             type: item.type,
