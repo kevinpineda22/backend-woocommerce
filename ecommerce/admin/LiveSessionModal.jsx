@@ -33,9 +33,13 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
   const [viewMode, setViewMode] = useState("batch");
   const [showTrash, setShowTrash] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  
+
   // -- NUEVOS ESTADOS DE EXPERIENCIA UX --
-  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, type: null, item: null });
+  const [confirmConfig, setConfirmConfig] = useState({
+    isOpen: false,
+    type: null,
+    item: null,
+  });
   const [toasts, setToasts] = useState([]);
 
   const showToast = useCallback((msg, type = "success") => {
@@ -76,17 +80,17 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "wc_log_picking" },
-        () => refreshRouteData()
+        () => refreshRouteData(),
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "wc_log_picking" },
-        () => refreshRouteData()
+        () => refreshRouteData(),
       )
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "wc_log_picking" },
-        () => refreshRouteData()
+        () => refreshRouteData(),
       )
       .on(
         "postgres_changes",
@@ -96,7 +100,7 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
           table: "wc_picking_sessions",
           filter: `id=eq.${sessionDetail.sessionInfo.session_id}`,
         },
-        () => refreshRouteData()
+        () => refreshRouteData(),
       )
       .subscribe();
 
@@ -105,8 +109,8 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
     const broadcastChannel = supabase
       .channel(`session-${sessionDetail.sessionInfo.session_id}`)
       .on("broadcast", { event: "picking_action" }, (payload) => {
-         // Se recibe la actividad fresca del picker al instante
-         refreshRouteData();
+        // Se recibe la actividad fresca del picker al instante
+        refreshRouteData();
       })
       .subscribe();
 
@@ -130,6 +134,26 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
   );
   const displayItems = showTrash ? removedItems : activeItems;
 
+  const isWeighable = (item) => {
+    const txt = (
+      item.name +
+      " " +
+      (item.categorias?.[0]?.name || "")
+    ).toLowerCase();
+    const isUnitPesable =
+      item.unidad_medida &&
+      ["kl", "kg", "kilo", "lb", "libra"].includes(
+        item.unidad_medida.toLowerCase(),
+      );
+    return (
+      isUnitPesable ||
+      txt.includes("kg") ||
+      txt.includes("gramos") ||
+      txt.includes("fruver") ||
+      txt.includes("carniceria")
+    );
+  };
+
   // ⚡ CANAL DE RADIO: Avisar al Picker instantáneamente
   const notifyPickerInstantly = async () => {
     try {
@@ -150,28 +174,43 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
     setIsProcessing(true);
     try {
       if (type === "delete") {
-        await ecommerceApi.post("/admin-remove-item", { id_sesion: sessionInfo.session_id, id_producto: item.product_id });
+        await ecommerceApi.post("/admin-remove-item", {
+          id_sesion: sessionInfo.session_id,
+          id_producto: item.product_id,
+        });
         showToast(`Anulado: ${item.name}`, "success");
       } else if (type === "restore") {
-        await ecommerceApi.post("/admin-restore-item", { id_sesion: sessionInfo.session_id, id_producto: item.product_id });
+        await ecommerceApi.post("/admin-restore-item", {
+          id_sesion: sessionInfo.session_id,
+          id_producto: item.product_id,
+        });
         showToast(`Restaurado: ${item.name}`, "info");
       } else if (type === "pick") {
-        await ecommerceApi.post("/admin-force-pick", { id_sesion: sessionInfo.session_id, id_producto: item.product_id });
+        await ecommerceApi.post("/admin-force-pick", {
+          id_sesion: sessionInfo.session_id,
+          id_producto: item.product_id,
+        });
         showToast(`Recolectado a la fuerza: ${item.name}`, "success");
       }
       await refreshRouteData();
       await notifyPickerInstantly(); // ⚡ Disparo en tiempo real
     } catch (error) {
-      showToast("Error: " + (error.response?.data?.error || error.message), "error");
+      showToast(
+        "Error: " + (error.response?.data?.error || error.message),
+        "error",
+      );
     } finally {
       setIsProcessing(false);
       setConfirmConfig({ isOpen: false, type: null, item: null });
     }
   };
 
-  const handleAdminDelete = (item) => setConfirmConfig({ isOpen: true, type: "delete", item });
-  const handleAdminRestore = (item) => setConfirmConfig({ isOpen: true, type: "restore", item });
-  const handleAdminPick = (item) => setConfirmConfig({ isOpen: true, type: "pick", item });
+  const handleAdminDelete = (item) =>
+    setConfirmConfig({ isOpen: true, type: "delete", item });
+  const handleAdminRestore = (item) =>
+    setConfirmConfig({ isOpen: true, type: "restore", item });
+  const handleAdminPick = (item) =>
+    setConfirmConfig({ isOpen: true, type: "pick", item });
 
   const getOrderColor = (id) =>
     ORDER_COLORS[
@@ -386,7 +425,12 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                         onClick={() => handleAdminRestore(item)}
                         disabled={isProcessing}
                       >
-                        {isProcessing ? <FaSpinner className="ec-spin" /> : <FaTrashRestore />} Restaurar
+                        {isProcessing ? (
+                          <FaSpinner className="ec-spin" />
+                        ) : (
+                          <FaTrashRestore />
+                        )}{" "}
+                        Restaurar
                       </button>
                     ) : (
                       <>
@@ -403,14 +447,20 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                         </div>
                         {item.status === "pendiente" && (
                           <div className="lsm-actions-wrapper">
-                            <button
-                              className="lsm-pick-btn"
-                              onClick={() => handleAdminPick(item)}
-                              disabled={isProcessing}
-                              title="Pasar a canasta (Forzar)"
-                            >
-                              {isProcessing ? <FaSpinner className="ec-spin" /> : <FaCheck />}
-                            </button>
+                            {!isWeighable(item) && (
+                              <button
+                                className="lsm-pick-btn"
+                                onClick={() => handleAdminPick(item)}
+                                disabled={isProcessing}
+                                title="Pasar a canasta (Forzar)"
+                              >
+                                {isProcessing ? (
+                                  <FaSpinner className="ec-spin" />
+                                ) : (
+                                  <FaCheck />
+                                )}
+                              </button>
+                            )}
                             <button
                               className="lsm-delete-btn"
                               style={{ marginRight: 0 }}
@@ -418,7 +468,11 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                               disabled={isProcessing}
                               title="Anular producto"
                             >
-                              {isProcessing ? <FaSpinner className="ec-spin" /> : <FaTrash />}
+                              {isProcessing ? (
+                                <FaSpinner className="ec-spin" />
+                              ) : (
+                                <FaTrash />
+                              )}
                             </button>
                           </div>
                         )}
@@ -560,26 +614,50 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
       <ConfirmModal
         isOpen={confirmConfig.isOpen}
         title={
-          confirmConfig.type === "delete" ? "⚠️ Anular Producto" :
-          confirmConfig.type === "restore" ? "🔄 Restaurar a Canasta" :
-          confirmConfig.type === "pick" ? "✅ Forzar Recolección" : ""
+          confirmConfig.type === "delete"
+            ? "⚠️ Anular Producto"
+            : confirmConfig.type === "restore"
+              ? "🔄 Restaurar a Canasta"
+              : confirmConfig.type === "pick"
+                ? "✅ Forzar Recolección"
+                : ""
         }
         message={
-          confirmConfig.item ? `¿Estás completamente seguro que deseas realizar esta acción sobre "${confirmConfig.item.name}"?` : ""
+          confirmConfig.item
+            ? `¿Estás completamente seguro que deseas realizar esta acción sobre "${confirmConfig.item.name}"?`
+            : ""
         }
         isDanger={confirmConfig.type === "delete"}
         onConfirm={handleAdminActionExecute}
-        onCancel={() => setConfirmConfig({ isOpen: false, type: null, item: null })}
+        onCancel={() =>
+          setConfirmConfig({ isOpen: false, type: null, item: null })
+        }
         confirmText={
-          confirmConfig.type === "delete" ? "Sí, Anular" :
-          confirmConfig.type === "restore" ? "Sí, Restaurar" :
-          confirmConfig.type === "pick" ? "Sí, Forzar y Recolectar" : "Confirmar"
+          confirmConfig.type === "delete"
+            ? "Sí, Anular"
+            : confirmConfig.type === "restore"
+              ? "Sí, Restaurar"
+              : confirmConfig.type === "pick"
+                ? "Sí, Forzar y Recolectar"
+                : "Confirmar"
         }
         isProcessing={isProcessing}
       />
 
       {/* NOTIFICACIONES TOAST */}
-      <div style={{ position: "fixed", bottom: "30px", left: "50%", transform: "translateX(-50%)", zIndex: 99999, display: "flex", flexDirection: "column", gap: "8px", pointerEvents: "none" }}>
+      <div
+        style={{
+          position: "fixed",
+          bottom: "30px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 99999,
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+          pointerEvents: "none",
+        }}
+      >
         <AnimatePresence>
           {toasts.map((t) => (
             <motion.div
@@ -589,8 +667,18 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
               exit={{ opacity: 0, y: -20, scale: 0.9 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
               style={{
-                background: t.type === "success" ? "#10b981" : t.type === "error" ? "#ef4444" : "#3b82f6",
-                color: "#fff", padding: "8px 16px", borderRadius: "20px", fontSize: "14px", fontWeight: "600", boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                background:
+                  t.type === "success"
+                    ? "#10b981"
+                    : t.type === "error"
+                      ? "#ef4444"
+                      : "#3b82f6",
+                color: "#fff",
+                padding: "8px 16px",
+                borderRadius: "20px",
+                fontSize: "14px",
+                fontWeight: "600",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
               }}
             >
               {t.msg}

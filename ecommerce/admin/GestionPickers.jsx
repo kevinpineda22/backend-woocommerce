@@ -79,15 +79,48 @@ export const GestionPickers = () => {
       if (wcError) throw wcError;
 
       // 3. Fusionar datos y calcular carga real
-      const merged = profilesData
-        .map((profile) => {
-          const operativo = wcData.find((w) => w.email === profile.correo);
+      const mergedList = await Promise.all(
+        profilesData.map(async (profile) => {
+          let operativo = wcData.find((w) => w.email === profile.correo);
+
+          // AUTO-FIX: Si existe en profiles pero no en wc_pickers, intentar crearlo
+          if (!operativo && profile.correo) {
+            try {
+              const { data: newOp, error: insertErr } = await supabase
+                .from("wc_pickers")
+                .insert([
+                  {
+                    nombre_completo: profile.nombre || "Sin Nombre",
+                    email: profile.correo,
+                    estado_picker: "disponible",
+
+                    sede_id: profile.sede_id || null,
+                  },
+                ])
+                .select("*, wc_sedes(id, nombre, slug)")
+                .maybeSingle();
+
+              if (!insertErr && newOp) {
+                operativo = newOp;
+                console.log(
+                  "Auto-creado picker operativo para:",
+                  profile.correo,
+                );
+              }
+            } catch (e) {
+              console.error(
+                "No se pudo auto-crear picker para",
+                profile.correo,
+                e,
+              );
+            }
+          }
 
           // Si estamos filtrando por sede y este picker no tiene entrada en wc_pickers
-          // para esa sede, no lo mostramos (evita filas vacías)
-          if (sedeId && !operativo) return null;
+          // para esa sede, o si no se pudo crear, no lo mostramos (evita filas vacías)
+          if (sedeId && (!operativo || operativo.sede_id !== sedeId))
+            return null;
 
-          // Analizamos si tiene sesión activa para mostrar info correcta
           const sessionInfo = operativo?.wc_picking_sessions;
           const activeOrders = sessionInfo ? sessionInfo.ids_pedidos : [];
 
@@ -100,11 +133,12 @@ export const GestionPickers = () => {
             active_orders_ids: activeOrders,
             session_start: sessionInfo?.fecha_inicio,
             sede_nombre: operativo?.wc_sedes?.nombre || "Sin sede",
-            sede_id_picker: operativo?.sede_id || null,
+            sede_id_picker: operativo?.sede_id || profile.sede_id || null, // Usar profile.sede_id como fallback
           };
-        })
-        .filter(Boolean); // Eliminar nulls (pickers sin match cuando hay filtro de sede)
-      setPickers(merged);
+        }),
+      );
+
+      setPickers(mergedList.filter(Boolean)); // Eliminar nulls
     } catch (error) {
       console.error("Error fetching pickers:", error);
     } finally {
@@ -160,15 +194,20 @@ export const GestionPickers = () => {
     if (!confirmCancel) return;
     setIsProcessing(true);
     try {
-      await ecommerceApi.post(
-        `/cancelar-asignacion?${getSedeParam()}`,
-        { id_picker: confirmCancel.wc_id },
+      await ecommerceApi.post(`/cancelar-asignacion?${getSedeParam()}`, {
+        id_picker: confirmCancel.wc_id,
+      });
+      showToast(
+        `Sesión de ${confirmCancel.nombre_completo} cancelada. Pedidos liberados.`,
+        "success",
       );
-      showToast(`Sesión de ${confirmCancel.nombre_completo} cancelada. Pedidos liberados.`, "success");
       fetchPickers(); // Recargar tabla
     } catch (error) {
       console.error("Error cancelando asignación:", error);
-      showToast("Hubo un error al intentar cancelar. Verifica la consola.", "error");
+      showToast(
+        "Hubo un error al intentar cancelar. Verifica la consola.",
+        "error",
+      );
     } finally {
       setIsProcessing(false);
       setConfirmCancel(null);
@@ -255,10 +294,15 @@ export const GestionPickers = () => {
                 <tr>
                   <td colSpan="6" className="gp-premium-empty-state">
                     <div className="gp-premium-empty-icon">
-                       <FaUserPlus size={60} />
+                      <FaUserPlus size={60} />
                     </div>
-                    <h3 className="gp-premium-empty-title">Aún no hay operarios en esta sede</h3>
-                    <p className="gp-premium-empty-text">Crea tu primer Picker usando el botón superior para empezar a asignar recolecciones.</p>
+                    <h3 className="gp-premium-empty-title">
+                      Aún no hay operarios en esta sede
+                    </h3>
+                    <p className="gp-premium-empty-text">
+                      Crea tu primer Picker usando el botón superior para
+                      empezar a asignar recolecciones.
+                    </p>
                   </td>
                 </tr>
               ) : (
@@ -267,30 +311,45 @@ export const GestionPickers = () => {
                     <td>
                       <div className="picker-name-cell">
                         <div className="gp-avatar-small">
-                          {r.nombre_completo
-                            ? r.nombre_completo.charAt(0).toUpperCase()
+                          {r.nombre_completo || r.nombre
+                            ? (r.nombre_completo || r.nombre)
+                                .charAt(0)
+                                .toUpperCase()
                             : "?"}
                         </div>
-                        {r.nombre_completo || "Sin Nombre"}
+                        {r.nombre_completo || r.nombre || "Sin Nombre"}
                       </div>
                     </td>
-                    <td>{r.email}</td>
+                    <td>{r.email || r.correo}</td>
                     <td>
-                      {isSuperAdmin && r.wc_id ? (
+                      {isSuperAdmin ? (
                         <select
                           className="gp-sede-select"
                           value={r.sede_id_picker || ""}
                           onChange={async (e) => {
                             const newSedeId = e.target.value || null;
                             try {
-                              await ecommerceApi.post(
-                                "/sedes/asignar-picker",
-                                { picker_id: r.wc_id, sede_id: newSedeId },
-                              );
+                              if (!r.wc_id) {
+                                showToast(
+                                  "No hay ID operativo para este picker. Intenta actualizar la página.",
+                                  "error",
+                                );
+                                return;
+                              }
+                              await ecommerceApi.post("/sedes/asignar-picker", {
+                                picker_id: r.wc_id,
+                                sede_id: newSedeId,
+                              });
                               fetchPickers();
-                              showToast("Sede asignada correctamente.", "success");
+                              showToast(
+                                "Sede asignada correctamente.",
+                                "success",
+                              );
                             } catch (err) {
-                              showToast("Error asignando sede: " + err.message, "error");
+                              showToast(
+                                "Error asignando sede: " + err.message,
+                                "error",
+                              );
                             }
                           }}
                         >
@@ -363,8 +422,9 @@ export const GestionPickers = () => {
         isOpen={!!confirmCancel}
         title="⚠️ ADVERTENCIA LEGAL DE CANCELACIÓN"
         message={
-          confirmCancel ? 
-          `Estás a punto de cancelar abruptamente la sesión activa de ${confirmCancel.nombre_completo}. Esto liberará de golpe ${confirmCancel.active_orders_count} pedido(s) de vuelta a la canasta general.\n\n¿Proceder de todas formas?` : ""
+          confirmCancel
+            ? `Estás a punto de cancelar abruptamente la sesión activa de ${confirmCancel.nombre_completo}. Esto liberará de golpe ${confirmCancel.active_orders_count} pedido(s) de vuelta a la canasta general.\n\n¿Proceder de todas formas?`
+            : ""
         }
         confirmText="Sí, Cancelar Ruta y Liberar Pedidos"
         cancelText="Conservar Asignación"
@@ -391,7 +451,6 @@ export const GestionPickers = () => {
           ))}
         </AnimatePresence>
       </div>
-
     </div>
   );
 };

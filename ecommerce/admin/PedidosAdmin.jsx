@@ -151,10 +151,15 @@ const PedidosAdmin = () => {
 
   // --- DATA FETCHING ---
   const fetchData = useCallback(
-    async (isBackground = false) => {
+    async (isBackground = false, forceSync = false) => {
       if (!isBackground) setLoading(true);
       const sedeParam = getSedeParam();
       const params = { ...Object.fromEntries(new URLSearchParams(sedeParam)) };
+
+      if (forceSync) {
+        params.force = "true";
+      }
+
       try {
         // Todas las llamadas en PARALELO (antes eran secuenciales)
         const [resPending, resActive, resAuditPending, resPaymentPending] =
@@ -589,6 +594,7 @@ const PedidosAdmin = () => {
                   onAssignClick={handleOpenAssignModal}
                   onAssignSingleDirect={handleAssignSingleOrder}
                   isFetchingPickers={isFetchingPickers}
+                  onForceSync={() => fetchData(false, true)}
                 />
               ) : (
                 <ActiveSessionsView

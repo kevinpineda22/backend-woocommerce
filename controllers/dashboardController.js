@@ -15,6 +15,7 @@ const {
   fetchFromAllSedes,
   fetchFromSede,
   getOrderFromAnySede,
+  invalidateResponseCache,
 } = require("../services/wooMultiService");
 
 // =========================================================
@@ -247,6 +248,10 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 // =========================================================
 exports.getPendingOrders = async (req, res) => {
   try {
+    if (req.query.force === "true") {
+      invalidateResponseCache();
+    }
+
     // ── MULTI-SEDE (WordPress Multisite): Cada sede tiene su propio WooCommerce ──
     let wcOrders;
     if (req.sedeId) {
@@ -265,12 +270,18 @@ exports.getPendingOrders = async (req, res) => {
       });
     }
 
-    // Obtener asignaciones activas o en proceso de auditoría
-    // NOTA: "completado" significa que el picker terminó, pero el auditor no (pedido sigue processing en Woo)
+    // Obtener asignaciones activas verificando la sesión a la que pertenecen.
+    // Solo omitimos el pedido si está en "en_proceso" o "completado"
+    // y su sesión correspondiente AÚN está activa (no finalizada/cancelada).
     let assignQuery = supabase
       .from("wc_asignaciones_pedidos")
-      .select("id_pedido")
-      .in("estado_asignacion", ["en_proceso", "completado"]);
+      .select("id_pedido, wc_picking_sessions!inner(estado)")
+      .in("estado_asignacion", ["en_proceso", "completado"])
+      .not(
+        "wc_picking_sessions.estado",
+        "in",
+        '("cancelado","finalizado","auditado")',
+      );
 
     if (req.sedeId) {
       assignQuery = assignQuery.eq("sede_id", req.sedeId);
