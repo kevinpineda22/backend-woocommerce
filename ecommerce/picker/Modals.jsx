@@ -1441,3 +1441,76 @@ export const ClientsModal = ({ isOpen, orders, onClose }) => {
     </div>
   );
 };
+
+// --- MODAL DE CANTIDAD MASIVA ---
+export const BulkQtyModal = ({ isOpen, item, onClose, onConfirm }) => {
+  const [qty, setQty] = useState("");
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && item) {
+      const remaining = item.quantity_total - (item.qty_scanned || 0);
+      setQty(remaining.toString());
+      setTimeout(() => inputRef.current?.select(), 100);
+    }
+  }, [isOpen, item]);
+
+  if (!isOpen || !item) return null;
+
+  const remaining = item.quantity_total - (item.qty_scanned || 0);
+
+  const handleSubmit = () => {
+    const val = parseInt(qty);
+    if (!isNaN(val) && val > 0 && val <= remaining) {
+      onConfirm(val);
+    } else {
+      alert(`Ingresa una cantidad válida (máximo ${remaining})`);
+    }
+  };
+
+  return (
+    <div className="ec-modal-overlay">
+      <div className="ec-modal-content" style={{ maxWidth: 350 }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <FaBoxOpen size={40} color="#f59e0b" />
+          <h3>¿Cuántas unidades encontraste?</h3>
+          <p className="ec-text-secondary">
+            Múltiples unidades detectadas.
+            <br />
+            Llevas:{" "}
+            <strong>
+              {item.qty_scanned || 0} / {item.quantity_total}
+            </strong>
+          </p>
+        </div>
+        <div className="ec-input-wrapper">
+          <input
+            ref={inputRef}
+            type="number"
+            className="ec-manual-input"
+            style={{ textAlign: "center", fontSize: "1.5rem" }}
+            value={qty}
+            min={1}
+            max={remaining}
+            onChange={(e) => setQty(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSubmit();
+            }}
+          />
+        </div>
+        <div className="ec-modal-grid">
+          <button className="ec-modal-cancel" onClick={onClose}>
+            Cancelar
+          </button>
+          <button
+            className="ec-reason-btn"
+            style={{ background: "#f59e0b", color: "white", width: "100%" }}
+            onClick={handleSubmit}
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};

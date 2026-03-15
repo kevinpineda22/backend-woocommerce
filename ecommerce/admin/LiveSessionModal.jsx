@@ -445,7 +445,7 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                             </div>
                           ))}
                         </div>
-                        {item.status === "pendiente" && (
+                        {["pendiente", "parcial"].includes(item.status) && (
                           <div className="lsm-actions-wrapper">
                             {!isWeighable(item) && (
                               <button

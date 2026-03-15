@@ -78,7 +78,7 @@ exports.createPickingSession = async (req, res) => {
       .single();
     const nombrePicker = pickerData ? pickerData.nombre_completo : "Picker";
 
-// Multi-Sede: La sede de la sesión viene del picker, o del request
+    // Multi-Sede: La sede de la sesión viene del picker, o del request
     let sedeId = req.sedeId || pickerData?.sede_id || null;
 
     let sessClient;
@@ -95,14 +95,19 @@ exports.createPickingSession = async (req, res) => {
 
     // 2. Obtener datos para Snapshot (Multi-sede: usar cliente WC de la sede)
     sessClient = await getWooClient(sedeId);
-    
+
     const pedidosPromesas = ids_pedidos.map((id) =>
-      sessClient.get(`orders/${id}`).catch(err => {
-        console.error(`Error buscando pedido ${id} en sede ${sedeId}:`, err.message);
-        throw new Error(`El pedido ${id} no existe o no se pudo cargar desde WooCommerce.`);
-      })
+      sessClient.get(`orders/${id}`).catch((err) => {
+        console.error(
+          `Error buscando pedido ${id} en sede ${sedeId}:`,
+          err.message,
+        );
+        throw new Error(
+          `El pedido ${id} no existe o no se pudo cargar desde WooCommerce.`,
+        );
+      }),
     );
-    
+
     responses = await Promise.all(pedidosPromesas);
 
     const snapshotPedidos = responses.map((r) => {
@@ -258,29 +263,37 @@ exports.getSessionActive = async (req, res) => {
         const categoryHierarchyMap = {};
         if (categoryIdsToFetch.size > 0) {
           // Obtener los datos completos de las categorías (incluyendo 'parent')
-          const { data: categoriesData } = await catClient.get("products/categories", {
-            include: Array.from(categoryIdsToFetch).join(","),
-            per_page: 100,
-            _fields: "id,name,parent",
-          });
-          categoriesData.forEach(c => {
-             categoryHierarchyMap[c.id] = c;
+          const { data: categoriesData } = await catClient.get(
+            "products/categories",
+            {
+              include: Array.from(categoryIdsToFetch).join(","),
+              per_page: 100,
+              _fields: "id,name,parent",
+            },
+          );
+          categoriesData.forEach((c) => {
+            categoryHierarchyMap[c.id] = c;
           });
         }
 
         // Enriquecer las categorías del producto con la bandera 'parent'
         productsData.forEach((p) => {
           if (p.categories) {
-            mapaCategoriasReales[p.id] = p.categories.map(c => ({
-               ...c,
-               parent: categoryHierarchyMap[c.id] ? categoryHierarchyMap[c.id].parent : 0
+            mapaCategoriasReales[p.id] = p.categories.map((c) => ({
+              ...c,
+              parent: categoryHierarchyMap[c.id]
+                ? categoryHierarchyMap[c.id].parent
+                : 0,
             }));
           } else {
-             mapaCategoriasReales[p.id] = [];
+            mapaCategoriasReales[p.id] = [];
           }
         });
       } catch (err) {
-         console.error("Error obteniendo categorías/productos de WC:", err.message);
+        console.error(
+          "Error obteniendo categorías/productos de WC:",
+          err.message,
+        );
       }
     }
 
@@ -332,8 +345,12 @@ exports.getSessionActive = async (req, res) => {
       let status = "pendiente";
       const totalProcessed = qtyPicked + qtySubbed + qtyShort;
 
-      if (totalProcessed >= item.quantity_total) status = "recolectado";
-      else if (totalProcessed > 0) status = "parcial"; // Opcional, pero útil
+      if (totalProcessed >= item.quantity_total) {
+        if (qtySubbed >= item.quantity_total) status = "sustituido";
+        else status = "recolectado";
+      } else if (totalProcessed > 0) {
+        status = "parcial";
+      }
 
       return {
         ...item,
@@ -350,8 +367,9 @@ exports.getSessionActive = async (req, res) => {
         qty_scanned: qtyPicked,
 
         // ✅ CÓDIGOS DE BARRAS: Prioridad SIESA (Array) > WooCommerce (Array[1]) > SKU (Array[1])
-        barcode:
-          barcodeMapSiesa[parseInt(item.sku)] || [item.barcode || item.sku],
+        barcode: barcodeMapSiesa[parseInt(item.sku)] || [
+          item.barcode || item.sku,
+        ],
 
         sustituto: lastSub
           ? {

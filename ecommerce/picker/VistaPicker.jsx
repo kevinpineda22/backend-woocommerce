@@ -25,6 +25,7 @@ import {
   SubstituteModal,
   ManualEntryModal,
   ClientsModal,
+  BulkQtyModal,
 } from "./Modals";
 import { ProductCard } from "./components/ProductCard";
 import { SessionTimer } from "./components/SessionTimer";
@@ -67,6 +68,7 @@ const VistaPicker = () => {
   const [showSubModal, setShowSubModal] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
   const [showClientsModal, setShowClientsModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [scanOverrideCallback, setScanOverrideCallback] = useState(null);
   const [missingQtyForSub, setMissingQtyForSub] = useState(0);
   const [lastScannedBarcode, setLastScannedBarcode] = useState(null);
@@ -166,17 +168,26 @@ const VistaPicker = () => {
     // Si llegó a 0, borramos todo rastro de sustitutos. Si aún quedan, los mantenemos.
     const newSubstitute = newScanned === 0 ? null : item.sustituto;
 
-    // Al quitar un producto, ya no está al 100%, así que vuelve a estado "pendiente"
+    // Al quitar un producto, ya no está al 100%, así que vuelve a estado "pendiente" o "parcial"
+    const newStatus =
+      newScanned > 0 && newScanned < item.quantity_total
+        ? "parcial"
+        : "pendiente";
+
     updateLocalSessionState(
       item.product_id,
       newScanned,
-      "pendiente",
+      newStatus,
       newSubstitute,
     );
   };
 
   // Recibimos "peso" y "scannedCodeFromModal" (Si viene de cárnicos)
-  const confirmPicking = async (peso = null, scannedCodeFromModal = null) => {
+  const confirmPicking = async (
+    peso = null,
+    scannedCodeFromModal = null,
+    bulkQty = null,
+  ) => {
     if (!currentItem) return;
     const itemRef = currentItem;
 
@@ -187,6 +198,8 @@ const VistaPicker = () => {
       const scanned = itemRef.qty_scanned || 0;
       qtyToProcess = itemRef.quantity_total - scanned;
       pesoToLog = parseFloat((peso / qtyToProcess).toFixed(3));
+    } else if (bulkQty !== null) {
+      qtyToProcess = bulkQty;
     }
 
     const currentScanned = (itemRef.qty_scanned || 0) + qtyToProcess;
@@ -224,7 +237,7 @@ const VistaPicker = () => {
     updateLocalSessionState(
       itemRef.product_id,
       currentScanned,
-      isFinished ? "recolectado" : "pendiente",
+      isFinished ? "recolectado" : "parcial",
       null,
       addedWeight,
     );
@@ -262,6 +275,7 @@ const VistaPicker = () => {
         setLastScannedBarcode(null);
         setShowManualModal(false);
         if (isWeighable(currentItem)) setShowWeightModal(true);
+        else if (currentItem.quantity_total > 4) setShowBulkModal(true);
         else confirmPicking();
       }
       return;
@@ -280,6 +294,7 @@ const VistaPicker = () => {
         setLastScannedBarcode(null);
         setShowManualModal(false);
         if (isWeighable(currentItem)) setShowWeightModal(true);
+        else if (currentItem.quantity_total > 4) setShowBulkModal(true);
         else confirmPicking();
       } else showToast("❌ Código incorrecto.", "error");
     } catch (e) {
@@ -311,7 +326,14 @@ const VistaPicker = () => {
 
     if (c === sku || isBarcodeMatch) {
       setLastScannedBarcode(c);
-      confirmPicking();
+
+      // Si piden más de 4 y no es pesable, preguntamos cantidad extra
+      if (currentItem.quantity_total > 4 && !isWeighable(currentItem)) {
+        setIsScanning(false);
+        setShowBulkModal(true);
+      } else {
+        confirmPicking();
+      }
     } else {
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       showToast(`❌ Código ${c} no coincide.`, "error");
@@ -323,6 +345,7 @@ const VistaPicker = () => {
     setShowWeightModal(false);
     setShowManualModal(false);
     setShowSubModal(false);
+    setShowBulkModal(false);
     setCurrentItem(null);
     setScanOverrideCallback(null);
   };
@@ -336,9 +359,13 @@ const VistaPicker = () => {
   }, [sessionData]);
 
   const pendingItems =
-    sessionData?.items.filter((i) => i.status === "pendiente") || [];
+    sessionData?.items.filter((i) =>
+      ["pendiente", "parcial"].includes(i.status),
+    ) || [];
   const doneItems =
-    sessionData?.items.filter((i) => i.status !== "pendiente") || [];
+    sessionData?.items.filter(
+      (i) => !["pendiente", "parcial"].includes(i.status),
+    ) || [];
   const currentList = activeZone === "pendientes" ? pendingItems : doneItems;
 
   // --- RENDERIZADO CONDICIONAL ---
@@ -578,6 +605,19 @@ const VistaPicker = () => {
         isOpen={showClientsModal}
         orders={sessionData.orders_info}
         onClose={() => setShowClientsModal(false)}
+      />
+
+      <BulkQtyModal
+        isOpen={showBulkModal}
+        item={currentItem}
+        onClose={() => {
+          setShowBulkModal(false);
+          setCurrentItem(null);
+        }}
+        onConfirm={(qty) => {
+          setShowBulkModal(false);
+          confirmPicking(null, null, qty);
+        }}
       />
 
       {/* --- CONFIRM MODAL FINALIZAR RUTA --- */}
