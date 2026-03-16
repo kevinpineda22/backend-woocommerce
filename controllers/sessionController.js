@@ -237,7 +237,7 @@ exports.getSessionActive = async (req, res) => {
     const { data: logs } = await supabase
       .from("wc_log_picking")
       .select(
-        "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original",
+        "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original, peso_real",
       )
       .in("id_asignacion", assignIds);
 
@@ -330,15 +330,20 @@ exports.getSessionActive = async (req, res) => {
       );
 
       // Contadores Reales
-      const qtyPicked = itemLogs.filter(
-        (l) => l.accion === "recolectado",
-      ).length;
+      const pickedLogs = itemLogs.filter((l) => l.accion === "recolectado");
+      const qtyPicked = pickedLogs.length;
       const qtySubbed = itemLogs.filter(
         (l) => l.accion === "sustituido",
       ).length;
       const qtyShort = itemLogs.filter(
         (l) => l.accion === "no_encontrado",
       ).length;
+
+      // Peso real acumulado (suma de todos los logs de recolección con peso)
+      const pesoRealTotal = pickedLogs.reduce(
+        (sum, l) => sum + (parseFloat(l.peso_real) || 0),
+        0,
+      );
 
       // Datos del sustituto (si existe alguno)
       const lastSub = itemLogs.find((l) => l.accion === "sustituido");
@@ -367,6 +372,7 @@ exports.getSessionActive = async (req, res) => {
         // 👉 ESTA ES LA MAGIA: Enviamos qty_scanned como solo los originales
         // El frontend calculará (Total - Originales) para saber cuántos son sustitutos
         qty_scanned: qtyPicked,
+        peso_real: pesoRealTotal > 0 ? parseFloat(pesoRealTotal.toFixed(3)) : 0,
 
         // ✅ CÓDIGOS DE BARRAS: Prioridad SIESA (Array) > WooCommerce (Array[1]) > SKU (Array[1])
         barcode: barcodeMapSiesa[parseInt(item.sku)] || [

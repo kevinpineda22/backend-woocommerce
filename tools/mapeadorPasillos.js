@@ -27,46 +27,72 @@ const ORDEN_RUTA = {
  * IMPORTANTE: El ORDEN del array determina la PRIORIDAD de matching.
  * Si un texto coincide con varias reglas, gana la que aparece PRIMERO.
  *
- * Categorías WooCommerce del ecommerce:
- * ──────────────────────────────────────
- * ASEO DEL HOGAR        → P9 (limpieza) / P10 (ropa)
- * BEBIDAS               → P12
- * BELLEZA               → P8
- * CARNES Y PROTEÍNAS    → P13
- * CONGELADOS            → P13
- * CUIDADO DEL BEBÉ      → P7
- * CUIDADO PERSONAL      → P8
- * FRUTAS Y VERDURAS     → P14
- * HELADOS               → P13
- * IMPLEMENTOS DEL HOGAR → P11
- * LICORES Y CIGARRILLOS → P13
- * LÁCTEOS, HUEVOS Y REF → P13 (subcat Huevos → P2)
- * MASCOTAS              → P11
- * MERCADO               → P1-P6 (según subcategoría)
- * SALUDABLE             → P8
+ * LETREROS FÍSICOS DEL SUPERMERCADO:
+ * ───────────────────────────────────
+ * P1:  arroz, azúcar, grano, vinagretas, salsas, sazonador
+ * P2:  huevos, atunes, enlatados, pastas
+ * P3:  harinas, margarinas, sopas, aceite vegetal/soya/oliva
+ * P4:  refrescos en polvo, gelatina, repostería, arequipe, leche larga vida
+ * P5:  pan dulce, avenas, galleta salada/dulce/saludable
+ * P6:  pan de sal, chocolate (para preparar), café molido/premium/soluble
+ * P7:  parte adulto, pañitos húmedos, pañales, cereales, leche en polvo, granola
+ * P8:  parte femenina, cremas dentales/corporales, jabón de baño, higiene capilar, desodorantes
+ * P9:  escobas, papel higiénico, traperas, limpia piso, velas
+ * P10: jabón barra, detergente líquido/polvo, insecticidas, blanqueadores, suavizantes
+ * P11: mascotas, esponjas, guantes, lavaplatos, desengrasante
+ * P12: bebidas, pasabocas, servilletas, papel cocina, desechables
+ * P13: nevera lácteos, cervezas, maní, golosinas, chocolates golosina, nueces,
+ *      mexicano, saludable, carnes frías, carnicería
+ * P14: nevera gaseosas, mecato, fruver
+ *
+ * Categorías WooCommerce → Pasillo:
+ * ──────────────────────────────────
+ * ASEO DEL HOGAR         → P9 (limpieza) / P10 (ropa/insecticidas)
+ * BEBIDAS                → P12 (jugos, agua, hidratantes) / P14 (gaseosas)
+ * BELLEZA                → P8
+ * CARNES Y PROTEÍNAS     → P13
+ * CONGELADOS             → P13
+ * CUIDADO DEL BEBÉ       → P7
+ * CUIDADO PERSONAL       → P8
+ * FRUTAS Y VERDURAS      → P14
+ * HELADOS                → P13
+ * IMPLEMENTOS DEL HOGAR  → P11
+ * LICORES Y CIGARRILLOS  → P13
+ * LÁCTEOS, HUEVOS Y REF  → P13 (subcat Huevos → P2)
+ * MASCOTAS               → P11
+ * MERCADO                → P1-P7 (según subcategoría)
+ * SALUDABLE              → P13
  */
 const DEFINICION_PASILLOS = [
   // ═══ PRIORIDAD ALTA: categorías específicas que pueden confundirse ═══
+
+  // P7: Bebé, adulto + cereales, granola, leche en polvo (letrero físico)
   {
     pasillo: "7",
-    nombre: "Bebé y Adulto",
+    nombre: "Bebé, Adulto y Cereales",
     categorias: [
       "bebe", "bebes",
       "pañal", "pañales", "pañitos humedos",
       "cuidado del bebe", "higiene para bebes",
       "adulto", "incontinencia", "pañal adulto",
+      "cereal", "cereales", "granola",
+      "leche en polvo",
     ],
   },
+
+  // P6: Pan de sal, chocolate para PREPARAR, café (NO golosinas de chocolate)
   {
     pasillo: "6",
-    nombre: "Café y Panadería",
+    nombre: "Pan de Sal, Chocolate y Café",
     categorias: [
       "cafe", "cafe molido", "cafe premium", "cafe soluble",
       "chocolate", "chocolates",
-      "pan", "tostada",
       "aromaticas",
+      "pan de sal", "pan", "tostada",
     ],
   },
+
+  // P8: Cuidado personal, belleza, higiene (NO saludable, NO aceites)
   {
     pasillo: "8",
     nombre: "Cuidado Personal y Belleza",
@@ -75,11 +101,13 @@ const DEFINICION_PASILLOS = [
       "higiene intima", "higiene personal",
       "belleza", "maquillaje", "cosmeticos",
       "proteccion solar", "repelente",
-      "salud", "medicamentos", "suplementos", "vitaminas",
       "desodorante", "shampoo", "jabon de baño", "crema dental",
-      "saludable", "alimentos saludables",
+      "crema corporal", "cremas corporales",
+      "salud", "medicamentos", "suplementos", "vitaminas",
     ],
   },
+
+  // P9: Aseo hogar (limpieza, escobas, traperas, papel higiénico, velas)
   {
     pasillo: "9",
     nombre: "Aseo Hogar",
@@ -88,28 +116,32 @@ const DEFINICION_PASILLOS = [
       "ambientador", "ambientadores",
       "gel antibacterial", "antibacterial",
       "limpiadores", "desinfectantes", "limpiadores y desinfectantes",
-      "papel higienico", "servilletas", "papel higienico y servilletas",
+      "papel higienico", "papel higienico y servilletas",
       "articulos de limpieza", "limpieza",
       "escoba", "escobas", "trapera", "traperas", "trapero",
+      "limpia piso", "limpiapiso",
       "bolsa basura", "vela", "velas",
       "fabuloso", "lavanda",
     ],
   },
+
+  // P10: Aseo ropa + insecticidas (letrero físico: insecticidas están acá)
   {
     pasillo: "10",
-    nombre: "Aseo Ropa",
+    nombre: "Aseo Ropa e Insecticidas",
     categorias: [
       "detergente", "detergentes", "detergente liquido", "detergente en polvo",
       "suavizante", "suavizantes",
       "blanqueador", "blanqueadores", "desmanchadores",
       "jabon barra", "jabones",
+      "insecticida", "insecticidas",
     ],
   },
 
-  // ═══ REFRIGERADOS Y CARNES: antes de alimentos secos para capturar subcategorías de LÁCTEOS ═══
+  // ═══ REFRIGERADOS: P13 (nevera lácteos, carnes, licores, golosinas, saludable) ═══
   {
     pasillo: "13",
-    nombre: "Refrigerados, Carnes y Licores",
+    nombre: "Refrigerados, Carnes, Golosinas y Licores",
     categorias: [
       "refrigerado", "congelado", "congelados", "comidas congeladas",
       "carne", "carnes", "carniceria", "carnes y proteinas",
@@ -126,19 +158,42 @@ const DEFINICION_PASILLOS = [
       "licor", "licores", "vino", "vinos",
       "cigarrillo", "cigarrillos",
       "helado", "helados", "paleta", "paletas",
+      // Letrero físico: golosinas, maní, nueces, mexicano, saludable están en P13
+      "golosina", "golosinas",
+      "mani", "nueces", "frutos secos",
+      "mexicano",
+      "saludable", "alimentos saludables",
+      "dulce", "dulces",
     ],
   },
 
-  // ═══ BEBIDAS Y DESECHABLES: antes de alimentos secos para capturar "bebidas de cereal" ═══
+  // ═══ P14: Nevera gaseosas + mecato + fruver ═══
+  {
+    pasillo: "14",
+    nombre: "Gaseosas, Mecato y Fruver",
+    categorias: [
+      "fruver",
+      "fruta", "frutas",
+      "verdura", "verduras",
+      "frutas y verduras",
+      "hortaliza", "hortalizas",
+      "tomate", "cebolla", "papa",
+      "gaseosa", "gaseosas",
+      "mecato",
+    ],
+  },
+
+  // ═══ P12: Bebidas (NO gaseosas), pasabocas, servilletas, desechables ═══
   {
     pasillo: "12",
-    nombre: "Bebidas y Desechables",
+    nombre: "Bebidas, Pasabocas y Desechables",
     categorias: [
-      "gaseosa", "gaseosas", "refrescos",
-      "agua",
       "jugo", "jugos", "zumo", "zumos",
       "bebida", "bebidas", "bebidas de cereal",
+      "agua",
       "hidratante", "hidratantes", "energizante", "energizantes",
+      "snack", "snacks", "pasabocas",
+      "servilletas",
       "desechable", "desechables",
       "vaso", "plato", "lonchera", "loncheras",
       "papel cocina",
@@ -148,7 +203,7 @@ const DEFINICION_PASILLOS = [
   // ═══ PRIORIDAD MEDIA: Alimentos secos (MERCADO subcategorías) ═══
   {
     pasillo: "2",
-    nombre: "Despensa Básica",
+    nombre: "Huevos, Atunes, Enlatados y Pastas",
     categorias: [
       "huevo", "huevos",
       "atun", "atunes",
@@ -159,7 +214,7 @@ const DEFINICION_PASILLOS = [
   },
   {
     pasillo: "1",
-    nombre: "Granos y Condimentos",
+    nombre: "Arroz, Azúcar, Granos y Salsas",
     categorias: [
       "arroz",
       "azucar", "panela", "panelas", "endulzante", "endulzantes",
@@ -171,7 +226,7 @@ const DEFINICION_PASILLOS = [
   },
   {
     pasillo: "3",
-    nombre: "Aceites y Harinas",
+    nombre: "Harinas, Margarinas, Sopas y Aceites",
     categorias: [
       "aceite", "aceites", "aceite vegetal", "aceite soya", "aceite oliva",
       "harina", "harinas", "harina de trigo",
@@ -181,7 +236,7 @@ const DEFINICION_PASILLOS = [
   },
   {
     pasillo: "4",
-    nombre: "Polvos y Repostería",
+    nombre: "Repostería, Gelatina y Leche Larga Vida",
     categorias: [
       "gelatina", "flan", "pudin",
       "reposteria", "parva", "reposteria y parva",
@@ -192,21 +247,20 @@ const DEFINICION_PASILLOS = [
   },
   {
     pasillo: "5",
-    nombre: "Galletas, Dulces y Snacks",
+    nombre: "Pan Dulce, Galletas y Avenas",
     categorias: [
-      "galleta", "galletas", "galleteria", "galleta salada",
-      "dulce", "dulces",
-      "snack", "snacks", "pasabocas",
+      "galleta", "galletas", "galleteria", "galleta salada", "galleta dulce",
+      "galleta saludable",
+      "pan dulce",
       "avena", "avenas",
-      "cereal", "cereales", "granola",
       "modificadores",
     ],
   },
 
-  // ═══ OTROS ═══
+  // ═══ P11: Mascotas, implementos cocina ═══
   {
     pasillo: "11",
-    nombre: "Mascotas, Cocina e Implementos",
+    nombre: "Mascotas, Esponjas e Implementos",
     categorias: [
       "mascota", "mascotas", "perro", "gato",
       "alimento para mascotas", "alimento para peces", "alimento para aves",
@@ -214,21 +268,8 @@ const DEFINICION_PASILLOS = [
       "cocina", "utensilios", "utensilios de cocina",
       "esponja", "esponjas", "guante", "guantes",
       "lavaplatos", "desengrasante", "desengrasantes",
-      "insecticida", "insecticidas",
       "carbon",
       "implementos del hogar",
-    ],
-  },
-  {
-    pasillo: "14",
-    nombre: "Fruver",
-    categorias: [
-      "fruver",
-      "fruta", "frutas",
-      "verdura", "verduras",
-      "frutas y verduras",
-      "hortaliza", "hortalizas",
-      "tomate", "cebolla", "papa",
     ],
   },
 ];
