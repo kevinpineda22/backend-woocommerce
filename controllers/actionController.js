@@ -57,14 +57,36 @@ exports.registerAction = async (req, res) => {
     }
 
     // =================================================================
+    // CASO REVERT SHORT PICK: BORRAR SÓLO LOGS DE "no_encontrado"
+    // =================================================================
+    if (accion === "revert_short_pick") {
+      const { error: delError } = await supabase
+        .from("wc_log_picking")
+        .delete()
+        .eq("id_asignacion", targetAssignment.id)
+        .eq("id_producto_original", id_producto_original)
+        .eq("accion", "no_encontrado");
+
+      if (delError) throw delError;
+
+      return res
+        .status(200)
+        .json({
+          success: true,
+          message: "Logs de stock insuficiente revertidos",
+        });
+    }
+
+    // =================================================================
     // CASO RESET (DESHACER): BORRAR LOGS FÍSICAMENTE
     // =================================================================
     if (accion === "reset") {
-      // Buscamos los últimos logs de este producto en esta asignación
+      // Buscamos los últimos logs de este producto en esta asignación (ignorando los de "no_encontrado" que se manejan aparte)
       const { data: logsToDelete } = await supabase
         .from("wc_log_picking")
         .select("id")
         .eq("id_asignacion", targetAssignment.id)
+        .neq("accion", "no_encontrado")
         // Buscamos tanto por id_producto como por id_producto_original para cubrir sustitutos
         .or(
           `id_producto.eq.${id_producto_original},id_producto_original.eq.${id_producto_original}`,
@@ -128,11 +150,9 @@ exports.registerAction = async (req, res) => {
       `Error registrando acción '${accion}' para producto ${id_producto_original}:`,
       error.message,
     );
-    res
-      .status(500)
-      .json({
-        error: `Error al registrar acción '${accion}': ${error.message}`,
-      });
+    res.status(500).json({
+      error: `Error al registrar acción '${accion}': ${error.message}`,
+    });
   }
 };
 

@@ -516,17 +516,116 @@
   color: #134e4a;
 }
 
-/* ─── RESPONSIVE TWEAKS ─── */
-@media (max-width: 400px) {
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE BREAKPOINTS – MODALS
+   ═══════════════════════════════════════════════════ */
+
+/* ─── SMALL PHONES (≤ 374px) ─── */
+@media (max-width: 374px) {
+  .wm-modal .ec-modal-content {
+    padding: 16px 14px 20px;
+    border-radius: 20px;
+    width: 98%;
+  }
+
+  .wm-header h3 {
+    font-size: 1.05rem;
+  }
+  .wm-product-name {
+    font-size: 0.92rem;
+  }
+  .wm-request-badge {
+    font-size: 0.88rem;
+    padding: 10px 12px;
+  }
+  .wm-request-badge strong {
+    font-size: 0.95rem;
+  }
+  .wm-request-badge small {
+    font-size: 0.78rem;
+  }
+  .wm-step-label {
+    font-size: 0.88rem;
+  }
+
+  .wm-code-input,
+  .wm-weight-input,
+  .wm-verify-input {
+    font-size: 1.05rem !important;
+    padding: 12px 14px !important;
+    height: 50px;
+  }
+  .wm-code-input.has-button {
+    padding-right: 100px !important;
+  }
+  .wm-validate-btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    border-radius: 10px;
+  }
+  .wm-camera-btn {
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
+    border-radius: 12px;
+  }
+
+  .wm-error-alert {
+    padding: 12px 14px;
+    font-size: 0.9rem;
+    gap: 8px;
+  }
+
+  .wm-action-grid {
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .wm-btn-cancel,
+  .wm-btn-confirm {
+    padding: 12px;
+    font-size: 0.92rem;
+    min-height: 48px;
+    border-radius: 12px;
+  }
+
+  /* Substitute modal sections */
+  .wm-sub-header {
+    padding: 18px 14px;
+    margin: -16px -14px 16px;
+  }
+  .wm-sub-header h3 {
+    font-size: 1.05rem;
+  }
+  .wm-sub-product-name {
+    font-size: 1rem;
+  }
+  .wm-sub-product-hint {
+    font-size: 0.85rem;
+    padding: 10px;
+  }
+  .wm-verify-row {
+    gap: 6px;
+  }
+
+  /* GS1 Feedback */
+  .wm-gs1-success-feedback {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .wm-gs1-code {
+    font-size: 0.78rem;
+  }
+}
+
+/* ─── REGULAR PHONES (375px–428px) ─── */
+@media (min-width: 375px) and (max-width: 428px) {
   .wm-modal .ec-modal-content {
     padding: 20px 18px 24px;
     border-radius: 24px;
   }
-
   .wm-header h3 {
     font-size: 1.15rem;
   }
-
   .wm-code-input,
   .wm-weight-input,
   .wm-verify-input {
@@ -534,26 +633,18 @@
     padding: 14px 16px !important;
     height: 54px;
   }
-
   .wm-code-input.has-button {
     padding-right: 110px !important;
   }
-
   .wm-validate-btn {
     padding: 10px 16px;
     font-size: 0.95rem;
   }
-
   .wm-camera-btn {
     width: 54px;
     height: 54px;
     min-width: 54px;
   }
-
-  .wm-price-value {
-    font-size: 1.3rem;
-  }
-
   .wm-btn-cancel,
   .wm-btn-confirm {
     padding: 14px;
@@ -562,9 +653,40 @@
   }
 }
 
+/* ─── TABLETS (600px+) ─── */
 @media (min-width: 600px) {
   .wm-modal .ec-modal-content {
     max-width: 540px;
     padding: 32px 36px 36px;
+  }
+  .wm-sub-header {
+    padding: 28px 24px;
+  }
+}
+
+/* ─── LANDSCAPE PHONES ─── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .wm-modal .ec-modal-content {
+    max-height: 96vh;
+    max-width: 70vw;
+    padding: 16px 18px;
+    border-radius: 18px;
+  }
+  .wm-header {
+    margin-bottom: 10px;
+  }
+  .wm-header-icon {
+    display: none;
+  }
+  .wm-request-badge {
+    padding: 8px 12px;
+  }
+  .wm-action-grid {
+    margin-top: 12px;
+  }
+  .wm-btn-cancel,
+  .wm-btn-confirm {
+    min-height: 44px;
+    padding: 10px;
   }
 }

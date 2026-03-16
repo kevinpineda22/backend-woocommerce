@@ -235,7 +235,7 @@ export const WeightModal = ({
 
     if (isFruver) {
       if (!weight || isNaN(parseFloat(weight))) return 0;
-      weightInDisplayUnits = parseFloat(weight); // Fruver digita kilos, asumimos que eso quiere la app.
+      weightInDisplayUnits = parseFloat(weight) / 1000; // Picker digita gramos, convertimos a KG
     } else if (isMeat) {
       // Extraer peso solo si es un código GS1 de peso variable (empieza por 2 y tiene 13 o 14 dígitos)
       if (
@@ -449,20 +449,20 @@ export const WeightModal = ({
 
     // --- RAMA FRUVER ---
     if (isFruver) {
-      const val = parseFloat(weight);
+      const valGramos = parseFloat(weight);
 
-      if (!val || isNaN(val)) {
-        setError(`❌ Ingresa un peso válido.`);
+      if (!valGramos || isNaN(valGramos) || valGramos <= 0) {
+        setError(`❌ Ingresa un peso válido en gramos.`);
         inputRefWeight.current?.focus();
         return;
       }
 
-      finalWeight = val;
+      // Convertir gramos a KG para el sistema
+      finalWeight = valGramos / 1000;
+
       if (baseEanFruver) {
-        const pesoGramos = Math.round(val * 1000)
-          .toString()
-          .padStart(5, "0");
-        const codigoSinCheck = `${baseEanFruver}${pesoGramos}`;
+        const pesoGramosStr = Math.round(valGramos).toString().padStart(5, "0");
+        const codigoSinCheck = `${baseEanFruver}${pesoGramosStr}`;
         const checkDigit = calcularDigitoVerificador(codigoSinCheck);
         if (checkDigit) {
           finalCodeToSave = `${codigoSinCheck}${checkDigit}`;
@@ -545,6 +545,10 @@ export const WeightModal = ({
             Solicitado:{" "}
             <strong>
               {item.quantity_total} {item.unidad_medida || "Kg"}
+              {(item.unidad_medida || "").toUpperCase() === "LB" ||
+              (item.unidad_medida || "").toUpperCase() === "LIBRA"
+                ? ` (≈ ${Math.round(parseFloat(item.quantity_total) * 500)}g)`
+                : ` (≈ ${Math.round(parseFloat(item.quantity_total) * 1000)}g)`}
             </strong>
             <small>Margen permitido: ±50g</small>
           </div>
@@ -646,14 +650,16 @@ export const WeightModal = ({
           <div
             className={`wm-step-section ${!isCodeValidated ? "disabled" : ""}`}
           >
-            <label className="wm-step-label">Paso 2: Digitar Peso (Kg)</label>
+            <label className="wm-step-label">
+              Paso 2: Digitar Peso en Gramos (g)
+            </label>
             <div className="wm-input-row">
               <input
                 ref={inputRefWeight}
                 type="number"
                 className="wm-weight-input"
-                placeholder="Ej: 0.500"
-                step="0.001"
+                placeholder="Ej: 1490"
+                step="1"
                 value={weight}
                 disabled={!isCodeValidated}
                 onChange={(e) => {
@@ -664,10 +670,20 @@ export const WeightModal = ({
                   e.key === "Enter" && weight && validateAndConfirm()
                 }
               />
-              <span className="wm-weight-unit">
-                {item.unidad_medida?.toUpperCase() || "KG"}
-              </span>
+              <span className="wm-weight-unit">g</span>
             </div>
+            {weight && !isNaN(parseFloat(weight)) && parseFloat(weight) > 0 && (
+              <p
+                style={{
+                  fontSize: "0.8rem",
+                  color: "#64748b",
+                  marginTop: "4px",
+                  textAlign: "center",
+                }}
+              >
+                = {(parseFloat(weight) / 1000).toFixed(3)} Kg
+              </p>
+            )}
           </div>
         )}
 

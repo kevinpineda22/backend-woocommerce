@@ -237,8 +237,11 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
                 }}
               >
                 <FaWeightHanging size={14} />
-                PESO REGISTRADO: {parseFloat(item.peso_real).toFixed(3)}{" "}
-                {item.unidad_medida?.toUpperCase() || "KG"}
+                PESO REGISTRADO: {parseFloat(item.peso_real).toFixed(3)} KG
+                {item.unidad_medida?.toUpperCase() === "LB" ||
+                item.unidad_medida?.toUpperCase() === "LIBRA"
+                  ? ` (${(parseFloat(item.peso_real) * 2).toFixed(2)} LB)`
+                  : ""}
               </div>
             )}
 
@@ -353,11 +356,12 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
               onClick={() => onAction(item, "short_pick")}
               title="Faltan Unidades"
             >
-              <FaBan />
+              <FaBan size={12} />
+              <span className="ec-btn-micro-label">NO HAY</span>
             </button>
           )}
 
-          <div style={{ display: "flex", gap: 5 }}>
+          <div style={{ display: "flex", gap: 3, width: "100%" }}>
             {/* Ocultamos el teclado si es pesable */}
             {!isWeighable && (
               <button
@@ -365,7 +369,8 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
                 onClick={() => onAction(item, "manual")}
                 title="Teclado"
               >
-                <FaKeyboard size={14} />
+                <FaKeyboard size={12} />
+                <span className="ec-btn-micro-label">DIGITAR</span>
               </button>
             )}
 
@@ -374,7 +379,8 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
               onClick={() => onAction(item, "substitute")}
               title="Sustituir Total"
             >
-              <FaExchangeAlt size={14} />
+              <FaExchangeAlt size={12} />
+              <span className="ec-btn-micro-label">CAMBIAR</span>
             </button>
           </div>
         </div>

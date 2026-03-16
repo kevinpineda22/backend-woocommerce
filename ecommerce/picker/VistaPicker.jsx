@@ -156,31 +156,69 @@ const VistaPicker = () => {
   };
 
   const handleUndo = async (item) => {
-    // 🧠 LÓGICA INTELIGENTE: Pesables borran TODO, normales borran de a 1.
     const isItemWeighable = isWeighable(item);
-    const qtyToUndo = isItemWeighable
-      ? item.qty_scanned || item.quantity_total || 1
-      : 1;
+    const scanned = item.qty_scanned || 0;
+    const total = item.quantity_total;
+    const wasShortPick =
+      item.status === "recolectado" && scanned > 0 && scanned < total;
 
-    queueAction({
-      id_sesion: sessionData.session_id,
-      id_producto_original: item.product_id,
-      accion: "reset",
-      cantidad_afectada: qtyToUndo,
-      pasillo: item.pasillo,
-    });
+    // Preguntar al usuario qué desea hacer si hay unidades escaneadas
+    let emptyCompletely = false;
+    let keepQuantity = false;
 
-    // Calculamos la nueva cantidad que queda en la canasta
-    const newScanned = Math.max(0, (item.qty_scanned || 0) - qtyToUndo);
+    if (scanned > 0) {
+      if (
+        window.confirm(
+          `¿Deseas devolver a pendientes VACÍO (0 unidades)?\n\n[ACEPTAR] = Empezar desde cero\n[CANCELAR] = Mantener progreso actual (${scanned}/${total})`,
+        )
+      ) {
+        emptyCompletely = true;
+      } else {
+        keepQuantity = true;
+      }
+    } else {
+      emptyCompletely = true;
+    }
 
-    // Si llegó a 0, borramos todo rastro de sustitutos. Si aún quedan, los mantenemos.
+    // Si fue un short-pick, primero lanzamos la reversión del short-pick
+    if (wasShortPick) {
+      queueAction({
+        id_sesion: sessionData.session_id,
+        id_producto_original: item.product_id,
+        accion: "revert_short_pick",
+        cantidad_afectada: 0,
+        pasillo: item.pasillo,
+      });
+    }
+
+    // Determinar cantidad a borrar
+    let qtyToUndo = 0;
+    if (emptyCompletely) {
+      qtyToUndo = scanned || total || 1;
+    } else if (keepQuantity) {
+      qtyToUndo = 0; // Mantenemos la cantidad intacta
+    } else {
+      // Por si algo falla, comportamiento antiguo:
+      qtyToUndo = isItemWeighable ? scanned || total || 1 : 1;
+    }
+
+    if (qtyToUndo > 0 || (emptyCompletely && scanned > 0)) {
+      queueAction({
+        id_sesion: sessionData.session_id,
+        id_producto_original: item.product_id,
+        accion: "reset",
+        cantidad_afectada: qtyToUndo,
+        pasillo: item.pasillo,
+      });
+    }
+
+    // Calculamos la nueva cantidad que queda
+    const newScanned = Math.max(0, scanned - qtyToUndo);
     const newSubstitute = newScanned === 0 ? null : item.sustituto;
 
-    // Al quitar un producto, ya no está al 100%, así que vuelve a estado "pendiente" o "parcial"
-    const newStatus =
-      newScanned > 0 && newScanned < item.quantity_total
-        ? "parcial"
-        : "pendiente";
+    // Al devolver a pendientes, forzamos el estado aunque tenga todo escaneado
+    // Si lo devolvió pero decidió mantener la cantidad ej 4/4, se va a "parcial" para que aparezca en pendientes
+    const newStatus = newScanned > 0 ? "parcial" : "pendiente";
 
     updateLocalSessionState(
       item.product_id,
@@ -188,6 +226,15 @@ const VistaPicker = () => {
       newStatus,
       newSubstitute,
     );
+
+    if (emptyCompletely) {
+      showToast("↩️ Devuelto a pendientes (VACÍO)", "info");
+    } else {
+      showToast(
+        `↩️ Devuelto a pendientes (${newScanned}/${total} conservadas)`,
+        "info",
+      );
+    }
   };
 
   // Recibimos "peso" y "scannedCodeFromModal" (Si viene de cárnicos)
