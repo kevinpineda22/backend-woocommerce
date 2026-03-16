@@ -194,7 +194,7 @@ const VistaPicker = () => {
     // Determinar cantidad a borrar
     let qtyToUndo = 0;
     if (emptyCompletely) {
-      qtyToUndo = scanned || total || 1;
+      qtyToUndo = 9999; // Borrado TOTAL garantizado (para evitar que queden logs huérfanos)
     } else if (keepQuantity) {
       qtyToUndo = 0; // Mantenemos la cantidad intacta
     } else {
@@ -207,13 +207,14 @@ const VistaPicker = () => {
         id_sesion: sessionData.session_id,
         id_producto_original: item.product_id,
         accion: "reset",
-        cantidad_afectada: qtyToUndo,
+        cantidad_afectada: qtyToUndo === 9999 ? 9999 : qtyToUndo,
         pasillo: item.pasillo,
       });
     }
 
-    // Calculamos la nueva cantidad que queda
-    const newScanned = Math.max(0, scanned - qtyToUndo);
+    // Calculamos la nueva cantidad que queda (si es 9999 obvio queda en 0)
+    const newScanned =
+      qtyToUndo === 9999 ? 0 : Math.max(0, scanned - qtyToUndo);
     const newSubstitute = newScanned === 0 ? null : item.sustituto;
 
     // Al devolver a pendientes, forzamos el estado aunque tenga todo escaneado

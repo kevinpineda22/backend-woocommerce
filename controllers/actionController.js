@@ -36,14 +36,16 @@ exports.registerAction = async (req, res) => {
       const items = assign.reporte_snapshot?.line_items || [];
       const found = items.find(
         (i) =>
-          i.product_id === id_producto_original ||
-          i.variation_id === id_producto_original,
+          String(i.product_id) === String(id_producto_original) ||
+          String(i.variation_id) === String(id_producto_original),
       );
       if (found) {
         targetAssignment = assign;
         break;
       }
     }
+
+    const allAssignmentIds = assignments.map((a) => a.id);
 
     // Multi-Sede: Obtener sede_id de la sesión para propagarla al log
     let sedeId = req.sedeId || null;
@@ -63,36 +65,40 @@ exports.registerAction = async (req, res) => {
       const { error: delError } = await supabase
         .from("wc_log_picking")
         .delete()
-        .eq("id_asignacion", targetAssignment.id)
+        .in("id_asignacion", allAssignmentIds)
         .eq("id_producto_original", id_producto_original)
         .eq("accion", "no_encontrado");
 
       if (delError) throw delError;
 
-      return res
-        .status(200)
-        .json({
-          success: true,
-          message: "Logs de stock insuficiente revertidos",
-        });
+      return res.status(200).json({
+        success: true,
+        message: "Logs de stock insuficiente revertidos",
+      });
     }
 
     // =================================================================
     // CASO RESET (DESHACER): BORRAR LOGS FÍSICAMENTE
     // =================================================================
     if (accion === "reset") {
-      // Buscamos los últimos logs de este producto en esta asignación (ignorando los de "no_encontrado" que se manejan aparte)
-      const { data: logsToDelete } = await supabase
+      // Buscamos los últimos logs de este producto en toda la sesión (ignorando los de "no_encontrado" que se manejan aparte)
+      let query = supabase
         .from("wc_log_picking")
         .select("id")
-        .eq("id_asignacion", targetAssignment.id)
+        .in("id_asignacion", allAssignmentIds)
         .neq("accion", "no_encontrado")
-        // Buscamos tanto por id_producto como por id_producto_original para cubrir sustitutos
-        .or(
-          `id_producto.eq.${id_producto_original},id_producto_original.eq.${id_producto_original}`,
-        )
-        .order("fecha_registro", { ascending: false })
-        .limit(qty);
+        .eq("id_producto_original", id_producto_original)
+        .order("fecha_registro", { ascending: false });
+
+      if (qty && qty > 0) {
+        query = query.limit(qty);
+      }
+
+      const { data: logsToDelete, error: selectError } = await query;
+
+      if (selectError) {
+        console.error("Error fetching logs to delete:", selectError);
+      }
 
       if (logsToDelete && logsToDelete.length > 0) {
         const ids = logsToDelete.map((l) => l.id);
