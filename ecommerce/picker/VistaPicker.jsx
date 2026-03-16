@@ -29,6 +29,7 @@ import {
 } from "./Modals";
 import { ProductCard } from "./components/ProductCard";
 import ImageZoomModal from "./components/ImageZoomModal";
+import ActionModal from "./components/ActionModal";
 import { SessionTimer } from "./components/SessionTimer";
 import { getOrderStyle } from "./utils/pickerConstants";
 import { isWeighable } from "./utils/isWeighable";
@@ -76,6 +77,7 @@ const VistaPicker = () => {
   const [missingQtyForSub, setMissingQtyForSub] = useState(0);
   const [lastScannedBarcode, setLastScannedBarcode] = useState(null);
   const [zoomImage, setZoomImage] = useState({ src: null, name: "" });
+  const [actionModal, setActionModal] = useState({ open: false, title: "", message: "", icon: null, iconVariant: "warning", actions: [] });
 
   // --- UI Toasts Feedback Mejorado ---
   const [toasts, setToasts] = useState([]);
@@ -111,31 +113,51 @@ const VistaPicker = () => {
     else if (type === "short_pick") handleShortPick(item);
   };
 
-  const handleShortPick = async (item) => {
+  const handleShortPick = (item) => {
     const scanned = item.qty_scanned || 0;
     const total = item.quantity_total;
     const missing = total - scanned;
     if (missing <= 0) return;
 
-    if (
-      window.confirm(
-        `⚠️ FALTAN ${missing} UNIDADES.\n\n[ACEPTAR] = Buscar un SUSTITUTO.\n[CANCELAR] = Enviar INCOMPLETO.`,
-      )
-    ) {
-      setMissingQtyForSub(missing);
-      setShowSubModal(true);
-    } else {
-      queueAction({
-        id_sesion: sessionData.session_id,
-        id_producto_original: item.product_id,
-        nombre_producto_original: item.name,
-        accion: "no_encontrado",
-        cantidad_afectada: missing,
-        motivo: "Stock Insuficiente",
-        pasillo: item.pasillo,
-      });
-      updateLocalSessionState(item.product_id, scanned, "recolectado");
-    }
+    const closeModal = () => setActionModal((prev) => ({ ...prev, open: false }));
+
+    setActionModal({
+      open: true,
+      title: `Faltan ${missing} unidades`,
+      message: `Llevas ${scanned} de ${total}.\n¿Qué deseas hacer con las ${missing} que faltan?`,
+      icon: <FaExclamationTriangle />,
+      iconVariant: "warning",
+      actions: [
+        {
+          label: "Buscar sustituto",
+          variant: "primary",
+          onClick: () => {
+            closeModal();
+            setCurrentItem(item);
+            setMissingQtyForSub(missing);
+            setShowSubModal(true);
+          },
+        },
+        {
+          label: "Enviar incompleto",
+          variant: "danger",
+          onClick: () => {
+            closeModal();
+            queueAction({
+              id_sesion: sessionData.session_id,
+              id_producto_original: item.product_id,
+              nombre_producto_original: item.name,
+              accion: "no_encontrado",
+              cantidad_afectada: missing,
+              motivo: "Stock Insuficiente",
+              pasillo: item.pasillo,
+            });
+            updateLocalSessionState(item.product_id, scanned, "recolectado");
+            showToast(`Enviado incompleto (${scanned}/${total})`, "warning");
+          },
+        },
+      ],
+    });
   };
 
   const handleUndo = (item) => {
@@ -145,39 +167,20 @@ const VistaPicker = () => {
     const wasShortPick =
       item.status === "recolectado" && scanned > 0 && scanned < total;
 
-    // ── LÓGICA DE UNDO SEGÚN TIPO DE PRODUCTO ──
-    // Pesables (fruver/carnes): SIEMPRE resetear a 0 (hay que re-pesar)
-    // Unidades completas (scanned >= total): SIEMPRE resetear a 0 (no tiene sentido mantener)
-    // Unidades parciales (0 < scanned < total): el picker elige si conservar progreso
-    let emptyCompletely = true;
+    const closeModal = () => setActionModal((prev) => ({ ...prev, open: false }));
 
-    if (isItemWeighable) {
-      if (!window.confirm("¿Devolver a pendientes?\nSe borrarán los datos de peso registrado.")) return;
-    } else if (scanned >= total) {
-      if (!window.confirm("¿Devolver a pendientes?\nSe empezará la recolección desde cero.")) return;
-    } else if (scanned > 0 && scanned < total) {
-      // Parcial: ofrecer opción de conservar progreso
-      emptyCompletely = window.confirm(
-        `Tienes ${scanned} de ${total} unidades.\n\n[ACEPTAR] = Empezar desde cero (0/${total})\n[CANCELAR] = Mantener progreso actual (${scanned}/${total})`,
-      );
-    } else {
-      // scanned === 0 (producto sustituido sin unidades propias): reset directo
-      if (!window.confirm("¿Devolver a pendientes?")) return;
-    }
-
-    // Si fue un short-pick, primero lanzamos la reversión
-    if (wasShortPick) {
-      queueAction({
-        id_sesion: sessionData.session_id,
-        id_producto_original: item.product_id,
-        accion: "revert_short_pick",
-        cantidad_afectada: 0,
-        pasillo: item.pasillo,
-      });
-    }
-
-    if (emptyCompletely) {
-      // Reset total: borrar todo el progreso
+    // Función que ejecuta el reset completo
+    const doFullReset = () => {
+      closeModal();
+      if (wasShortPick) {
+        queueAction({
+          id_sesion: sessionData.session_id,
+          id_producto_original: item.product_id,
+          accion: "revert_short_pick",
+          cantidad_afectada: 0,
+          pasillo: item.pasillo,
+        });
+      }
       if (scanned > 0) {
         queueAction({
           id_sesion: sessionData.session_id,
@@ -190,22 +193,104 @@ const VistaPicker = () => {
       updateLocalSessionState(item.product_id, 0, "pendiente", null);
       showToast(
         isItemWeighable
-          ? "↩️ Devuelto a pendientes (peso borrado)"
-          : "↩️ Devuelto a pendientes",
+          ? "Devuelto a pendientes (peso borrado)"
+          : "Devuelto a pendientes",
         "info",
       );
-    } else {
-      // Mantener progreso parcial: el producto vuelve a pendientes con su qty actual
-      queueAction({
-        id_sesion: sessionData.session_id,
-        id_producto_original: item.product_id,
-        accion: "reset",
-        cantidad_afectada: 0,
-        pasillo: item.pasillo,
+    };
+
+    // Función que mantiene progreso parcial
+    const doKeepProgress = () => {
+      closeModal();
+      if (wasShortPick) {
+        queueAction({
+          id_sesion: sessionData.session_id,
+          id_producto_original: item.product_id,
+          accion: "revert_short_pick",
+          cantidad_afectada: 0,
+          pasillo: item.pasillo,
+        });
+      }
+      // Si tiene sustituto, borramos solo los logs de sustitución
+      if (item.sustituto) {
+        queueAction({
+          id_sesion: sessionData.session_id,
+          id_producto_original: item.product_id,
+          accion: "reset_sustituto",
+          cantidad_afectada: 0,
+          pasillo: item.pasillo,
+        });
+      }
+      // NO enviamos reset de los recolectados: se mantienen en la BD
+      updateLocalSessionState(item.product_id, scanned, "parcial", null);
+      showToast(`Devuelto a pendientes (${scanned}/${total} conservadas)`, "info");
+    };
+
+    // ── CASO 1: Pesable (fruver/carnes) → siempre reset total ──
+    if (isItemWeighable) {
+      setActionModal({
+        open: true,
+        title: "Devolver a pendientes",
+        message: "Se borrarán los datos de peso registrado y deberás volver a pesar el producto.",
+        icon: <FaExclamationTriangle />,
+        iconVariant: "warning",
+        actions: [
+          { label: "Devolver y borrar peso", variant: "danger", onClick: doFullReset },
+        ],
       });
-      updateLocalSessionState(item.product_id, scanned, "parcial", item.sustituto);
-      showToast(`↩️ Devuelto a pendientes (${scanned}/${total} conservadas)`, "info");
+      return;
     }
+
+    // ── CASO 2: Completado (scanned >= total) → siempre reset total ──
+    if (scanned >= total) {
+      setActionModal({
+        open: true,
+        title: "Devolver a pendientes",
+        message: `Se empezará la recolección desde cero (0/${total}).`,
+        icon: <FaExclamationTriangle />,
+        iconVariant: "warning",
+        actions: [
+          { label: "Devolver desde cero", variant: "danger", onClick: doFullReset },
+        ],
+      });
+      return;
+    }
+
+    // ── CASO 3: Parcial (0 < scanned < total) → ofrecer opciones ──
+    if (scanned > 0 && scanned < total) {
+      setActionModal({
+        open: true,
+        title: "Devolver a pendientes",
+        message: `Llevas ${scanned} de ${total} unidades.\n¿Qué deseas hacer?`,
+        icon: <FaExclamationTriangle />,
+        iconVariant: "info",
+        actions: [
+          {
+            label: `Mantener progreso (${scanned}/${total})`,
+            variant: "primary",
+            onClick: doKeepProgress,
+          },
+          {
+            label: "Empezar desde cero (0/" + total + ")",
+            variant: "danger",
+            onClick: doFullReset,
+          },
+        ],
+      });
+      return;
+    }
+
+    // ── CASO 4: scanned === 0 (sustituido sin originales) ──
+    setActionModal({
+      open: true,
+      title: "Devolver a pendientes",
+      message: "El producto volverá a la lista de pendientes.",
+      icon: <FaExclamationTriangle />,
+      iconVariant: "warning",
+      actions: [
+        { label: "Devolver a pendientes", variant: "danger", onClick: doFullReset },
+      ],
+    });
   };
 
   // Recibimos "peso" y "scannedCodeFromModal" (Si viene de cárnicos)
@@ -742,6 +827,17 @@ const VistaPicker = () => {
         }}
         onCancel={() => setShowFinishConfirm(false)}
         isProcessing={isFinishing}
+      />
+
+      {/* --- ACTION MODAL (Short Pick / Undo) --- */}
+      <ActionModal
+        isOpen={actionModal.open}
+        title={actionModal.title}
+        message={actionModal.message}
+        icon={actionModal.icon}
+        iconVariant={actionModal.iconVariant}
+        actions={actionModal.actions}
+        onClose={() => setActionModal((prev) => ({ ...prev, open: false }))}
       />
 
       {/* --- IMAGE ZOOM LIGHTBOX --- */}

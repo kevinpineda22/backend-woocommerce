@@ -34,15 +34,15 @@ const ORDEN_RUTA = {
  * P3:  harinas, margarinas, sopas, aceite vegetal/soya/oliva
  * P4:  refrescos en polvo, gelatina, repostería, arequipe, leche larga vida
  * P5:  pan dulce, avenas, galleta salada/dulce/saludable
- * P6:  pan de sal, chocolate (para preparar), café molido/premium/soluble
+ * P6:  pan de sal, café molido/premium/soluble, aromáticas
  * P7:  parte adulto, pañitos húmedos, pañales, cereales, leche en polvo, granola
  * P8:  parte femenina, cremas dentales/corporales, jabón de baño, higiene capilar, desodorantes
  * P9:  escobas, papel higiénico, traperas, limpia piso, velas
  * P10: jabón barra, detergente líquido/polvo, insecticidas, blanqueadores, suavizantes
  * P11: mascotas, esponjas, guantes, lavaplatos, desengrasante
  * P12: bebidas, pasabocas, servilletas, papel cocina, desechables
- * P13: nevera lácteos, cervezas, maní, golosinas, chocolates golosina, nueces,
- *      mexicano, saludable, carnes frías, carnicería
+ * P13: nevera lácteos, cervezas, chocolates y dulces, maní, golosinas, nueces,
+ *      mexicano, saludable, suplementos/vitaminas, carnes frías, carnicería
  * P14: nevera gaseosas, mecato, fruver
  *
  * Categorías WooCommerce → Pasillo:
@@ -80,15 +80,14 @@ const DEFINICION_PASILLOS = [
     ],
   },
 
-  // P6: Pan de sal, chocolate para PREPARAR, café (NO golosinas de chocolate)
+  // P6: Pan de sal, café, aromáticas (NO chocolates → esos van a P13)
   {
     pasillo: "6",
-    nombre: "Pan de Sal, Chocolate y Café",
+    nombre: "Pan de Sal y Café",
     categorias: [
       "cafe", "cafe molido", "cafe premium", "cafe soluble",
-      "chocolate", "chocolates",
-      "aromaticas",
-      "pan de sal", "pan", "tostada",
+      "aromaticas", "aromaticas, te y cafe",
+      "pan de sal", "tostada",
     ],
   },
 
@@ -103,7 +102,7 @@ const DEFINICION_PASILLOS = [
       "proteccion solar", "repelente",
       "desodorante", "shampoo", "jabon de baño", "crema dental",
       "crema corporal", "cremas corporales",
-      "salud", "medicamentos", "suplementos", "vitaminas",
+      "salud", "medicamentos", "salud y medicamentos",
     ],
   },
 
@@ -158,12 +157,14 @@ const DEFINICION_PASILLOS = [
       "licor", "licores", "vino", "vinos",
       "cigarrillo", "cigarrillos",
       "helado", "helados", "paleta", "paletas",
-      // Letrero físico: golosinas, maní, nueces, mexicano, saludable están en P13
+      // Letrero físico: golosinas, chocolates, maní, nueces, mexicano, saludable están en P13
+      "chocolate", "chocolates", "chocolates y dulces",
       "golosina", "golosinas",
+      "dulce", "dulces",
       "mani", "nueces", "frutos secos",
       "mexicano",
       "saludable", "alimentos saludables",
-      "dulce", "dulces",
+      "suplementos", "vitaminas", "suplementos y vitaminas",
     ],
   },
 

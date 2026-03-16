@@ -116,6 +116,35 @@ exports.registerAction = async (req, res) => {
     }
 
     // =================================================================
+    // CASO RESET_SUSTITUTO: Solo borrar logs de sustitución (mantener recolectados)
+    // =================================================================
+    if (accion === "reset_sustituto") {
+      const { data: subLogs, error: subErr } = await supabase
+        .from("wc_log_picking")
+        .select("id")
+        .in("id_asignacion", allAssignmentIds)
+        .eq("id_producto_original", id_producto_original)
+        .eq("accion", "sustituido");
+
+      if (subErr) {
+        console.error("Error fetching sustituto logs:", subErr);
+      }
+
+      if (subLogs && subLogs.length > 0) {
+        const ids = subLogs.map((l) => l.id);
+        const { error: delError } = await supabase
+          .from("wc_log_picking")
+          .delete()
+          .in("id", ids);
+        if (delError) throw delError;
+      }
+
+      return res
+        .status(200)
+        .json({ success: true, message: "Sustitución revertida" });
+    }
+
+    // =================================================================
     // CASO NORMAL (INSERTAR ACCIÓN)
     // =================================================================
     const logData = {
