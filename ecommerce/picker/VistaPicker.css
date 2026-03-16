@@ -231,6 +231,9 @@
 
 /* SCROLL CONTAINER */
 .ec-picker-scroll-container {
+  overflow-x: hidden;
+}
+.ec-list-inner {
   padding: 16px;
 }
 .ec-spacer {
@@ -240,20 +243,19 @@
   text-align: center;
   padding: 60px 20px;
   color: #94a3b8;
-  font-style: italic;
 }
 
 /* PRODUCT CARD */
 .ec-product-card {
   background: var(--ec-picker-white);
   border-radius: 18px;
-  padding: 16px;
-  margin-bottom: 14px;
+  padding: 12px; /* Reducido de 16px para ahorrar espacio en celular */
+  margin-bottom: 12px; /* Reducido de 14px */
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
   display: grid;
-  grid-template-columns: 85px 1fr 75px;
-  gap: 12px;
-  align-items: center;
+  grid-template-columns: 80px 1fr 70px; /* Anchos ligeramente ajustados */
+  gap: 10px; /* Reducido de 12px */
+  align-items: start; /* Alineado arriba en lugar de al centro para evitar espacio vacío arriba/abajo */
   border: 2px solid transparent;
   transition:
     transform 0.2s,
@@ -265,7 +267,6 @@
   transform: scale(0.99);
 }
 .ec-product-card.completed {
-  opacity: 0.6;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
 }
@@ -303,15 +304,15 @@
 }
 
 .ec-img-wrapper {
-  width: 85px;
-  height: 85px;
+  width: 80px;
+  height: 80px;
   background: #fff;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 5px;
+  padding: 4px;
   position: relative;
 }
 .ec-prod-img {
@@ -324,12 +325,16 @@
 .ec-massive-qty-badge {
   background: #eff6ff;
   border: 2px solid #3b82f6;
-  padding: 6px 14px;
-  border-radius: 12px;
+  padding: 6px 10px;
+  border-radius: 10px; /* Borde y padding más ajustado */
   display: flex;
-  align-items: baseline;
-  gap: 4px;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+  flex-direction: column; /* Apilar número y unidad para ahorrar espacio a lo ancho */
+  align-items: center;
+  justify-content: center;
+  gap: 0px;
+  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.15);
+  flex-shrink: 0; /* Evita que el badge se aplaste o se monte encima de otro texto */
+  min-width: 48px;
 }
 
 .mq-num {
@@ -739,8 +744,15 @@
   gap: 10px;
   border-bottom: 1px solid #f1f5f9;
 }
+.ec-search-form .wm-camera-btn {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 12px;
+}
 .ec-search-input {
   flex: 1;
+  min-width: 0;
   padding: 14px;
   border: 2px solid #e2e8f0;
   border-radius: 12px;
@@ -791,6 +803,7 @@
   border-radius: 14px;
   transition: background 0.2s;
   min-height: 60px;
+  flex-shrink: 0; /* Previene que la tarjeta se aplaste perdiendo altura */
 }
 .ec-result-item:hover,
 .ec-result-item:active {
@@ -807,6 +820,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  flex-shrink: 0;
 }
 .ec-res-img img {
   max-width: 100%;
@@ -1338,16 +1352,27 @@
     padding: 10px 12px;
     gap: 6px;
   }
+  .ec-search-form .wm-camera-btn {
+    width: 46px;
+    height: 46px;
+    min-width: 46px;
+    border-radius: 12px;
+  }
   .ec-search-input {
     padding: 10px;
     font-size: 0.95rem;
     min-height: 46px;
+    width: 100%;
+    min-width: 0; /* Permite que el input no desborde el flex container */
   }
   .ec-search-btn {
     min-height: 46px;
     min-width: 46px;
     padding: 0 16px;
     font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .ec-result-item {
     padding: 10px 8px;

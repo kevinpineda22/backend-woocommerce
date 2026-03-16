@@ -1,6 +1,43 @@
 import { supabase } from "./supabaseClient";
 
 /**
+ * Recibe una lista de códigos, si son cortos (items) busca su código de barras real (f120_id -> codigo_barras).
+ * @param {string[]} codes - Lista de items (SKU)
+ * @returns {Promise<Object>} - Mapa { "ITEM": "CODIGO_BARRAS" }
+ */
+export const convertItemsToBarcodes = async (codes) => {
+  if (!codes || codes.length === 0) return {};
+
+  try {
+    const { data, error } = await supabase
+      .from("siesa_codigos_barras")
+      .select("f120_id, codigo_barras")
+      .in("f120_id", codes);
+
+    if (error) {
+      console.error(
+        "Error consultando siesa_codigos_barras para items:",
+        error,
+      );
+      return {};
+    }
+
+    const conversionMap = {};
+    data.forEach((item) => {
+      // Tomamos el primer código de barras válido encontrado para el f120_id
+      if (!conversionMap[item.f120_id]) {
+        conversionMap[item.f120_id] = item.codigo_barras;
+      }
+    });
+
+    return conversionMap;
+  } catch (err) {
+    console.error("Error en convertItemsToBarcodes:", err);
+    return {};
+  }
+};
+
+/**
  * Verifica y corrige los códigos de barras contra la tabla `siesa_codigos_barras`.
  * Si un código de barras necesita un '+' al final según la tabla, se lo agrega.
  *

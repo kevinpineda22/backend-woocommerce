@@ -1,7 +1,10 @@
 import React from "react";
 import QRCode from "react-qr-code";
 import { getAssetUrl } from "../../../config/storage";
-import { checkSiesaBarcodes } from "../../../services/siesaService";
+import {
+  checkSiesaBarcodes,
+  convertItemsToBarcodes,
+} from "../../../services/siesaService";
 import "./ManifestSheet.css";
 
 /**
@@ -36,18 +39,39 @@ const ManifestSheet = ({
     "Cliente";
 
   const [correctedCodes, setCorrectedCodes] = React.useState({});
+  const [itemToBarcodeMap, setItemToBarcodeMap] = React.useState({});
   const [showFullDetails, setShowFullDetails] = React.useState(true);
 
   React.useEffect(() => {
-    // Solo consultar SIESA para códigos cortos (no GS1) que necesiten mapeo
-    const codes = items
-      .map((item) => item.sku || item.name)
-      .filter((c) => c && c !== "N/A" && c.length < 10);
+    // 1. Corregir códigos SIESA que falte el "+" (sólo para códigos presumiblemente códigos de barras)
+    const barcodesToFix = items
+      .map((item) => item.barcode || item.sku || item.name)
+      .filter(
+        (c) =>
+          c &&
+          c !== "N/A" &&
+          c !== "ADMIN_OVERRIDE" &&
+          c.length >= 8 &&
+          c.length < 13,
+      );
 
-    if (codes.length > 0) {
-      checkSiesaBarcodes(codes).then((map) => {
+    if (barcodesToFix.length > 0) {
+      checkSiesaBarcodes(barcodesToFix).then((map) => {
         if (map && Object.keys(map).length > 0) {
           setCorrectedCodes(map);
+        }
+      });
+    }
+
+    // 2. Convertir Items (4 a 7 caracteres numéricos) escaneados manualmente a su código de barras real
+    const itemsToConvert = items
+      .flatMap((item) => [item.barcode, item.sku])
+      .filter((c) => c && typeof c === "string" && /^\d{1,7}$/.test(c.trim()));
+
+    if (itemsToConvert.length > 0) {
+      convertItemsToBarcodes(itemsToConvert).then((map) => {
+        if (map && Object.keys(map).length > 0) {
+          setItemToBarcodeMap(map);
         }
       });
     }
@@ -62,24 +86,35 @@ const ManifestSheet = ({
 
   // Generar QR Value: Cantidad * Código de Barras (separado por salto de línea \r\n para simular ENTER)
   // SOLO códigos de barras válidos — nunca SKUs ni nombres de producto
+  const omittedItems = [];
+
   const qrValue = items
     .map((item) => {
       const qty = item.qty || item.count || 1;
 
-      // PRIORIDAD: barcode escaneado > corrección SIESA > nada
+      // START
       let code = item.barcode || "";
 
-      // Aplicar corrección de Siesa si el barcode actual no parece ser un pesado GS1 de 13+ chars
-      if (correctedCodes[code] && code.length < 13) {
-        code = correctedCodes[code];
-      }
-      // Si el barcode no es válido, intentar corregir el SKU vía SIESA
-      if (!isValidBarcode(code) && item.sku && correctedCodes[item.sku]) {
-        code = correctedCodes[item.sku];
+      // 1. Si lo que tenemos como código es de hecho un ITEM (<= 7 dígitos), intentamos buscar su barcode
+      if (itemToBarcodeMap[code]) {
+        code = itemToBarcodeMap[code];
       }
 
-      // Solo incluir si es un código de barras válido
-      if (!isValidBarcode(code)) return null;
+      // 2. Si todavía no es un código de barras válido, intentamos usar el SKU convertido a barcode
+      if (!isValidBarcode(code) && item.sku && itemToBarcodeMap[item.sku]) {
+        code = itemToBarcodeMap[item.sku];
+      }
+
+      // 3. Aplicar corrección '+' de Siesa si aplica
+      if (correctedCodes[code]) {
+        code = correctedCodes[code];
+      }
+
+      // Solo incluir si finalmente resultó ser un código de barras válido
+      if (!isValidBarcode(code)) {
+        omittedItems.push(item);
+        return null;
+      }
 
       return `${qty}*${code}`;
     })
@@ -189,7 +224,28 @@ const ManifestSheet = ({
         </div>
         <div className="qr-info">
           <h4>CERTIFICADO DE SALIDA</h4>
-          <p>{items.length} productos verificados</p>
+          <p>
+            {items.length - omittedItems.length} de {items.length} productos
+            incluidos en el QR
+          </p>
+          {omittedItems.length > 0 && (
+            <div
+              style={{
+                marginTop: "10px",
+                padding: "8px 12px",
+                background: "#fef2f2",
+                border: "1px solid #fca5a5",
+                borderRadius: "6px",
+                color: "#b91c1c",
+                fontSize: "0.80rem",
+                textAlign: "left",
+              }}
+            >
+              <strong>⚠️ Advertencia:</strong> Se omitieron{" "}
+              {omittedItems.length} producto(s) del QR por no contar con un
+              código de barras válido en el sistema.
+            </div>
+          )}
         </div>
       </div>
 

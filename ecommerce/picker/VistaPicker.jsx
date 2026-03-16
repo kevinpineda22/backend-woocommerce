@@ -78,7 +78,6 @@ const VistaPicker = () => {
   const [lastScannedBarcode, setLastScannedBarcode] = useState(null);
   const [zoomImage, setZoomImage] = useState({ src: null, name: "" });
   const [actionModal, setActionModal] = useState({ open: false, title: "", message: "", icon: null, iconVariant: "warning", actions: [] });
-
   // --- UI Toasts Feedback Mejorado ---
   const [toasts, setToasts] = useState([]);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -471,14 +470,20 @@ const VistaPicker = () => {
     return map;
   }, [sessionData]);
 
-  const pendingItems =
-    sessionData?.items.filter((i) =>
-      ["pendiente", "parcial"].includes(i.status),
-    ) || [];
-  const doneItems =
-    sessionData?.items.filter(
-      (i) => !["pendiente", "parcial"].includes(i.status),
-    ) || [];
+  const pendingItems = useMemo(
+    () =>
+      sessionData?.items.filter((i) =>
+        ["pendiente", "parcial"].includes(i.status),
+      ) || [],
+    [sessionData],
+  );
+  const doneItems = useMemo(
+    () =>
+      sessionData?.items.filter(
+        (i) => !["pendiente", "parcial"].includes(i.status),
+      ) || [],
+    [sessionData],
+  );
   const currentList = activeZone === "pendientes" ? pendingItems : doneItems;
 
   // --- RENDERIZADO CONDICIONAL ---
@@ -666,14 +671,20 @@ const VistaPicker = () => {
         <div className="ec-zones-tabs">
           <div
             className={`ec-zone-tab ${activeZone === "pendientes" ? "active" : ""}`}
-            onClick={() => setActiveZone("pendientes")}
+            onClick={() => {
+              setActiveZone("pendientes");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
           >
             📋 Pendientes{" "}
             <span className="ec-tab-count">{pendingItems.length}</span>
           </div>
           <div
             className={`ec-zone-tab ${activeZone === "canasta" ? "active" : ""}`}
-            onClick={() => setActiveZone("canasta")}
+            onClick={() => {
+              setActiveZone("canasta");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
           >
             🛒 Canasta <span className="ec-tab-count">{doneItems.length}</span>
           </div>
@@ -682,39 +693,49 @@ const VistaPicker = () => {
 
       {/* LISTA PRODUCTOS */}
       <div className="ec-picker-scroll-container">
-        <AnimatePresence mode="popLayout">
-          {currentList.length > 0 ? (
-            currentList.map((item) => (
-              <ProductCard
-                key={item.product_id}
-                item={item}
-                orderMap={orderIndexMap}
-                isCompleted={activeZone === "canasta"}
-                onAction={handleCardAction}
-                onImageZoom={(src, name) => setZoomImage({ src, name })}
-              />
-            ))
-          ) : (
-            <div className="ec-empty-state">
-              {activeZone === "pendientes" ? (
-                <>
-                  <div className="ec-empty-icon">🎉</div>
-                  <p className="ec-empty-title">¡Ruta Completada!</p>
-                  <p className="ec-empty-subtitle">
-                    Todos los productos están en la canasta
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="ec-empty-icon">🛒</div>
-                  <p className="ec-empty-title">Canasta vacía</p>
-                  <p className="ec-empty-subtitle">
-                    Escanea productos para agregarlos aquí
-                  </p>
-                </>
-              )}
-            </div>
-          )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeZone}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="ec-list-inner"
+          >
+            {currentList.length > 0 ? (
+              currentList.map((item, idx) => (
+                <ProductCard
+                  key={item.product_id}
+                  item={item}
+                  orderMap={orderIndexMap}
+                  isCompleted={activeZone === "canasta"}
+                  onAction={handleCardAction}
+                  onImageZoom={(src, name) => setZoomImage({ src, name })}
+                  animDelay={idx * 0.03}
+                />
+              ))
+            ) : (
+              <div className="ec-empty-state">
+                {activeZone === "pendientes" ? (
+                  <>
+                    <div className="ec-empty-icon">🎉</div>
+                    <p className="ec-empty-title">¡Ruta Completada!</p>
+                    <p className="ec-empty-subtitle">
+                      Todos los productos están en la canasta
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="ec-empty-icon">🛒</div>
+                    <p className="ec-empty-title">Canasta vacía</p>
+                    <p className="ec-empty-subtitle">
+                      Escanea productos para agregarlos aquí
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </motion.div>
         </AnimatePresence>
         <div className="ec-spacer"></div>
       </div>

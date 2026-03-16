@@ -17,7 +17,7 @@ import { getOrderStyle, formatPrice } from "../utils/pickerConstants";
 import { isWeighable as isWeighableFn } from "../utils/isWeighable";
 import "./ProductCard.css";
 
-export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom }) => {
+export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom, animDelay = 0 }) => {
   const scannedRaw = item.qty_scanned || 0;
   const total = item.quantity_total;
 
@@ -51,10 +51,9 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
 
   return (
     <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, delay: animDelay }}
       className={[
         "ec-product-card",
         isCompleted ? "completed" : "",

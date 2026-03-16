@@ -10,8 +10,8 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 8px;
-  gap: 6px;
+  margin-bottom: 6px; /* Reducido para dar respiro vertical a los demás info */
+  gap: 8px; /* Separación garantizada entre la izquierda y la derecha */
 }
 
 .ec-card-left-info {
@@ -19,7 +19,9 @@
   flex-direction: column;
   gap: 3px;
   align-items: flex-start;
+  flex: 1; /* Permite ocupar espacio completo y acorrala textos largos */
   min-width: 0;
+  padding-right: 4px; /* un poquito de aire contra el badge */
 }
 
 /* ─── PASILLO BADGE (azul primario en contexto de producto) ─── */
