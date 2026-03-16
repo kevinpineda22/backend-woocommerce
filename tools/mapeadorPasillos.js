@@ -23,82 +23,213 @@ const ORDEN_RUTA = {
 
 /**
  * CONFIGURACIÓN DE PASILLOS Y SUS CATEGORÍAS (REGLAS DE MATCHING)
+ *
+ * IMPORTANTE: El ORDEN del array determina la PRIORIDAD de matching.
+ * Si un texto coincide con varias reglas, gana la que aparece PRIMERO.
+ *
+ * Categorías WooCommerce del ecommerce:
+ * ──────────────────────────────────────
+ * ASEO DEL HOGAR        → P9 (limpieza) / P10 (ropa)
+ * BEBIDAS               → P12
+ * BELLEZA               → P8
+ * CARNES Y PROTEÍNAS    → P13
+ * CONGELADOS            → P13
+ * CUIDADO DEL BEBÉ      → P7
+ * CUIDADO PERSONAL      → P8
+ * FRUTAS Y VERDURAS     → P14
+ * HELADOS               → P13
+ * IMPLEMENTOS DEL HOGAR → P11
+ * LICORES Y CIGARRILLOS → P13
+ * LÁCTEOS, HUEVOS Y REF → P13 (subcat Huevos → P2)
+ * MASCOTAS              → P11
+ * MERCADO               → P1-P6 (según subcategoría)
+ * SALUDABLE             → P8
  */
 const DEFINICION_PASILLOS = [
-  // --- PRIORIDAD ALTA: Productos Específicos que pueden confundirse ---
-  {
-    pasillo: "6",
-    nombre: "Café y Panadería",
-    categorias: ["cafe", "chocolate", "pan", "tostada", "cafe molido", "cafe premium", "cafe soluble"],
-  },
+  // ═══ PRIORIDAD ALTA: categorías específicas que pueden confundirse ═══
   {
     pasillo: "7",
     nombre: "Bebé y Adulto",
-    categorias: ["adulto", "incontinencia", "pañal adulto", "pañitos humedos", "pañales", "cereales", "granola", "leche en polvo", "bebe", "pañal"],
+    categorias: [
+      "bebe", "bebes",
+      "pañal", "pañales", "pañitos humedos",
+      "cuidado del bebe", "higiene para bebes",
+      "adulto", "incontinencia", "pañal adulto",
+    ],
+  },
+  {
+    pasillo: "6",
+    nombre: "Café y Panadería",
+    categorias: [
+      "cafe", "cafe molido", "cafe premium", "cafe soluble",
+      "chocolate", "chocolates",
+      "pan", "tostada",
+      "aromaticas",
+    ],
   },
   {
     pasillo: "8",
-    nombre: "Cuidado Personal",
-    categorias: ["cuidado personal", "aseo personal", "higiene", "oral", "capilar", "corporal", "femenina", "desodorante", "shampoo", "jabon de baño", "crema dental", "cremas corporales", "higiene capilar", "cremas detales"],
+    nombre: "Cuidado Personal y Belleza",
+    categorias: [
+      "cuidado personal", "cuidado capilar", "cuidado corporal", "cuidado oral",
+      "higiene intima", "higiene personal",
+      "belleza", "maquillaje", "cosmeticos",
+      "proteccion solar", "repelente",
+      "salud", "medicamentos", "suplementos", "vitaminas",
+      "desodorante", "shampoo", "jabon de baño", "crema dental",
+      "saludable", "alimentos saludables",
+    ],
   },
   {
     pasillo: "9",
     nombre: "Aseo Hogar",
-    categorias: ["aseo hogar", "limpieza hogar", "papel higienico", "escoba", "traperas", "bolsa basura", "vela", "limpia piso", "escobas", "fabuloso", "lavanda"],
+    categorias: [
+      "aseo del hogar", "aseo hogar", "limpieza hogar",
+      "ambientador", "ambientadores",
+      "gel antibacterial", "antibacterial",
+      "limpiadores", "desinfectantes", "limpiadores y desinfectantes",
+      "papel higienico", "servilletas", "papel higienico y servilletas",
+      "articulos de limpieza", "limpieza",
+      "escoba", "escobas", "trapera", "traperas", "trapero",
+      "bolsa basura", "vela", "velas",
+      "fabuloso", "lavanda",
+    ],
   },
   {
     pasillo: "10",
     nombre: "Aseo Ropa",
-    categorias: ["detergente", "suavizante", "ropa", "blanqueador", "jabon barra", "insecticidas", "detergente liquido", "detergente en polvo", "blanqueadores"],
+    categorias: [
+      "detergente", "detergentes", "detergente liquido", "detergente en polvo",
+      "suavizante", "suavizantes",
+      "blanqueador", "blanqueadores", "desmanchadores",
+      "jabon barra", "jabones",
+    ],
   },
 
-  // --- PRIORIDAD MEDIA: Alimentos ---
+  // ═══ REFRIGERADOS Y CARNES: antes de alimentos secos para capturar subcategorías de LÁCTEOS ═══
+  {
+    pasillo: "13",
+    nombre: "Refrigerados, Carnes y Licores",
+    categorias: [
+      "refrigerado", "congelado", "congelados", "comidas congeladas",
+      "carne", "carnes", "carniceria", "carnes y proteinas",
+      "pollo", "cerdo", "res y cerdo",
+      "pescado", "pescados", "mariscos", "pescados y mariscos",
+      "jamon", "embutido", "embutidos", "carnes frias",
+      "queso", "quesos", "cuajada", "cuajadas", "queso crema", "sueros",
+      "yogurt", "bebidas lacteas",
+      "lacteos",
+      "leche",
+      "arepa", "arepas",
+      "postres", "postres y gelatinas",
+      "cerveza", "cervezas",
+      "licor", "licores", "vino", "vinos",
+      "cigarrillo", "cigarrillos",
+      "helado", "helados", "paleta", "paletas",
+    ],
+  },
+
+  // ═══ BEBIDAS Y DESECHABLES: antes de alimentos secos para capturar "bebidas de cereal" ═══
+  {
+    pasillo: "12",
+    nombre: "Bebidas y Desechables",
+    categorias: [
+      "gaseosa", "gaseosas", "refrescos",
+      "agua",
+      "jugo", "jugos", "zumo", "zumos",
+      "bebida", "bebidas", "bebidas de cereal",
+      "hidratante", "hidratantes", "energizante", "energizantes",
+      "desechable", "desechables",
+      "vaso", "plato", "lonchera", "loncheras",
+      "papel cocina",
+    ],
+  },
+
+  // ═══ PRIORIDAD MEDIA: Alimentos secos (MERCADO subcategorías) ═══
   {
     pasillo: "2",
     nombre: "Despensa Básica",
-    categorias: ["huevo", "atun", "enlatado", "pasta", "spaghetti", "harina precocida", "huevos", "atunes", "enlatados", "pastas"],
+    categorias: [
+      "huevo", "huevos",
+      "atun", "atunes",
+      "enlatado", "enlatados", "alimentos enlatados", "conservas",
+      "pasta", "pastas", "spaghetti",
+      "harina precocida",
+    ],
   },
   {
     pasillo: "1",
     nombre: "Granos y Condimentos",
-    categorias: ["arroz", "azucar", "grano", "sal", "salsa", "aderezo", "vinagre", "vinagretas", "sazonador", "panela", "panelas"],
+    categorias: [
+      "arroz",
+      "azucar", "panela", "panelas", "endulzante", "endulzantes",
+      "grano", "granos",
+      "sal", "salsa", "salsas", "aderezo", "aderezos",
+      "vinagre", "vinagreta", "vinagretas",
+      "sazonador", "sazonadores", "condimento", "condimentos", "caldos",
+    ],
   },
   {
     pasillo: "3",
     nombre: "Aceites y Harinas",
-    categorias: ["harinas", "margarinas", "sopas", "aceite vegetal", "aceite soya", "aceite oliva", "aceite", "harina de trigo", "mantequilla", "crema"],
+    categorias: [
+      "aceite", "aceites", "aceite vegetal", "aceite soya", "aceite oliva",
+      "harina", "harinas", "harina de trigo",
+      "margarina", "margarinas", "mantequilla",
+      "sopa", "sopas",
+    ],
   },
   {
     pasillo: "4",
     nombre: "Polvos y Repostería",
-    categorias: ["gelatina", "flan", "pudin", "reposteria", "leche larga vida", "refrescos en polvo", "arequipe"],
+    categorias: [
+      "gelatina", "flan", "pudin",
+      "reposteria", "parva", "reposteria y parva",
+      "leche larga vida",
+      "refrescos en polvo", "bebidas en polvo",
+      "arequipe",
+    ],
   },
   {
     pasillo: "5",
-    nombre: "Galletas y Dulces",
-    categorias: ["galleta", "dulce", "snack dulce", "avena", "pan dulce", "avenas", "galleta salada", "galleta saludable", "galletas", "modificadores"],
+    nombre: "Galletas, Dulces y Snacks",
+    categorias: [
+      "galleta", "galletas", "galleteria", "galleta salada",
+      "dulce", "dulces",
+      "snack", "snacks", "pasabocas",
+      "avena", "avenas",
+      "cereal", "cereales", "granola",
+      "modificadores",
+    ],
   },
 
-  // --- OTROS ---
+  // ═══ OTROS ═══
   {
     pasillo: "11",
-    nombre: "Mascotas y Cocina",
-    categorias: ["mascota", "perro", "gato", "cocina", "esponja", "guante", "mascotas", "esponjas", "guantes", "lavaplatos", "desengrasante"],
-  },
-  {
-    pasillo: "12",
-    nombre: "Bebidas y Desechables",
-    categorias: ["jugo", "desechable", "vaso", "plato", "lonchera", "loncheras", "servilletas", "papel cocina", "desechables"],
-  },
-  {
-    pasillo: "13",
-    nombre: "Refrigerados y Carnes",
-    categorias: ["refrigerado", "congelado", "carne", "pollo", "pescado", "jamon", "queso", "yogurt", "lacteos derivados", "lacteos", "cervezas", "mani", "golosinas", "nueces", "mexicano", "saludable", "carnes frias", "carniceria", "embutidos", "licores"],
+    nombre: "Mascotas, Cocina e Implementos",
+    categorias: [
+      "mascota", "mascotas", "perro", "gato",
+      "alimento para mascotas", "alimento para peces", "alimento para aves",
+      "arena para gatos",
+      "cocina", "utensilios", "utensilios de cocina",
+      "esponja", "esponjas", "guante", "guantes",
+      "lavaplatos", "desengrasante", "desengrasantes",
+      "insecticida", "insecticidas",
+      "carbon",
+      "implementos del hogar",
+    ],
   },
   {
     pasillo: "14",
     nombre: "Fruver",
-    categorias: ["gaseosa", "agua", "bebida", "fruta", "verdura", "tomate", "cebolla", "papa", "gaseosas", "fruver", "pasabocas", "snacks", "medicamentos"],
+    categorias: [
+      "fruver",
+      "fruta", "frutas",
+      "verdura", "verduras",
+      "frutas y verduras",
+      "hortaliza", "hortalizas",
+      "tomate", "cebolla", "papa",
+    ],
   },
 ];
 
@@ -156,18 +287,18 @@ const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
     // Si WooCommerce nos devolvió la estructura de padre-hijo (propiedad parent),
     // nos quedamos EXCLUSIVAMENTE con las categorías hoja (subcategorías, cuyo parent NO es 0).
     const tieneDataDeJerarquia = categoriasValidas.some((c) => c.hasOwnProperty("parent"));
-    
+
     if (tieneDataDeJerarquia && categoriasValidas.length > 1) {
       const subcategoriasOficiales = categoriasValidas.filter((c) => c.parent > 0);
       if (subcategoriasOficiales.length > 0) {
         categoriasValidas = subcategoriasOficiales;
       }
-    } 
+    }
     // HEURÍSTICA DE SUBCATEGORÍAS (Antiguo método preventivo si falla la API):
     else if (categoriasValidas.length > 1) {
       const subcategorias = categoriasValidas.filter(c => {
         const n = removeAccents(c.name).toLowerCase();
-        return !n.includes(" y ") && !n.includes(",");
+        return !n.includes(",");
       });
       // Si logramos identificar al menos una subcategoría limpia, utilizamos solo esa
       if (subcategorias.length > 0) {

@@ -690,3 +690,254 @@
     padding: 10px;
   }
 }
+
+/* ─── MANUAL ENTRY MODAL: cabecera ─── */
+.modal-header-center {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.modal-header-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin-top: 12px;
+  margin-bottom: 0;
+  color: #1e293b;
+}
+
+.modal-header-subtitle {
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: #64748b;
+  margin-top: 6px;
+}
+
+/* ─── BOTÓN PRIMARIO (razón azul confirmar) ─── */
+.ec-reason-btn--primary {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  width: 100%;
+}
+
+.ec-reason-btn--primary:active {
+  background: #2563eb;
+}
+
+.ec-reason-btn--primary:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* ─── MODAL NARROW (max-width pequeño) ─── */
+.ec-modal-content--narrow {
+  max-width: 400px !important;
+}
+
+/* ─── CANTIDAD DESTACADA EN BULK MODAL ─── */
+.modal-qty-highlight {
+  color: #1e293b;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+/* ─── INPUT DE CANTIDAD GRANDE (BulkQtyModal) ─── */
+.bulk-input-qty {
+  text-align: center !important;
+  font-size: 2rem !important;
+  letter-spacing: 2px !important;
+}
+
+/* ─── HINT DE MÁXIMO PERMITIDO ─── */
+.bulk-max-hint {
+  text-align: center;
+  font-size: 0.9rem;
+  color: #64748b;
+  margin: 10px 0 0;
+  font-weight: 600;
+}
+
+.bulk-max-value {
+  color: #f59e0b;
+  font-weight: 800;
+}
+
+/* ─── BOTÓN PRIMARIO NARANJA (warning) ─── */
+.ec-reason-btn--warning {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  width: 100%;
+}
+
+.ec-reason-btn--warning:active {
+  background: #d97706;
+}
+
+.ec-reason-btn--warning:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* ─── WM CONFIRM NARANJA (SubstituteModal) ─── */
+.wm-btn-confirm--warning {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
+}
+
+.wm-btn-confirm--warning:active {
+  background: #d97706;
+}
+
+/* ─── HEADER OSCURO (ClientsModal) ─── */
+.ec-modal-header--dark {
+  background: #1e293b;
+}
+
+.ec-modal-header--dark h3 {
+  color: white;
+  margin: 0;
+}
+
+.ec-modal-header--dark button {
+  color: white;
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* ─── CUERPO SCROLLABLE ─── */
+.ec-modal-body--scroll {
+  padding: 20px 0;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+/* ─── FILA DE PEDIDO EN DIRECTORIO ─── */
+.clients-order-row {
+  padding: 15px 20px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.clients-order-row:last-child {
+  border-bottom: none;
+}
+
+.clients-order-info {
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+
+.clients-order-name {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clients-order-id {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.clients-order-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ─── PIE DE MODAL ─── */
+.ec-modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.ec-modal-cancel--full {
+  width: 100%;
+}
+
+/* ─── CÁMARA VARIANTE AZUL (búsqueda de sustitutos) ─── */
+.wm-camera-btn--blue {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  border-radius: 12px;
+  padding: 0 16px;
+  border: none;
+  min-width: 52px;
+  min-height: 52px;
+}
+
+.wm-camera-btn--blue:active {
+  background: #2563eb;
+  transform: scale(0.93);
+}
+
+/* ─── ETIQUETA SUGERENCIAS (búsqueda) ─── */
+.ec-suggestion-label {
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+}
+
+/* ─── SPINNER INLINE (altura reducida) ─── */
+.ec-picker-centered--inline {
+  height: 100px;
+}
+
+/* ─── ESTADO VACÍO EN BÚSQUEDA ─── */
+.ec-search-empty {
+  text-align: center;
+  color: #999;
+  padding: 40px 20px;
+}
+
+/* ─── HINT DE CONVERSIÓN DE PESO ─── */
+.wm-weight-hint {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 4px;
+  text-align: center;
+}
+
+/* ─── MODIFICADORES DE MARGEN ─── */
+.wm-error-alert--mt {
+  margin-top: 10px;
+}
+
+.wm-error-alert--mb {
+  margin: 0 0 10px;
+}
+
+.wm-gs1-success-feedback--sub {
+  margin-bottom: 16px;
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 374px) {
+  .modal-header-title {
+    font-size: 1.1rem;
+  }
+  .modal-header-subtitle {
+    font-size: 0.92rem;
+  }
+  .bulk-input-qty {
+    font-size: 1.6rem !important;
+  }
+  .clients-order-row {
+    padding: 12px 14px;
+  }
+  .ec-modal-footer {
+    padding: 12px 14px;
+  }
+}

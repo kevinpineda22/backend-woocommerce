@@ -10,12 +10,14 @@ import {
   FaExclamationTriangle,
   FaBan,
   FaUndo,
-  FaWalking,
-  FaWeightHanging, // ✅ Importamos el ícono de la báscula
+  FaWeightHanging,
+  FaSearchPlus,
 } from "react-icons/fa";
 import { getOrderStyle, formatPrice } from "../utils/pickerConstants";
+import { isWeighable as isWeighableFn } from "../utils/isWeighable";
+import "./ProductCard.css";
 
-export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
+export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom }) => {
   const scannedRaw = item.qty_scanned || 0;
   const total = item.quantity_total;
 
@@ -27,41 +29,25 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
   const isMixed = scanned > 0 && item.sustituto;
   const isShortPick = isCompleted && scanned < total && !item.sustituto;
 
-  // 🧠 Lógica centralizada para detectar si es pesable
-  const isWeighable = useMemo(() => {
-    if (!item) return false;
-    const txt = (
-      item.name +
-      " " +
-      (item.categorias?.[0]?.name || "")
-    ).toLowerCase();
-    const isUnitPesable =
-      item.unidad_medida &&
-      ["kl", "kg", "kilo", "lb", "libra"].includes(
-        item.unidad_medida.toLowerCase(),
-      );
-    return (
-      isUnitPesable ||
-      txt.includes("kg") ||
-      txt.includes("gramos") ||
-      txt.includes("fruver") ||
-      txt.includes("carniceria")
-    );
-  }, [item]);
+  const isWeighable = useMemo(() => isWeighableFn(item), [item]);
 
-  // Lógica para detectar si es un multipack (P6, P3, etc.)
   const isMultipack = useMemo(() => {
     if (!item) return false;
     const uom = item.unidad_medida ? item.unidad_medida.toUpperCase() : "";
     return uom.startsWith("P") && !isNaN(uom.substring(1));
   }, [item]);
 
-  // Si es multipack, determinar la cantidad del paquete
   const multipackQty = useMemo(() => {
     if (!isMultipack) return 0;
     const qtyStr = item.unidad_medida.toUpperCase().substring(1);
     return parseInt(qtyStr) || 0;
   }, [isMultipack, item]);
+
+  const statusIconClass = useMemo(() => {
+    if (isFullySubstituted || isMixed) return "ec-card-status-icon--warning";
+    if (isShortPick) return "ec-card-status-icon--danger";
+    return "ec-card-status-icon--success";
+  }, [isFullySubstituted, isMixed, isShortPick]);
 
   return (
     <motion.div
@@ -69,64 +55,44 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`ec-product-card ${isCompleted ? "completed" : ""} ${isPartial ? "partial-scan" : ""} ${isFullySubstituted ? "sustituido-card" : ""} ${isMixed ? "mixed-card" : ""} ${isShortPick ? "short-pick-mode" : ""} ${isMultipack && !isCompleted ? "multipack-card" : ""}`}
-      style={
-        isMultipack && !isCompleted
-          ? { border: "2px solid #9333ea", background: "#faf5ff" }
-          : {}
-      }
+      className={[
+        "ec-product-card",
+        isCompleted ? "completed" : "",
+        isPartial ? "partial-scan" : "",
+        isFullySubstituted ? "sustituido-card" : "",
+        isMixed ? "mixed-card" : "",
+        isShortPick ? "short-pick-mode" : "",
+        isMultipack && !isCompleted ? "multipack-card" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
-      <div className="ec-img-wrapper">
+      <div
+        className={`ec-img-wrapper ${item.image_src ? "ec-img-zoomable" : ""}`}
+        onClick={() => item.image_src && onImageZoom && onImageZoom(item.image_src, item.name)}
+      >
         {item.image_src ? (
-          <img src={item.image_src} className="ec-prod-img" alt="" />
+          <>
+            <img src={item.image_src} className="ec-prod-img" alt="" />
+            <span className="ec-zoom-icon"><FaSearchPlus /></span>
+          </>
         ) : (
           <FaBoxOpen color="#cbd5e1" size={40} />
         )}
       </div>
 
       <div className="ec-info-col">
-        {/* FILA SUPERIOR: Pasillo + Cantidad Gigante */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            marginBottom: "8px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "3px",
-              alignItems: "flex-start",
-            }}
-          >
-            <span
-              className="ec-pasillo-badge"
-              style={{
-                background: "#2563eb",
-                color: "white",
-                padding: "4px 10px",
-                fontSize: "0.8rem",
-                boxShadow: "0 2px 4px rgba(37,99,235,0.3)",
-              }}
-            >
+        {/* FILA SUPERIOR: Pasillo + Cantidad */}
+        <div className="ec-card-top-row">
+          <div className="ec-card-left-info">
+            <span className="ec-pasillo-badge">
               {item.pasillo === "S/N" || item.pasillo === "Otros"
                 ? "GENERAL"
                 : `PASILLO ${item.pasillo}`}
             </span>
             {(item.categorias_reales ||
               (item.categorias && item.categorias.length > 0)) && (
-              <span
-                style={{
-                  fontSize: "0.65rem",
-                  color: "#64748b",
-                  fontWeight: "700",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                }}
-              >
+              <span className="ec-category-text">
                 {(item.categorias_reales || item.categorias.map((c) => c.name))
                   .slice(0, 3)
                   .join(" • ")}
@@ -142,49 +108,27 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
           </div>
         </div>
 
-        {/* ALERTA VISUAL DE EMPAQUE (MULTIPACK) */}
+        {/* ALERTA MULTIPACK */}
         {isMultipack && !isCompleted && (
-          <div
-            style={{
-              background: "#9333ea",
-              color: "white",
-              padding: "8px 12px",
-              borderRadius: "8px",
-              fontWeight: "900",
-              fontSize: "1rem",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginBottom: "8px",
-              boxShadow: "0 4px 6px rgba(147, 51, 234, 0.3)",
-              textTransform: "uppercase",
-              animation: "pulse 2s infinite",
-            }}
-          >
+          <div className="ec-multipack-alert">
             📦 ATENCIÓN: LLEVAR EMPAKE x{multipackQty}
           </div>
         )}
 
         {isMixed ? (
           <div className="ec-sub-details">
-            <div
-              style={{
-                borderBottom: "1px dashed #ccc",
-                paddingBottom: 4,
-                marginBottom: 4,
-              }}
-            >
-              <span className="ec-label-tiny" style={{ color: "#16a34a" }}>
+            <div className="ec-sub-divider">
+              <span className="ec-label-tiny ec-label-tiny--success">
                 ORIGINAL:
               </span>
-              <span style={{ fontWeight: "bold" }}>{scanned} un.</span>{" "}
+              <strong>{scanned} un.</strong>{" "}
               {item.name}
             </div>
             <div>
-              <span className="ec-label-tiny" style={{ color: "#d97706" }}>
+              <span className="ec-label-tiny ec-label-tiny--warning">
                 SUSTITUTO:
               </span>
-              <span style={{ fontWeight: "bold" }}>{total - scanned} un.</span>{" "}
+              <strong>{total - scanned} un.</strong>{" "}
               {item.sustituto.name}
             </div>
           </div>
@@ -195,13 +139,7 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
               <span className="ec-text-crossed">{item.name}</span>
             </div>
             <div className="ec-arrow-down">
-              <FaArrowRight
-                style={{
-                  transform: "rotate(90deg)",
-                  fontSize: "0.8rem",
-                  color: "#f59e0b",
-                }}
-              />
+              <FaArrowRight className="ec-arrow-icon-down" />
             </div>
             <div className="ec-final-row">
               <span className="ec-label-tiny">LLEVAS:</span>
@@ -219,60 +157,15 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
               {item.unidad_medida && `/ ${item.unidad_medida}`}
             </div>
 
-            {/* ✅ SI TIENE PESO REGISTRADO, LO MOSTRAMOS GIGANTE EN VERDE */}
-            {item.peso_real > 0 && (
-              <div
-                style={{
-                  marginTop: "8px",
-                  background: "#dcfce7",
-                  border: "1px solid #22c55e",
-                  color: "#16a34a",
-                  padding: "6px 10px",
-                  borderRadius: "8px",
-                  fontWeight: "900",
-                  fontSize: "0.9rem",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-              >
-                <FaWeightHanging size={14} />
-                PESO REGISTRADO: {parseFloat(item.peso_real).toFixed(3)} KG
-                {item.unidad_medida?.toUpperCase() === "LB" ||
-                item.unidad_medida?.toUpperCase() === "LIBRA"
-                  ? ` (${(parseFloat(item.peso_real) * 2).toFixed(2)} LB)`
-                  : ""}
-              </div>
-            )}
-
-            {/* NOTAS ESPECÍFICAS DEL PRODUCTO (instrucciones de preparación) */}
             {item.notas_cliente && item.notas_cliente.length > 0 && (
-              <div
-                style={{
-                  background: "#fef08a",
-                  borderLeft: "4px solid #eab308",
-                  padding: "8px 10px",
-                  marginTop: "8px",
-                  borderRadius: "6px",
-                  fontSize: "0.85rem",
-                  color: "#854d0e",
-                }}
-              >
-                <strong
-                  style={{
-                    display: "block",
-                    marginBottom: "4px",
-                    textTransform: "uppercase",
-                    fontSize: "0.7rem",
-                  }}
-                >
+              <div className="ec-product-notes">
+                <strong className="ec-notes-title">
                   📝 Instrucción Especial:
                 </strong>
                 {item.notas_cliente.map((n, i) => (
-                  <div key={i} style={{ marginBottom: "4px" }}>
+                  <div key={i} className="ec-notes-item">
                     <strong>
-                      El cliente {typeof n === "object" ? n.cliente : ""}{" "}
-                      indicó:
+                      El cliente {typeof n === "object" ? n.cliente : ""} indicó:
                     </strong>{" "}
                     {typeof n === "object" ? n.nota : n}
                   </div>
@@ -287,6 +180,18 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
               </div>
             )}
           </>
+        )}
+
+        {/* Peso registrado - visible en canasta para TODOS los estados */}
+        {isCompleted && item.peso_real > 0 && (
+          <div className="ec-weight-registered">
+            <FaWeightHanging size={14} />
+            PESO REGISTRADO: {parseFloat(item.peso_real).toFixed(3)} KG
+            {item.unidad_medida?.toUpperCase() === "LB" ||
+            item.unidad_medida?.toUpperCase() === "LIBRA"
+              ? ` (${(parseFloat(item.peso_real) * 2).toFixed(2)} LB)`
+              : ""}
+          </div>
         )}
 
         <div className="ec-req-list">
@@ -309,10 +214,7 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
                   {ped.nombre_cliente.split(" ")[0]}
                 </span>
                 {ped.is_pickup && (
-                  <span
-                    title="Recogida en Local"
-                    style={{ marginLeft: "auto", fontSize: "1rem" }}
-                  >
+                  <span className="ec-pickup-icon" title="Recogida en Local">
                     🚶‍♂️
                   </span>
                 )}
@@ -336,13 +238,11 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
                 <span className="ec-scan-prog-label">FALTAN {remaining}</span>
               </div>
             ) : isWeighable ? (
-              // ✅ Si es pesable, muestra la báscula y dice "PESAR"
               <>
                 <FaWeightHanging size={18} />
                 <span className="ec-scan-label">PESAR</span>
               </>
             ) : (
-              // ❌ Si es un producto normal (latas de atún, etc), dice "SCAN"
               <>
                 <FaBarcode size={18} />
                 <span className="ec-scan-label">SCAN</span>
@@ -361,8 +261,7 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
             </button>
           )}
 
-          <div style={{ display: "flex", gap: 3, width: "100%" }}>
-            {/* Ocultamos el teclado si es pesable */}
+          <div className="ec-action-row">
             {!isWeighable && (
               <button
                 className="ec-alt-btn"
@@ -387,31 +286,13 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted }) => {
       ) : (
         <div className="ec-action-col">
           <button
-            className="ec-alt-btn"
-            style={{
-              color: "#dc2626",
-              borderColor: "#fca5a5",
-              background: "#fef2f2",
-            }}
-            onClick={() => {
-              if (window.confirm("¿Devolver a pendientes?"))
-                onAction(item, "undo");
-            }}
+            className="ec-alt-btn ec-alt-btn--danger"
+            onClick={() => onAction(item, "undo")}
             title="Devolver a pendientes"
           >
             <FaUndo />
           </button>
-          <div
-            style={{
-              marginTop: 5,
-              color:
-                isFullySubstituted || isMixed
-                  ? "#d97706"
-                  : isShortPick
-                    ? "#ef4444"
-                    : "#16a34a",
-            }}
-          >
+          <div className={`ec-card-status-icon ${statusIconClass}`}>
             {isFullySubstituted || isMixed ? (
               <FaExchangeAlt />
             ) : isShortPick ? (

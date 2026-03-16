@@ -28,8 +28,10 @@ import {
   BulkQtyModal,
 } from "./Modals";
 import { ProductCard } from "./components/ProductCard";
+import ImageZoomModal from "./components/ImageZoomModal";
 import { SessionTimer } from "./components/SessionTimer";
 import { getOrderStyle } from "./utils/pickerConstants";
+import { isWeighable } from "./utils/isWeighable";
 
 // Hooks (El Cerebro)
 import { useOfflineQueue } from "./hooks/useOfflineQueue";
@@ -73,6 +75,7 @@ const VistaPicker = () => {
   const [scanOverrideCallback, setScanOverrideCallback] = useState(null);
   const [missingQtyForSub, setMissingQtyForSub] = useState(0);
   const [lastScannedBarcode, setLastScannedBarcode] = useState(null);
+  const [zoomImage, setZoomImage] = useState({ src: null, name: "" });
 
   // --- UI Toasts Feedback Mejorado ---
   const [toasts, setToasts] = useState([]);
@@ -94,26 +97,6 @@ const VistaPicker = () => {
   }, []);
 
   // --- LÓGICA DE INTERACCIÓN (Botones y Acciones) ---
-
-  const isWeighable = (item) => {
-    const txt = (
-      item.name +
-      " " +
-      (item.categorias?.[0]?.name || "")
-    ).toLowerCase();
-    const isUnitPesable =
-      item.unidad_medida &&
-      ["kl", "kg", "kilo", "lb", "libra"].includes(
-        item.unidad_medida.toLowerCase(),
-      );
-    return (
-      isUnitPesable ||
-      txt.includes("kg") ||
-      txt.includes("gramos") ||
-      txt.includes("fruver") ||
-      txt.includes("carniceria")
-    );
-  };
 
   const handleCardAction = (item, type) => {
     setCurrentItem(item);
@@ -155,32 +138,34 @@ const VistaPicker = () => {
     }
   };
 
-  const handleUndo = async (item) => {
+  const handleUndo = (item) => {
     const isItemWeighable = isWeighable(item);
     const scanned = item.qty_scanned || 0;
     const total = item.quantity_total;
     const wasShortPick =
       item.status === "recolectado" && scanned > 0 && scanned < total;
 
-    // Preguntar al usuario qué desea hacer si hay unidades escaneadas
-    let emptyCompletely = false;
-    let keepQuantity = false;
+    // ── LÓGICA DE UNDO SEGÚN TIPO DE PRODUCTO ──
+    // Pesables (fruver/carnes): SIEMPRE resetear a 0 (hay que re-pesar)
+    // Unidades completas (scanned >= total): SIEMPRE resetear a 0 (no tiene sentido mantener)
+    // Unidades parciales (0 < scanned < total): el picker elige si conservar progreso
+    let emptyCompletely = true;
 
-    if (scanned > 0) {
-      if (
-        window.confirm(
-          `¿Deseas devolver a pendientes VACÍO (0 unidades)?\n\n[ACEPTAR] = Empezar desde cero\n[CANCELAR] = Mantener progreso actual (${scanned}/${total})`,
-        )
-      ) {
-        emptyCompletely = true;
-      } else {
-        keepQuantity = true;
-      }
+    if (isItemWeighable) {
+      if (!window.confirm("¿Devolver a pendientes?\nSe borrarán los datos de peso registrado.")) return;
+    } else if (scanned >= total) {
+      if (!window.confirm("¿Devolver a pendientes?\nSe empezará la recolección desde cero.")) return;
+    } else if (scanned > 0 && scanned < total) {
+      // Parcial: ofrecer opción de conservar progreso
+      emptyCompletely = window.confirm(
+        `Tienes ${scanned} de ${total} unidades.\n\n[ACEPTAR] = Empezar desde cero (0/${total})\n[CANCELAR] = Mantener progreso actual (${scanned}/${total})`,
+      );
     } else {
-      emptyCompletely = true;
+      // scanned === 0 (producto sustituido sin unidades propias): reset directo
+      if (!window.confirm("¿Devolver a pendientes?")) return;
     }
 
-    // Si fue un short-pick, primero lanzamos la reversión del short-pick
+    // Si fue un short-pick, primero lanzamos la reversión
     if (wasShortPick) {
       queueAction({
         id_sesion: sessionData.session_id,
@@ -191,50 +176,35 @@ const VistaPicker = () => {
       });
     }
 
-    // Determinar cantidad a borrar
-    let qtyToUndo = 0;
     if (emptyCompletely) {
-      qtyToUndo = 9999; // Borrado TOTAL garantizado (para evitar que queden logs huérfanos)
-    } else if (keepQuantity) {
-      qtyToUndo = 0; // Mantenemos la cantidad intacta
+      // Reset total: borrar todo el progreso
+      if (scanned > 0) {
+        queueAction({
+          id_sesion: sessionData.session_id,
+          id_producto_original: item.product_id,
+          accion: "reset",
+          cantidad_afectada: 9999,
+          pasillo: item.pasillo,
+        });
+      }
+      updateLocalSessionState(item.product_id, 0, "pendiente", null);
+      showToast(
+        isItemWeighable
+          ? "↩️ Devuelto a pendientes (peso borrado)"
+          : "↩️ Devuelto a pendientes",
+        "info",
+      );
     } else {
-      // Por si algo falla, comportamiento antiguo:
-      qtyToUndo = isItemWeighable ? scanned || total || 1 : 1;
-    }
-
-    if (qtyToUndo > 0 || (emptyCompletely && scanned > 0)) {
+      // Mantener progreso parcial: el producto vuelve a pendientes con su qty actual
       queueAction({
         id_sesion: sessionData.session_id,
         id_producto_original: item.product_id,
         accion: "reset",
-        cantidad_afectada: qtyToUndo === 9999 ? 9999 : qtyToUndo,
+        cantidad_afectada: 0,
         pasillo: item.pasillo,
       });
-    }
-
-    // Calculamos la nueva cantidad que queda (si es 9999 obvio queda en 0)
-    const newScanned =
-      qtyToUndo === 9999 ? 0 : Math.max(0, scanned - qtyToUndo);
-    const newSubstitute = newScanned === 0 ? null : item.sustituto;
-
-    // Al devolver a pendientes, forzamos el estado aunque tenga todo escaneado
-    // Si lo devolvió pero decidió mantener la cantidad ej 4/4, se va a "parcial" para que aparezca en pendientes
-    const newStatus = newScanned > 0 ? "parcial" : "pendiente";
-
-    updateLocalSessionState(
-      item.product_id,
-      newScanned,
-      newStatus,
-      newSubstitute,
-    );
-
-    if (emptyCompletely) {
-      showToast("↩️ Devuelto a pendientes (VACÍO)", "info");
-    } else {
-      showToast(
-        `↩️ Devuelto a pendientes (${newScanned}/${total} conservadas)`,
-        "info",
-      );
+      updateLocalSessionState(item.product_id, scanned, "parcial", item.sustituto);
+      showToast(`↩️ Devuelto a pendientes (${scanned}/${total} conservadas)`, "info");
     }
   };
 
@@ -444,9 +414,7 @@ const VistaPicker = () => {
           className="ec-no-assignment-icon"
         />
         <h3>Error al iniciar</h3>
-        <p style={{ color: "#64748b", textAlign: "center", padding: "0 1rem" }}>
-          {initError}
-        </p>
+        <p className="ec-centered-message">{initError}</p>
         <button
           onClick={() => window.location.reload()}
           className="ec-scan-btn ec-no-assignment-refresh"
@@ -595,40 +563,14 @@ const VistaPicker = () => {
 
         {/* NOTAS GENERALES DE CLIENTES (order-level customer_note) */}
         {sessionData.orders_info.some((o) => o.customer_note) && (
-          <div
-            style={{
-              background: "#fffbeb",
-              border: "1px solid #f59e0b",
-              borderLeft: "4px solid #f59e0b",
-              borderRadius: "8px",
-              padding: "8px 12px",
-              margin: "6px 0 2px",
-            }}
-          >
-            <strong
-              style={{
-                display: "block",
-                fontSize: "0.7rem",
-                textTransform: "uppercase",
-                color: "#92400e",
-                marginBottom: "4px",
-                letterSpacing: "0.5px",
-              }}
-            >
+          <div className="ec-customer-notes-section">
+            <strong className="ec-customer-notes-title">
               📝 Notas de los Clientes
             </strong>
             {sessionData.orders_info
               .filter((o) => o.customer_note)
               .map((ord) => (
-                <div
-                  key={ord.id}
-                  style={{
-                    fontSize: "0.85rem",
-                    color: "#854d0e",
-                    padding: "4px 0",
-                    borderBottom: "1px dashed #fcd34d",
-                  }}
-                >
+                <div key={ord.id} className="ec-customer-note-item">
                   <strong>{ord.customer.split(" ")[0]} indicó:</strong>{" "}
                   {ord.customer_note}
                 </div>
@@ -664,6 +606,7 @@ const VistaPicker = () => {
                 orderMap={orderIndexMap}
                 isCompleted={activeZone === "canasta"}
                 onAction={handleCardAction}
+                onImageZoom={(src, name) => setZoomImage({ src, name })}
               />
             ))
           ) : (
@@ -801,21 +744,16 @@ const VistaPicker = () => {
         isProcessing={isFinishing}
       />
 
+      {/* --- IMAGE ZOOM LIGHTBOX --- */}
+      <ImageZoomModal
+        isOpen={!!zoomImage.src}
+        imageSrc={zoomImage.src}
+        productName={zoomImage.name}
+        onClose={() => setZoomImage({ src: null, name: "" })}
+      />
+
       {/* --- FLOATING TOASTS NOTIFICATIONS --- */}
-      <div
-        style={{
-          position: "fixed",
-          bottom: "90px", // Just above the FAB
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 9999,
-          display: "flex",
-          flexDirection: "column",
-          gap: "8px",
-          alignItems: "center",
-          pointerEvents: "none",
-        }}
-      >
+      <div className="ec-toasts-container">
         <AnimatePresence>
           {toasts.map((t) => (
             <motion.div

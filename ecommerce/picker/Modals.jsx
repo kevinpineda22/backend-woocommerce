@@ -36,15 +36,10 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
   return (
     <div className="ec-modal-overlay">
       <div className="ec-modal-content">
-        <div style={{ textAlign: "center", marginBottom: 22 }}>
+        <div className="modal-header-center">
           <FaKeyboard size={48} color="#3b82f6" />
-          <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginTop: 12 }}>
-            Digitar Código
-          </h3>
-          <p
-            className="ec-text-secondary"
-            style={{ fontSize: "1.05rem", lineHeight: 1.5 }}
-          >
+          <h3 className="modal-header-title">Digitar Código</h3>
+          <p className="modal-header-subtitle">
             Si el escáner falla, ingresa el EAN/SKU manual.
           </p>
         </div>
@@ -76,12 +71,7 @@ export const ManualEntryModal = ({ isOpen, onClose, onConfirm }) => {
             ✕ Cancelar
           </button>
           <button
-            className="ec-reason-btn"
-            style={{
-              background: "linear-gradient(135deg, #3b82f6, #2563eb)",
-              color: "white",
-              width: "100%",
-            }}
+            className="ec-reason-btn ec-reason-btn--primary"
             onClick={() => {
               if (code.trim().length > 0) onConfirm(code.trim());
             }}
@@ -673,14 +663,7 @@ export const WeightModal = ({
               <span className="wm-weight-unit">g</span>
             </div>
             {weight && !isNaN(parseFloat(weight)) && parseFloat(weight) > 0 && (
-              <p
-                style={{
-                  fontSize: "0.8rem",
-                  color: "#64748b",
-                  marginTop: "4px",
-                  textAlign: "center",
-                }}
-              >
+              <p className="wm-weight-hint">
                 = {(parseFloat(weight) / 1000).toFixed(3)} Kg
               </p>
             )}
@@ -1172,8 +1155,7 @@ export const SubstituteModal = ({
               {/* ✅ NUEVO: Feedback explícito de éxito GS1 en Sustituto */}
               {isMeat && isSubCodeValidated && subMeatLabel && (
                 <div
-                  className="wm-gs1-success-feedback"
-                  style={{ marginBottom: 16 }}
+                  className="wm-gs1-success-feedback wm-gs1-success-feedback--sub"
                 >
                   <div className="wm-gs1-icon">✅</div>
                   <div className="wm-gs1-details">
@@ -1242,11 +1224,7 @@ export const SubstituteModal = ({
               <FaArrowLeft /> Atrás
             </button>
             <button
-              className="wm-btn-confirm"
-              style={{
-                background: "linear-gradient(135deg, #f59e0b, #d97706)",
-                boxShadow: "0 4px 16px rgba(245,158,11,0.35)",
-              }}
+              className="wm-btn-confirm wm-btn-confirm--warning"
               onClick={
                 !isSubCodeValidated
                   ? () => handleVerify()
@@ -1280,26 +1258,12 @@ export const SubstituteModal = ({
           Original: <strong>{originalItem.name}</strong>
         </div>
 
-        <form
-          onSubmit={handleManualSearch}
-          className="ec-search-form"
-          style={{ display: "flex", gap: "8px" }}
-        >
+        <form onSubmit={handleManualSearch} className="ec-search-form">
           <button
             type="button"
-            className="wm-camera-btn"
+            className="wm-camera-btn wm-camera-btn--blue"
             onClick={handleCameraClickSearch}
             title="Escanear producto"
-            style={{
-              borderRadius: "12px",
-              padding: "0 16px",
-              background: "linear-gradient(135deg, #3b82f6, #2563eb)",
-              color: "white",
-              border: "none",
-              cursor: "pointer",
-              minWidth: "52px",
-              minHeight: "52px",
-            }}
           >
             <FaCamera size={22} />
           </button>
@@ -1309,7 +1273,6 @@ export const SubstituteModal = ({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="ec-search-input"
-            style={{ flex: 1 }}
           />
           <button type="submit" className="ec-search-btn">
             <FaSearch />
@@ -1320,14 +1283,7 @@ export const SubstituteModal = ({
           {isManualSearch ? (
             "Resultados de búsqueda:"
           ) : (
-            <span
-              style={{
-                color: "#2563eb",
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-              }}
-            >
+            <span className="ec-suggestion-label">
               <FaMagic /> Sugerencias (Mismo Pasillo)
             </span>
           )}
@@ -1335,7 +1291,7 @@ export const SubstituteModal = ({
 
         <div className="ec-search-results">
           {searchError && (
-            <div className="wm-error-alert" style={{ margin: "0 0 10px" }}>
+            <div className="wm-error-alert wm-error-alert--mb">
               <div className="wm-error-icon">
                 <FaExclamationTriangle />
               </div>
@@ -1343,13 +1299,13 @@ export const SubstituteModal = ({
             </div>
           )}
           {loading && (
-            <div className="ec-picker-centered" style={{ height: "100px" }}>
+            <div className="ec-picker-centered ec-picker-centered--inline">
               <div className="ec-spinner"></div>
             </div>
           )}
 
           {!loading && suggestions.length === 0 && (
-            <div style={{ textAlign: "center", color: "#999", padding: 40 }}>
+            <div className="ec-search-empty">
               <FaBoxOpen size={40} style={{ marginBottom: 10, opacity: 0.3 }} />
               <br />
               No se encontraron productos.
@@ -1400,44 +1356,20 @@ export const ClientsModal = ({ isOpen, orders, onClose }) => {
   return (
     <div className="ec-modal-overlay high-z">
       <div className="ec-modal-content">
-        <div className="ec-modal-header" style={{ background: "#1e293b" }}>
-          <h3 style={{ color: "white", margin: 0 }}>Directorio Clientes</h3>
-          <button
-            onClick={onClose}
-            style={{
-              color: "white",
-              background: "transparent",
-              border: "none",
-              fontSize: "1.2rem",
-            }}
-          >
+        <div className="ec-modal-header ec-modal-header--dark">
+          <h3>Directorio Clientes</h3>
+          <button onClick={onClose}>
             <FaTimes />
           </button>
         </div>
-        <div
-          className="ec-modal-body"
-          style={{ padding: "20px 0", overflowY: "auto", maxHeight: "60vh" }}
-        >
+        <div className="ec-modal-body--scroll">
           {orders.map((order) => (
-            <div
-              key={order.id}
-              style={{
-                padding: "15px 20px",
-                borderBottom: "1px solid #eee",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontWeight: "bold", color: "#1e293b" }}>
-                  {order.customer}
-                </div>
-                <div style={{ fontSize: "0.8rem", color: "#64748b" }}>
-                  Pedido #{order.id}
-                </div>
+            <div key={order.id} className="clients-order-row">
+              <div className="clients-order-info">
+                <div className="clients-order-name">{order.customer}</div>
+                <div className="clients-order-id">Pedido #{order.id}</div>
               </div>
-              <div style={{ display: "flex", gap: 10 }}>
+              <div className="clients-order-actions">
                 {order.phone && (
                   <>
                     <a
@@ -1460,10 +1392,9 @@ export const ClientsModal = ({ isOpen, orders, onClose }) => {
             </div>
           ))}
         </div>
-        <div style={{ padding: 20 }}>
+        <div className="ec-modal-footer">
           <button
-            className="ec-modal-cancel"
-            style={{ width: "100%" }}
+            className="ec-modal-cancel ec-modal-cancel--full"
             onClick={onClose}
           >
             Cerrar
@@ -1513,20 +1444,15 @@ export const BulkQtyModal = ({ isOpen, item, onClose, onConfirm }) => {
 
   return (
     <div className="ec-modal-overlay">
-      <div className="ec-modal-content" style={{ maxWidth: 400 }}>
-        <div style={{ textAlign: "center", marginBottom: 22 }}>
+      <div className="ec-modal-content ec-modal-content--narrow">
+        <div className="modal-header-center">
           <FaBoxOpen size={48} color="#f59e0b" />
-          <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginTop: 12 }}>
-            ¿Cuántas unidades encontraste?
-          </h3>
-          <p
-            className="ec-text-secondary"
-            style={{ fontSize: "1.05rem", lineHeight: 1.5 }}
-          >
+          <h3 className="modal-header-title">¿Cuántas unidades encontraste?</h3>
+          <p className="modal-header-subtitle">
             Múltiples unidades detectadas.
             <br />
             Llevas:{" "}
-            <strong style={{ color: "#1e293b", fontSize: "1.15rem" }}>
+            <strong className="modal-qty-highlight">
               {item.qty_scanned || 0} / {item.quantity_total}
             </strong>
           </p>
@@ -1535,12 +1461,7 @@ export const BulkQtyModal = ({ isOpen, item, onClose, onConfirm }) => {
           <input
             ref={inputRef}
             type="number"
-            className="ec-manual-input"
-            style={{
-              textAlign: "center",
-              fontSize: "2rem",
-              letterSpacing: "2px",
-            }}
+            className="ec-manual-input bulk-input-qty"
             value={qty}
             min={1}
             max={remaining}
@@ -1550,20 +1471,12 @@ export const BulkQtyModal = ({ isOpen, item, onClose, onConfirm }) => {
             }}
           />
         </div>
-        <p
-          style={{
-            textAlign: "center",
-            fontSize: "0.9rem",
-            color: "#64748b",
-            margin: "10px 0 0",
-            fontWeight: 600,
-          }}
-        >
+        <p className="bulk-max-hint">
           Máximo permitido:{" "}
-          <strong style={{ color: "#f59e0b" }}>{remaining}</strong>
+          <strong className="bulk-max-value">{remaining}</strong>
         </p>
         {bulkError && (
-          <div className="wm-error-alert" style={{ marginTop: 10 }}>
+          <div className="wm-error-alert wm-error-alert--mt">
             <div className="wm-error-icon">
               <FaExclamationTriangle />
             </div>
@@ -1575,12 +1488,7 @@ export const BulkQtyModal = ({ isOpen, item, onClose, onConfirm }) => {
             ✕ Cancelar
           </button>
           <button
-            className="ec-reason-btn"
-            style={{
-              background: "linear-gradient(135deg, #f59e0b, #d97706)",
-              color: "white",
-              width: "100%",
-            }}
+            className="ec-reason-btn ec-reason-btn--warning"
             onClick={handleSubmit}
           >
             ✅ Confirmar
