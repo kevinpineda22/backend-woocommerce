@@ -43,6 +43,21 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
     return parseInt(qtyStr) || 0;
   }, [isMultipack, item]);
 
+  // Helper para describir la presentación
+  const getMultipackLabel = useMemo(() => {
+    if (!isMultipack) return "";
+    const uom = item.unidad_medida?.toUpperCase() || "";
+    if (uom.startsWith("P")) {
+      const num = uom.substring(1);
+      if (num === "6") return "SIXPACK";
+      if (num === "2") return "DÚO";
+      return `PACK DE ${num}`;
+    }
+    if (uom === "KL" || uom === "KG") return "KILO";
+    if (uom === "LB") return "LIBRA";
+    return uom;
+  }, [isMultipack, item]);
+
   const statusIconClass = useMemo(() => {
     if (isFullySubstituted || isMixed) return "ec-card-status-icon--warning";
     if (isShortPick) return "ec-card-status-icon--danger";
@@ -110,7 +125,8 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
         {/* ALERTA MULTIPACK */}
         {isMultipack && !isCompleted && (
           <div className="ec-multipack-alert">
-            📦 ATENCIÓN: LLEVAR EMPAKE x{multipackQty}
+            📦 ATENCIÓN: LLEVAR {getMultipackLabel}
+            {total > 1 && ` (${total} unidades)`}
           </div>
         )}
 

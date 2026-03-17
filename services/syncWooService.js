@@ -135,7 +135,6 @@ const syncOrderToWoo = async (sessionId, orderId) => {
     // 6. EJECUTAR PUT
     const updatePayload = {
       status: "completed",
-      customer_note: `Pedido verificado y ajustado por Auditoría (Sesión ${sessionId.slice(0, 6)}).`,
     };
 
     if (lineItemsPayload.length > 0) {
@@ -163,7 +162,6 @@ const syncOrderToWoo = async (sessionId, orderId) => {
         );
         await activeClient.put(`orders/${orderId}`, {
           status: "completed",
-          customer_note: `Pedido completado (ajustes de líneas pendientes - Sesión ${sessionId.slice(0, 6)}).`,
         });
         console.log(
           `⚠️ [FALLBACK OK] Pedido #${orderId} marcado como completed (sin ajustes de líneas).`,

@@ -237,7 +237,7 @@ exports.getSessionActive = async (req, res) => {
     const { data: logs } = await supabase
       .from("wc_log_picking")
       .select(
-        "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original, peso_real",
+        "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original, peso_real, f120_id_siesa, unidad_medida_siesa",
       )
       .in("id_asignacion", assignIds);
 
@@ -315,6 +315,42 @@ exports.getSessionActive = async (req, res) => {
       Object.keys(barcodeMapSiesa).length,
     );
 
+    // ✅ 2C. DETECTAR PRODUCTOS CON VARIACIONES (múltiples unidad_medida)
+    const f120IdList = Array.from(
+      new Set(
+        skuList.map((sku) => sku) // Ya son los f120_ids extraídos
+      ),
+    );
+
+    const variacionesMap = {};
+    if (f120IdList.length > 0) {
+      try {
+        const { data: variacionesData } = await supabase
+          .from("siesa_codigos_barras")
+          .select("f120_id, unidad_medida")
+          .in("f120_id", f120IdList);
+
+        if (variacionesData) {
+          // Agrupar por f120_id y contar unidad_medida únicas
+          variacionesData.forEach((row) => {
+            if (!variacionesMap[row.f120_id]) {
+              variacionesMap[row.f120_id] = new Set();
+            }
+            variacionesMap[row.f120_id].add(row.unidad_medida);
+          });
+
+          // Convertir Set a boolean: true si tiene más de 1 variación
+          Object.keys(variacionesMap).forEach((f120_id) => {
+            variacionesMap[f120_id] = variacionesMap[f120_id].size > 1;
+          });
+
+          console.log("📦 Productos con variaciones detectados:", variacionesMap);
+        }
+      } catch (e) {
+        console.error("Error detectando variaciones:", e.message);
+      }
+    }
+
     // 3. PROCESAMIENTO DE ESTADO ITEM POR ITEM
     const itemsConRuta = itemsAgrupados.map((item) => {
       const realCategories =
@@ -348,6 +384,20 @@ exports.getSessionActive = async (req, res) => {
       // Datos del sustituto (si existe alguno)
       const lastSub = itemLogs.find((l) => l.accion === "sustituido");
 
+      // ✅ RECONSTRUIR SKU CORRECTO desde SIESA si está disponible
+      // Si el picker escaneó un código que se validó contra SIESA,
+      // usamos f120_id_siesa + unidad_medida_siesa para construir el SKU correcto
+      let skuFinal = item.sku; // Default: usar SKU original de WooCommerce
+      let f120_idFinal = parseInt(item.sku); // Extraer f120_id para detectar variaciones
+      const firstPickedLog = pickedLogs[0];
+      if (firstPickedLog && firstPickedLog.f120_id_siesa && firstPickedLog.unidad_medida_siesa) {
+        skuFinal = `${firstPickedLog.f120_id_siesa}${firstPickedLog.unidad_medida_siesa}`;
+        f120_idFinal = firstPickedLog.f120_id_siesa;
+      }
+
+      // ✅ DETECTAR SI PRODUCTO TIENE VARIACIONES
+      const tieneVariaciones = variacionesMap[f120_idFinal] || false;
+
       // Estado Global
       let status = "pendiente";
       const totalProcessed = qtyPicked + qtySubbed + qtyShort;
@@ -373,6 +423,12 @@ exports.getSessionActive = async (req, res) => {
         // El frontend calculará (Total - Originales) para saber cuántos son sustitutos
         qty_scanned: qtyPicked,
         peso_real: pesoRealTotal > 0 ? parseFloat(pesoRealTotal.toFixed(3)) : 0,
+
+        // ✅ SKU FINAL: Reconstruido desde SIESA si está disponible
+        sku_final: skuFinal,
+
+        // ✅ NUEVO: Indica si el producto tiene variaciones (múltiples unidad_medida)
+        tiene_variaciones: tieneVariaciones,
 
         // ✅ CÓDIGOS DE BARRAS: Prioridad SIESA (Array) > WooCommerce (Array[1]) > SKU (Array[1])
         barcode: barcodeMapSiesa[parseInt(item.sku)] || [

@@ -248,12 +248,13 @@ const DEFINICION_PASILLOS = [
   },
   {
     pasillo: "5",
-    nombre: "Pan Dulce, Galletas y Avenas",
+    nombre: "Pan Dulce, Galletas, Avenas y Leche en Polvo",
     categorias: [
       "galleta", "galletas", "galleteria", "galleta salada", "galleta dulce",
       "galleta saludable",
       "pan dulce",
       "avena", "avenas",
+      "leche en polvo",
       "modificadores",
     ],
   },

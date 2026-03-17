@@ -11,7 +11,9 @@ exports.registerAction = async (req, res) => {
     motivo,
     cantidad_afectada,
     pasillo,
-    codigo_barras_escaneado, // ✅ NUEVO: Código de barras exacto que se escaneó
+    codigo_barras_escaneado, // ✅ Código de barras exacto que se escaneó
+    f120_id_siesa, // ✅ NUEVO: f120_id encontrado en SIESA
+    unidad_medida_siesa, // ✅ NUEVO: unidad_medida encontrada en SIESA
   } = req.body;
 
   try {
@@ -159,6 +161,8 @@ exports.registerAction = async (req, res) => {
       motivo: motivo || null,
       pasillo: pasillo || "General",
       codigo_barras_escaneado: codigo_barras_escaneado || null,
+      f120_id_siesa: f120_id_siesa || null, // ✅ NUEVO: Para reconstruir SKU correcto
+      unidad_medida_siesa: unidad_medida_siesa || null, // ✅ NUEVO: Para reconstruir SKU correcto
       sede_id: sedeId, // ✅ MULTI-SEDE
     };
 
@@ -216,4 +220,167 @@ exports.validateManualCode = async (req, res) => {
   }
 
   res.json({ valid: skuMatch || barcodeMatch });
+};
+
+/**
+ * Validar código contra SIESA considerando presentaciones
+ * - Busca el código en siesa_codigos_barras
+ * - Construye el SKU esperado (f120_id + unidad_medida)
+ * - Compara con el SKU esperado del producto
+ * - Si no coincide la presentación, retorna error específico
+ */
+exports.validateCodeWithSiesa = async (req, res) => {
+  const { codigo, f120_id_esperado, unidad_medida_esperada } = req.body;
+
+  if (!codigo || !f120_id_esperado || !unidad_medida_esperada) {
+    return res.status(400).json({
+      valid: false,
+      message: "Parámetros incompletos",
+    });
+  }
+
+  try {
+    const codigoLimpio = codigo.toString().trim().toUpperCase();
+
+    // 1. Buscar el código en SIESA
+    const { data: siesaData, error: siesaError } = await supabase
+      .from("siesa_codigos_barras")
+      .select("f120_id, unidad_medida")
+      .eq("codigo_barras", codigoLimpio)
+      .single();
+
+    // Código NO existe en SIESA
+    if (siesaError || !siesaData) {
+      return res.status(200).json({
+        valid: false,
+        message: "❌ Código no encontrado en el sistema",
+        codigo_existe: false,
+      });
+    }
+
+    // 2. Construir SKUs para comparar
+    const skuEscaneado = `${siesaData.f120_id}${siesaData.unidad_medida}`;
+    const skuEsperado = `${f120_id_esperado}${unidad_medida_esperada}`;
+    const cleanSku = (sku) => sku.replace(/-/g, "");
+    const skuEscaneadoLimpio = cleanSku(skuEscaneado);
+    const skuEsperadoLimpio = cleanSku(skuEsperado);
+
+    // 3. Comparar presentaciones
+    if (skuEscaneadoLimpio !== skuEsperadoLimpio) {
+      // El f120_id coincide, pero la presentación es diferente
+      if (siesaData.f120_id === f120_id_esperado) {
+        return res.status(200).json({
+          valid: false,
+          message: `❌ El código que escaneaste es para ${siesaData.unidad_medida}, pero se esperaba ${unidad_medida_esperada}`,
+          f120_id_coincide: true,
+          unidad_media_encontrada: siesaData.unidad_medida,
+          unidad_medida_esperada: unidad_medida_esperada,
+        });
+      }
+      // El f120_id no coincide (producto completamente diferente)
+      return res.status(200).json({
+        valid: false,
+        message: `❌ El código pertenece a un producto diferente`,
+        f120_id_encontrado: siesaData.f120_id,
+        f120_id_esperado: f120_id_esperado,
+      });
+    }
+
+    // 4. Validación exitosa
+    return res.status(200).json({
+      valid: true,
+      message: "✅ Código validado correctamente",
+      sku_encontrado: skuEscaneadoLimpio,
+      f120_id: siesaData.f120_id,
+      unidad_medida: siesaData.unidad_medida,
+    });
+  } catch (error) {
+    console.error("Error en validateCodeWithSiesa:", error.message);
+    return res.status(500).json({
+      valid: false,
+      message: "Error al validar código",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Validar código para AUDITOR - IGUAL DE RESTRICTIVO QUE PICKER
+ * Valida presentación EXACTA (f120_id + unidad_medida)
+ * El auditor digita CANTIDAD manualmente (diferencia con picker)
+ * Diferencia: Picker valida por unidad, Auditor valida cantidad total de una vez
+ */
+exports.validateCodeForAuditor = async (req, res) => {
+  const { codigo, f120_id_esperado, unidad_medida_esperada } = req.body;
+
+  if (!codigo || !f120_id_esperado || !unidad_medida_esperada) {
+    return res.status(400).json({
+      valid: false,
+      message: "Parámetros incompletos",
+    });
+  }
+
+  try {
+    const codigoLimpio = codigo.toString().trim().toUpperCase();
+
+    // 1. Buscar el código en SIESA (igual que picker)
+    const { data: siesaData, error: siesaError } = await supabase
+      .from("siesa_codigos_barras")
+      .select("f120_id, unidad_medida")
+      .eq("codigo_barras", codigoLimpio)
+      .single();
+
+    // Código NO existe en SIESA
+    if (siesaError || !siesaData) {
+      return res.status(200).json({
+        valid: false,
+        message: "❌ Código no encontrado en el sistema",
+        codigo_existe: false,
+      });
+    }
+
+    // 2. Construir SKUs para comparar (EXACTAMENTE IGUAL QUE PICKER)
+    const skuEscaneado = `${siesaData.f120_id}${siesaData.unidad_medida}`;
+    const skuEsperado = `${f120_id_esperado}${unidad_medida_esperada}`;
+    const cleanSku = (sku) => sku.replace(/-/g, "");
+    const skuEscaneadoLimpio = cleanSku(skuEscaneado);
+    const skuEsperadoLimpio = cleanSku(skuEsperado);
+
+    // 3. Comparar presentaciones - MISMO CRITERIO QUE PICKER
+    if (skuEscaneadoLimpio !== skuEsperadoLimpio) {
+      // El f120_id coincide, pero la presentación es diferente
+      if (siesaData.f120_id === f120_id_esperado) {
+        return res.status(200).json({
+          valid: false,
+          message: `❌ El código que escaneaste es para ${siesaData.unidad_medida}, pero se esperaba ${unidad_medida_esperada}`,
+          f120_id_coincide: true,
+          unidad_media_encontrada: siesaData.unidad_medida,
+          unidad_medida_esperada: unidad_medida_esperada,
+        });
+      }
+      // El f120_id no coincide (producto completamente diferente)
+      return res.status(200).json({
+        valid: false,
+        message: `❌ El código pertenece a un producto diferente`,
+        f120_id_encontrado: siesaData.f120_id,
+        f120_id_esperado: f120_id_esperado,
+      });
+    }
+
+    // 4. Validación exitosa - Presentación correcta
+    return res.status(200).json({
+      valid: true,
+      message: "✅ Código validado correctamente",
+      sku_encontrado: skuEscaneadoLimpio,
+      f120_id: siesaData.f120_id,
+      unidad_medida: siesaData.unidad_medida,
+    });
+  } catch (error) {
+    console.error("Error en validateCodeForAuditor:", error.message);
+    return res.status(500).json({
+      valid: false,
+      message: "Error al validar código",
+      error: error.message,
+    });
+  }
 };

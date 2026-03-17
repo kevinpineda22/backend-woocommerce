@@ -574,10 +574,13 @@ const VistaAuditor = () => {
             id: i.id || i.sku,
             name: i.name,
             original_name: i.original_name || null,
-            sku: i.sku || "",
+            // ✅ IMPORTANTE: Usar sku_final si está disponible (SKU reconstruido desde SIESA)
+            // Si no, usar sku original de WooCommerce
+            sku: i.sku_final || i.sku || "",
             barcode: i.barcode || "", // Solo barcode real, nunca SKU ni ID
             qty: i.qty || i.count || 1,
             is_sub: i.type === "sustituido" || i.is_sub,
+            unidad_medida: i.unidad_medida || "", // Para detectar multipacks (P6, P25, KL, LB, etc.)
           }));
 
           return (

@@ -77,6 +77,12 @@ const ManifestSheet = ({
     }
   }, [items]);
 
+  // Helper: Limpiar SKU removiendo guiones
+  const cleanSku = (sku) => {
+    if (!sku) return "";
+    return sku.toString().replace(/-/g, "");
+  };
+
   // Helper: Validar si un código es un barcode real (8+ dígitos numéricos, opcionalmente con '+' al final)
   const isValidBarcode = (code) => {
     if (!code || code === "N/A" || code === "ADMIN_OVERRIDE") return false;
@@ -84,13 +90,49 @@ const ManifestSheet = ({
     return /^\d+$/.test(cleaned) && cleaned.length >= 8;
   };
 
+  // Helper: Detectar si un producto es multipack (presentación especial)
+  const isMultipack = (unidad_medida) => {
+    if (!unidad_medida) return false;
+    const uom = unidad_medida.toUpperCase();
+    // P6, P25, KL, LB, etc. (no "UN" = unidad)
+    return /^[A-Z]+\d+$/.test(uom) && uom !== "UN";
+  };
+
+  // Helper: Detectar si un producto es fruver o carnes (usan peso, no cantidad)
+  const isFruverOrMeat = (itemName) => {
+    if (!itemName) return false;
+    const name = itemName.toLowerCase();
+    // Fruver (pasillo 14)
+    const fruverKeywords = [
+      "fruta", "verdura", "hortaliza", "fruver",
+      "tomate", "cebolla", "papa", "lechuga", "zanahoria",
+    ];
+    // Carnes (pasillo 13)
+    const meatKeywords = [
+      "carne", "carnes", "pescado", "pollo", "jamón",
+      "embutido", "embutidos", "mariscos", "res y cerdo",
+      "carnicería", "filete", "costilla", "pechuga",
+    ];
+    const allKeywords = [...fruverKeywords, ...meatKeywords];
+    return allKeywords.some((keyword) => name.includes(keyword));
+  };
+
   // Generar QR Value: Cantidad * Código de Barras (separado por salto de línea \r\n para simular ENTER)
-  // SOLO códigos de barras válidos — nunca SKUs ni nombres de producto
+  // REGLAS:
+  // 1. Fruver/Carnes: SOLO código (sin multiplicador)
+  // 2. Productos CON variaciones: 1*sku repetido qty veces (salto de línea entre cada uno)
+  // 3. Productos SIN variaciones: qty*sku (una sola línea)
   const omittedItems = [];
 
   const qrValue = items
-    .map((item) => {
+    .flatMap((item) => {
       const qty = item.qty || item.count || 1;
+      const itemName = item.name || item.original_name || "";
+      const unidad_medida = item.unidad_medida || "";
+      const tieneVariaciones = item.tiene_variaciones || false;
+
+      // Detectar si es multipack (presentación especial como P6, P25, KL, LB)
+      const isMP = isMultipack(unidad_medida);
 
       // START
       let code = item.barcode || "";
@@ -110,13 +152,30 @@ const ManifestSheet = ({
         code = correctedCodes[code];
       }
 
-      // Solo incluir si finalmente resultó ser un código de barras válido
-      if (!isValidBarcode(code)) {
-        omittedItems.push(item);
-        return null;
+      // Para productos con variaciones, usar SKU en lugar del código escaneado
+      if ((isMP || tieneVariaciones) && item.sku) {
+        code = cleanSku(item.sku);
       }
 
-      return `${qty}*${code}`;
+      // Solo incluir si finalmente resultó ser válido
+      if (!isValidBarcode(code) && !isMP && !tieneVariaciones) {
+        omittedItems.push(item);
+        return [];
+      }
+
+      // ✅ FRUVER Y CARNES: SOLO código sin multiplicador
+      if (isFruverOrMeat(itemName)) {
+        return [code];
+      }
+
+      // ✅ PRODUCTOS CON VARIACIONES: Repetir qty líneas de "1*sku"
+      // (cada línea es una presentación individual para la caja registradora)
+      if (tieneVariaciones && item.sku) {
+        return Array(qty).fill(`1*${cleanSku(item.sku)}`);
+      }
+
+      // ✅ PRODUCTOS SIN VARIACIONES: qty*sku (una sola línea)
+      return [`${qty}*${code}`];
     })
     .filter(Boolean)
     .join("\r\n");
@@ -271,7 +330,7 @@ const ManifestSheet = ({
                   if (item.barcode && item.barcode !== "ADMIN_OVERRIDE")
                     return item.barcode;
                   if (item.sku && item.sku !== "ADMIN_OVERRIDE")
-                    return item.sku;
+                    return cleanSku(item.sku); // Sin guiones
                   if (item.id && item.id !== "ADMIN_OVERRIDE") return item.id;
                   return "";
                 };
@@ -371,7 +430,7 @@ const ManifestSheet = ({
                   if (item.barcode && item.barcode !== "ADMIN_OVERRIDE")
                     return item.barcode;
                   if (item.sku && item.sku !== "ADMIN_OVERRIDE")
-                    return item.sku;
+                    return cleanSku(item.sku); // Sin guiones
                   if (item.id && item.id !== "ADMIN_OVERRIDE") return item.id;
                   return "";
                 };

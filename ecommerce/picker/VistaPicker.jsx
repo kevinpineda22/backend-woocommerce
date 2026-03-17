@@ -327,7 +327,13 @@ const VistaPicker = () => {
       cantidad_afectada: qtyToProcess,
       pasillo: itemRef.pasillo,
       codigo_barras_escaneado: finalBarcode, // ✅ Se guarda en la BD para auditoría
+      // ✅ NUEVO: Datos de SIESA para reconstruir SKU correcto en el manifiesto
+      f120_id_siesa: siesaData?.f120_id_siesa || null,
+      unidad_medida_siesa: siesaData?.unidad_medida_siesa || null,
     });
+
+    // Limpiar datos de SIESA después de usar
+    setSiesaData(null);
 
     if (isFinished) {
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
@@ -379,6 +385,25 @@ const VistaPicker = () => {
     showToast("🔄 Sustitución registrada", "info");
   };
 
+  // Estado para guardar datos de SIESA validados
+  const [siesaData, setSiesaData] = useState(null);
+
+  // Helper: Parsear SKU para extraer f120_id y unidad_medida
+  const parseSku = (sku) => {
+    if (!sku) return { f120_id: null, unidad_medida: null };
+    const cleaned = sku.replace(/-/g, ""); // Remover guiones si existen
+    // Formato: 11420P6 o 11420UND o 11420KL, etc.
+    // El f120_id son los dígitos al inicio, unidad_medida es lo que sigue
+    const match = cleaned.match(/^(\d+)([A-Z]+\d*)$/);
+    if (match) {
+      return {
+        f120_id: parseInt(match[1]),
+        unidad_medida: match[2],
+      };
+    }
+    return { f120_id: null, unidad_medida: null };
+  };
+
   const handleManualValidation = async (inputCode) => {
     if (!isOnline) {
       if (window.confirm("⚠️ Estás Offline. ¿Forzar?")) {
@@ -392,21 +417,53 @@ const VistaPicker = () => {
     }
     if (!currentItem) return;
     try {
-      const res = await ecommerceApi.post(
-        `/validar-codigo${sedeParam ? "?" + sedeParam : ""}`,
-        {
-          input_code: inputCode,
-          expected_sku: currentItem.sku,
-          expected_barcode: currentItem.barcode,
-        },
-      );
-      if (res.data.valid) {
-        setLastScannedBarcode(null);
-        setShowManualModal(false);
-        if (isWeighable(currentItem)) setShowWeightModal(true);
-        else if (currentItem.quantity_total > 4) setShowBulkModal(true);
-        else confirmPicking();
-      } else showToast("❌ Código incorrecto.", "error");
+      // Extraer f120_id y unidad_medida del SKU esperado
+      const { f120_id, unidad_medida } = parseSku(currentItem.sku);
+
+      // Si el SKU tiene estructura reconocible, usar validación SIESA mejorada
+      if (f120_id && unidad_medida) {
+        const res = await ecommerceApi.post(
+          `/validar-codigo-siesa${sedeParam ? "?" + sedeParam : ""}`,
+          {
+            codigo: inputCode,
+            f120_id_esperado: f120_id,
+            unidad_medida_esperada: unidad_medida,
+          },
+        );
+
+        if (res.data.valid) {
+          // ✅ Guardar datos de SIESA para pasarlos a confirmPicking
+          setSiesaData({
+            f120_id_siesa: res.data.f120_id,
+            unidad_medida_siesa: res.data.unidad_medida,
+          });
+          setLastScannedBarcode(null);
+          setShowManualModal(false);
+          if (isWeighable(currentItem)) setShowWeightModal(true);
+          else if (currentItem.quantity_total > 4) setShowBulkModal(true);
+          else confirmPicking();
+        } else {
+          // Mensaje de error descriptivo según el tipo de problema
+          showToast(res.data.message || "❌ Código incorrecto.", "error");
+        }
+      } else {
+        // Fallback a validación antigua si el SKU no tiene estructura conocida
+        const res = await ecommerceApi.post(
+          `/validar-codigo${sedeParam ? "?" + sedeParam : ""}`,
+          {
+            input_code: inputCode,
+            expected_sku: currentItem.sku,
+            expected_barcode: currentItem.barcode,
+          },
+        );
+        if (res.data.valid) {
+          setLastScannedBarcode(null);
+          setShowManualModal(false);
+          if (isWeighable(currentItem)) setShowWeightModal(true);
+          else if (currentItem.quantity_total > 4) setShowBulkModal(true);
+          else confirmPicking();
+        } else showToast("❌ Código incorrecto.", "error");
+      }
     } catch (e) {
       const detail =
         e.response?.data?.error || e.message || "Sin conexión al servidor";

@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { supabase } from "../supabaseClient";
 
 /**
  * Recibe una lista de códigos, si son cortos (items) busca su código de barras real (f120_id -> codigo_barras).
