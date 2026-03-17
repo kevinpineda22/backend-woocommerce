@@ -44,6 +44,7 @@ const VistaPicker = () => {
   const {
     loading,
     sessionData,
+    pickerInfo,
     pickerSedeId,
     sedeParam,
     showSuccessQR,

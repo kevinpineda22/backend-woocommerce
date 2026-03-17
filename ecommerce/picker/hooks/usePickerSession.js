@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ecommerceApi } from "../../shared/ecommerceApi";
 import { supabase } from "../../../../supabaseClient";
 
@@ -12,6 +12,12 @@ export const usePickerSession = () => {
   const [isFinishing, setIsFinishing] = useState(false);
   const [initError, setInitError] = useState(null);
 
+  // Ref para acceder a pickerSedeId dentro de callbacks sin causar re-creaciones
+  const pickerSedeIdRef = useRef(pickerSedeId);
+  useEffect(() => {
+    pickerSedeIdRef.current = pickerSedeId;
+  }, [pickerSedeId]);
+
   // Helper: construir sede param para URLs
   const sedeParam = pickerSedeId ? `sede_id=${pickerSedeId}` : "";
 
@@ -24,8 +30,8 @@ export const usePickerSession = () => {
   const refreshSessionData = useCallback(
     async (idPicker, sedeId = null) => {
       if (!idPicker) return;
-      const sp =
-        sedeId || pickerSedeId ? `&sede_id=${sedeId || pickerSedeId}` : "";
+      const effectiveSede = sedeId || pickerSedeIdRef.current || "";
+      const sp = effectiveSede ? `&sede_id=${effectiveSede}` : "";
       try {
         const res = await ecommerceApi.get(
           `/sesion-activa?id_picker=${idPicker}${sp}`,
@@ -57,6 +63,7 @@ export const usePickerSession = () => {
           setShowSuccessQR(false);
           setCompletedSessionId(null);
         } else {
+          console.warn("Error refrescando sesión:", err.message || err);
           const cached = localStorage.getItem("session_active_cache");
           if (cached) setSessionData(JSON.parse(cached));
         }
@@ -228,7 +235,7 @@ export const usePickerSession = () => {
           .eq("id", completedSessionId)
           .single();
         if (
-          data &&
+          !data ||
           ["auditado", "finalizado", "cancelado"].includes(data.estado)
         ) {
           if (navigator.vibrate) navigator.vibrate([200, 100, 200]);

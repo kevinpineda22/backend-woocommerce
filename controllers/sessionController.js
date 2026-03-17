@@ -208,6 +208,18 @@ exports.getSessionActive = async (req, res) => {
       .eq("id", sessionId)
       .single();
 
+    if (!session) {
+      // Si la sesión fue eliminada manualmente de Supabase, limpiamos el estado del picker
+      await supabase
+        .from("wc_pickers")
+        .update({ id_sesion_actual: null, estado_picker: "disponible" })
+        .eq("id", id_picker);
+
+      return res
+        .status(404)
+        .json({ message: "La sesión asignada ya no existe." });
+    }
+
     // Obtener órdenes (Snapshot o Woo)
     let orders =
       session.snapshot_pedidos && session.snapshot_pedidos.length > 0
