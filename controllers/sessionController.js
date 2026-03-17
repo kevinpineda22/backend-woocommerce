@@ -376,6 +376,14 @@ exports.getSessionActive = async (req, res) => {
       }
     }
 
+    // ✅ HELPER: Extraer unidad_medida del SKU (ej: "11420P6" → "P6", "11420UND" → "UND")
+    const parseSkuPresentation = (sku) => {
+      if (!sku) return null;
+      const cleaned = sku.toString().replace(/-/g, "").trim();
+      const match = cleaned.match(/^\d+([A-Z]+\d*)$/i);
+      return match ? match[1].toUpperCase() : null;
+    };
+
     // 3. PROCESAMIENTO DE ESTADO ITEM POR ITEM
     const itemsConRuta = itemsAgrupados.map((item) => {
       const realCategories =
@@ -438,6 +446,11 @@ exports.getSessionActive = async (req, res) => {
         status = "parcial";
       }
 
+      // ✅ PRESENTACIÓN: Extraer del SKU (P6, UND, KL, LB, etc.)
+      // Solo sobreescribir si el item NO tiene ya unidad_medida del meta de WooCommerce
+      const skuPresentation = parseSkuPresentation(item.sku);
+      const unidadMedidaFinal = item.unidad_medida || skuPresentation || null;
+
       return {
         ...item,
         pasillo: info.pasillo,
@@ -455,6 +468,9 @@ exports.getSessionActive = async (req, res) => {
 
         // ✅ SKU FINAL: Reconstruido desde SIESA si está disponible
         sku_final: skuFinal,
+
+        // ✅ PRESENTACIÓN: P6 → SIXPACK, P2 → DÚO, UND → Unidad, KL → Kilo, etc.
+        unidad_medida: unidadMedidaFinal,
 
         // ✅ NUEVO: Indica si el producto tiene variaciones (múltiples unidad_medida)
         tiene_variaciones: tieneVariaciones,

@@ -43,20 +43,31 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
     return parseInt(qtyStr) || 0;
   }, [isMultipack, item]);
 
-  // Helper para describir la presentación
+  // Helper para describir la presentación en lenguaje humano
   const getMultipackLabel = useMemo(() => {
     if (!isMultipack) return "";
     const uom = item.unidad_medida?.toUpperCase() || "";
     if (uom.startsWith("P")) {
       const num = uom.substring(1);
-      if (num === "6") return "SIXPACK";
       if (num === "2") return "DÚO";
-      return `PACK DE ${num}`;
+      if (num === "3") return "TRIPACK";
+      if (num === "4") return "PACK x4";
+      if (num === "6") return "SIXPACK";
+      if (num === "12") return "DOCENA";
+      return `PACK x${num}`;
     }
-    if (uom === "KL" || uom === "KG") return "KILO";
-    if (uom === "LB") return "LIBRA";
     return uom;
   }, [isMultipack, item]);
+
+  // Label legible para el badge de cantidad
+  const presentationLabel = useMemo(() => {
+    const uom = item.unidad_medida?.toUpperCase() || "";
+    if (!uom || uom === "UND" || uom === "UN") return "UN";
+    if (uom === "KL" || uom === "KG") return "KILO";
+    if (uom === "LB") return "LIBRA";
+    if (isMultipack) return getMultipackLabel;
+    return uom;
+  }, [item, isMultipack, getMultipackLabel]);
 
   const statusIconClass = useMemo(() => {
     if (isFullySubstituted || isMixed) return "ec-card-status-icon--warning";
@@ -114,11 +125,9 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
             )}
           </div>
 
-          <div className="ec-massive-qty-badge">
+          <div className={`ec-massive-qty-badge ${isMultipack ? "ec-badge-multipack" : ""}`}>
             <span className="mq-num">{total}</span>
-            <span className="mq-unit">
-              {item.unidad_medida ? item.unidad_medida.toUpperCase() : "UN"}
-            </span>
+            <span className="mq-unit">{presentationLabel}</span>
           </div>
         </div>
 
