@@ -284,7 +284,9 @@ export const usePickerSession = () => {
   ) => {
     if (!sessionData) return;
     const newItems = sessionData.items.map((i) => {
-      if (i.product_id === prodId) {
+      // ✅ Usar variation_id para distinguir variaciones del mismo producto padre
+      const effectiveId = i.variation_id || i.product_id;
+      if (effectiveId === prodId) {
         // Calculamos el peso acumulado localmente
         let newWeight = parseFloat(i.peso_real || 0);
         if (addedWeight !== null) newWeight += parseFloat(addedWeight);

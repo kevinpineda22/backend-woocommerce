@@ -107,6 +107,9 @@ const VistaPicker = () => {
 
   // --- LÓGICA DE INTERACCIÓN (Botones y Acciones) ---
 
+  // ✅ Helper: ID efectivo que distingue variaciones del mismo producto padre
+  const effectiveId = (item) => item.variation_id || item.product_id;
+
   const handleCardAction = (item, type) => {
     setCurrentItem(item);
     if (type === "scan") {
@@ -153,14 +156,14 @@ const VistaPicker = () => {
             closeModal();
             queueAction({
               id_sesion: sessionData.session_id,
-              id_producto_original: item.product_id,
+              id_producto_original: effectiveId(item),
               nombre_producto_original: item.name,
               accion: "no_encontrado",
               cantidad_afectada: missing,
               motivo: "Stock Insuficiente",
               pasillo: item.pasillo,
             });
-            updateLocalSessionState(item.product_id, scanned, "recolectado");
+            updateLocalSessionState(effectiveId(item), scanned, "recolectado");
             showToast(`Enviado incompleto (${scanned}/${total})`, "warning");
           },
         },
@@ -184,7 +187,7 @@ const VistaPicker = () => {
       if (wasShortPick) {
         queueAction({
           id_sesion: sessionData.session_id,
-          id_producto_original: item.product_id,
+          id_producto_original: effectiveId(item),
           accion: "revert_short_pick",
           cantidad_afectada: 0,
           pasillo: item.pasillo,
@@ -193,13 +196,13 @@ const VistaPicker = () => {
       if (scanned > 0) {
         queueAction({
           id_sesion: sessionData.session_id,
-          id_producto_original: item.product_id,
+          id_producto_original: effectiveId(item),
           accion: "reset",
           cantidad_afectada: 9999,
           pasillo: item.pasillo,
         });
       }
-      updateLocalSessionState(item.product_id, 0, "pendiente", null);
+      updateLocalSessionState(effectiveId(item), 0, "pendiente", null);
       showToast(
         isItemWeighable
           ? "Devuelto a pendientes (peso borrado)"
@@ -214,7 +217,7 @@ const VistaPicker = () => {
       if (wasShortPick) {
         queueAction({
           id_sesion: sessionData.session_id,
-          id_producto_original: item.product_id,
+          id_producto_original: effectiveId(item),
           accion: "revert_short_pick",
           cantidad_afectada: 0,
           pasillo: item.pasillo,
@@ -224,14 +227,14 @@ const VistaPicker = () => {
       if (item.sustituto) {
         queueAction({
           id_sesion: sessionData.session_id,
-          id_producto_original: item.product_id,
+          id_producto_original: effectiveId(item),
           accion: "reset_sustituto",
           cantidad_afectada: 0,
           pasillo: item.pasillo,
         });
       }
       // NO enviamos reset de los recolectados: se mantienen en la BD
-      updateLocalSessionState(item.product_id, scanned, "parcial", null);
+      updateLocalSessionState(effectiveId(item), scanned, "parcial", null);
       showToast(
         `Devuelto a pendientes (${scanned}/${total} conservadas)`,
         "info",
@@ -346,7 +349,7 @@ const VistaPicker = () => {
 
     queueAction({
       id_sesion: sessionData.session_id,
-      id_producto_original: itemRef.product_id,
+      id_producto_original: effectiveId(itemRef),
       nombre_producto_original: itemRef.name,
       accion: "recolectado",
       peso_real: pesoToLog,
@@ -377,7 +380,7 @@ const VistaPicker = () => {
     // ✅ Le pasamos el peso exacto para que lo muestre en pantalla
     const addedWeight = peso !== null ? qtyToProcess * pesoToLog : 0;
     updateLocalSessionState(
-      itemRef.product_id,
+      effectiveId(itemRef),
       currentScanned,
       isFinished ? "recolectado" : "parcial",
       null,
@@ -389,7 +392,7 @@ const VistaPicker = () => {
   const confirmSubstitution = (newItem, qty, finalBarcode = null) => {
     queueAction({
       id_sesion: sessionData.session_id,
-      id_producto_original: currentItem.product_id,
+      id_producto_original: effectiveId(currentItem),
       nombre_producto_original: currentItem.name,
       accion: "sustituido",
       datos_sustituto: {
@@ -402,7 +405,7 @@ const VistaPicker = () => {
       codigo_barras_escaneado: finalBarcode || newItem.barcode || newItem.sku,
     });
     updateLocalSessionState(
-      currentItem.product_id,
+      effectiveId(currentItem),
       currentItem.qty_scanned || 0,
       "sustituido",
       { name: newItem.name, price: newItem.price },
@@ -846,7 +849,7 @@ const VistaPicker = () => {
             {currentList.length > 0 ? (
               currentList.map((item, idx) => (
                 <ProductCard
-                  key={item.product_id}
+                  key={item.key || item.product_id}
                   item={item}
                   orderMap={orderIndexMap}
                   isCompleted={activeZone === "canasta"}
