@@ -161,8 +161,6 @@ exports.registerAction = async (req, res) => {
       motivo: motivo || null,
       pasillo: pasillo || "General",
       codigo_barras_escaneado: codigo_barras_escaneado || null,
-      f120_id_siesa: f120_id_siesa || null, // ✅ NUEVO: Para reconstruir SKU correcto
-      unidad_medida_siesa: unidad_medida_siesa || null, // ✅ NUEVO: Para reconstruir SKU correcto
       sede_id: sedeId, // ✅ MULTI-SEDE
     };
 
