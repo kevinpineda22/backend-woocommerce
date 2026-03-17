@@ -261,6 +261,11 @@ exports.getSessionActive = async (req, res) => {
       .in("id_asignacion", assignIds);
 
     const logs = logsData || [];
+
+    // 2. MAPEO DE CATEGORÍAS (CON JERARQUÍA)
+    const productIds = itemsAgrupados.map((i) => i.product_id);
+    const mapaCategoriasReales = {};
+
     if (productIds.length > 0) {
       try {
         // Multi-sede: usar cliente WC de la sede de la sesión
