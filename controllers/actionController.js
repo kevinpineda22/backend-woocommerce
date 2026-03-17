@@ -200,8 +200,7 @@ exports.validateManualCode = async (req, res) => {
   const code = input_code.trim().toUpperCase();
 
   // 1. Validar contra el SKU (solo coincidencia EXACTA, no parcial)
-  const skuMatch =
-    expected_sku && code === expected_sku.trim().toUpperCase();
+  const skuMatch = expected_sku && code === expected_sku.trim().toUpperCase();
 
   // 2. Validar contra la Lista de Códigos de Barras (Si la manda el frontend)
   let barcodeMatch = false;
@@ -241,12 +240,13 @@ exports.validateCodeWithSiesa = async (req, res) => {
     // ✅ VALIDACIÓN: Rechazar códigos demasiado cortos (f120_id desnudo sin presentación)
     // Un código de barras real tiene 8+ dígitos. Un SKU válido tiene dígitos + letras (ej: 11420P6)
     const isValidBarcode = /^\d{8,}\+?$/.test(codigoLimpio); // 8+ dígitos (con + opcional)
-    const isValidSku = /^\d+[A-Z]+\d*$/.test(codigoLimpio);  // dígitos + letras (ej: 11420P6)
+    const isValidSku = /^\d+[A-Z]+\d*$/.test(codigoLimpio); // dígitos + letras (ej: 11420P6)
 
     if (!isValidBarcode && !isValidSku) {
       return res.status(200).json({
         valid: false,
-        message: "❌ Código inválido. Escanea el código de barras del producto.",
+        message:
+          "❌ Código inválido. Escanea el código de barras del producto.",
         codigo_existe: false,
       });
     }
@@ -259,7 +259,9 @@ exports.validateCodeWithSiesa = async (req, res) => {
         const umIngresada = skuMatch[2];
         const skuIngresado = `${f120Ingresado}${umIngresada}`;
         const cleanSku = (s) => s.replace(/-/g, "");
-        const skuEsperado = cleanSku(`${f120_id_esperado}${unidad_medida_esperada}`);
+        const skuEsperado = cleanSku(
+          `${f120_id_esperado}${unidad_medida_esperada}`,
+        );
 
         if (skuIngresado === skuEsperado) {
           return res.status(200).json({
@@ -373,7 +375,8 @@ exports.validateCodeForAuditor = async (req, res) => {
     if (!isValidBarcode && !isValidSku) {
       return res.status(200).json({
         valid: false,
-        message: "❌ Código inválido. Escanea el código de barras del producto.",
+        message:
+          "❌ Código inválido. Escanea el código de barras del producto.",
         codigo_existe: false,
       });
     }
@@ -386,7 +389,9 @@ exports.validateCodeForAuditor = async (req, res) => {
         const umIngresada = skuMatch[2];
         const skuIngresado = `${f120Ingresado}${umIngresada}`;
         const cleanSku = (s) => s.replace(/-/g, "");
-        const skuEsperado = cleanSku(`${f120_id_esperado}${unidad_medida_esperada}`);
+        const skuEsperado = cleanSku(
+          `${f120_id_esperado}${unidad_medida_esperada}`,
+        );
 
         if (skuIngresado === skuEsperado) {
           return res.status(200).json({
