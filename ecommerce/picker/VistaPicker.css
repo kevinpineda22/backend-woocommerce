@@ -1041,8 +1041,144 @@
 }
 
 /* ─── No Assignment Screen ─── */
-.ec-no-assignment-icon {
-  margin-bottom: 20px;
+/* ━━━ NO ASSIGNMENT SCREEN ━━━ */
+.ec-no-assignment-screen {
+  background: linear-gradient(160deg, #f8fafc 0%, #e0e7ff 50%, #dbeafe 100%);
+  min-height: 100vh;
+  padding: 24px 16px;
+}
+
+.ec-no-assignment-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 360px;
+}
+
+/* Ícono principal */
+.ec-no-assignment-icon-wrapper {
+  width: 96px;
+  height: 96px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12px 32px rgba(59, 130, 246, 0.35);
+}
+
+/* Contenido de texto */
+.ec-no-assignment-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ec-no-assignment-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+.ec-no-assignment-message {
+  font-size: 0.95rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Info del picker y sede */
+.ec-no-assignment-info {
+  background: white;
+  border-radius: 16px;
+  padding: 16px 20px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.ec-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ec-info-item:last-child {
+  border-bottom: none;
+}
+
+.ec-info-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ec-info-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+/* Indicador de polling automático */
+.ec-no-assignment-polling {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(59, 130, 246, 0.08);
+  padding: 10px 20px;
+  border-radius: 100px;
+  color: #3b82f6;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ec-polling-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Botón de acción */
+.ec-no-assignment-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ec-no-assignment-primary-btn {
+  width: 100%;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
+  transition: transform 0.15s ease;
+}
+
+.ec-no-assignment-primary-btn:active {
+  transform: scale(0.97);
 }
 
 /* ─── Mensaje de error centrado ─── */

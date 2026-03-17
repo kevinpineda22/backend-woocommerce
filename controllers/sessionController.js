@@ -146,10 +146,17 @@ exports.createPickingSession = async (req, res) => {
     if (sessError) throw sessError;
 
     // 4. Actualizar Picker
-    await supabase
+    const { error: pickerUpdateError } = await supabase
       .from("wc_pickers")
       .update({ estado_picker: "picking", id_sesion_actual: session.id })
       .eq("id", id_picker);
+
+    if (pickerUpdateError) {
+      console.error("Error actualizando picker:", pickerUpdateError);
+      throw new Error(
+        `No se pudo vincular la sesión al picker: ${pickerUpdateError.message}`,
+      );
+    }
 
     // 5. Crear Asignaciones (con sede_id)
     const asignaciones = ids_pedidos.map((idPedido) => ({
@@ -318,7 +325,7 @@ exports.getSessionActive = async (req, res) => {
     // ✅ 2C. DETECTAR PRODUCTOS CON VARIACIONES (múltiples unidad_medida)
     const f120IdList = Array.from(
       new Set(
-        skuList.map((sku) => sku) // Ya son los f120_ids extraídos
+        skuList.map((sku) => sku), // Ya son los f120_ids extraídos
       ),
     );
 
@@ -344,7 +351,10 @@ exports.getSessionActive = async (req, res) => {
             variacionesMap[f120_id] = variacionesMap[f120_id].size > 1;
           });
 
-          console.log("📦 Productos con variaciones detectados:", variacionesMap);
+          console.log(
+            "📦 Productos con variaciones detectados:",
+            variacionesMap,
+          );
         }
       } catch (e) {
         console.error("Error detectando variaciones:", e.message);
@@ -390,7 +400,11 @@ exports.getSessionActive = async (req, res) => {
       let skuFinal = item.sku; // Default: usar SKU original de WooCommerce
       let f120_idFinal = parseInt(item.sku); // Extraer f120_id para detectar variaciones
       const firstPickedLog = pickedLogs[0];
-      if (firstPickedLog && firstPickedLog.f120_id_siesa && firstPickedLog.unidad_medida_siesa) {
+      if (
+        firstPickedLog &&
+        firstPickedLog.f120_id_siesa &&
+        firstPickedLog.unidad_medida_siesa
+      ) {
         skuFinal = `${firstPickedLog.f120_id_siesa}${firstPickedLog.unidad_medida_siesa}`;
         f120_idFinal = firstPickedLog.f120_id_siesa;
       }

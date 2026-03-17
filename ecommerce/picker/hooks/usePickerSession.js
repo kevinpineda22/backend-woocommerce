@@ -119,6 +119,17 @@ export const usePickerSession = () => {
     init();
   }, [refreshSessionData]);
 
+  // --- AUTO-REFRESH CUANDO NO HAY SESIÓN (cada 5 segundos) ---
+  useEffect(() => {
+    if (!pickerInfo?.id || sessionData) return; // Solo si no hay sesión activa
+
+    const interval = setInterval(() => {
+      refreshSessionData(pickerInfo.id, pickerSedeId);
+    }, 5000); // Cada 5 segundos
+
+    return () => clearInterval(interval);
+  }, [pickerInfo?.id, pickerSedeId, sessionData, refreshSessionData]);
+
   // --- LISTENERS SUPABASE ---
   useEffect(() => {
     if (!pickerInfo?.id) return;

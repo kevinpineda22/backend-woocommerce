@@ -77,7 +77,14 @@ const VistaPicker = () => {
   const [missingQtyForSub, setMissingQtyForSub] = useState(0);
   const [lastScannedBarcode, setLastScannedBarcode] = useState(null);
   const [zoomImage, setZoomImage] = useState({ src: null, name: "" });
-  const [actionModal, setActionModal] = useState({ open: false, title: "", message: "", icon: null, iconVariant: "warning", actions: [] });
+  const [actionModal, setActionModal] = useState({
+    open: false,
+    title: "",
+    message: "",
+    icon: null,
+    iconVariant: "warning",
+    actions: [],
+  });
   // --- UI Toasts Feedback Mejorado ---
   const [toasts, setToasts] = useState([]);
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
@@ -118,7 +125,8 @@ const VistaPicker = () => {
     const missing = total - scanned;
     if (missing <= 0) return;
 
-    const closeModal = () => setActionModal((prev) => ({ ...prev, open: false }));
+    const closeModal = () =>
+      setActionModal((prev) => ({ ...prev, open: false }));
 
     setActionModal({
       open: true,
@@ -166,7 +174,8 @@ const VistaPicker = () => {
     const wasShortPick =
       item.status === "recolectado" && scanned > 0 && scanned < total;
 
-    const closeModal = () => setActionModal((prev) => ({ ...prev, open: false }));
+    const closeModal = () =>
+      setActionModal((prev) => ({ ...prev, open: false }));
 
     // Función que ejecuta el reset completo
     const doFullReset = () => {
@@ -222,7 +231,10 @@ const VistaPicker = () => {
       }
       // NO enviamos reset de los recolectados: se mantienen en la BD
       updateLocalSessionState(item.product_id, scanned, "parcial", null);
-      showToast(`Devuelto a pendientes (${scanned}/${total} conservadas)`, "info");
+      showToast(
+        `Devuelto a pendientes (${scanned}/${total} conservadas)`,
+        "info",
+      );
     };
 
     // ── CASO 1: Pesable (fruver/carnes) → siempre reset total ──
@@ -230,11 +242,16 @@ const VistaPicker = () => {
       setActionModal({
         open: true,
         title: "Devolver a pendientes",
-        message: "Se borrarán los datos de peso registrado y deberás volver a pesar el producto.",
+        message:
+          "Se borrarán los datos de peso registrado y deberás volver a pesar el producto.",
         icon: <FaExclamationTriangle />,
         iconVariant: "warning",
         actions: [
-          { label: "Devolver y borrar peso", variant: "danger", onClick: doFullReset },
+          {
+            label: "Devolver y borrar peso",
+            variant: "danger",
+            onClick: doFullReset,
+          },
         ],
       });
       return;
@@ -249,7 +266,11 @@ const VistaPicker = () => {
         icon: <FaExclamationTriangle />,
         iconVariant: "warning",
         actions: [
-          { label: "Devolver desde cero", variant: "danger", onClick: doFullReset },
+          {
+            label: "Devolver desde cero",
+            variant: "danger",
+            onClick: doFullReset,
+          },
         ],
       });
       return;
@@ -287,7 +308,11 @@ const VistaPicker = () => {
       icon: <FaExclamationTriangle />,
       iconVariant: "warning",
       actions: [
-        { label: "Devolver a pendientes", variant: "danger", onClick: doFullReset },
+        {
+          label: "Devolver a pendientes",
+          variant: "danger",
+          onClick: doFullReset,
+        },
       ],
     });
   };
@@ -597,19 +622,77 @@ const VistaPicker = () => {
 
   if (!sessionData)
     return (
-      <div className="ec-picker-centered">
-        <FaShoppingBasket
-          size={50}
-          color="#cbd5e1"
-          className="ec-no-assignment-icon"
-        />
-        <h3>Sin asignación</h3>
-        <button
-          onClick={() => window.location.reload()}
-          className="ec-scan-btn ec-no-assignment-refresh"
+      <div className="ec-picker-centered ec-no-assignment-screen">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="ec-no-assignment-container"
         >
-          Actualizar
-        </button>
+          {/* Ícono animado */}
+          <div className="ec-no-assignment-icon-wrapper">
+            <motion.div
+              animate={{ y: [0, -8, 0] }}
+              transition={{
+                duration: 2.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            >
+              <FaShoppingBasket size={48} color="white" />
+            </motion.div>
+          </div>
+
+          {/* Contenido */}
+          <div className="ec-no-assignment-content">
+            <h2 className="ec-no-assignment-title">Sin Ruta Asignada</h2>
+            <p className="ec-no-assignment-message">
+              Espera a que el supervisor te asigne una ruta de picking.
+            </p>
+          </div>
+
+          {/* Info del picker */}
+          {pickerInfo && (
+            <div className="ec-no-assignment-info">
+              <div className="ec-info-item">
+                <span className="ec-info-label">Picker</span>
+                <span className="ec-info-value">
+                  {pickerInfo.nombre_completo || "—"}
+                </span>
+              </div>
+              {sedeName && (
+                <div className="ec-info-item">
+                  <span className="ec-info-label">Sede</span>
+                  <span className="ec-info-value">{sedeName}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Indicador de verificación automática */}
+          <div className="ec-no-assignment-polling">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              className="ec-polling-spinner"
+            >
+              <FaSync size={14} />
+            </motion.div>
+            <span>Verificando asignaciones...</span>
+          </div>
+
+          {/* Botón de acción */}
+          <div className="ec-no-assignment-actions">
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onClick={() => window.location.reload()}
+              className="ec-no-assignment-primary-btn"
+            >
+              <FaSync size={16} />
+              <span>Actualizar</span>
+            </motion.button>
+          </div>
+        </motion.div>
       </div>
     );
 
