@@ -253,12 +253,16 @@ exports.getSessionActive = async (req, res) => {
     const assignIds = assignments ? assignments.map((a) => a.id) : [];
 
     // 1. TRAER TODOS LOS LOGS DE ESTA SESIÓN
-    const { data: logsData } = await supabase
+    const { data: logsData, error: logsError } = await supabase
       .from("wc_log_picking")
       .select(
-        "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original, peso_real, f120_id_siesa, unidad_medida_siesa",
+        "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original, peso_real",
       )
       .in("id_asignacion", assignIds);
+
+    if (logsError) {
+      console.error("Error obteniendo logs de picking:", logsError);
+    }
 
     const logs = logsData || [];
 
@@ -424,20 +428,9 @@ exports.getSessionActive = async (req, res) => {
       // Datos del sustituto (si existe alguno)
       const lastSub = itemLogs.find((l) => l.accion === "sustituido");
 
-      // ✅ RECONSTRUIR SKU CORRECTO desde SIESA si está disponible
-      // Si el picker escaneó un código que se validó contra SIESA,
-      // usamos f120_id_siesa + unidad_medida_siesa para construir el SKU correcto
-      let skuFinal = item.sku; // Default: usar SKU original de WooCommerce
-      let f120_idFinal = parseInt(item.sku); // Extraer f120_id para detectar variaciones
-      const firstPickedLog = pickedLogs[0];
-      if (
-        firstPickedLog &&
-        firstPickedLog.f120_id_siesa &&
-        firstPickedLog.unidad_medida_siesa
-      ) {
-        skuFinal = `${firstPickedLog.f120_id_siesa}${firstPickedLog.unidad_medida_siesa}`;
-        f120_idFinal = firstPickedLog.f120_id_siesa;
-      }
+      // SKU y f120_id desde el SKU original de WooCommerce
+      let skuFinal = item.sku;
+      let f120_idFinal = parseInt(item.sku);
 
       // ✅ DETECTAR SI PRODUCTO TIENE VARIACIONES
       const tieneVariaciones = variacionesMap[f120_idFinal] || false;
