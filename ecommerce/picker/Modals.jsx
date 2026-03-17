@@ -280,10 +280,8 @@ export const WeightModal = ({
               setBaseEanFruver(res.data.baseEAN);
             }
           })
-          .catch((err) => {
-            setError(
-              `❌ No se encontró Código Base EAN para este Fruver (SKU: ${item.sku})`,
-            );
+          .catch(() => {
+            // Silencioso al abrir: el error se mostrará cuando intente confirmar
           })
           .finally(() => {
             setLoadingBaseEan(false);
@@ -378,7 +376,7 @@ export const WeightModal = ({
         return;
       }
     } else {
-      // ✅ NUEVO: Soporte robusto paramétrico (Array o String) desde SIESA
+      // ✅ Soporte robusto paramétrico (Array o String) desde SIESA
       const checkBarcodeMath = (barcode) => {
         if (!barcode) return false;
         const b = barcode.toString().toUpperCase();
@@ -389,8 +387,13 @@ export const WeightModal = ({
         ? expectedBarcode.some(checkBarcodeMath)
         : checkBarcodeMath(expectedBarcode);
 
+      // ✅ Para Fruver: aceptar el f120_id base (solo dígitos, e.g., "5106")
+      // Extraer parte numérica del SKU esperado para comparar
+      const expectedNumeric = expectedSku.match(/^(\d+)/)?.[1] || "";
+      const isBaseIdMatch = isFruver && /^\d+$/.test(rawCode) && rawCode === expectedNumeric;
+
       isValidCode =
-        rawCode === expectedSku || cleanCode === expectedSku || barcodeMatches;
+        rawCode === expectedSku || cleanCode === expectedSku || barcodeMatches || isBaseIdMatch;
     }
 
     if (!rawCode) {
@@ -430,7 +433,7 @@ export const WeightModal = ({
     }
 
     if (isFruver && !baseEanFruver) {
-      setError(`❌ Bloqueado: No se encontró Base EAN para este producto.`);
+      setError(`❌ Este producto no tiene código de peso registrado. Contacta al supervisor.`);
       return;
     }
 
@@ -1039,7 +1042,7 @@ export const SubstituteModal = ({
     } else {
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
       setSubError(
-        `❌ Código incorrecto.\nEscaneado: ${code}\nEsperado SKU: ${pendingSub.sku}`,
+        `❌ Código incorrecto. Verifica que estés escaneando el producto correcto.`,
       );
       setIsSubCodeValidated(false);
       setVerifyCode("");

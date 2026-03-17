@@ -69,8 +69,9 @@ exports.getBaseEanFruver = async (req, res) => {
   const { sku } = req.params;
   if (!sku) return res.status(400).json({ error: "SKU requerido" });
 
-  // Extraer solo la parte numérica del SKU (ej: "6857-LB" -> "6857")
-  const numericSku = sku.split("-")[0];
+  // Extraer solo la parte numérica del SKU (ej: "6857-LB" → "6857", "5106KL" → "5106")
+  const numericMatch = sku.match(/^(\d+)/);
+  const numericSku = numericMatch ? numericMatch[1] : sku.split("-")[0];
 
   try {
     const { data: barcodes, error } = await supabase
