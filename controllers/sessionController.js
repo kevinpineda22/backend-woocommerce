@@ -250,19 +250,17 @@ exports.getSessionActive = async (req, res) => {
       .from("wc_asignaciones_pedidos")
       .select("id")
       .eq("id_sesion", sessionId);
-    const assignIds = assignments.map((a) => a.id);
+    const assignIds = assignments ? assignments.map((a) => a.id) : [];
 
     // 1. TRAER TODOS LOS LOGS DE ESTA SESIÓN
-    const { data: logs } = await supabase
+    const { data: logsData } = await supabase
       .from("wc_log_picking")
       .select(
         "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original, peso_real, f120_id_siesa, unidad_medida_siesa",
       )
       .in("id_asignacion", assignIds);
 
-    // 2. MAPEO DE CATEGORÍAS (CON JERARQUÍA)
-    const productIds = itemsAgrupados.map((i) => i.product_id);
-    const mapaCategoriasReales = {};
+    const logs = logsData || [];
     if (productIds.length > 0) {
       try {
         // Multi-sede: usar cliente WC de la sede de la sesión
