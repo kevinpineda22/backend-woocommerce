@@ -201,11 +201,9 @@ exports.validateManualCode = async (req, res) => {
 
   const code = input_code.trim().toUpperCase();
 
-  // 1. Validar contra el SKU
+  // 1. Validar contra el SKU (solo coincidencia EXACTA, no parcial)
   const skuMatch =
-    expected_sku &&
-    (code === expected_sku.trim().toUpperCase() ||
-      expected_sku.toUpperCase().includes(code));
+    expected_sku && code === expected_sku.trim().toUpperCase();
 
   // 2. Validar contra la Lista de Códigos de Barras (Si la manda el frontend)
   let barcodeMatch = false;

@@ -447,9 +447,19 @@ const VistaPicker = () => {
     if (!currentItem) return;
     try {
       // Extraer f120_id y unidad_medida del SKU esperado
-      const { f120_id, unidad_medida } = parseSku(currentItem.sku);
+      let { f120_id, unidad_medida } = parseSku(currentItem.sku);
 
-      // Si el SKU tiene estructura reconocible, usar validación SIESA mejorada
+      // ✅ Si el SKU no tiene presentación (ej: "11420" sin letras),
+      // usar unidad_medida del backend (extraída del SKU de WooCommerce)
+      if (!unidad_medida && currentItem.unidad_medida) {
+        const skuNum = parseInt(currentItem.sku);
+        if (!isNaN(skuNum)) {
+          f120_id = skuNum;
+          unidad_medida = currentItem.unidad_medida.toUpperCase();
+        }
+      }
+
+      // Si tenemos f120_id y unidad_medida, usar validación SIESA estricta
       if (f120_id && unidad_medida) {
         const res = await ecommerceApi.post(
           `/validar-codigo-siesa${sedeParam ? "?" + sedeParam : ""}`,
@@ -461,7 +471,6 @@ const VistaPicker = () => {
         );
 
         if (res.data.valid) {
-          // ✅ Guardar datos de SIESA para pasarlos a confirmPicking
           setSiesaData({
             f120_id_siesa: res.data.f120_id,
             unidad_medida_siesa: res.data.unidad_medida,
@@ -472,11 +481,10 @@ const VistaPicker = () => {
           else if (currentItem.quantity_total > 4) setShowBulkModal(true);
           else confirmPicking();
         } else {
-          // Mensaje de error descriptivo según el tipo de problema
           showToast(res.data.message || "❌ Código incorrecto.", "error");
         }
       } else {
-        // Fallback a validación antigua si el SKU no tiene estructura conocida
+        // Fallback: SKU sin estructura conocida Y sin unidad_medida del backend
         const res = await ecommerceApi.post(
           `/validar-codigo${sedeParam ? "?" + sedeParam : ""}`,
           {
