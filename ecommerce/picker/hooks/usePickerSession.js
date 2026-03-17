@@ -27,12 +27,73 @@ export const usePickerSession = () => {
     localStorage.removeItem("waiting_for_audit_id");
   }, []);
 
+  // Helper: re-aplica acciones pendientes de la cola offline sobre los datos del backend
+  const applyPendingActions = useCallback((data, queueSnapshot = null) => {
+    const queue =
+      queueSnapshot ||
+      JSON.parse(localStorage.getItem("offline_actions_queue") || "[]");
+    if (!queue.length || !data?.items) return data;
+
+    const newItems = data.items.map((item) => {
+      const effectiveId = item.variation_id || item.product_id;
+      // Filtrar acciones de la cola que corresponden a este producto y sesión
+      const relatedActions = queue.filter(
+        (a) =>
+          String(a.id_sesion) === String(data.session_id) &&
+          String(a.id_producto_original) === String(effectiveId),
+      );
+      if (!relatedActions.length) return item;
+
+      let qtyScanned = parseFloat(item.qty_scanned || 0);
+      let status = item.status;
+      let pesoReal = parseFloat(item.peso_real || 0);
+      let sustituto = item.sustituto;
+
+      for (const action of relatedActions) {
+        if (action.accion === "recolectado" || action.accion === "parcial") {
+          qtyScanned += parseFloat(action.cantidad_afectada || 0);
+          if (action.peso_agregado)
+            pesoReal += parseFloat(action.peso_agregado);
+          status =
+            qtyScanned >= parseFloat(item.quantity_total || item.quantity)
+              ? "recolectado"
+              : "parcial";
+        } else if (action.accion === "no_encontrado") {
+          status = "no_encontrado";
+        } else if (action.accion === "sustituido") {
+          status = "sustituido";
+          if (action.sustituto) sustituto = action.sustituto;
+        } else if (action.accion === "reset") {
+          qtyScanned = 0;
+          pesoReal = 0;
+          status = "pendiente";
+          sustituto = null;
+        }
+      }
+
+      return {
+        ...item,
+        qty_scanned: qtyScanned,
+        status,
+        peso_real: pesoReal,
+        sustituto: sustituto || item.sustituto,
+      };
+    });
+
+    return { ...data, items: newItems };
+  }, []);
+
   const refreshSessionData = useCallback(
     async (idPicker, sedeId = null) => {
       if (!idPicker) return;
       const effectiveSede = sedeId || pickerSedeIdRef.current || "";
       const sp = effectiveSede ? `&sede_id=${effectiveSede}` : "";
       try {
+        // Capturar snapshot de la cola ANTES del fetch para evitar race condition con processQueue
+        const queueSnapshot = JSON.parse(
+          localStorage.getItem("offline_actions_queue") || "[]",
+        );
+
         const res = await ecommerceApi.get(
           `/sesion-activa?id_picker=${idPicker}${sp}`,
         );
@@ -50,8 +111,13 @@ export const usePickerSession = () => {
           return;
         }
 
-        setSessionData(data);
-        localStorage.setItem("session_active_cache", JSON.stringify(data));
+        // Re-aplicar acciones pendientes de la cola offline sobre los datos frescos
+        const mergedData = applyPendingActions(data, queueSnapshot);
+        setSessionData(mergedData);
+        localStorage.setItem(
+          "session_active_cache",
+          JSON.stringify(mergedData),
+        );
       } catch (err) {
         if (err.response && err.response.status === 404) {
           if (localStorage.getItem("waiting_for_audit_id")) {
@@ -71,7 +137,7 @@ export const usePickerSession = () => {
         setLoading(false);
       }
     },
-    [resetSesionLocal],
+    [resetSesionLocal, applyPendingActions],
   );
 
   // --- INIT ---

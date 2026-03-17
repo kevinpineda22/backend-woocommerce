@@ -393,13 +393,16 @@ exports.getSessionActive = async (req, res) => {
       // 🔍 FILTRO CLAVE: Buscamos logs donde este producto sea el protagonista (original o target)
       // Usamos id_producto_original para no perder el rastro si fue sustituido
       // ✅ Usar variation_id para distinguir variaciones del mismo producto padre
-      const itemEffectiveId = item.variation_id || item.product_id;
+      // ✅ FIX: Usar String() para evitar mismatch de tipo (number vs string de Supabase)
+      const itemEffectiveId = String(item.variation_id || item.product_id);
       const itemLogs = logs.filter(
         (l) =>
-          l.id_producto === itemEffectiveId ||
-          l.id_producto_original === itemEffectiveId ||
+          String(l.id_producto) === itemEffectiveId ||
+          String(l.id_producto_original) === itemEffectiveId ||
           // Fallback para logs antiguos que usaban product_id sin variation_id
-          (!item.variation_id && (l.id_producto === item.product_id || l.id_producto_original === item.product_id)),
+          (!item.variation_id &&
+            (String(l.id_producto) === String(item.product_id) ||
+              String(l.id_producto_original) === String(item.product_id))),
       );
 
       // Contadores Reales
