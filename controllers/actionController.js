@@ -161,9 +161,7 @@ exports.registerAction = async (req, res) => {
       motivo: motivo || null,
       pasillo: pasillo || "General",
       codigo_barras_escaneado: codigo_barras_escaneado || null,
-      f120_id_siesa: f120_id_siesa || null,
-      unidad_medida_siesa: unidad_medida_siesa || null,
-      sede_id: sedeId, // ✅ MULTI-SEDE
+      sede_id: sedeId,
     };
 
     if (accion === "sustituido" && datos_sustituto) {
