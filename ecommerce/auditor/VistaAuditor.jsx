@@ -80,9 +80,39 @@ const VistaAuditor = () => {
     "pimenton",
   ];
 
+  const MEAT_KEYWORDS = [
+    "carne", "carnes", "pollo", "pollos", "pescado", "pescados",
+    "res", "cerdo", "carnicería", "carniceria", "embutido", "embutidos",
+    "chorizo", "costilla", "chuleta", "lomo", "tocino", "pechuga",
+    "salchicha", "salchichas", "pescaderia", "pescadería",
+    "marisco", "mariscos", "camaron", "camarones", "trucha", "filete",
+  ];
+
   const isFruverItem = (itemName) => {
     const name = (itemName || "").toLowerCase();
     return FRUVER_KEYWORDS.some((kw) => name.includes(kw));
+  };
+
+  const isMeatItem = (itemName) => {
+    const name = (itemName || "").toLowerCase();
+    return MEAT_KEYWORDS.some((kw) => name.includes(kw));
+  };
+
+  // ✅ Determina si un producto es fruver o carnicería (no debe requerir validación del auditor)
+  const isFruverOrMeatItem = (item) => {
+    const name = item.name || "";
+    // Verificar por nombre
+    if (isFruverItem(name) || isMeatItem(name)) return true;
+    // Verificar por unidad de medida pesable
+    if (item.unidad_medida && ["kl", "kg", "lb", "libra"].includes(item.unidad_medida.toLowerCase())) return true;
+    // Verificar si el código escaneado es GS1 de peso variable
+    const scannedBarcodes = item._scannedBarcodes;
+    if (scannedBarcodes) {
+      for (const code of scannedBarcodes) {
+        if (/^\d{13,14}$/.test(code) && code.startsWith("2")) return true;
+      }
+    }
+    return false;
   };
 
   const requiresGS1 = (itemId) => {
@@ -226,9 +256,21 @@ const VistaAuditor = () => {
     setManualVerifyCode("");
   };
 
-  const generateSmartSample = (items, logs, metadata) => {
+  const generateSmartSample = (items, logs, metadata, scannedBarcodesMap = {}) => {
+    // ✅ Excluir productos fruver y carnicería de la muestra de auditoría
+    const eligibleItems = items.filter((item) => {
+      // Adjuntamos los barcodes escaneados para la detección
+      const itemWithBarcodes = {
+        ...item,
+        _scannedBarcodes: scannedBarcodesMap[item.id]
+          ? Array.from(scannedBarcodesMap[item.id])
+          : [],
+      };
+      return !isFruverOrMeatItem(itemWithBarcodes);
+    });
+
     const groupedByOrder = {};
-    items.forEach((item) => {
+    eligibleItems.forEach((item) => {
       const relatedLog = logs.find(
         (l) =>
           (l.es_sustituto ? l.id_producto_final : l.id_producto) === item.id,
@@ -252,8 +294,8 @@ const VistaAuditor = () => {
       selection.forEach((id) => selectedIds.add(id));
     });
 
-    if (selectedIds.size === 0 && items.length > 0) {
-      selectedIds.add(items[0].id);
+    if (selectedIds.size === 0 && eligibleItems.length > 0) {
+      selectedIds.add(eligibleItems[0].id);
     }
 
     return selectedIds;
@@ -337,7 +379,7 @@ const VistaAuditor = () => {
       }
 
       if (!loadedFromStorage) {
-        const sampleSet = generateSmartSample(itemsArray, logs, metadata);
+        const sampleSet = generateSmartSample(itemsArray, logs, metadata, scannedBarcodesMap);
         setRequiredItems(sampleSet);
         setVerifiedItems(new Set());
       }

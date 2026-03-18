@@ -62,7 +62,9 @@ exports.removeItemFromSession = async (req, res) => {
 
     const nuevoSnapshot = session.snapshot_pedidos.map((pedido) => {
       const nuevosItems = pedido.line_items.map((item) => {
-        if (item.product_id === id_producto) {
+        // Comparar contra variation_id (para variaciones) o product_id
+        const effectiveId = item.variation_id || item.product_id;
+        if (effectiveId === id_producto || item.product_id === id_producto) {
           productoEncontrado = true;
           nombreProducto = item.name;
           return {
@@ -129,7 +131,9 @@ exports.restoreItemToSession = async (req, res) => {
     // REVERTIR SOFT DELETE
     const nuevoSnapshot = session.snapshot_pedidos.map((pedido) => {
       const nuevosItems = pedido.line_items.map((item) => {
-        if (item.product_id === id_producto) {
+        // Comparar contra variation_id (para variaciones) o product_id
+        const effectiveId = item.variation_id || item.product_id;
+        if (effectiveId === id_producto || item.product_id === id_producto) {
           // Quitamos la bandera is_removed
           return { ...item, is_removed: false, restored_at: now };
         }

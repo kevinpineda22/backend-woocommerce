@@ -508,7 +508,7 @@ const VistaPicker = () => {
     }
   };
 
-  const handleScanMatch = (code) => {
+  const handleScanMatch = async (code) => {
     if (scanOverrideCallback) {
       scanOverrideCallback(code);
       setScanOverrideCallback(null);
@@ -517,8 +517,58 @@ const VistaPicker = () => {
     }
     if (!currentItem) return;
     const c = code.trim().toUpperCase();
-    const sku = (currentItem.sku || "").trim().toUpperCase();
 
+    // ✅ Si el producto tiene variaciones (tiene_variaciones) o unidad_medida específica,
+    // SIEMPRE validar contra SIESA para asegurar que la presentación coincide.
+    let { f120_id, unidad_medida } = parseSku(currentItem.sku);
+    if (!unidad_medida && currentItem.unidad_medida) {
+      const skuNum = parseInt(currentItem.sku);
+      if (!isNaN(skuNum)) {
+        f120_id = skuNum;
+        unidad_medida = currentItem.unidad_medida.toUpperCase();
+      }
+    }
+
+    if (f120_id && unidad_medida && isOnline) {
+      try {
+        const res = await ecommerceApi.post(
+          `/validar-codigo-siesa${sedeParam ? "?" + sedeParam : ""}`,
+          {
+            codigo: c,
+            f120_id_esperado: f120_id,
+            unidad_medida_esperada: unidad_medida,
+          },
+        );
+
+        if (res.data.valid) {
+          setSiesaData({
+            f120_id_siesa: res.data.f120_id,
+            unidad_medida_siesa: res.data.unidad_medida,
+          });
+          setLastScannedBarcode(c);
+          setIsScanning(false);
+
+          if (isWeighable(currentItem)) {
+            setShowWeightModal(true);
+          } else if (currentItem.quantity_total > 4) {
+            setShowBulkModal(true);
+          } else {
+            confirmPicking();
+          }
+        } else {
+          setIsScanning(false);
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+          showToast(res.data.message || `❌ Código ${c} no coincide.`, "error");
+        }
+        return;
+      } catch (e) {
+        // Si falla la validación SIESA, continuar con validación local como fallback
+        console.warn("SIESA validation failed, falling back to local:", e.message);
+      }
+    }
+
+    // Fallback: validación local (sin SIESA)
+    const sku = (currentItem.sku || "").trim().toUpperCase();
     let isBarcodeMatch = false;
     if (Array.isArray(currentItem.barcode)) {
       isBarcodeMatch = currentItem.barcode.some((b) => {
@@ -533,7 +583,6 @@ const VistaPicker = () => {
     if (c === sku || isBarcodeMatch) {
       setLastScannedBarcode(c);
 
-      // Si piden más de 4 y no es pesable, preguntamos cantidad extra
       if (currentItem.quantity_total > 4 && !isWeighable(currentItem)) {
         setIsScanning(false);
         setShowBulkModal(true);

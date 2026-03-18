@@ -164,7 +164,12 @@ const ManifestSheet = ({
       }
 
       // ✅ FRUVER Y CARNES: SOLO código sin multiplicador
-      if (isFruverOrMeat(itemName)) {
+      // También detectar por código GS1 de peso variable (empieza con "2", 13-14 dígitos)
+      const cleanCodeForGS1 = code.toString().replace(/\+$/, "");
+      const isGS1VariableWeight =
+        /^\d{13,14}$/.test(cleanCodeForGS1) && cleanCodeForGS1.startsWith("2");
+
+      if (isFruverOrMeat(itemName) || isGS1VariableWeight) {
         return [code];
       }
 

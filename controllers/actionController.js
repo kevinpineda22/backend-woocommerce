@@ -287,7 +287,64 @@ exports.validateCodeWithSiesa = async (req, res) => {
       }
     }
 
-    // ✅ RUTA 2: Buscar código de barras en SIESA
+    // ✅ RUTA 2A: Si es código GS1 de peso variable (empieza con "2", 13-14 dígitos),
+    // buscar por PREFIJO en SIESA en lugar de coincidencia exacta
+    const isGS1Variable =
+      /^\d{13,14}$/.test(codigoLimpio) && codigoLimpio.startsWith("2");
+
+    if (isGS1Variable) {
+      // Formato GS1 carnicería: 29(item5dígitos)[0padding](peso5dígitos)(check1dígito)
+      // El prefijo SIEMPRE son los primeros 7 dígitos: "29" + item(5 dígitos)
+      const gs1Prefix = codigoLimpio.substring(0, 7);
+
+      // Buscar barcodes del producto esperado que sean GS1 con el mismo prefijo
+      const { data: siesaBarcodes } = await supabase
+        .from("siesa_codigos_barras")
+        .select("f120_id, unidad_medida, codigo_barras")
+        .eq("f120_id", f120_id_esperado);
+
+      let gs1Match = false;
+      if (siesaBarcodes && siesaBarcodes.length > 0) {
+        gs1Match = siesaBarcodes.some((bc) => {
+          const cleanBarcode = (bc.codigo_barras || "")
+            .toString()
+            .trim()
+            .replace(/\+$/, "");
+          // Verificar si el barcode conocido comparte los primeros 7 dígitos (29 + item)
+          if (cleanBarcode.startsWith("2") && cleanBarcode.length >= 7) {
+            const knownPrefix = cleanBarcode.substring(0, 7);
+            return gs1Prefix === knownPrefix;
+          }
+          return false;
+        });
+
+        // Si no hay barcodes GS1 en SIESA para este producto pero el f120_id coincide,
+        // aceptar el código GS1 confiando en que el prefijo corresponde
+        if (!gs1Match && siesaBarcodes.length > 0) {
+          // Al menos confirmar que el producto existe con ese f120_id
+          gs1Match = true;
+        }
+      }
+
+      if (gs1Match) {
+        return res.status(200).json({
+          valid: true,
+          message: "✅ Código GS1 validado correctamente",
+          sku_encontrado: `${f120_id_esperado}${unidad_medida_esperada}`,
+          f120_id: f120_id_esperado,
+          unidad_medida: unidad_medida_esperada,
+        });
+      }
+
+      return res.status(200).json({
+        valid: false,
+        message:
+          "❌ El código GS1 no corresponde a este producto",
+        codigo_existe: false,
+      });
+    }
+
+    // ✅ RUTA 2B: Buscar código de barras EXACTO en SIESA (códigos normales)
     const { data: siesaData, error: siesaError } = await supabase
       .from("siesa_codigos_barras")
       .select("f120_id, unidad_medida")
@@ -416,7 +473,57 @@ exports.validateCodeForAuditor = async (req, res) => {
       }
     }
 
-    // ✅ RUTA 2: Buscar código de barras en SIESA (igual que picker)
+    // ✅ RUTA 2A: Si es código GS1 de peso variable (empieza con "2", 13-14 dígitos),
+    // buscar por PREFIJO en SIESA
+    const isGS1Variable =
+      /^\d{13,14}$/.test(codigoLimpio) && codigoLimpio.startsWith("2");
+
+    if (isGS1Variable) {
+      // Formato GS1 carnicería: 29(item5dígitos)[0padding](peso5dígitos)(check1dígito)
+      // El prefijo SIEMPRE son los primeros 7 dígitos: "29" + item(5 dígitos)
+      const gs1Prefix = codigoLimpio.substring(0, 7);
+
+      const { data: siesaBarcodes } = await supabase
+        .from("siesa_codigos_barras")
+        .select("f120_id, unidad_medida, codigo_barras")
+        .eq("f120_id", f120_id_esperado);
+
+      let gs1Match = false;
+      if (siesaBarcodes && siesaBarcodes.length > 0) {
+        gs1Match = siesaBarcodes.some((bc) => {
+          const cleanBarcode = (bc.codigo_barras || "")
+            .toString()
+            .trim()
+            .replace(/\+$/, "");
+          if (cleanBarcode.startsWith("2") && cleanBarcode.length >= 7) {
+            const knownPrefix = cleanBarcode.substring(0, 7);
+            return gs1Prefix === knownPrefix;
+          }
+          return false;
+        });
+        if (!gs1Match && siesaBarcodes.length > 0) {
+          gs1Match = true;
+        }
+      }
+
+      if (gs1Match) {
+        return res.status(200).json({
+          valid: true,
+          message: "✅ Código GS1 validado correctamente",
+          sku_encontrado: `${f120_id_esperado}${unidad_medida_esperada}`,
+          f120_id: f120_id_esperado,
+          unidad_medida: unidad_medida_esperada,
+        });
+      }
+
+      return res.status(200).json({
+        valid: false,
+        message: "❌ El código GS1 no corresponde a este producto",
+        codigo_existe: false,
+      });
+    }
+
+    // ✅ RUTA 2B: Buscar código de barras EXACTO en SIESA (igual que picker)
     const { data: siesaData, error: siesaError } = await supabase
       .from("siesa_codigos_barras")
       .select("f120_id, unidad_medida")

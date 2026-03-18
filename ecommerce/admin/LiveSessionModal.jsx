@@ -135,23 +135,34 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
   const displayItems = showTrash ? removedItems : activeItems;
 
   const isWeighable = (item) => {
-    const txt = (
-      item.name +
-      " " +
-      (item.categorias?.[0]?.name || "")
-    ).toLowerCase();
+    // 1. Unidad de medida pesable (KL = kilo, LB = libra)
     const isUnitPesable =
       item.unidad_medida &&
       ["kl", "kg", "kilo", "lb", "libra"].includes(
         item.unidad_medida.toLowerCase(),
       );
-    return (
-      isUnitPesable ||
-      txt.includes("kg") ||
-      txt.includes("gramos") ||
-      txt.includes("fruver") ||
-      txt.includes("carniceria")
+
+    // 2. Detección por CATEGORÍAS REALES (no por nombre del producto)
+    const catReales = Array.isArray(item.categorias_reales)
+      ? item.categorias_reales.join(" ").toLowerCase()
+      : "";
+    const catNormales = Array.isArray(item.categorias)
+      ? item.categorias.map((c) => c.name).join(" ").toLowerCase()
+      : "";
+    const categoriesWords = `${catReales} ${catNormales}`.split(/[\s,.\-]+/);
+
+    const weighableKeywords = [
+      "fruver", "fruta", "frutas", "verdura", "verduras",
+      "hortaliza", "hortalizas", "legumbre", "legumbres",
+      "carne", "carnes", "pollo", "pollos", "pescado", "pescados",
+      "res", "cerdo", "carnicería", "carniceria", "embutido", "embutidos",
+      "pescaderia", "pescadería", "marisco", "mariscos",
+    ];
+    const isCategoryWeighable = categoriesWords.some((w) =>
+      weighableKeywords.includes(w),
     );
+
+    return isUnitPesable || isCategoryWeighable;
   };
 
   // ⚡ CANAL DE RADIO: Avisar al Picker instantáneamente
@@ -176,19 +187,19 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
       if (type === "delete") {
         await ecommerceApi.post("/admin-remove-item", {
           id_sesion: sessionInfo.session_id,
-          id_producto: item.product_id,
+          id_producto: item.variation_id || item.product_id,
         });
         showToast(`Anulado: ${item.name}`, "success");
       } else if (type === "restore") {
         await ecommerceApi.post("/admin-restore-item", {
           id_sesion: sessionInfo.session_id,
-          id_producto: item.product_id,
+          id_producto: item.variation_id || item.product_id,
         });
         showToast(`Restaurado: ${item.name}`, "info");
       } else if (type === "pick") {
         await ecommerceApi.post("/admin-force-pick", {
           id_sesion: sessionInfo.session_id,
-          id_producto: item.product_id,
+          id_producto: item.variation_id || item.product_id,
         });
         showToast(`Recolectado a la fuerza: ${item.name}`, "success");
       }
