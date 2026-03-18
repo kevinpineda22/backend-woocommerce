@@ -66,17 +66,26 @@ const ORDEN_RUTA = {
 const DEFINICION_PASILLOS = [
   // ═══ PRIORIDAD ALTA: categorías específicas que pueden confundirse ═══
 
-  // P7: Bebé, adulto + cereales, granola, leche en polvo (letrero físico)
+  // P7: Bebé, adulto + cereales, granola, leche en polvo, bebidas en polvo (letrero físico)
   {
     pasillo: "7",
     nombre: "Bebé, Adulto y Cereales",
     categorias: [
-      "bebe", "bebes",
-      "pañal", "pañales", "pañitos humedos",
-      "cuidado del bebe", "higiene para bebes",
-      "adulto", "incontinencia", "pañal adulto",
-      "cereal", "cereales", "granola",
+      "bebe",
+      "bebes",
+      "pañal",
+      "pañales",
+      "pañitos humedos",
+      "cuidado del bebe",
+      "higiene para bebes",
+      "adulto",
+      "incontinencia",
+      "pañal adulto",
+      "cereal",
+      "cereales",
+      "granola",
       "leche en polvo",
+      "bebidas en polvo",
     ],
   },
 
@@ -85,9 +94,14 @@ const DEFINICION_PASILLOS = [
     pasillo: "6",
     nombre: "Pan de Sal y Café",
     categorias: [
-      "cafe", "cafe molido", "cafe premium", "cafe soluble",
-      "aromaticas", "aromaticas, te y cafe",
-      "pan de sal", "tostada",
+      "cafe",
+      "cafe molido",
+      "cafe premium",
+      "cafe soluble",
+      "aromaticas",
+      "aromaticas, te y cafe",
+      "pan de sal",
+      "tostada",
     ],
   },
 
@@ -96,13 +110,26 @@ const DEFINICION_PASILLOS = [
     pasillo: "8",
     nombre: "Cuidado Personal y Belleza",
     categorias: [
-      "cuidado personal", "cuidado capilar", "cuidado corporal", "cuidado oral",
-      "higiene intima", "higiene personal",
-      "belleza", "maquillaje", "cosmeticos",
-      "proteccion solar", "repelente",
-      "desodorante", "shampoo", "jabon de baño", "crema dental",
-      "crema corporal", "cremas corporales",
-      "salud", "medicamentos", "salud y medicamentos",
+      "cuidado personal",
+      "cuidado capilar",
+      "cuidado corporal",
+      "cuidado oral",
+      "higiene intima",
+      "higiene personal",
+      "belleza",
+      "maquillaje",
+      "cosmeticos",
+      "proteccion solar",
+      "repelente",
+      "desodorante",
+      "shampoo",
+      "jabon de baño",
+      "crema dental",
+      "crema corporal",
+      "cremas corporales",
+      "salud",
+      "medicamentos",
+      "salud y medicamentos",
     ],
   },
 
@@ -111,16 +138,32 @@ const DEFINICION_PASILLOS = [
     pasillo: "9",
     nombre: "Aseo Hogar",
     categorias: [
-      "aseo del hogar", "aseo hogar", "limpieza hogar",
-      "ambientador", "ambientadores",
-      "gel antibacterial", "antibacterial",
-      "limpiadores", "desinfectantes", "limpiadores y desinfectantes",
-      "papel higienico", "papel higienico y servilletas",
-      "articulos de limpieza", "limpieza",
-      "escoba", "escobas", "trapera", "traperas", "trapero",
-      "limpia piso", "limpiapiso",
-      "bolsa basura", "vela", "velas",
-      "fabuloso", "lavanda",
+      "aseo del hogar",
+      "aseo hogar",
+      "limpieza hogar",
+      "ambientador",
+      "ambientadores",
+      "gel antibacterial",
+      "antibacterial",
+      "limpiadores",
+      "desinfectantes",
+      "limpiadores y desinfectantes",
+      "papel higienico",
+      "papel higienico y servilletas",
+      "articulos de limpieza",
+      "limpieza",
+      "escoba",
+      "escobas",
+      "trapera",
+      "traperas",
+      "trapero",
+      "limpia piso",
+      "limpiapiso",
+      "bolsa basura",
+      "vela",
+      "velas",
+      "fabuloso",
+      "lavanda",
     ],
   },
 
@@ -129,11 +172,19 @@ const DEFINICION_PASILLOS = [
     pasillo: "10",
     nombre: "Aseo Ropa e Insecticidas",
     categorias: [
-      "detergente", "detergentes", "detergente liquido", "detergente en polvo",
-      "suavizante", "suavizantes",
-      "blanqueador", "blanqueadores", "desmanchadores",
-      "jabon barra", "jabones",
-      "insecticida", "insecticidas",
+      "detergente",
+      "detergentes",
+      "detergente liquido",
+      "detergente en polvo",
+      "suavizante",
+      "suavizantes",
+      "blanqueador",
+      "blanqueadores",
+      "desmanchadores",
+      "jabon barra",
+      "jabones",
+      "insecticida",
+      "insecticidas",
     ],
   },
 
@@ -142,28 +193,67 @@ const DEFINICION_PASILLOS = [
     pasillo: "13",
     nombre: "Refrigerados, Carnes, Golosinas y Licores",
     categorias: [
-      "refrigerado", "congelado", "congelados", "comidas congeladas",
-      "carne", "carnes", "carniceria", "carnes y proteinas",
-      "pollo", "cerdo", "res y cerdo",
-      "pescado", "pescados", "mariscos", "pescados y mariscos",
-      "jamon", "embutido", "embutidos", "carnes frias",
-      "queso", "quesos", "cuajada", "cuajadas", "queso crema", "sueros",
-      "yogurt", "bebidas lacteas",
+      "refrigerado",
+      "congelado",
+      "congelados",
+      "comidas congeladas",
+      "carne",
+      "carnes",
+      "carniceria",
+      "carnes y proteinas",
+      "pollo",
+      "cerdo",
+      "res y cerdo",
+      "pescado",
+      "pescados",
+      "mariscos",
+      "pescados y mariscos",
+      "jamon",
+      "embutido",
+      "embutidos",
+      "carnes frias",
+      "queso",
+      "quesos",
+      "cuajada",
+      "cuajadas",
+      "queso crema",
+      "sueros",
+      "yogurt",
+      "bebidas lacteas",
       "lacteos",
-      "arepa", "arepas",
-      "postres", "postres y gelatinas",
-      "cerveza", "cervezas",
-      "licor", "licores", "vino", "vinos",
-      "cigarrillo", "cigarrillos",
-      "helado", "helados", "paleta", "paletas",
+      "arepa",
+      "arepas",
+      "postres",
+      "postres y gelatinas",
+      "cerveza",
+      "cervezas",
+      "licor",
+      "licores",
+      "vino",
+      "vinos",
+      "cigarrillo",
+      "cigarrillos",
+      "helado",
+      "helados",
+      "paleta",
+      "paletas",
       // Letrero físico: golosinas, chocolates, maní, nueces, mexicano, saludable están en P13
-      "chocolate", "chocolates", "chocolates y dulces",
-      "golosina", "golosinas",
-      "dulce", "dulces",
-      "mani", "nueces", "frutos secos",
+      "chocolate",
+      "chocolates",
+      "chocolates y dulces",
+      "golosina",
+      "golosinas",
+      "dulce",
+      "dulces",
+      "mani",
+      "nueces",
+      "frutos secos",
       "mexicano",
-      "saludable", "alimentos saludables",
-      "suplementos", "vitaminas", "suplementos y vitaminas",
+      "saludable",
+      "alimentos saludables",
+      "suplementos",
+      "vitaminas",
+      "suplementos y vitaminas",
     ],
   },
 
@@ -173,12 +263,18 @@ const DEFINICION_PASILLOS = [
     nombre: "Gaseosas, Mecato y Fruver",
     categorias: [
       "fruver",
-      "fruta", "frutas",
-      "verdura", "verduras",
+      "fruta",
+      "frutas",
+      "verdura",
+      "verduras",
       "frutas y verduras",
-      "hortaliza", "hortalizas",
-      "tomate", "cebolla", "papa",
-      "gaseosa", "gaseosas",
+      "hortaliza",
+      "hortalizas",
+      "tomate",
+      "cebolla",
+      "papa",
+      "gaseosa",
+      "gaseosas",
       "mecato",
     ],
   },
@@ -188,14 +284,28 @@ const DEFINICION_PASILLOS = [
     pasillo: "12",
     nombre: "Bebidas, Pasabocas y Desechables",
     categorias: [
-      "jugo", "jugos", "zumo", "zumos",
-      "bebida", "bebidas", "bebidas de cereal",
+      "jugo",
+      "jugos",
+      "zumo",
+      "zumos",
+      "bebida",
+      "bebidas",
+      "bebidas de cereal",
       "agua",
-      "hidratante", "hidratantes", "energizante", "energizantes",
-      "snack", "snacks", "pasabocas",
+      "hidratante",
+      "hidratantes",
+      "energizante",
+      "energizantes",
+      "snack",
+      "snacks",
+      "pasabocas",
       "servilletas",
-      "desechable", "desechables",
-      "vaso", "plato", "lonchera", "loncheras",
+      "desechable",
+      "desechables",
+      "vaso",
+      "plato",
+      "lonchera",
+      "loncheras",
       "papel cocina",
     ],
   },
@@ -205,10 +315,17 @@ const DEFINICION_PASILLOS = [
     pasillo: "2",
     nombre: "Huevos, Atunes, Enlatados y Pastas",
     categorias: [
-      "huevo", "huevos",
-      "atun", "atunes",
-      "enlatado", "enlatados", "alimentos enlatados", "conservas",
-      "pasta", "pastas", "spaghetti",
+      "huevo",
+      "huevos",
+      "atun",
+      "atunes",
+      "enlatado",
+      "enlatados",
+      "alimentos enlatados",
+      "conservas",
+      "pasta",
+      "pastas",
+      "spaghetti",
       "harina precocida",
     ],
   },
@@ -217,31 +334,60 @@ const DEFINICION_PASILLOS = [
     nombre: "Arroz, Azúcar, Granos y Salsas",
     categorias: [
       "arroz",
-      "azucar", "panela", "panelas", "endulzante", "endulzantes",
-      "grano", "granos",
-      "sal", "salsa", "salsas", "aderezo", "aderezos",
-      "vinagre", "vinagreta", "vinagretas",
-      "sazonador", "sazonadores", "condimento", "condimentos", "caldos",
+      "azucar",
+      "panela",
+      "panelas",
+      "endulzante",
+      "endulzantes",
+      "grano",
+      "granos",
+      "sal",
+      "salsa",
+      "salsas",
+      "aderezo",
+      "aderezos",
+      "vinagre",
+      "vinagreta",
+      "vinagretas",
+      "sazonador",
+      "sazonadores",
+      "condimento",
+      "condimentos",
+      "caldos",
     ],
   },
   {
     pasillo: "3",
     nombre: "Harinas, Margarinas, Sopas y Aceites",
     categorias: [
-      "aceite", "aceites", "aceite vegetal", "aceite soya", "aceite oliva",
-      "harina", "harinas", "harina de trigo",
-      "margarina", "margarinas", "mantequilla",
-      "sopa", "sopas",
+      "aceite",
+      "aceites",
+      "aceite vegetal",
+      "aceite soya",
+      "aceite oliva",
+      "harina",
+      "harinas",
+      "harina de trigo",
+      "margarina",
+      "margarinas",
+      "mantequilla",
+      "sopa",
+      "sopas",
     ],
   },
   {
     pasillo: "4",
     nombre: "Repostería, Gelatina y Leche Larga Vida",
     categorias: [
-      "gelatina", "flan", "pudin",
-      "reposteria", "parva", "reposteria y parva",
-      "leche larga vida", "leche",
-      "refrescos en polvo", "bebidas en polvo",
+      "gelatina",
+      "flan",
+      "pudin",
+      "reposteria",
+      "parva",
+      "reposteria y parva",
+      "leche larga vida",
+      "leche",
+      "refrescos en polvo",
       "arequipe",
     ],
   },
@@ -249,10 +395,15 @@ const DEFINICION_PASILLOS = [
     pasillo: "5",
     nombre: "Pan Dulce, Galletas, Avenas y Leche en Polvo",
     categorias: [
-      "galleta", "galletas", "galleteria", "galleta salada", "galleta dulce",
+      "galleta",
+      "galletas",
+      "galleteria",
+      "galleta salada",
+      "galleta dulce",
       "galleta saludable",
       "pan dulce",
-      "avena", "avenas",
+      "avena",
+      "avenas",
       "modificadores",
     ],
   },
@@ -262,12 +413,24 @@ const DEFINICION_PASILLOS = [
     pasillo: "11",
     nombre: "Mascotas, Esponjas e Implementos",
     categorias: [
-      "mascota", "mascotas", "perro", "gato",
-      "alimento para mascotas", "alimento para peces", "alimento para aves",
+      "mascota",
+      "mascotas",
+      "perro",
+      "gato",
+      "alimento para mascotas",
+      "alimento para peces",
+      "alimento para aves",
       "arena para gatos",
-      "cocina", "utensilios", "utensilios de cocina",
-      "esponja", "esponjas", "guante", "guantes",
-      "lavaplatos", "desengrasante", "desengrasantes",
+      "cocina",
+      "utensilios",
+      "utensilios de cocina",
+      "esponja",
+      "esponjas",
+      "guante",
+      "guantes",
+      "lavaplatos",
+      "desengrasante",
+      "desengrasantes",
       "carbon",
       "implementos del hogar",
     ],
@@ -307,6 +470,26 @@ const matchesKey = (text, key) => {
 };
 
 /**
+ * Busca la regla con la coincidencia MÁS ESPECÍFICA (key más larga).
+ * Así "bebidas en polvo" (16 chars) gana sobre "bebidas" (7 chars).
+ */
+const findBestMatch = (text) => {
+  let bestMatch = null;
+  let bestKeyLength = 0;
+
+  for (const regla of REGLAS_PASILLOS) {
+    for (const key of regla.keys) {
+      if (matchesKey(text, key) && key.length > bestKeyLength) {
+        bestKeyLength = key.length;
+        bestMatch = regla;
+      }
+    }
+  }
+
+  return bestMatch;
+};
+
+/**
  * Determina el pasillo y prioridad de un producto basado en sus categorías Y su nombre
  * @param {Array} categoriasWC - Array de objetos de categorías de WooCommerce
  * @param {String} nombreProducto - (Opcional) El nombre del producto para búsqueda de respaldo
@@ -320,24 +503,29 @@ const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
       const nombreNormalizado = removeAccents(c.name).toLowerCase().trim();
       // Ignorar "despensa" y la categoría conflictiva dada por el usuario
       if (nombreNormalizado.includes("despensa")) return false;
-      if (nombreNormalizado.includes("lacteos, huevos y refrigerados")) return false;
+      if (nombreNormalizado.includes("lacteos, huevos y refrigerados"))
+        return false;
       return true;
     });
 
     // JERARQUÍA OFICIAL (Nuevo método):
     // Si WooCommerce nos devolvió la estructura de padre-hijo (propiedad parent),
     // nos quedamos EXCLUSIVAMENTE con las categorías hoja (subcategorías, cuyo parent NO es 0).
-    const tieneDataDeJerarquia = categoriasValidas.some((c) => c.hasOwnProperty("parent"));
+    const tieneDataDeJerarquia = categoriasValidas.some((c) =>
+      c.hasOwnProperty("parent"),
+    );
 
     if (tieneDataDeJerarquia && categoriasValidas.length > 1) {
-      const subcategoriasOficiales = categoriasValidas.filter((c) => c.parent > 0);
+      const subcategoriasOficiales = categoriasValidas.filter(
+        (c) => c.parent > 0,
+      );
       if (subcategoriasOficiales.length > 0) {
         categoriasValidas = subcategoriasOficiales;
       }
     }
     // HEURÍSTICA DE SUBCATEGORÍAS (Antiguo método preventivo si falla la API):
     else if (categoriasValidas.length > 1) {
-      const subcategorias = categoriasValidas.filter(c => {
+      const subcategorias = categoriasValidas.filter((c) => {
         const n = removeAccents(c.name).toLowerCase();
         return !n.includes(",");
       });
@@ -347,22 +535,22 @@ const obtenerInfoPasillo = (categoriasWC, nombreProducto = "") => {
       }
     }
 
-    const nombresCategorias = categoriasValidas.map((c) => c.name || "").join(" ");
+    const nombresCategorias = categoriasValidas
+      .map((c) => c.name || "")
+      .join(" ");
 
-    for (const regla of REGLAS_PASILLOS) {
-      if (regla.keys.some((key) => matchesKey(nombresCategorias, key))) {
-        return { pasillo: regla.pasillo, prioridad: regla.prioridad };
-      }
+    const match = findBestMatch(nombresCategorias);
+    if (match) {
+      return { pasillo: match.pasillo, prioridad: match.prioridad };
     }
   }
 
   // 2. Estrategia Fallback: Búsqueda por NOMBRE DEL PRODUCTO
   const nombreParaBusqueda = nombreProducto || "";
 
-  for (const regla of REGLAS_PASILLOS) {
-    if (regla.keys.some((key) => matchesKey(nombreParaBusqueda, key))) {
-      return { pasillo: regla.pasillo, prioridad: regla.prioridad };
-    }
+  const match = findBestMatch(nombreParaBusqueda);
+  if (match) {
+    return { pasillo: match.pasillo, prioridad: match.prioridad };
   }
 
   // 3. Default
