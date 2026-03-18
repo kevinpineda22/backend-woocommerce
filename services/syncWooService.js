@@ -42,8 +42,12 @@ const syncOrderToWoo = async (sessionId, orderId) => {
     const productMap = {};
 
     // A. Llenar con lo solicitado
+    // ✅ FIX: Usar variation_id como key cuando existe (los logs de picking usan variation_id como id_producto)
+    // Mantener también un mapa de product_id → effectiveKey para fallback
+    const pidToKey = {};
     wooOrder.line_items.forEach((item) => {
-      productMap[item.product_id] = {
+      const effectiveKey = item.variation_id || item.product_id;
+      productMap[effectiveKey] = {
         line_id: item.id,
         name: item.name,
         original_price: parseFloat(item.price || 0),
@@ -51,6 +55,9 @@ const syncOrderToWoo = async (sessionId, orderId) => {
         picked_qty: 0,
         weight_total: 0,
       };
+      // Mapa inverso: si el log trae product_id padre, también lo encontramos
+      pidToKey[item.product_id] = effectiveKey;
+      if (item.variation_id) pidToKey[item.variation_id] = effectiveKey;
     });
 
     // B. Procesar Logs para entender la realidad
@@ -58,12 +65,14 @@ const syncOrderToWoo = async (sessionId, orderId) => {
 
     logs.forEach((log) => {
       if (log.accion === "recolectado" && !log.es_sustituto) {
-        if (productMap[log.id_producto]) {
-          productMap[log.id_producto].picked_qty += 1;
+        // ✅ FIX: Buscar por id_producto directo o a través del mapa de variaciones
+        const key = productMap[log.id_producto]
+          ? log.id_producto
+          : pidToKey[log.id_producto] || null;
+        if (key && productMap[key]) {
+          productMap[key].picked_qty += 1;
           if (log.peso_real && parseFloat(log.peso_real) > 0) {
-            productMap[log.id_producto].weight_total += parseFloat(
-              log.peso_real,
-            );
+            productMap[key].weight_total += parseFloat(log.peso_real);
           }
         }
       } else if (log.accion === "sustituido") {

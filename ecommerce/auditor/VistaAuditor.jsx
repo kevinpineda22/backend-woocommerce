@@ -67,21 +67,65 @@ const VistaAuditor = () => {
   // NUNCA en el nombre del producto (evita falsos positivos como "AZUCAR X 1 KG").
   const isFruverOrMeatItem = (item) => {
     // 1. Verificar por unidad de medida pesable (KL, KG, LB, LIBRA)
-    if (item.unidad_medida && WEIGHABLE_UNITS.includes(item.unidad_medida.toLowerCase())) return true;
+    if (
+      item.unidad_medida &&
+      WEIGHABLE_UNITS.includes(item.unidad_medida.toLowerCase())
+    )
+      return true;
 
     // 2. Verificar por categorías reales (si están disponibles)
-    const catWords = []
-      .concat(
-        Array.isArray(item.categorias_reales) ? item.categorias_reales.join(" ").toLowerCase().split(/[\s,.\-]+/) : [],
-        Array.isArray(item.categorias) ? item.categorias.map((c) => c.name).join(" ").toLowerCase().split(/[\s,.\-]+/) : [],
-      );
+    const catWords = [].concat(
+      Array.isArray(item.categorias_reales)
+        ? item.categorias_reales
+            .join(" ")
+            .toLowerCase()
+            .split(/[\s,.\-]+/)
+        : [],
+      Array.isArray(item.categorias)
+        ? item.categorias
+            .map((c) => c.name)
+            .join(" ")
+            .toLowerCase()
+            .split(/[\s,.\-]+/)
+        : [],
+    );
 
     const CATEGORY_KEYWORDS = [
-      "fruver", "fruta", "frutas", "verdura", "verduras", "hortaliza", "hortalizas", "legumbre", "legumbres",
-      "carne", "carnes", "pollo", "pollos", "pescado", "pescados", "res", "cerdo",
-      "carnicería", "carniceria", "embutido", "embutidos", "chorizo", "costilla", "chuleta",
-      "lomo", "tocino", "pechuga", "salchicha", "salchichas", "pescaderia", "pescadería",
-      "marisco", "mariscos", "camaron", "camarones",
+      "fruver",
+      "fruta",
+      "frutas",
+      "verdura",
+      "verduras",
+      "hortaliza",
+      "hortalizas",
+      "legumbre",
+      "legumbres",
+      "carne",
+      "carnes",
+      "pollo",
+      "pollos",
+      "pescado",
+      "pescados",
+      "res",
+      "cerdo",
+      "carnicería",
+      "carniceria",
+      "embutido",
+      "embutidos",
+      "chorizo",
+      "costilla",
+      "chuleta",
+      "lomo",
+      "tocino",
+      "pechuga",
+      "salchicha",
+      "salchichas",
+      "pescaderia",
+      "pescadería",
+      "marisco",
+      "mariscos",
+      "camaron",
+      "camarones",
     ];
 
     if (catWords.some((w) => CATEGORY_KEYWORDS.includes(w))) return true;
@@ -237,7 +281,12 @@ const VistaAuditor = () => {
     setManualVerifyCode("");
   };
 
-  const generateSmartSample = (items, logs, metadata, scannedBarcodesMap = {}) => {
+  const generateSmartSample = (
+    items,
+    logs,
+    metadata,
+    scannedBarcodesMap = {},
+  ) => {
     // ✅ Excluir productos fruver y carnicería de la muestra de auditoría
     const eligibleItems = items.filter((item) => {
       // Adjuntamos los barcodes escaneados para la detección
@@ -361,7 +410,12 @@ const VistaAuditor = () => {
       }
 
       if (!loadedFromStorage) {
-        const sampleSet = generateSmartSample(itemsArray, logs, metadata, scannedBarcodesMap);
+        const sampleSet = generateSmartSample(
+          itemsArray,
+          logs,
+          metadata,
+          scannedBarcodesMap,
+        );
         setRequiredItems(sampleSet);
         setVerifiedItems(new Set());
       }
@@ -1047,7 +1101,7 @@ const VistaAuditor = () => {
                                           <span className="aud-type-badge meat">
                                             ⚖️ Escanear etiqueta GS1
                                           </span>
-                                        ) : isFruverItem(item.name) ? (
+                                        ) : isFruverOrMeatItem(item) ? (
                                           <button
                                             className="aud-visual-approve-btn"
                                             onClick={() => {

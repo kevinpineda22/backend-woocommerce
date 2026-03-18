@@ -64,7 +64,9 @@ async function getBarcodesFromSiesa(productIds) {
   }
 }
 
-// ✅ NUEVO: Endpoint estricto para recuperar la base EAN de Fruver (ej: 2900002)
+// ✅ Construye la base EAN GS1 para productos pesables (fruver/carnicería).
+// El prefijo "29" NO existe en SIESA — se construye: "29" + f120_id padded a 5 dígitos = 7 dígitos.
+// Ejemplo: f120_id=4999 → "29" + "04999" = "2904999"
 exports.getBaseEanFruver = async (req, res) => {
   const { sku } = req.params;
   if (!sku) return res.status(400).json({ error: "SKU requerido" });
@@ -73,42 +75,15 @@ exports.getBaseEanFruver = async (req, res) => {
   const numericMatch = sku.match(/^(\d+)/);
   const numericSku = numericMatch ? numericMatch[1] : sku.split("-")[0];
 
-  try {
-    const { data: barcodes, error } = await supabase
-      .from("siesa_codigos_barras")
-      .select("codigo_barras")
-      .eq("f120_id", numericSku)
-      .like("codigo_barras", "29%");
-
-    if (error) throw error;
-    if (!barcodes || barcodes.length === 0) {
-      return res
-        .status(404)
-        .json({ error: "No se encontró base EAN para este producto Fruver." });
-    }
-
-    // Filtramos estrictamente los códigos que tienen exactamente 7 dígitos (limpiando "+" de SIESA) y empiezan en 29
-    const validBase = barcodes.find((b) => {
-      if (!b.codigo_barras) return false;
-      const cleaned = b.codigo_barras.trim().replace(/\+$/, "");
-      return cleaned.length === 7 && /^\d+$/.test(cleaned) && cleaned.startsWith("29");
-    });
-
-    if (validBase) {
-      const cleanedCode = validBase.codigo_barras.trim().replace(/\+$/, "");
-      return res.status(200).json({ baseEAN: cleanedCode });
-    } else {
-      return res.status(404).json({
-        error:
-          "Se encontraron códigos 29, pero ninguno de exactamente 7 dígitos.",
-      });
-    }
-  } catch (error) {
-    console.error("Error obteniendo base EAN Fruver:", error);
-    res.status(500).json({
-      error: `Error al buscar código EAN Fruver para SKU ${sku}: ${error.message || "Servicio no disponible"}`,
-    });
+  if (!numericSku || isNaN(parseInt(numericSku))) {
+    return res.status(400).json({ error: "SKU no contiene un f120_id numérico válido." });
   }
+
+  // Construir base EAN: "29" + f120_id (tal cual, sin padding) + "0" (separador fijo)
+  // Ejemplo: f120_id=4999 → "2949990", f120_id=15132 → "29151320"
+  const baseEAN = "29" + numericSku + "0";
+
+  return res.status(200).json({ baseEAN });
 };
 
 exports.searchProduct = async (req, res) => {

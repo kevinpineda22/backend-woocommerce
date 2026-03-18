@@ -1,28 +1,28 @@
 /**
  * Utilidades GS1 para códigos de barras de peso variable (carnicería/fruver).
  *
- * Formato GS1 carnicería: 29(item 5 dígitos)[0 padding](peso 5 dígitos)(check 1 dígito)
- *   - 13 dígitos: 29 + item(5) + peso(5) + check(1)
- *   - 14 dígitos: 29 + item(5) + 0 + peso(5) + check(1)
+ * Formato: 29(item tal cual)(0 separador)(peso 5 dígitos)(check 1 dígito)
+ *   - Item 4 dígitos → 13 dígitos total: 29 + item(4) + 0 + peso(5) + check(1)
+ *   - Item 5 dígitos → 14 dígitos total: 29 + item(5) + 0 + peso(5) + check(1)
  */
 
 /**
- * Calcula el dígito verificador EAN-13 estándar.
- * @param {string} codigo12 - Los primeros 12 dígitos del código EAN.
+ * Calcula el dígito verificador GS1 estándar.
+ * Soporta 12 dígitos (→ EAN-13) y 13 dígitos (→ EAN-14).
+ * @param {string} codigo - Los dígitos del código SIN el dígito verificador.
  * @returns {string|null} El dígito verificador (0-9) o null si el input es inválido.
  */
-export const calcularDigitoVerificador = (codigo12) => {
-  if (codigo12.length !== 12) return null;
-  let sumaImpares = 0;
-  let sumaPares = 0;
-  for (let i = 0; i < 12; i++) {
-    const digito = parseInt(codigo12[i]);
-    if ((i + 1) % 2 !== 0) sumaImpares += digito;
-    else sumaPares += digito;
+export const calcularDigitoVerificador = (codigo) => {
+  if (codigo.length < 12 || codigo.length > 13) return null;
+  const n = codigo.length;
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    const d = parseInt(codigo[i]);
+    // Desde la derecha: posición impar ×3, par ×1
+    const weight = (n - i) % 2 === 1 ? 3 : 1;
+    sum += d * weight;
   }
-  const total = sumaImpares + sumaPares * 3;
-  const siguienteDecena = Math.ceil(total / 10) * 10;
-  return (siguienteDecena - total).toString();
+  return ((10 - (sum % 10)) % 10).toString();
 };
 
 /**

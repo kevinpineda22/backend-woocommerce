@@ -6,7 +6,8 @@
       "Bash(node -c controllers/adminController.js)",
       "Bash(npx --no-install acorn --ecma2020 --module ecommerce/picker/utils/isWeighable.js)",
       "Bash(node -e \"try { require\\(''''./ecommerce/picker/utils/isWeighable.js''''\\) } catch\\(e\\) { console.log\\(e.message\\) }\")",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(git status:*)"
     ]
   }
 }
