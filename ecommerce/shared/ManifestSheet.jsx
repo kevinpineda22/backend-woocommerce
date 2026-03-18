@@ -99,22 +99,12 @@ const ManifestSheet = ({
   };
 
   // Helper: Detectar si un producto es fruver o carnes (usan peso, no cantidad)
-  const isFruverOrMeat = (itemName) => {
-    if (!itemName) return false;
-    const name = itemName.toLowerCase();
-    // Fruver (pasillo 14)
-    const fruverKeywords = [
-      "fruta", "verdura", "hortaliza", "fruver",
-      "tomate", "cebolla", "papa", "lechuga", "zanahoria",
-    ];
-    // Carnes (pasillo 13)
-    const meatKeywords = [
-      "carne", "carnes", "pescado", "pollo", "jamón",
-      "embutido", "embutidos", "mariscos", "res y cerdo",
-      "carnicería", "filete", "costilla", "pechuga",
-    ];
-    const allKeywords = [...fruverKeywords, ...meatKeywords];
-    return allKeywords.some((keyword) => name.includes(keyword));
+  // Se basa en unidad de medida pesable, NUNCA en el nombre del producto.
+  const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
+
+  const isWeighableProduct = (unidadMedida) => {
+    if (!unidadMedida) return false;
+    return WEIGHABLE_UNITS.includes(unidadMedida.toLowerCase());
   };
 
   // Generar QR Value: Cantidad * Código de Barras (separado por salto de línea \r\n para simular ENTER)
@@ -164,12 +154,13 @@ const ManifestSheet = ({
       }
 
       // ✅ FRUVER Y CARNES: SOLO código sin multiplicador
-      // También detectar por código GS1 de peso variable (empieza con "2", 13-14 dígitos)
+      // Detectar por: unidad de medida pesable (KL, KG, LB, LIBRA)
+      // O código GS1 de peso variable (empieza con "2", 13-14 dígitos)
       const cleanCodeForGS1 = code.toString().replace(/\+$/, "");
       const isGS1VariableWeight =
         /^\d{13,14}$/.test(cleanCodeForGS1) && cleanCodeForGS1.startsWith("2");
 
-      if (isFruverOrMeat(itemName) || isGS1VariableWeight) {
+      if (isWeighableProduct(unidad_medida) || isGS1VariableWeight) {
         return [code];
       }
 

@@ -87,16 +87,16 @@ exports.getBaseEanFruver = async (req, res) => {
         .json({ error: "No se encontró base EAN para este producto Fruver." });
     }
 
-    // Filtramos estrictamente los códigos que tienen exactamente 7 dígitos y empiezan en 29
-    const validBase = barcodes.find(
-      (b) =>
-        b.codigo_barras &&
-        b.codigo_barras.trim().length === 7 &&
-        /^\d+$/.test(b.codigo_barras.trim()),
-    );
+    // Filtramos estrictamente los códigos que tienen exactamente 7 dígitos (limpiando "+" de SIESA) y empiezan en 29
+    const validBase = barcodes.find((b) => {
+      if (!b.codigo_barras) return false;
+      const cleaned = b.codigo_barras.trim().replace(/\+$/, "");
+      return cleaned.length === 7 && /^\d+$/.test(cleaned) && cleaned.startsWith("29");
+    });
 
     if (validBase) {
-      return res.status(200).json({ baseEAN: validBase.codigo_barras.trim() });
+      const cleanedCode = validBase.codigo_barras.trim().replace(/\+$/, "");
+      return res.status(200).json({ baseEAN: cleanedCode });
     } else {
       return res.status(404).json({
         error:

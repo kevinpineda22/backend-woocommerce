@@ -59,53 +59,34 @@ const VistaAuditor = () => {
     }, 4000);
   };
 
-  // ─── DETECCIÓN DE TIPO DE PRODUCTO ───
-  const FRUVER_KEYWORDS = [
-    "fruver",
-    "fruta",
-    "verdura",
-    "manzana",
-    "banano",
-    "tomate",
-    "cebolla",
-    "papa",
-    "zanahoria",
-    "limón",
-    "limon",
-    "naranja",
-    "aguacate",
-    "lechuga",
-    "pepino",
-    "pimentón",
-    "pimenton",
-  ];
-
-  const MEAT_KEYWORDS = [
-    "carne", "carnes", "pollo", "pollos", "pescado", "pescados",
-    "res", "cerdo", "carnicería", "carniceria", "embutido", "embutidos",
-    "chorizo", "costilla", "chuleta", "lomo", "tocino", "pechuga",
-    "salchicha", "salchichas", "pescaderia", "pescadería",
-    "marisco", "mariscos", "camaron", "camarones", "trucha", "filete",
-  ];
-
-  const isFruverItem = (itemName) => {
-    const name = (itemName || "").toLowerCase();
-    return FRUVER_KEYWORDS.some((kw) => name.includes(kw));
-  };
-
-  const isMeatItem = (itemName) => {
-    const name = (itemName || "").toLowerCase();
-    return MEAT_KEYWORDS.some((kw) => name.includes(kw));
-  };
+  // ─── DETECCIÓN DE TIPO DE PRODUCTO (por unidad de medida y categorías, NUNCA por nombre) ───
+  const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
 
   // ✅ Determina si un producto es fruver o carnicería (no debe requerir validación del auditor)
+  // Se basa en: unidad de medida pesable, categorías reales, o código GS1 de peso variable.
+  // NUNCA en el nombre del producto (evita falsos positivos como "AZUCAR X 1 KG").
   const isFruverOrMeatItem = (item) => {
-    const name = item.name || "";
-    // Verificar por nombre
-    if (isFruverItem(name) || isMeatItem(name)) return true;
-    // Verificar por unidad de medida pesable
-    if (item.unidad_medida && ["kl", "kg", "lb", "libra"].includes(item.unidad_medida.toLowerCase())) return true;
-    // Verificar si el código escaneado es GS1 de peso variable
+    // 1. Verificar por unidad de medida pesable (KL, KG, LB, LIBRA)
+    if (item.unidad_medida && WEIGHABLE_UNITS.includes(item.unidad_medida.toLowerCase())) return true;
+
+    // 2. Verificar por categorías reales (si están disponibles)
+    const catWords = []
+      .concat(
+        Array.isArray(item.categorias_reales) ? item.categorias_reales.join(" ").toLowerCase().split(/[\s,.\-]+/) : [],
+        Array.isArray(item.categorias) ? item.categorias.map((c) => c.name).join(" ").toLowerCase().split(/[\s,.\-]+/) : [],
+      );
+
+    const CATEGORY_KEYWORDS = [
+      "fruver", "fruta", "frutas", "verdura", "verduras", "hortaliza", "hortalizas", "legumbre", "legumbres",
+      "carne", "carnes", "pollo", "pollos", "pescado", "pescados", "res", "cerdo",
+      "carnicería", "carniceria", "embutido", "embutidos", "chorizo", "costilla", "chuleta",
+      "lomo", "tocino", "pechuga", "salchicha", "salchichas", "pescaderia", "pescadería",
+      "marisco", "mariscos", "camaron", "camarones",
+    ];
+
+    if (catWords.some((w) => CATEGORY_KEYWORDS.includes(w))) return true;
+
+    // 3. Verificar si el código escaneado es GS1 de peso variable (empieza con "2", 13-14 dígitos)
     const scannedBarcodes = item._scannedBarcodes;
     if (scannedBarcodes) {
       for (const code of scannedBarcodes) {
@@ -354,8 +335,9 @@ const VistaAuditor = () => {
               order_id: log.id_pedido,
               image: prodDetail?.image || null,
               sku: prodDetail?.sku || null,
-              barcode: prodDetail?.barcode || null, // ✅ Código de barras de SIESA
-              unidad_medida: prodDetail?.unidad_medida || null, // ⚖️ UOM (UND, P6, KL...)
+              barcode: prodDetail?.barcode || null,
+              unidad_medida: prodDetail?.unidad_medida || null,
+              categorias_reales: prodDetail?.categorias_reales || null, // ✅ Categorías reales para detección fruver/carnicería
             };
           }
           itemsMap[key].count += 1;
@@ -484,7 +466,8 @@ const VistaAuditor = () => {
           qty: i.count,
           price: i.price,
           is_sub: i.is_sub,
-          barcode: exactScannedBarcode, // ✅ El código EXACTO GS1 capturado en el picker
+          barcode: exactScannedBarcode,
+          unidad_medida: i.unidad_medida || "",
         };
       }),
     }));

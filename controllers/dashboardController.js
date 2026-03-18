@@ -817,6 +817,30 @@ exports.getSessionLogsDetail = async (req, res) => {
       }
     });
 
+    // ✅ OBTENER CATEGORÍAS REALES para detección fruver/carnicería en auditor
+    try {
+      const productIdsForCat = Object.keys(productDetailsMap).map(Number).filter((id) => !isNaN(id));
+      if (productIdsForCat.length > 0) {
+        const catClient = await getWooClient(sessionInfo.sede_id || req.sedeId);
+        const { data: productsWithCats } = await catClient.get("products", {
+          include: productIdsForCat.join(","),
+          per_page: 100,
+          _fields: "id,categories",
+        });
+        if (productsWithCats) {
+          productsWithCats.forEach((p) => {
+            if (p.categories && productDetailsMap[p.id]) {
+              productDetailsMap[p.id].categorias_reales = p.categories
+                .map((c) => c.name)
+                .filter((n) => n !== "Uncategorized");
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ No se pudieron obtener categorías para auditor:", e.message);
+    }
+
     res.status(200).json({
       metadata: {
         session_id: sessionInfo.id,
