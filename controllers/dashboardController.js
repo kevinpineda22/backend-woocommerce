@@ -806,7 +806,8 @@ exports.getSessionLogsDetail = async (req, res) => {
       const f120_id = parseInt(sku);
 
       if (!isNaN(f120_id) && barcodeMapByF120Id[f120_id]) {
-        productDetailsMap[productId].barcode = barcodeMapByF120Id[f120_id];
+        // Strip "+" suffix que SIESA agrega a algunos códigos (ej: "7702004001012+" → "7702004001012")
+        productDetailsMap[productId].barcode = barcodeMapByF120Id[f120_id].replace(/\+$/, "");
         console.log(
           `✅ Producto ${productId} (SKU ${sku} -> Maestro ${f120_id}): código = ${barcodeMapByF120Id[f120_id]}`,
         );

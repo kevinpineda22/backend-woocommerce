@@ -5,6 +5,7 @@ import {
   checkSiesaBarcodes,
   convertItemsToBarcodes,
 } from "../../../services/siesaService";
+import { calcularDigitoVerificador } from "../picker/modals/utils/gs1Utils";
 import "./ManifestSheet.css";
 
 /**
@@ -117,60 +118,71 @@ const ManifestSheet = ({
   const qrValue = items
     .flatMap((item) => {
       const qty = item.qty || item.count || 1;
-      const itemName = item.name || item.original_name || "";
       const unidad_medida = item.unidad_medida || "";
       const tieneVariaciones = item.tiene_variaciones || false;
-
-      // Detectar si es multipack (presentación especial como P6, P25, KL, LB)
       const isMP = isMultipack(unidad_medida);
-
-      // START
       let code = item.barcode || "";
-
-      // 1. Si lo que tenemos como código es de hecho un ITEM (<= 7 dígitos), intentamos buscar su barcode
-      if (itemToBarcodeMap[code]) {
-        code = itemToBarcodeMap[code];
-      }
-
-      // 2. Si todavía no es un código de barras válido, intentamos usar el SKU convertido a barcode
-      if (!isValidBarcode(code) && item.sku && itemToBarcodeMap[item.sku]) {
+      if (itemToBarcodeMap[code]) code = itemToBarcodeMap[code];
+      if (!isValidBarcode(code) && item.sku && itemToBarcodeMap[item.sku])
         code = itemToBarcodeMap[item.sku];
-      }
-
-      // 3. Aplicar corrección '+' de Siesa si aplica
-      if (correctedCodes[code]) {
-        code = correctedCodes[code];
-      }
-
-      // Para productos con variaciones, usar SKU en lugar del código escaneado
-      if ((isMP || tieneVariaciones) && item.sku) {
-        code = cleanSku(item.sku);
-      }
-
-      // Solo incluir si finalmente resultó ser válido
+      if (correctedCodes[code]) code = correctedCodes[code];
+      if ((isMP || tieneVariaciones) && item.sku) code = cleanSku(item.sku);
       if (!isValidBarcode(code) && !isMP && !tieneVariaciones) {
         omittedItems.push(item);
         return [];
       }
+      // ✅ FRUVER/CARNES: Reconstruir SIEMPRE con prefijo "29"
+      // Formato: 29 + item(tal cual) + 0(separador) + peso(5 dígitos) + checkDigit
+      const cleanCodeGS1 = code.toString().replace(/\+$/, "");
+      const numericSku = (item.sku || "").match(/^(\d+)/)?.[1];
 
-      // ✅ FRUVER Y CARNES: SOLO código sin multiplicador
-      // Detectar por: unidad de medida pesable (KL, KG, LB, LIBRA)
-      // O código GS1 de peso variable (empieza con "2", 13-14 dígitos)
-      const cleanCodeForGS1 = code.toString().replace(/\+$/, "");
-      const isGS1VariableWeight =
-        /^\d{13,14}$/.test(cleanCodeForGS1) && cleanCodeForGS1.startsWith("2");
+      // Detectar si ya es GS1 válido con "29"
+      const isAlreadyGS1_29 =
+        /^\d{13,14}$/.test(cleanCodeGS1) && cleanCodeGS1.startsWith("29");
 
-      if (isWeighableProduct(unidad_medida) || isGS1VariableWeight) {
-        return [code];
+      // Detectar si el código es un código SIESA de fruver/pesable con prefijo "00"
+      // Patrón: "00" + SKU + "0" + peso(5) + check(1) → empieza con "00" y contiene el SKU
+      const isSiesaFruverCode =
+        numericSku &&
+        /^\d{12,14}$/.test(cleanCodeGS1) &&
+        cleanCodeGS1.startsWith("00") &&
+        cleanCodeGS1.includes(numericSku);
+
+      // Aplica si: unidad pesable, O ya tiene "29", O es código SIESA con "00" que contiene el SKU
+      if (isWeighableProduct(unidad_medida) || isAlreadyGS1_29 || isSiesaFruverCode) {
+        // Si ya tiene prefijo "29" correcto, usarlo tal cual
+        if (isAlreadyGS1_29) {
+          return [cleanCodeGS1];
+        }
+
+        // Reconstruir el código con prefijo "29" usando el SKU del producto
+        if (numericSku) {
+          // Extraer el peso del código existente
+          // El SKU aparece en el código, después viene separador "0" + peso(5 dígitos)
+          let pesoStr = "00000";
+          const skuIdx = cleanCodeGS1.indexOf(numericSku);
+          if (skuIdx >= 0) {
+            const afterSku = cleanCodeGS1.substring(skuIdx + numericSku.length);
+            // afterSku: "0" + peso(5) + [check(1)]
+            if (afterSku.length >= 6) {
+              pesoStr = afterSku.substring(1, 6);
+            }
+          }
+
+          // Construir: "29" + item(tal cual, sin padding) + "0" + peso(5) + checkDigit
+          const codigoSinCheck = "29" + numericSku + "0" + pesoStr.padStart(5, "0");
+          const checkDigit = calcularDigitoVerificador(codigoSinCheck);
+          if (checkDigit) {
+            return [`${codigoSinCheck}${checkDigit}`];
+          }
+        }
+
+        // Fallback: código tal cual
+        return [cleanCodeGS1];
       }
-
-      // ✅ PRODUCTOS CON VARIACIONES: Repetir qty líneas de "1*sku"
-      // (cada línea es una presentación individual para la caja registradora)
       if (tieneVariaciones && item.sku) {
         return Array(qty).fill(`1*${cleanSku(item.sku)}`);
       }
-
-      // ✅ PRODUCTOS SIN VARIACIONES: qty*sku (una sola línea)
       return [`${qty}*${code}`];
     })
     .filter(Boolean)

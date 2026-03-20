@@ -59,78 +59,20 @@ const VistaAuditor = () => {
     }, 4000);
   };
 
-  // ─── DETECCIÓN DE TIPO DE PRODUCTO (por unidad de medida y categorías, NUNCA por nombre) ───
+  // ─── DETECCIÓN DE TIPO DE PRODUCTO (por unidad de medida del pedido WooCommerce) ───
   const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
 
-  // ✅ Determina si un producto es fruver o carnicería (no debe requerir validación del auditor)
-  // Se basa en: unidad de medida pesable, categorías reales, o código GS1 de peso variable.
-  // NUNCA en el nombre del producto (evita falsos positivos como "AZUCAR X 1 KG").
+  // ✅ Determina si un producto es pesable: únicamente por la unidad_medida del pedido WooCommerce.
+  // Si el cliente pidió KL o LB, es pesable. Si pidió unidades o no tiene, no lo es.
   const isFruverOrMeatItem = (item) => {
-    // 1. Verificar por unidad de medida pesable (KL, KG, LB, LIBRA)
+    // 1. Unidad de medida pesable del pedido
     if (
       item.unidad_medida &&
       WEIGHABLE_UNITS.includes(item.unidad_medida.toLowerCase())
     )
       return true;
 
-    // 2. Verificar por categorías reales (si están disponibles)
-    const catWords = [].concat(
-      Array.isArray(item.categorias_reales)
-        ? item.categorias_reales
-            .join(" ")
-            .toLowerCase()
-            .split(/[\s,.\-]+/)
-        : [],
-      Array.isArray(item.categorias)
-        ? item.categorias
-            .map((c) => c.name)
-            .join(" ")
-            .toLowerCase()
-            .split(/[\s,.\-]+/)
-        : [],
-    );
-
-    const CATEGORY_KEYWORDS = [
-      "fruver",
-      "fruta",
-      "frutas",
-      "verdura",
-      "verduras",
-      "hortaliza",
-      "hortalizas",
-      "legumbre",
-      "legumbres",
-      "carne",
-      "carnes",
-      "pollo",
-      "pollos",
-      "pescado",
-      "pescados",
-      "res",
-      "cerdo",
-      "carnicería",
-      "carniceria",
-      "embutido",
-      "embutidos",
-      "chorizo",
-      "costilla",
-      "chuleta",
-      "lomo",
-      "tocino",
-      "pechuga",
-      "salchicha",
-      "salchichas",
-      "pescaderia",
-      "pescadería",
-      "marisco",
-      "mariscos",
-      "camaron",
-      "camarones",
-    ];
-
-    if (catWords.some((w) => CATEGORY_KEYWORDS.includes(w))) return true;
-
-    // 3. Verificar si el código escaneado es GS1 de peso variable (empieza con "2", 13-14 dígitos)
+    // 2. Código GS1 de peso variable (empieza con "2", 13-14 dígitos)
     const scannedBarcodes = item._scannedBarcodes;
     if (scannedBarcodes) {
       for (const code of scannedBarcodes) {
@@ -181,27 +123,60 @@ const VistaAuditor = () => {
   };
 
   const verifyProductScan = (code) => {
-    const cleanCode = code.trim().toUpperCase();
+    const cleanCode = code.trim().replace(/\+$/, "").toUpperCase();
     let matchId = null;
+    let matchPriority = 0; // 0=none, 1=non-required, 2=required+verified, 3=required+unverified
     let foundInOrder = false;
     let matchedName = "";
 
     auditData.items.forEach((item) => {
       const scannedBarcodes = auditData.scannedBarcodes?.[item.id];
-      const hasScannedBarcode =
-        scannedBarcodes && scannedBarcodes.has(cleanCode);
-      const hasSiesaBarcode =
-        item.barcode && item.barcode.trim().toUpperCase() === cleanCode;
+
+      // ✅ Comparar contra scannedBarcodes (stripping "+" suffix de SIESA)
+      let hasScannedBarcode = false;
+      if (scannedBarcodes) {
+        if (scannedBarcodes.has(cleanCode)) {
+          hasScannedBarcode = true;
+        } else {
+          // Intentar match sin "+" por si el código almacenado tiene "+"
+          for (const bc of scannedBarcodes) {
+            if (bc.replace(/\+$/, "") === cleanCode) {
+              hasScannedBarcode = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // ✅ Comparar contra SIESA barcode (stripping "+" suffix)
+      const siesaClean = item.barcode
+        ? item.barcode.trim().replace(/\+$/, "").toUpperCase()
+        : "";
+      const hasSiesaBarcode = siesaClean && siesaClean === cleanCode;
+
       const itemSku = (item.id || "").toString().toUpperCase();
       const hasSkuMatch =
         itemSku === cleanCode ||
         (item.sku && item.sku.toUpperCase() === cleanCode);
 
+      // ✅ Match por prefijo GS1: si el código escaneado es GS1 (13-14 dígitos, empieza con "2"),
+      // y el producto tiene un barcode SIESA que comparte los primeros 7 dígitos (29+SKU+0),
+      // es el mismo producto (solo difiere el peso codificado).
+      let hasGS1PrefixMatch = false;
+      const isCleanCodeGS1 =
+        /^\d{13,14}$/.test(cleanCode) && cleanCode.startsWith("2");
+      if (isCleanCodeGS1 && siesaClean && /^\d{13,14}$/.test(siesaClean) && siesaClean.startsWith("2")) {
+        // Comparar prefijo (primeros 7-8 dígitos: "29" + item + "0")
+        if (cleanCode.substring(0, 7) === siesaClean.substring(0, 7)) {
+          hasGS1PrefixMatch = true;
+        }
+      }
+
       // Comprobamos si el picker escaneó un código GS1 para este producto
       let pickerScannedGS1 = false;
       if (scannedBarcodes) {
-        for (const code of scannedBarcodes) {
-          if (/^\d{13,14}$/.test(code) && code.startsWith("2")) {
+        for (const bc of scannedBarcodes) {
+          if (/^\d{13,14}$/.test(bc) && bc.startsWith("2")) {
             pickerScannedGS1 = true;
             break;
           }
@@ -210,24 +185,46 @@ const VistaAuditor = () => {
 
       // Si el picker escaneó un GS1 (ej. etiqueta de báscula de carnes),
       // forzamos al auditor a escanear exactamente la misma etiqueta o al menos un GS1 válido.
-      if (pickerScannedGS1 && requiredItems.has(item.id)) {
+      if (pickerScannedGS1) {
         const isGS1 =
           /^\d{13,14}$/.test(cleanCode) && cleanCode.startsWith("2");
         if (!isGS1) return; // Ignorar coincidencias si el auditor intenta escanear el SKU corto normal
 
-        if (hasScannedBarcode) {
+        // ✅ Para GS1, aceptar: barcode exacto del picker, o match por prefijo GS1 (mismo producto, peso distinto)
+        let gs1MatchFound = hasScannedBarcode;
+        if (!gs1MatchFound && scannedBarcodes) {
+          for (const bc of scannedBarcodes) {
+            if (/^\d{13,14}$/.test(bc) && bc.startsWith("2") &&
+                cleanCode.substring(0, 7) === bc.substring(0, 7)) {
+              gs1MatchFound = true;
+              break;
+            }
+          }
+        }
+
+        if (gs1MatchFound) {
           foundInOrder = true;
-          matchedName = item.name;
-          matchId = item.id;
+          const isReq = requiredItems.has(item.id);
+          const isVer = verifiedItems.has(item.id);
+          const pri = isReq && !isVer ? 3 : isReq && isVer ? 2 : 1;
+          if (pri > matchPriority) {
+            matchId = item.id;
+            matchedName = item.name;
+            matchPriority = pri;
+          }
         }
         return;
       }
 
-      if (hasScannedBarcode || hasSiesaBarcode || hasSkuMatch) {
+      if (hasScannedBarcode || hasSiesaBarcode || hasSkuMatch || hasGS1PrefixMatch) {
         foundInOrder = true;
-        matchedName = item.name;
-        if (requiredItems.has(item.id)) {
+        const isReq = requiredItems.has(item.id);
+        const isVer = verifiedItems.has(item.id);
+        const pri = isReq && !isVer ? 3 : isReq && isVer ? 2 : 1;
+        if (pri > matchPriority) {
           matchId = item.id;
+          matchedName = item.name;
+          matchPriority = pri;
         }
       }
     });
@@ -235,24 +232,30 @@ const VistaAuditor = () => {
     if (matchId) {
       if (!verifiedItems.has(matchId)) {
         setVerifiedItems((prev) => new Set(prev).add(matchId));
-        showFeedback("success", `Producto verificado: ${matchedName}`);
+        const isRequired = requiredItems.has(matchId);
+        showFeedback(
+          "success",
+          isRequired
+            ? `Producto verificado: ${matchedName}`
+            : `Producto verificado (extra): ${matchedName}`,
+        );
       } else {
-        showFeedback("warning", "El producto ya había sido verificado.");
+        showFeedback("warning", `${matchedName} ya había sido verificado.`);
       }
     } else if (foundInOrder) {
+      // Esto solo debería pasar si el producto necesita GS1 y el auditor usó SKU corto
       showFeedback(
         "info",
-        "El producto pertenece al pedido, pero no requiere validación (fuera de muestra).",
+        "Producto encontrado, pero requiere escanear la etiqueta GS1 completa.",
       );
     } else {
       // Check if the rejected code was a short code for a meat/weighable item
       const itemRequiringGS1 = auditData.items.find((item) => {
-        if (!requiredItems.has(item.id) || verifiedItems.has(item.id))
-          return false;
+        if (verifiedItems.has(item.id)) return false;
         const scans = auditData.scannedBarcodes?.[item.id];
         if (scans) {
-          for (const code of scans) {
-            if (/^\d{13,14}$/.test(code) && code.startsWith("2")) return true;
+          for (const bc of scans) {
+            if (/^\d{13,14}$/.test(bc) && bc.startsWith("2")) return true;
           }
         }
         return false;
@@ -301,9 +304,11 @@ const VistaAuditor = () => {
 
     const groupedByOrder = {};
     eligibleItems.forEach((item) => {
+      const itemIdStr = String(item.id);
       const relatedLog = logs.find(
         (l) =>
-          (l.es_sustituto ? l.id_producto_final : l.id_producto) === item.id,
+          String(l.es_sustituto ? l.id_producto_final : l.id_producto) ===
+          itemIdStr,
       );
       if (relatedLog) {
         const orderId = relatedLog.id_pedido;
@@ -356,17 +361,19 @@ const VistaAuditor = () => {
 
       logs.forEach((log) => {
         if (log.accion === "recolectado" || log.accion === "sustituido") {
-          const key = log.es_sustituto
+          // ✅ Normalizar IDs a string para evitar type mismatch number/string en Sets
+          const rawKey = log.es_sustituto
             ? log.id_producto_final || log.id_producto
             : log.id_producto;
+          const key = String(rawKey);
 
-          // ✅ GUARDAR código de barras escaneado si existe
+          // ✅ GUARDAR código de barras escaneado si existe (strip "+" de SIESA)
           if (log.codigo_barras_escaneado) {
             if (!scannedBarcodesMap[key]) {
               scannedBarcodesMap[key] = new Set();
             }
             scannedBarcodesMap[key].add(
-              log.codigo_barras_escaneado.trim().toUpperCase(),
+              log.codigo_barras_escaneado.trim().replace(/\+$/, "").toUpperCase(),
             );
           }
 
@@ -402,8 +409,8 @@ const VistaAuditor = () => {
         try {
           const storedState = JSON.parse(storedStateStr);
           if (storedState.sessionId === metadata.session_id) {
-            setRequiredItems(new Set(storedState.required));
-            setVerifiedItems(new Set(storedState.verified));
+            setRequiredItems(new Set(storedState.required.map(String)));
+            setVerifiedItems(new Set(storedState.verified.map(String)));
             loadedFromStorage = true;
           }
         } catch (e) {}
@@ -801,9 +808,14 @@ const VistaAuditor = () => {
             const trustedItems = allItems.filter(
               (i) => !requiredItems.has(i.id),
             );
+            const verifiedRequiredCount = Array.from(requiredItems).filter(
+              (id) => verifiedItems.has(id),
+            ).length;
             const progress =
               requiredItems.size > 0
-                ? Math.round((verifiedItems.size / requiredItems.size) * 100)
+                ? Math.round(
+                    (verifiedRequiredCount / requiredItems.size) * 100,
+                  )
                 : 0;
             const allDone = isAuditComplete();
 
@@ -839,7 +851,7 @@ const VistaAuditor = () => {
                     <span>
                       {allDone
                         ? "✅ Auditoría completa"
-                        : `${verifiedItems.size} de ${requiredItems.size} verificados`}
+                        : `${verifiedRequiredCount} de ${requiredItems.size} verificados`}
                     </span>
                     <span className="aud-progress-pct">{progress}%</span>
                   </div>
@@ -1290,8 +1302,15 @@ const VistaAuditor = () => {
                                   {trustedItems.map((item, idx) => (
                                     <div
                                       key={idx}
-                                      className={`aud-item-card trusted ${item.is_sub ? "sub" : ""}`}
-                                      style={{ opacity: 0.8 }}
+                                      className={`aud-item-card trusted ${item.is_sub ? "sub" : ""} ${verifiedItems.has(item.id) ? "extra-verified" : ""}`}
+                                      style={{
+                                        opacity: verifiedItems.has(item.id)
+                                          ? 1
+                                          : 0.8,
+                                        borderLeft: verifiedItems.has(item.id)
+                                          ? "3px solid #22c55e"
+                                          : undefined,
+                                      }}
                                     >
                                       {/* COLUMNA 1: IMAGEN */}
                                       <div className="aud-item-img-col">

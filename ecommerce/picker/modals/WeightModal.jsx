@@ -18,13 +18,7 @@ import {
 import "../Modals.css";
 
 // --- MODAL DE PESO INTELIGENTE (CARNES VS FRUVER CON PRECIO EN VIVO) ---
-const WeightModal = ({
-  isOpen,
-  item,
-  onClose,
-  onConfirm,
-  onRequestScan,
-}) => {
+const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
   const [weight, setWeight] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -127,7 +121,9 @@ const WeightModal = ({
         const gs1Sku = rawCode.substring(2, 7);
 
         // Verificar si el prefijo coincide con algún barcode conocido del producto
-        const barcodes = Array.isArray(expectedBarcode) ? expectedBarcode : [expectedBarcode];
+        const barcodes = Array.isArray(expectedBarcode)
+          ? expectedBarcode
+          : [expectedBarcode];
         let prefixMatch = barcodes.some((b) => {
           if (!b) return false;
           const bStr = b.toString().toUpperCase().replace(/\+$/, "");
@@ -170,7 +166,10 @@ const WeightModal = ({
           const extractedWeight = extractWeightFromGS1(rawCode);
           const requested = parseFloat(item.quantity_total);
           const requestedKg = toKgForValidation(requested, item.unidad_medida);
-          const tolerance = validateWeightTolerance(extractedWeight, requestedKg);
+          const tolerance = validateWeightTolerance(
+            extractedWeight,
+            requestedKg,
+          );
 
           if (!tolerance.valid) {
             setError(tolerance.error);
@@ -206,10 +205,14 @@ const WeightModal = ({
 
       // Para Fruver: aceptar el f120_id base
       const expectedNumeric = expectedSku.match(/^(\d+)/)?.[1] || "";
-      const isBaseIdMatch = isFruver && /^\d+$/.test(rawCode) && rawCode === expectedNumeric;
+      const isBaseIdMatch =
+        isFruver && /^\d+$/.test(rawCode) && rawCode === expectedNumeric;
 
       isValidCode =
-        rawCode === expectedSku || cleanCode === expectedSku || barcodeMatches || isBaseIdMatch;
+        rawCode === expectedSku ||
+        cleanCode === expectedSku ||
+        barcodeMatches ||
+        isBaseIdMatch;
     }
 
     if (!rawCode) {
@@ -248,7 +251,9 @@ const WeightModal = ({
     }
 
     if (isFruver && !baseEanFruver) {
-      setError(`❌ Este producto no tiene código de peso registrado. Contacta al supervisor.`);
+      setError(
+        `❌ Este producto no tiene código de peso registrado. Contacta al supervisor.`,
+      );
       return;
     }
 
@@ -267,14 +272,16 @@ const WeightModal = ({
 
       finalWeight = valGramos / 1000;
 
-      if (baseEanFruver) {
-        const pesoGramosStr = Math.round(valGramos).toString().padStart(5, "0");
-        const codigoSinCheck = `${baseEanFruver}${pesoGramosStr}`;
-        const checkDigit = calcularDigitoVerificador(codigoSinCheck);
-        if (checkDigit) {
-          finalCodeToSave = `${codigoSinCheck}${checkDigit}`;
-          console.log("🍏 EAN Fruver Generado Exitosamente:", finalCodeToSave);
-        }
+      // Prefijo GS1 para fruver: "29" + item (5 dígitos)
+      // Tomar el SKU del producto como item (sin consultar EAN base)
+      let item5d = (item.sku || "").padStart(5, "0").slice(-5);
+      const gs1Prefix = `29${item5d}`;
+      const pesoGramosStr = Math.round(valGramos).toString().padStart(5, "0");
+      const codigoSinCheck = `${gs1Prefix}0${pesoGramosStr}`;
+      const checkDigit = calcularDigitoVerificador(codigoSinCheck);
+      if (checkDigit) {
+        finalCodeToSave = `${codigoSinCheck}${checkDigit}`;
+        console.log("🍏 GS1 Fruver Generado Exitosamente:", finalCodeToSave);
       }
     }
     // --- RAMA CARNICERÍA ---
@@ -290,7 +297,8 @@ const WeightModal = ({
 
       if (isGS1Variable(finalCodeToSave)) {
         const extracted = extractWeightFromGS1(finalCodeToSave);
-        finalWeight = extracted > 0 ? extracted : parseFloat(item.quantity_total) || 1;
+        finalWeight =
+          extracted > 0 ? extracted : parseFloat(item.quantity_total) || 1;
       } else {
         finalWeight = parseFloat(item.quantity_total) || 1;
       }
