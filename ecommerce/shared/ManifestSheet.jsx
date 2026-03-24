@@ -127,50 +127,38 @@ const ManifestSheet = ({
         code = itemToBarcodeMap[item.sku];
       if (correctedCodes[code]) code = correctedCodes[code];
       if ((isMP || tieneVariaciones) && item.sku) code = cleanSku(item.sku);
-      if (!isValidBarcode(code) && !isMP && !tieneVariaciones) {
+      if (!isValidBarcode(code) && !isMP && !tieneVariaciones && !isWeighableProduct(unidad_medida)) {
         omittedItems.push(item);
         return [];
       }
-      // ✅ FRUVER/CARNES: Reconstruir SIEMPRE con prefijo "29"
-      // Formato: 29 + item(tal cual) + 0(separador) + peso(5 dígitos) + checkDigit
+      // ✅ FRUVER/CARNES: Construir SIEMPRE con prefijo "29" desde el SKU + peso
+      // Formato: 29 + item(tal cual) + 0(separador) + peso_gramos(5 dígitos) + checkDigit
       const cleanCodeGS1 = code.toString().replace(/\+$/, "");
       const numericSku = (item.sku || "").match(/^(\d+)/)?.[1];
 
-      // Detectar si ya es GS1 válido con "29"
+      // Si ya es GS1 válido con "29", usarlo tal cual
       const isAlreadyGS1_29 =
         /^\d{13,14}$/.test(cleanCodeGS1) && cleanCodeGS1.startsWith("29");
 
-      // Detectar si el código es un código SIESA de fruver/pesable con prefijo "00"
-      // Patrón: "00" + SKU + "0" + peso(5) + check(1) → empieza con "00" y contiene el SKU
-      const isSiesaFruverCode =
-        numericSku &&
-        /^\d{12,14}$/.test(cleanCodeGS1) &&
-        cleanCodeGS1.startsWith("00") &&
-        cleanCodeGS1.includes(numericSku);
-
-      // Aplica si: unidad pesable, O ya tiene "29", O es código SIESA con "00" que contiene el SKU
-      if (isWeighableProduct(unidad_medida) || isAlreadyGS1_29 || isSiesaFruverCode) {
-        // Si ya tiene prefijo "29" correcto, usarlo tal cual
+      if (isWeighableProduct(unidad_medida) || isAlreadyGS1_29) {
         if (isAlreadyGS1_29) {
           return [cleanCodeGS1];
         }
 
-        // Reconstruir el código con prefijo "29" usando el SKU del producto
+        // Construir desde cero usando SKU + peso
         if (numericSku) {
-          // Extraer el peso del código existente
-          // El SKU aparece en el código, después viene separador "0" + peso(5 dígitos)
-          let pesoStr = "00000";
-          const skuIdx = cleanCodeGS1.indexOf(numericSku);
-          if (skuIdx >= 0) {
-            const afterSku = cleanCodeGS1.substring(skuIdx + numericSku.length);
-            // afterSku: "0" + peso(5) + [check(1)]
-            if (afterSku.length >= 6) {
-              pesoStr = afterSku.substring(1, 6);
-            }
+          // Peso en gramos: usar peso_total real si existe, sino derivar de qty × 1000
+          const um = (unidad_medida || "KG").toUpperCase();
+          let pesoKg = item.peso_total || 0;
+          if (!pesoKg || pesoKg <= 0) {
+            // Derivar del qty (cantidad = peso en la unidad del pedido)
+            pesoKg = (um === "LB" || um === "LIBRA") ? qty * 0.4536 : qty;
           }
+          const pesoGramos = Math.round(pesoKg * 1000);
+          const pesoStr = pesoGramos.toString().padStart(5, "0");
 
           // Construir: "29" + item(tal cual, sin padding) + "0" + peso(5) + checkDigit
-          const codigoSinCheck = "29" + numericSku + "0" + pesoStr.padStart(5, "0");
+          const codigoSinCheck = "29" + numericSku + "0" + pesoStr;
           const checkDigit = calcularDigitoVerificador(codigoSinCheck);
           if (checkDigit) {
             return [`${codigoSinCheck}${checkDigit}`];
@@ -333,12 +321,28 @@ const ManifestSheet = ({
                 const qty = item.qty || item.count || 1;
                 const isSub = item.type === "sustituido" || item.is_sub;
 
-                // En la tabla SÍ mostramos el item (SKU/ID) como referencia visual
+                // En la tabla mostramos el código de barras / GS1
                 const getValidCode = () => {
+                  // ✅ Para pesables: construir GS1 "29" desde SKU + peso
+                  if (isWeighableProduct(item.unidad_medida)) {
+                    const numSku = (item.sku || "").match(/^(\d+)/)?.[1];
+                    if (numSku) {
+                      const um = (item.unidad_medida || "KG").toUpperCase();
+                      let pesoKg = item.peso_total || 0;
+                      if (!pesoKg || pesoKg <= 0) {
+                        pesoKg = (um === "LB" || um === "LIBRA") ? qty * 0.4536 : qty;
+                      }
+                      const pesoGramos = Math.round(pesoKg * 1000);
+                      const pesoStr = pesoGramos.toString().padStart(5, "0");
+                      const sinCheck = "29" + numSku + "0" + pesoStr;
+                      const chk = calcularDigitoVerificador(sinCheck);
+                      if (chk) return `${sinCheck}${chk}`;
+                    }
+                  }
                   if (item.barcode && item.barcode !== "ADMIN_OVERRIDE")
                     return item.barcode;
                   if (item.sku && item.sku !== "ADMIN_OVERRIDE")
-                    return cleanSku(item.sku); // Sin guiones
+                    return cleanSku(item.sku);
                   if (item.id && item.id !== "ADMIN_OVERRIDE") return item.id;
                   return "";
                 };
@@ -376,7 +380,14 @@ const ManifestSheet = ({
                     {/* Fila del producto (normal o sustituto) */}
                     <tr className={isSub ? "manifest-row-substitute" : ""}>
                       <td className="cell-num">{idx + 1}</td>
-                      <td className="cell-qty">{qty}</td>
+                      <td className="cell-qty">
+                        {qty}
+                        {isWeighableProduct(item.unidad_medida) && (
+                          <span style={{ fontSize: "0.75em", marginLeft: 2 }}>
+                            {(item.unidad_medida || "KG").toUpperCase()}
+                          </span>
+                        )}
+                      </td>
                       <td className="cell-item">
                         <span className="item-name">{item.name}</span>
                         {isSub && (

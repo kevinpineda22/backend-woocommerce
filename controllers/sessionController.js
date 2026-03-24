@@ -334,6 +334,8 @@ exports.getSessionActive = async (req, res) => {
       ),
     );
 
+    // DEBUG: Ver SKUs de los items agrupados
+    console.log("🔍 SKUs de items agrupados:", itemsAgrupados.map(i => ({ name: i.name?.substring(0, 30), sku: i.sku, um: i.unidad_medida })));
     console.log(`🔍 Buscando códigos de barras para ${skuList.length} SKUs`);
     const barcodeMapSiesa = await getBarcodesFromSiesa(skuList);
     console.log(

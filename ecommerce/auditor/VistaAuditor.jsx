@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ecommerceApi } from "../shared/ecommerceApi";
 import EscanerBarras from "../../DesarrolloSurtido_API/EscanerBarras";
-import ManifestSheet from "../shared/ManifestSheet";
+import ManifestInvoiceModal from "../shared/ManifestInvoiceModal";
 import { useSedeContext } from "../shared/SedeContext";
 import { supabase } from "../../../supabaseClient";
 import {
@@ -21,7 +21,6 @@ import {
   FaBarcode,
   FaBoxOpen,
   FaArrowRight,
-  FaPrint,
   FaFileInvoice,
   FaShieldAlt,
   FaSearchPlus,
@@ -386,6 +385,7 @@ const VistaAuditor = () => {
                 : log.nombre_producto,
               original_name: log.nombre_producto,
               count: 0,
+              peso_total: 0, // ✅ Peso real acumulado (en Kg)
               is_sub: log.es_sustituto,
               price: log.precio_nuevo || 0,
               order_id: log.id_pedido,
@@ -393,10 +393,16 @@ const VistaAuditor = () => {
               sku: prodDetail?.sku || null,
               barcode: prodDetail?.barcode || null,
               unidad_medida: prodDetail?.unidad_medida || null,
-              categorias_reales: prodDetail?.categorias_reales || null, // ✅ Categorías reales para detección fruver/carnicería
+              categorias_reales: prodDetail?.categorias_reales || null,
             };
           }
-          itemsMap[key].count += 1;
+          // ✅ Acumular cantidad real (cantidad_afectada) en vez de +1 por log
+          const cantAfectada = log.cantidad_afectada || 1;
+          itemsMap[key].count += cantAfectada;
+          // ✅ Acumular peso real si existe (peso_real es por unidad × cantidad)
+          if (log.peso_real) {
+            itemsMap[key].peso_total += parseFloat(log.peso_real) * cantAfectada;
+          }
           if (log.es_sustituto) substitutedCount += 1;
         }
       });
@@ -525,6 +531,7 @@ const VistaAuditor = () => {
           name: i.name,
           original_name: i.original_name || null,
           qty: i.count,
+          peso_total: i.peso_total || 0, // ✅ Peso real acumulado (Kg)
           price: i.price,
           is_sub: i.is_sub,
           barcode: exactScannedBarcode,
@@ -606,81 +613,26 @@ const VistaAuditor = () => {
         })
       : "--:--";
 
-  const generateMasterCode = (group) => {
-    const payload = {
-      id: group.id,
-      date: new Date().toISOString().split("T")[0],
-      // Minimizamos el JSON para que quepa bien en el QR
-      items: group.items.map((i) => ({
-        s: i.sku || i.id,
-        q: i.count,
-        p: i.price,
-      })),
-    };
-    return JSON.stringify(payload);
-  };
-
   if (showInvoices && auditData) {
-    // Intentamos usar los datos del servidor (finalSnapshot) o fallamos a los locales
+    // Construir manifestData con la misma estructura que usa el admin
     const qrData = auditData.finalSnapshot || {
       session_id: auditData.meta.session_id,
       timestamp: new Date().toISOString(),
       orders: generateOutputData(),
     };
 
-    const normalizedOrders = Array.isArray(qrData.orders)
-      ? qrData.orders
-      : qrData.items
-        ? [
-            {
-              id: qrData.order_id || qrData.session_id,
-              customer: "Cliente",
-              items: qrData.items,
-            },
-          ]
-        : [];
+    const manifestData = {
+      ...qrData,
+      session_id: auditData.meta.session_id,
+      picker: auditData.meta.picker_name || "Sistema WMS",
+      sede_nombre: sedeName || null,
+    };
 
     return (
-      <div className="invoice-mode-layout">
-        <div className="invoice-actions no-print">
-          <button
-            className="audit-act-btn approve"
-            onClick={() => window.print()}
-          >
-            <FaPrint /> IMPRIMIR
-          </button>
-          <button className="audit-act-btn reject" onClick={clearAudit}>
-            🏠 FINALIZAR Y SALIR
-          </button>
-        </div>
-
-        {normalizedOrders.map((order, orderIndex) => {
-          // Normalizar items para que tengan el formato esperado por ManifestSheet
-          const normalizedItems = (order.items || []).map((i) => ({
-            id: i.id || i.sku,
-            name: i.name,
-            original_name: i.original_name || null,
-            // ✅ IMPORTANTE: Usar sku_final si está disponible (SKU reconstruido desde SIESA)
-            // Si no, usar sku original de WooCommerce
-            sku: i.sku_final || i.sku || "",
-            barcode: i.barcode || "", // Solo barcode real, nunca SKU ni ID
-            qty: i.qty || i.count || 1,
-            is_sub: i.type === "sustituido" || i.is_sub,
-            unidad_medida: i.unidad_medida || "", // Para detectar multipacks (P6, P25, KL, LB, etc.)
-          }));
-
-          return (
-            <ManifestSheet
-              key={orderIndex}
-              order={{ ...order, items: normalizedItems }}
-              timestamp={qrData.timestamp}
-              pickerName={auditData.meta.picker_name}
-              orderIndex={orderIndex}
-              sedeName={sedeName}
-            />
-          );
-        })}
-      </div>
+      <ManifestInvoiceModal
+        manifestData={manifestData}
+        onClose={clearAudit}
+      />
     );
   }
 

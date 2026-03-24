@@ -90,13 +90,15 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
             id: item.id || item.sku,
             name: item.name,
             original_name: item.original_name || null,
-            sku: item.sku || item.id,
+            sku: item.sku_final || item.sku || item.id,
             barcode: item.barcode || "",
             qty: item.qty || item.count || 0,
+            peso_total: item.peso_total || 0,
             count: item.count,
             type: item.type,
             is_sub: item.type === "sustituido" || item.is_sub,
             unidad_medida: item.unidad_medida || "",
+            tiene_variaciones: item.tiene_variaciones || false,
           }));
 
           return (

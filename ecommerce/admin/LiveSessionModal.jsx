@@ -135,34 +135,15 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
   const displayItems = showTrash ? removedItems : activeItems;
 
   const isWeighable = (item) => {
-    // 1. Unidad de medida pesable (KL = kilo, LB = libra)
-    const isUnitPesable =
+    // Igual que el picker: solo la unidad de medida del pedido WooCommerce determina
+    // si es pesable. Si el cliente pidió KL/KG/LB → pesable. Si pidió UND o no tiene → no pesable.
+    // Productos como embutidos (salchichón, chorizo) vendidos por unidad NO son pesables.
+    return (
       item.unidad_medida &&
       ["kl", "kg", "kilo", "lb", "libra"].includes(
         item.unidad_medida.toLowerCase(),
-      );
-
-    // 2. Detección por CATEGORÍAS REALES (no por nombre del producto)
-    const catReales = Array.isArray(item.categorias_reales)
-      ? item.categorias_reales.join(" ").toLowerCase()
-      : "";
-    const catNormales = Array.isArray(item.categorias)
-      ? item.categorias.map((c) => c.name).join(" ").toLowerCase()
-      : "";
-    const categoriesWords = `${catReales} ${catNormales}`.split(/[\s,.\-]+/);
-
-    const weighableKeywords = [
-      "fruver", "fruta", "frutas", "verdura", "verduras",
-      "hortaliza", "hortalizas", "legumbre", "legumbres",
-      "carne", "carnes", "pollo", "pollos", "pescado", "pescados",
-      "res", "cerdo", "carnicería", "carniceria", "embutido", "embutidos",
-      "pescaderia", "pescadería", "marisco", "mariscos",
-    ];
-    const isCategoryWeighable = categoriesWords.some((w) =>
-      weighableKeywords.includes(w),
+      )
     );
-
-    return isUnitPesable || isCategoryWeighable;
   };
 
   // ⚡ CANAL DE RADIO: Avisar al Picker instantáneamente

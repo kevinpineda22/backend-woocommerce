@@ -329,6 +329,14 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
           <FaWeightHanging size={40} className="wm-header-icon" />
           <h3>{isMeat ? "Validar y Pesar Cárnico" : "Ingresar Peso Fruver"}</h3>
           <p className="wm-product-name">{item.name}</p>
+          {isFruver && (item.sku || item.sku_final) && (
+            <div className="wm-fruver-item-hint">
+              <span className="wm-fruver-item-label">ITEM</span>
+              <span className="wm-fruver-item-value">
+                {(item.sku || item.sku_final || "").toString().match(/^(\d+)/)?.[1] || item.sku || item.sku_final}
+              </span>
+            </div>
+          )}
           <div className="wm-request-badge">
             Solicitado:{" "}
             <strong>

@@ -15,6 +15,7 @@ import {
 } from "react-icons/fa";
 import { getOrderStyle, formatPrice } from "../utils/pickerConstants";
 import { isWeighable as isWeighableFn } from "../utils/isWeighable";
+import { detectFruver } from "../modals/utils/categoryDetection";
 import "./ProductCard.css";
 
 export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom, animDelay = 0 }) => {
@@ -30,6 +31,7 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
   const isShortPick = isCompleted && scanned < total && !item.sustituto;
 
   const isWeighable = useMemo(() => isWeighableFn(item), [item]);
+  const isFruver = useMemo(() => detectFruver(item), [item]);
 
   const isMultipack = useMemo(() => {
     if (!item) return false;
@@ -176,6 +178,14 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
         ) : (
           <>
             <h4 className="ec-prod-name">{item.name}</h4>
+            {isFruver && (item.sku || item.sku_final) && (
+              <div className="ec-fruver-item-code">
+                <span className="ec-fruver-item-label">ITEM</span>
+                <span className="ec-fruver-item-value">
+                  {(item.sku || item.sku_final || "").toString().match(/^(\d+)/)?.[1] || item.sku || item.sku_final}
+                </span>
+              </div>
+            )}
             <div className="ec-price-tag">
               {item.price > 0 ? formatPrice(item.price) : ""}{" "}
               {item.unidad_medida && `/ ${item.unidad_medida}`}

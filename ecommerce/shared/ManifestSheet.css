@@ -1,26 +1,28 @@
-/* ManifestSheet.css - Componente Reutilizable de Manifiesto */
+/* ManifestSheet.css - Componente Reutilizable de Manifiesto de Salida */
 @import url("https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Libre+Barcode+39+Text&display=swap");
 
 /* =========================================
-   HOJA DE MANIFIESTO
+   HOJA DE MANIFIESTO — A4 contenida
    ========================================= */
 .manifest-sheet {
   background: white;
   width: 100%;
-  max-width: 800px;
+  max-width: 210mm;
   padding: 12mm 10mm;
   border-radius: 8px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08); /* Sombra estilo "papel flotante" */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
   font-family: "Cabin", Helvetica, sans-serif;
   font-size: 16px;
   color: #1e293b;
-  margin: 0 auto 30px; /* Margen amplio para separar hojas en pantalla */
+  margin: 0 auto 30px;
   page-break-after: always;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .manifest-sheet:last-of-type {
-  margin-bottom: 0px;
+  margin-bottom: 0;
   page-break-after: auto;
 }
 
@@ -31,7 +33,7 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  border-bottom: 1.5px solid #cbd5e1;
+  border-bottom: 2px solid #0f172a;
   padding-bottom: 8px;
   margin-bottom: 10px;
 }
@@ -43,15 +45,15 @@
 }
 
 .manifest-logo-img {
-  height: 40px;
+  height: 38px;
   width: auto;
   object-fit: contain;
 }
 
 .manifest-title {
-  font-size: 1.2rem;
+  font-size: 1.15rem;
   font-weight: 800;
-  color: #334155;
+  color: #0f172a;
   text-transform: uppercase;
   letter-spacing: -0.5px;
 }
@@ -75,7 +77,7 @@
 }
 
 /* =========================================
-   INFORMACIÓN DEL CLIENTE Y ENVÍO
+   INFORMACIÓN DEL CLIENTE
    ========================================= */
 .manifest-customer {
   margin-bottom: 10px;
@@ -98,17 +100,21 @@
   display: flex;
   gap: 5px;
   align-items: baseline;
+  min-width: 0;
 }
 
 .manifest-customer-field .manifest-field-label {
   font-weight: 700;
-  color: #475569;
+  color: #0f172a;
   white-space: nowrap;
 }
 
 .manifest-customer-field .manifest-field-value {
   font-weight: 500;
-  color: #64748b;
+  color: #475569;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* =========================================
@@ -123,11 +129,10 @@
   border-radius: 6px;
   margin-bottom: 12px;
   page-break-inside: avoid;
-  background: #fff;
-  transition: all 0.3s ease;
+  background: #fafbfc;
 }
 
-/* Modo: Solo QR */
+/* Modo: Solo QR (pantalla) */
 .manifest-qr-section.manifest-qr-only {
   flex-direction: column;
   justify-content: center;
@@ -143,33 +148,58 @@
 .qr-wrapper {
   background: white;
   padding: 6px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #e2e8f0;
   border-radius: 4px;
+  flex-shrink: 0;
+  /* Limitar QR para que nunca desborde */
+  max-width: 130px;
+  max-height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-wrapper svg {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 110px;
+  max-height: 110px;
+}
+
+.manifest-qr-section.manifest-qr-only .qr-wrapper {
+  max-width: 260px;
+  max-height: 260px;
+}
+
+.manifest-qr-section.manifest-qr-only .qr-wrapper svg {
+  max-width: 250px;
+  max-height: 250px;
+}
+
+.qr-info {
+  min-width: 0;
+  flex: 1;
 }
 
 .qr-info h4 {
   margin: 0 0 4px 0;
-  color: #334155;
+  color: #0f172a;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  transition: all 0.3s ease;
 }
 
 .qr-info p {
   margin: 0;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 0.72rem;
   font-weight: 500;
-  transition: all 0.3s ease;
 }
 
-/* Tamaños ajustados para el modo Solo QR */
 .manifest-qr-section.manifest-qr-only .qr-info h4 {
   font-size: 1.6rem;
   margin-bottom: 8px;
-  color: #0f172a;
 }
 
 .manifest-qr-section.manifest-qr-only .qr-info p {
@@ -179,13 +209,14 @@
 }
 
 /* =========================================
-   TABLA DE PRODUCTOS (compacta, sin barcodes)
+   TABLA DE PRODUCTOS
    ========================================= */
 .manifest-table {
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 10px;
   font-size: 0.75rem;
+  table-layout: fixed;
 }
 
 .manifest-table thead {
@@ -210,7 +241,7 @@
 
 .manifest-table th.col-qty {
   text-align: center;
-  width: 40px;
+  width: 45px;
 }
 
 .manifest-table th.col-ref {
@@ -226,6 +257,8 @@
   padding: 3px 8px;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Celda numeración */
@@ -242,11 +275,13 @@
   font-weight: 700;
   font-size: 0.85rem;
   color: #1e293b;
+  white-space: nowrap;
 }
 
 /* Celda de Item */
 .cell-item {
   vertical-align: middle;
+  overflow: hidden;
 }
 
 .item-name {
@@ -254,6 +289,11 @@
   font-size: 0.72rem;
   color: #1e293b;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  max-width: 100%;
 }
 
 .item-substitute-badge {
@@ -268,13 +308,24 @@
   vertical-align: middle;
   border: 1px solid #fbbf24;
   letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+/* Celda de referencia (barcode/sku) */
+.cell-ref {
+  text-align: right;
+  font-family: monospace;
+  font-size: 0.6rem;
+  color: #94a3b8;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* =========================================
    FILAS DE SUSTITUCIÓN EN TABLA
    ========================================= */
-
-/* Fila del producto original retirado (tachado) */
 .manifest-row-original-replaced {
   background: #fef2f2 !important;
 }
@@ -289,12 +340,14 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  overflow: hidden;
 }
 
 .original-icon {
   color: #dc2626;
   font-weight: 900;
   font-size: 0.7rem;
+  flex-shrink: 0;
 }
 
 .original-name-strikethrough {
@@ -302,6 +355,9 @@
   color: #9ca3af;
   font-size: 0.68rem;
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .original-replaced-label {
@@ -313,6 +369,8 @@
   border-radius: 3px;
   letter-spacing: 0.3px;
   border: 1px solid #fca5a5;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .original-qty-badge {
@@ -321,7 +379,6 @@
   font-weight: 700;
 }
 
-/* Fila del producto sustituto (nuevo) */
 .manifest-row-substitute {
   background: #fffbeb !important;
 }
@@ -404,17 +461,8 @@
   flex-shrink: 0;
 }
 
-/* Celda de Item (ref) */
-.cell-ref {
-  text-align: right;
-  font-family: monospace;
-  font-size: 0.6rem;
-  color: #94a3b8;
-  font-weight: 600;
-}
-
 /* =========================================
-   GRID DE CÓDIGOS DE BARRAS (horizontal)
+   GRID DE CÓDIGOS DE BARRAS
    ========================================= */
 .manifest-barcodes-section {
   margin-top: 8px;
@@ -433,44 +481,45 @@
 }
 
 .manifest-barcodes-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
 }
 
 .manifest-barcode-cell {
-  flex: 0 1 auto;
-  min-width: 110px;
-  max-width: 100%;
   text-align: center;
-  padding: 6px;
+  padding: 4px 3px;
   border: 1px solid #e2e8f0;
-  border-radius: 6px;
+  border-radius: 4px;
   background: #f8fafc;
+  overflow: hidden;
+  min-width: 0;
 }
 
 .manifest-barcode-font {
   font-family: "Libre Barcode 39 Text", cursive;
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   color: #000;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: clip; /* It shouldn't clip because it can grow */
+  text-overflow: ellipsis;
+  /* Escalar el texto del barcode para que quepa */
+  max-width: 100%;
 }
 
 .manifest-barcode-label {
   font-family: monospace;
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   color: #64748b;
   font-weight: 600;
-  margin-top: 4px;
+  margin-top: 2px;
   white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
+  overflow: hidden;
 }
 
 .manifest-barcode-num {
@@ -481,9 +530,16 @@
   flex-shrink: 0;
 }
 
+.manifest-barcode-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 .manifest-barcode-qty {
   color: #94a3b8;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 /* =========================================
@@ -501,11 +557,11 @@
 }
 
 .manifest-sheet.compact .manifest-logo-img {
-  height: 36px;
+  height: 34px;
 }
 
 .manifest-sheet.compact .manifest-title {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
 }
 
 .manifest-sheet.compact .manifest-barcodes-grid {
@@ -513,7 +569,7 @@
 }
 
 .manifest-sheet.compact .manifest-barcode-font {
-  font-size: 1.3rem;
+  font-size: 1.2rem;
 }
 
 /* VERY COMPACT: 26-40 productos */
@@ -527,11 +583,11 @@
 }
 
 .manifest-sheet.very-compact .manifest-logo-img {
-  height: 32px;
+  height: 30px;
 }
 
 .manifest-sheet.very-compact .manifest-title {
-  font-size: 1rem;
+  font-size: 0.95rem;
 }
 
 .manifest-sheet.very-compact .manifest-table {
@@ -544,15 +600,25 @@
 
 .manifest-sheet.very-compact .manifest-barcodes-grid {
   grid-template-columns: repeat(5, 1fr);
-  gap: 3px 6px;
+  gap: 4px;
 }
 
 .manifest-sheet.very-compact .manifest-barcode-font {
-  font-size: 1.1rem;
+  font-size: 1rem;
 }
 
 .manifest-sheet.very-compact .manifest-barcode-label {
-  font-size: 0.5rem;
+  font-size: 0.48rem;
+}
+
+.manifest-sheet.very-compact .qr-wrapper {
+  max-width: 90px;
+  max-height: 90px;
+}
+
+.manifest-sheet.very-compact .qr-wrapper svg {
+  max-width: 80px;
+  max-height: 80px;
 }
 
 /* ULTRA COMPACT: 40+ productos */
@@ -566,11 +632,11 @@
 }
 
 .manifest-sheet.ultra-compact .manifest-logo-img {
-  height: 28px;
+  height: 26px;
 }
 
 .manifest-sheet.ultra-compact .manifest-title {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 .manifest-sheet.ultra-compact .manifest-table {
@@ -586,18 +652,23 @@
 }
 
 .manifest-sheet.ultra-compact .manifest-qr-section {
-  padding: 8px;
-  gap: 10px;
+  padding: 6px;
+  gap: 8px;
+}
+
+.manifest-sheet.ultra-compact .qr-wrapper {
+  max-width: 75px;
+  max-height: 75px;
 }
 
 .manifest-sheet.ultra-compact .qr-wrapper svg {
-  width: 70px !important;
-  height: 70px !important;
+  max-width: 65px;
+  max-height: 65px;
 }
 
 .manifest-sheet.ultra-compact .manifest-barcodes-grid {
   grid-template-columns: repeat(6, 1fr);
-  gap: 2px 4px;
+  gap: 3px;
 }
 
 .manifest-sheet.ultra-compact .manifest-barcode-cell {
@@ -605,17 +676,39 @@
 }
 
 .manifest-sheet.ultra-compact .manifest-barcode-font {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
 }
 
 .manifest-sheet.ultra-compact .manifest-barcode-label {
-  font-size: 0.45rem;
+  font-size: 0.42rem;
+}
+
+/* =========================================
+   SEDE LABEL & CODE CORRECTED
+   ========================================= */
+.manifest-sede-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #4338ca;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+}
+
+.manifest-code-corrected-dot {
+  color: #16a34a;
+  margin-left: 4px;
+  font-weight: bold;
+  font-size: 0.8em;
 }
 
 /* =========================================
    ESTILOS DE IMPRESIÓN
    ========================================= */
 @media print {
+  /* Ocultar elementos no imprimibles */
+  .no-print,
+  .manifest-controls,
   .pedidos-layout-sidebar,
   .pedidos-layout-content,
   .history-table-container,
@@ -625,8 +718,7 @@
   .admin-sidebar,
   nav,
   .navbar,
-  header,
-  .no-print {
+  header:not(.manifest-header) {
     display: none !important;
   }
 
@@ -637,97 +729,104 @@
     padding: 0 !important;
   }
 
+  /* Hoja base */
   .manifest-sheet {
     box-shadow: none !important;
     margin: 0 auto !important;
     width: 100% !important;
     max-width: 210mm !important;
     min-height: auto !important;
-    padding: 15mm 12mm !important;
+    padding: 10mm 10mm !important;
     border: none !important;
     border-radius: 0 !important;
     page-break-after: always !important;
+    overflow: hidden !important;
   }
 
-  /* El último manifiesto no rompe página para no dejar una hoja en blanco al final */
   .manifest-sheet:last-of-type {
     page-break-after: auto !important;
   }
 
+  /* Header */
   .manifest-header {
-    padding-bottom: 10px !important;
-    margin-bottom: 15px !important;
-    border-bottom: 1.5px solid #999 !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 10px !important;
+    border-bottom: 2px solid #000 !important;
   }
 
   .manifest-logo-img {
-    height: 40px !important;
+    height: 36px !important;
   }
 
   .manifest-title {
-    font-size: 1.2rem !important;
+    font-size: 1.1rem !important;
     font-weight: 800 !important;
   }
 
   .manifest-info h2 {
-    font-size: 1rem !important;
+    font-size: 0.95rem !important;
   }
 
   .manifest-info p {
-    font-size: 0.75rem !important;
+    font-size: 0.7rem !important;
   }
 
+  /* Cliente */
   .manifest-customer {
-    margin-bottom: 12px !important;
-    padding-bottom: 10px !important;
-    font-size: 0.8rem !important;
-    gap: 20px !important;
-    border-bottom: 1px solid #ddd !important;
+    margin-bottom: 8px !important;
+    padding-bottom: 6px !important;
+    font-size: 0.75rem !important;
+    border-bottom: 1px solid #ccc !important;
   }
 
+  /* QR */
   .manifest-qr-section {
-    margin-bottom: 15px !important;
-    padding: 10px !important;
-    border: 1px solid #ccc !important;
+    margin-bottom: 10px !important;
+    padding: 8px !important;
+    border: 1.5px solid #999 !important;
     background: white !important;
-    gap: 18px !important;
+    gap: 12px !important;
   }
 
   .qr-wrapper {
-    padding: 6px !important;
+    padding: 4px !important;
     border: 1px solid #999 !important;
+    max-width: 110px !important;
+    max-height: 110px !important;
   }
 
   .qr-wrapper svg {
-    width: 110px !important;
-    height: 110px !important;
+    max-width: 100px !important;
+    max-height: 100px !important;
   }
 
   .qr-info h4 {
-    font-size: 0.85rem !important;
+    font-size: 0.8rem !important;
     font-weight: 800 !important;
   }
 
   .qr-info p {
-    font-size: 0.72rem !important;
+    font-size: 0.68rem !important;
     font-weight: 600 !important;
   }
 
   /* Tabla */
   .manifest-table {
-    margin-bottom: 0 !important;
-    font-size: 0.75rem !important;
+    margin-bottom: 6px !important;
+    font-size: 0.72rem !important;
+    table-layout: fixed !important;
   }
 
   .manifest-table thead {
     background: #f1f5f9 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    display: table-header-group;
   }
 
   .manifest-table th {
     padding: 4px 6px !important;
-    font-size: 0.6rem !important;
+    font-size: 0.58rem !important;
     color: #475569 !important;
     border-bottom: 1.5px solid #999 !important;
     -webkit-print-color-adjust: exact;
@@ -745,16 +844,21 @@
     print-color-adjust: exact;
   }
 
+  .manifest-table tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
   .cell-qty {
-    font-size: 0.85rem !important;
+    font-size: 0.8rem !important;
   }
 
   .item-name {
-    font-size: 0.7rem !important;
+    font-size: 0.68rem !important;
   }
 
   .item-substitute-badge {
-    font-size: 0.55rem !important;
+    font-size: 0.5rem !important;
     background: #fef3c7 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -785,7 +889,7 @@
     print-color-adjust: exact;
   }
 
-  /* Grid de barcodes */
+  /* Barcodes grid */
   .manifest-barcodes-section {
     margin-top: 6px !important;
     border-top: 1px solid #ccc !important;
@@ -794,11 +898,11 @@
 
   .manifest-barcodes-grid {
     grid-template-columns: repeat(4, 1fr) !important;
-    gap: 3px 6px !important;
+    gap: 4px !important;
   }
 
   .manifest-barcode-cell {
-    border-bottom: 1px solid #ddd !important;
+    border: 1px solid #ddd !important;
     padding: 3px 2px !important;
   }
 
@@ -809,36 +913,37 @@
   }
 
   .manifest-barcode-font {
-    font-size: 1.4rem !important;
+    font-size: 1.2rem !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
   .manifest-barcode-label {
-    font-size: 0.55rem !important;
+    font-size: 0.5rem !important;
   }
 
-  /* Saltos de página */
-  .manifest-table {
-    page-break-inside: auto;
-  }
-
-  .manifest-table tr {
-    page-break-inside: avoid;
-    page-break-after: auto;
-  }
-
-  .manifest-table thead {
-    display: table-header-group;
-  }
-
+  /* Secciones que no deben partirse */
   .manifest-header,
   .manifest-qr-section,
   .manifest-customer {
     page-break-inside: avoid;
   }
 
+  .manifest-table {
+    page-break-inside: auto;
+  }
+
   /* Densidades en impresión */
+  .manifest-sheet.compact {
+    padding: 8mm 9mm !important;
+  }
+
   .manifest-sheet.compact .manifest-barcodes-grid {
     grid-template-columns: repeat(5, 1fr) !important;
+  }
+
+  .manifest-sheet.very-compact {
+    padding: 6mm 8mm !important;
   }
 
   .manifest-sheet.very-compact .manifest-barcodes-grid {
@@ -846,7 +951,19 @@
   }
 
   .manifest-sheet.very-compact .manifest-barcode-font {
-    font-size: 1.1rem !important;
+    font-size: 0.95rem !important;
+  }
+
+  .manifest-sheet.very-compact .manifest-table td {
+    padding: 1.5px 5px !important;
+  }
+
+  .manifest-sheet.very-compact .item-name {
+    font-size: 0.62rem !important;
+  }
+
+  .manifest-sheet.ultra-compact {
+    padding: 4mm 6mm !important;
   }
 
   .manifest-sheet.ultra-compact .manifest-barcodes-grid {
@@ -854,11 +971,11 @@
   }
 
   .manifest-sheet.ultra-compact .manifest-barcode-font {
-    font-size: 0.9rem !important;
+    font-size: 0.8rem !important;
   }
 
   .manifest-sheet.ultra-compact .manifest-barcode-label {
-    font-size: 0.45rem !important;
+    font-size: 0.4rem !important;
   }
 
   .manifest-sheet.ultra-compact .manifest-table td {
@@ -872,22 +989,14 @@
   .manifest-sheet.ultra-compact .cell-qty {
     font-size: 0.7rem !important;
   }
-}
 
-/* ─── Sede Label (Header) ─── */
-.manifest-sede-label {
-  display: block;
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: #4338ca;
-  margin-top: 2px;
-  letter-spacing: 0.5px;
-}
+  .manifest-sheet.ultra-compact .qr-wrapper {
+    max-width: 65px !important;
+    max-height: 65px !important;
+  }
 
-/* ─── Corrected Code Indicator ─── */
-.manifest-code-corrected-dot {
-  color: #16a34a;
-  margin-left: 4px;
-  font-weight: bold;
-  font-size: 0.8em;
+  .manifest-sheet.ultra-compact .qr-wrapper svg {
+    max-width: 55px !important;
+    max-height: 55px !important;
+  }
 }
