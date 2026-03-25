@@ -64,9 +64,9 @@ async function getBarcodesFromSiesa(productIds) {
   }
 }
 
-// ✅ Construye la base EAN GS1 para productos pesables (fruver/carnicería).
-// El prefijo "29" NO existe en SIESA — se construye: "29" + f120_id padded a 5 dígitos = 7 dígitos.
-// Ejemplo: f120_id=4999 → "29" + "04999" = "2904999"
+// ✅ Consulta SIESA para obtener el código GS1 real (prefijo "29") de un producto pesable.
+// Busca en siesa_codigos_barras por f120_id y devuelve el codigo_barras que empieza por "29".
+// Si no existe en SIESA, construye uno como fallback: "29" + f120_id padded.
 exports.getBaseEanFruver = async (req, res) => {
   const { sku } = req.params;
   if (!sku) return res.status(400).json({ error: "SKU requerido" });
@@ -79,11 +79,53 @@ exports.getBaseEanFruver = async (req, res) => {
     return res.status(400).json({ error: "SKU no contiene un f120_id numérico válido." });
   }
 
-  // Construir base EAN: "29" + f120_id (tal cual, sin padding) + "0" (separador fijo)
-  // Ejemplo: f120_id=4999 → "2949990", f120_id=15132 → "29151320"
-  const baseEAN = "29" + numericSku + "0";
+  try {
+    // Consultar SIESA para obtener TODOS los códigos de barras de este producto
+    const { data: siesaRows, error } = await supabase
+      .from("siesa_codigos_barras")
+      .select("codigo_barras, unidad_medida")
+      .eq("f120_id", parseInt(numericSku));
 
-  return res.status(200).json({ baseEAN });
+    if (error) {
+      console.error("Error consultando SIESA para base EAN fruver:", error);
+    }
+
+    // Buscar el código que empieza por "29" (GS1 de peso variable)
+    let gs1Code = null;
+    if (siesaRows && siesaRows.length > 0) {
+      const gs1Row = siesaRows.find((row) => {
+        const code = (row.codigo_barras || "").toString().trim().replace(/\+$/, "");
+        return code.startsWith("29") && /^\d+$/.test(code);
+      });
+      if (gs1Row) {
+        gs1Code = gs1Row.codigo_barras.toString().trim().replace(/\+$/, "");
+      }
+    }
+
+    if (gs1Code) {
+      // Código GS1 real de SIESA (ej: "2900002" para item 4736)
+      // Este es el prefijo — el picker solo agrega peso + dígito verificador
+      return res.status(200).json({
+        baseEAN: gs1Code,
+        source: "siesa",
+      });
+    }
+
+    // Fallback: construir prefijo manualmente si no hay código "29" en SIESA
+    const baseEAN = "29" + numericSku.padStart(5, "0").slice(-5);
+    return res.status(200).json({
+      baseEAN,
+      source: "generated",
+    });
+  } catch (err) {
+    console.error("Error en getBaseEanFruver:", err);
+    // Fallback en caso de error
+    const baseEAN = "29" + numericSku.padStart(5, "0").slice(-5);
+    return res.status(200).json({
+      baseEAN,
+      source: "fallback",
+    });
+  }
 };
 
 exports.searchProduct = async (req, res) => {

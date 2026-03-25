@@ -1,0 +1,1162 @@
+/* ================================================================
+   Modals.css – WeightModal & SubstituteModal
+   Prefijo: wm-  (Weight Modal)
+   Mobile-first, responsive, profesional.
+   ================================================================ */
+
+/* ─── OVERRIDE: Modal más amplio para Peso/Sustitutos ─── */
+.wm-modal .ec-modal-content {
+  width: 95%;
+  max-width: 500px;
+  padding: 24px 24px 28px;
+  box-sizing: border-box;
+}
+
+/* ─── HEADER ─── */
+.wm-header {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.wm-header-icon {
+  color: #22c55e;
+}
+
+.wm-header h3 {
+  margin: 10px 0 0;
+  font-size: 1.25rem;
+  color: #1e293b;
+  font-weight: 800;
+}
+
+.wm-product-name {
+  font-size: 1.1rem;
+  margin: 10px 0;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.4;
+}
+
+/* ─── HINT ITEM FRUVER (dentro del WeightModal) ─── */
+.wm-fruver-item-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  margin: 8px auto 10px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.3);
+}
+
+.wm-fruver-item-label {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 8px 8px 8px 14px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.wm-fruver-item-value {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 1.3rem;
+  font-weight: 900;
+  padding: 6px 18px 6px 12px;
+  font-family: monospace;
+  letter-spacing: 2.5px;
+  border-radius: 0 12px 12px 0;
+}
+
+/* ─── BADGE DE SOLICITUD ─── */
+.wm-request-badge {
+  font-size: 1rem;
+  background: #f0fdf4;
+  padding: 14px 18px;
+  border-radius: 12px;
+  border: 1.5px solid #bbf7d0;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.wm-request-badge strong {
+  color: #15803d;
+  font-size: 1.1rem;
+}
+
+.wm-request-badge small {
+  color: #15803d;
+  display: block;
+  margin-top: 6px;
+  font-size: 0.9rem;
+}
+
+/* ─── INFO MESSAGES ─── */
+.wm-info-loading {
+  color: #3b82f6;
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.wm-info-success {
+  color: #16a34a;
+  font-size: 0.88rem;
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* ─── STEP SECTION ─── */
+.wm-step-section {
+  text-align: left;
+  margin-bottom: 16px;
+}
+
+.wm-step-section.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.wm-step-label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 800;
+  font-size: 1rem;
+  color: #1e293b;
+}
+
+/* ─── INPUT ROW (camera + input + validate button) ─── */
+.wm-input-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ─── CAMERA BUTTON ─── */
+.wm-camera-btn {
+  background: #1e293b;
+  width: 58px;
+  height: 58px;
+  min-width: 58px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  color: white;
+  transition:
+    opacity 0.15s,
+    transform 0.1s;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.wm-camera-btn:active {
+  transform: scale(0.93);
+}
+
+.wm-camera-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── CODE INPUT (overrides .ec-manual-input dark styling) ─── */
+.wm-code-input {
+  width: 100%;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border: 2.5px solid #cbd5e1 !important;
+  border-radius: 14px !important;
+  padding: 16px 18px !important;
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  text-align: left !important;
+  outline: none;
+  height: 58px;
+  box-sizing: border-box;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    box-shadow 0.2s;
+}
+
+.wm-code-input::placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 1.1rem;
+}
+
+.wm-code-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+}
+
+.wm-code-input.validated {
+  background: #f0fdf4 !important;
+  color: #16a34a !important;
+  border-color: #22c55e !important;
+}
+
+.wm-code-input.has-button {
+  padding-right: 120px !important;
+}
+
+/* ─── VALIDATE BUTTON (floating inside input) ─── */
+.wm-validate-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 20px;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+  transition:
+    background 0.15s,
+    transform 0.1s;
+  white-space: nowrap;
+  min-height: 44px;
+}
+
+.wm-validate-btn:active {
+  background: #2563eb;
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* ─── WEIGHT INPUT (Fruver) ─── */
+.wm-weight-input {
+  width: 100%;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border: 2.5px solid #cbd5e1 !important;
+  border-radius: 14px !important;
+  padding: 16px 60px 16px 18px !important;
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  text-align: left !important;
+  outline: none;
+  height: 58px;
+  box-sizing: border-box;
+}
+
+.wm-weight-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+}
+
+.wm-weight-unit {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: 800;
+  color: #64748b;
+  font-size: 1.05rem;
+}
+
+/* ─── FAST-PASS PRICE INLINE ─── */
+.wm-fastpass-price {
+  margin-top: 10px;
+  font-size: 1.1rem;
+  color: #334155;
+}
+
+.wm-fastpass-price strong {
+  color: #16a34a;
+}
+
+/* ─── PRICE BOX ─── */
+.wm-price-box {
+  margin-top: 18px;
+  padding: 16px 18px;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1.5px solid #93c5fd;
+  border-radius: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wm-price-label {
+  font-size: 0.9rem;
+  color: #1e40af;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.wm-price-value {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #1e40af;
+}
+
+/* ─── ERROR ALERT ─── */
+.wm-error-alert {
+  margin-top: 14px;
+  padding: 16px 18px;
+  background: #fef2f2;
+  border: 1.5px solid #fecaca;
+  border-radius: 12px;
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 1.05rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  line-height: 1.45;
+}
+
+.wm-error-icon {
+  flex-shrink: 0;
+  margin-top: 3px;
+  font-size: 1.1rem;
+}
+
+/* ─── ACTION BUTTONS ─── */
+.wm-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.wm-btn-cancel {
+  background: white;
+  border: 2.5px solid #e2e8f0;
+  padding: 16px;
+  border-radius: 14px;
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: #475569;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.wm-btn-cancel:active {
+  background: #f1f5f9;
+  transform: scale(0.96);
+}
+
+.wm-btn-confirm {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border: none;
+  padding: 16px;
+  border-radius: 14px;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: white;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.35);
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wm-btn-confirm:active {
+  transform: scale(0.96);
+}
+
+.wm-btn-confirm:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ─── SUBSTITUTE MODAL HEADER ─── */
+.wm-sub-header {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  padding: 24px 20px;
+  margin: -24px -24px 20px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+}
+
+.wm-sub-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.wm-sub-header p {
+  margin: 6px 0 0;
+  opacity: 0.95;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+/* ─── SUBSTITUTE PRODUCT INFO ─── */
+.wm-sub-product-info {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.wm-sub-product-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin: 0;
+}
+
+.wm-sub-product-name {
+  color: #1e293b;
+  margin: 8px 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.wm-sub-product-hint {
+  font-size: 0.95rem;
+  background: #f0f9ff;
+  padding: 14px;
+  border-radius: 12px;
+  color: #1e40af;
+  margin: 0;
+  font-weight: 600;
+  border: 1px solid #bfdbfe;
+}
+
+/* ─── SUBSTITUTE VERIFY INPUT ─── */
+.wm-verify-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.wm-verify-input {
+  flex: 1;
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border: 2.5px solid #cbd5e1 !important;
+  border-radius: 14px !important;
+  padding: 16px 18px !important;
+  font-size: 1.2rem !important;
+  font-weight: 700 !important;
+  text-align: left !important;
+  height: 58px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.wm-verify-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+}
+
+.wm-verify-input.validated {
+  background: #f0fdf4 !important;
+  color: #16a34a !important;
+  border-color: #22c55e !important;
+}
+
+/* ─── FEEDBACK GS1 CÁRNICOS ─── */
+.wm-gs1-success-feedback {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #f0fdfa, #ccfbf1);
+  border: 1.5px solid #5eead4;
+  padding: 12px 16px;
+  border-radius: 12px;
+  margin-top: 12px;
+  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.15);
+  animation: slideInDown 0.3s ease-out;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wm-gs1-icon {
+  font-size: 1.8rem;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.wm-gs1-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wm-gs1-title {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #0d9488;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wm-gs1-code {
+  font-family: "SF Mono", "Fira Code", monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #115e59;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  align-self: flex-start;
+  margin-bottom: 2px;
+}
+
+.wm-gs1-extracted-weight {
+  font-size: 0.8rem;
+  color: #0f766e;
+}
+
+.wm-gs1-extracted-weight strong {
+  font-size: 0.9rem;
+  color: #134e4a;
+}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE BREAKPOINTS – MODALS
+   ═══════════════════════════════════════════════════ */
+
+/* ─── SMALL PHONES (≤ 374px) ─── */
+@media (max-width: 374px) {
+  .wm-modal .ec-modal-content {
+    padding: 16px 14px 20px;
+    border-radius: 20px;
+    width: 98%;
+  }
+
+  .wm-header h3 {
+    font-size: 1.05rem;
+  }
+  .wm-product-name {
+    font-size: 0.92rem;
+  }
+  .wm-request-badge {
+    font-size: 0.88rem;
+    padding: 10px 12px;
+  }
+  .wm-request-badge strong {
+    font-size: 0.95rem;
+  }
+  .wm-request-badge small {
+    font-size: 0.78rem;
+  }
+  .wm-step-label {
+    font-size: 0.88rem;
+  }
+
+  .wm-code-input,
+  .wm-weight-input,
+  .wm-verify-input {
+    font-size: 1.05rem !important;
+    padding: 12px 14px !important;
+    height: 50px;
+  }
+  .wm-code-input.has-button {
+    padding-right: 100px !important;
+  }
+  .wm-validate-btn {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    border-radius: 10px;
+  }
+  .wm-camera-btn {
+    width: 50px;
+    height: 50px;
+    min-width: 50px;
+    border-radius: 12px;
+  }
+
+  .wm-concat-row {
+    gap: 4px;
+    padding: 6px 8px;
+  }
+  .wm-concat-prefix {
+    font-size: 0.9rem;
+    padding: 8px 8px;
+    letter-spacing: 1px;
+  }
+  .wm-concat-separator {
+    font-size: 1rem;
+  }
+  .wm-concat-weight-input {
+    font-size: 1.1rem;
+    height: 42px;
+    padding: 8px 30px 8px 8px;
+  }
+  .wm-concat-check {
+    font-size: 1.1rem;
+    padding: 8px 8px;
+    min-width: 30px;
+  }
+  .wm-concat-preview-code {
+    font-size: 0.95rem;
+    letter-spacing: 1px;
+  }
+  .wm-fruver-preview {
+    padding: 10px 14px;
+  }
+  .wm-fruver-preview-weight,
+  .wm-fruver-preview-price {
+    font-size: 1.05rem;
+  }
+
+  .wm-error-alert {
+    padding: 12px 14px;
+    font-size: 0.9rem;
+    gap: 8px;
+  }
+
+  .wm-action-grid {
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .wm-btn-cancel,
+  .wm-btn-confirm {
+    padding: 12px;
+    font-size: 0.92rem;
+    min-height: 48px;
+    border-radius: 12px;
+  }
+
+  /* Substitute modal sections */
+  .wm-sub-header {
+    padding: 18px 14px;
+    margin: -16px -14px 16px;
+  }
+  .wm-sub-header h3 {
+    font-size: 1.05rem;
+  }
+  .wm-sub-product-name {
+    font-size: 1rem;
+  }
+  .wm-sub-product-hint {
+    font-size: 0.85rem;
+    padding: 10px;
+  }
+  .wm-verify-row {
+    gap: 6px;
+  }
+
+  /* GS1 Feedback */
+  .wm-gs1-success-feedback {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .wm-gs1-code {
+    font-size: 0.78rem;
+  }
+}
+
+/* ─── REGULAR PHONES (375px–428px) ─── */
+@media (min-width: 375px) and (max-width: 428px) {
+  .wm-modal .ec-modal-content {
+    padding: 20px 18px 24px;
+    border-radius: 24px;
+  }
+  .wm-header h3 {
+    font-size: 1.15rem;
+  }
+  .wm-code-input,
+  .wm-weight-input,
+  .wm-verify-input {
+    font-size: 1.15rem !important;
+    padding: 14px 16px !important;
+    height: 54px;
+  }
+  .wm-code-input.has-button {
+    padding-right: 110px !important;
+  }
+  .wm-validate-btn {
+    padding: 10px 16px;
+    font-size: 0.95rem;
+  }
+  .wm-camera-btn {
+    width: 54px;
+    height: 54px;
+    min-width: 54px;
+  }
+  .wm-btn-cancel,
+  .wm-btn-confirm {
+    padding: 14px;
+    font-size: 1rem;
+    min-height: 52px;
+  }
+}
+
+/* ─── TABLETS (600px+) ─── */
+@media (min-width: 600px) {
+  .wm-modal .ec-modal-content {
+    max-width: 540px;
+    padding: 32px 36px 36px;
+  }
+  .wm-sub-header {
+    padding: 28px 24px;
+  }
+}
+
+/* ─── LANDSCAPE PHONES ─── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .wm-modal .ec-modal-content {
+    max-height: 96vh;
+    max-width: 70vw;
+    padding: 16px 18px;
+    border-radius: 18px;
+  }
+  .wm-header {
+    margin-bottom: 10px;
+  }
+  .wm-header-icon {
+    display: none;
+  }
+  .wm-request-badge {
+    padding: 8px 12px;
+  }
+  .wm-action-grid {
+    margin-top: 12px;
+  }
+  .wm-btn-cancel,
+  .wm-btn-confirm {
+    min-height: 44px;
+    padding: 10px;
+  }
+}
+
+/* ─── MANUAL ENTRY MODAL: cabecera ─── */
+.modal-header-center {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.modal-header-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin-top: 12px;
+  margin-bottom: 0;
+  color: #1e293b;
+}
+
+.modal-header-subtitle {
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: #64748b;
+  margin-top: 6px;
+}
+
+/* ─── BOTÓN PRIMARIO (razón azul confirmar) ─── */
+.ec-reason-btn--primary {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  width: 100%;
+}
+
+.ec-reason-btn--primary:active {
+  background: #2563eb;
+}
+
+.ec-reason-btn--primary:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* ─── MODAL NARROW (max-width pequeño) ─── */
+.ec-modal-content--narrow {
+  max-width: 400px !important;
+}
+
+/* ─── CANTIDAD DESTACADA EN BULK MODAL ─── */
+.modal-qty-highlight {
+  color: #1e293b;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+/* ─── INPUT DE CANTIDAD GRANDE (BulkQtyModal) ─── */
+.bulk-input-qty {
+  text-align: center !important;
+  font-size: 2rem !important;
+  letter-spacing: 2px !important;
+}
+
+/* ─── HINT DE MÁXIMO PERMITIDO ─── */
+.bulk-max-hint {
+  text-align: center;
+  font-size: 0.9rem;
+  color: #64748b;
+  margin: 10px 0 0;
+  font-weight: 600;
+}
+
+.bulk-max-value {
+  color: #f59e0b;
+  font-weight: 800;
+}
+
+/* ─── BOTÓN PRIMARIO NARANJA (warning) ─── */
+.ec-reason-btn--warning {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  width: 100%;
+}
+
+.ec-reason-btn--warning:active {
+  background: #d97706;
+}
+
+.ec-reason-btn--warning:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* ─── WM CONFIRM NARANJA (SubstituteModal) ─── */
+.wm-btn-confirm--warning {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.35);
+}
+
+.wm-btn-confirm--warning:active {
+  background: #d97706;
+}
+
+/* ─── HEADER OSCURO (ClientsModal) ─── */
+.ec-modal-header--dark {
+  background: #1e293b;
+}
+
+.ec-modal-header--dark h3 {
+  color: white;
+  margin: 0;
+}
+
+.ec-modal-header--dark button {
+  color: white;
+  background: transparent;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+/* ─── CUERPO SCROLLABLE ─── */
+.ec-modal-body--scroll {
+  padding: 20px 0;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+/* ─── FILA DE PEDIDO EN DIRECTORIO ─── */
+.clients-order-row {
+  padding: 15px 20px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.clients-order-row:last-child {
+  border-bottom: none;
+}
+
+.clients-order-info {
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+
+.clients-order-name {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clients-order-id {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.clients-order-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* ─── PIE DE MODAL ─── */
+.ec-modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.ec-modal-cancel--full {
+  width: 100%;
+}
+
+/* ─── CÁMARA VARIANTE AZUL (búsqueda de sustitutos) ─── */
+.wm-camera-btn--blue {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  border-radius: 12px;
+  padding: 0 16px;
+  border: none;
+  min-width: 52px;
+  min-height: 52px;
+}
+
+.wm-camera-btn--blue:active {
+  background: #2563eb;
+  transform: scale(0.93);
+}
+
+/* ─── ETIQUETA SUGERENCIAS (búsqueda) ─── */
+.ec-suggestion-label {
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+}
+
+/* ─── SPINNER INLINE (altura reducida) ─── */
+.ec-picker-centered--inline {
+  height: 100px;
+}
+
+/* ─── ESTADO VACÍO EN BÚSQUEDA ─── */
+.ec-search-empty {
+  text-align: center;
+  color: #999;
+  padding: 40px 20px;
+}
+
+/* ─── HINT DE CONVERSIÓN DE PESO ─── */
+.wm-weight-hint {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 4px;
+  text-align: center;
+}
+
+/* ─── FRUVER: Fila concatenada (prefijo + peso + check) ─── */
+.wm-concat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 8px 10px;
+}
+
+.wm-concat-prefix {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: white;
+  font-family: "Courier New", monospace;
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.wm-concat-separator {
+  color: #94a3b8;
+  font-size: 1.2rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.wm-concat-weight-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.wm-concat-weight-input {
+  width: 100%;
+  background: white;
+  color: #0f172a;
+  border: 2.5px solid #3b82f6;
+  border-radius: 10px;
+  padding: 10px 36px 10px 12px;
+  font-size: 1.3rem;
+  font-weight: 800;
+  font-family: "Courier New", monospace;
+  letter-spacing: 1px;
+  text-align: center;
+  outline: none;
+  box-sizing: border-box;
+  height: 48px;
+  /* Ocultar flechas de number input */
+  -moz-appearance: textfield;
+}
+.wm-concat-weight-input::-webkit-outer-spin-button,
+.wm-concat-weight-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.wm-concat-weight-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.wm-concat-weight-input::placeholder {
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.wm-concat-weight-unit {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: 800;
+  color: #64748b;
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.wm-concat-check {
+  background: #1e293b;
+  color: #fbbf24;
+  font-family: "Courier New", monospace;
+  font-size: 1.3rem;
+  font-weight: 900;
+  padding: 10px 12px;
+  border-radius: 10px;
+  min-width: 36px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ─── FRUVER: Preview código final concatenado ─── */
+.wm-concat-preview {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wm-concat-preview-label {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.wm-concat-preview-code {
+  color: #4ade80;
+  font-family: "Courier New", monospace;
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+
+/* ─── FRUVER: Preview de peso + precio en vivo ─── */
+.wm-fruver-preview {
+  margin-top: 10px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border: 1.5px solid #86efac;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wm-fruver-preview-weight {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #15803d;
+  font-family: monospace;
+  letter-spacing: 1px;
+}
+
+.wm-fruver-preview-price {
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: #1e40af;
+  background: rgba(59, 130, 246, 0.1);
+  padding: 4px 12px;
+  border-radius: 8px;
+}
+
+/* ─── MODIFICADORES DE MARGEN ─── */
+.wm-error-alert--mt {
+  margin-top: 10px;
+}
+
+.wm-error-alert--mb {
+  margin: 0 0 10px;
+}
+
+.wm-gs1-success-feedback--sub {
+  margin-bottom: 16px;
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 374px) {
+  .modal-header-title {
+    font-size: 1.1rem;
+  }
+  .modal-header-subtitle {
+    font-size: 0.92rem;
+  }
+  .bulk-input-qty {
+    font-size: 1.6rem !important;
+  }
+  .clients-order-row {
+    padding: 12px 14px;
+  }
+  .ec-modal-footer {
+    padding: 12px 14px;
+  }
+}
