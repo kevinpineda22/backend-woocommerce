@@ -133,6 +133,7 @@ exports.getActiveSessionsDashboard = async (req, res) => {
               "id_asignacion, id_producto, id_producto_original, accion, es_sustituto, fecha_registro, nombre_producto, pasillo",
             )
             .in("id_asignacion", allAssignIds)
+            .order("fecha_registro", { ascending: true })
         : { data: [] };
 
     // Indexar para acceso rápido
@@ -235,12 +236,22 @@ exports.getActiveSessionsDashboard = async (req, res) => {
           else currentLocation = "En Ruta";
         }
 
+        // Tiempo de inicio real de picking (primer log de acción válida)
+        const validPickActions = ["recolectado", "sustituido", "no_encontrado"];
+        const firstPickLog = logs
+          .filter((l) => validPickActions.includes(l.accion))
+          .sort(
+            (a, b) => new Date(a.fecha_registro) - new Date(b.fecha_registro),
+          )[0];
+        const pickingStartTime = firstPickLog?.fecha_registro || null;
+
         return {
           session_id: sess.id,
           picker_id: sess.id_picker,
           picker_name: sess.wc_pickers?.nombre_completo || "Desconocido",
           sede_nombre: sess.wc_sedes?.nombre || null,
           start_time: sess.fecha_inicio,
+          picking_start_time: pickingStartTime,
 
           total_items: totalItems, // Total de líneas de producto distintas
           completed_items: completedLines, // Líneas completadas al 100%

@@ -256,9 +256,10 @@ exports.getSessionActive = async (req, res) => {
     const { data: logsData, error: logsError } = await supabase
       .from("wc_log_picking")
       .select(
-        "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original, peso_real",
+        "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original, peso_real, fecha_registro",
       )
-      .in("id_asignacion", assignIds);
+      .in("id_asignacion", assignIds)
+      .order("fecha_registro", { ascending: true });
 
     if (logsError) {
       console.error("Error obteniendo logs de picking:", logsError);
@@ -494,10 +495,20 @@ exports.getSessionActive = async (req, res) => {
 
     itemsConRuta.sort((a, b) => a.prioridad - b.prioridad);
 
+    // Tiempo real de inicio de picking (primer log de acción válida)
+    const validPickActions = ["recolectado", "sustituido", "no_encontrado"];
+    const firstPickLog = logs
+      .filter((l) => validPickActions.includes(l.accion))
+      .sort(
+        (a, b) => new Date(a.fecha_registro) - new Date(b.fecha_registro),
+      )[0];
+    const pickingStartTime = firstPickLog?.fecha_registro || null;
+
     res.status(200).json({
       session_id: session.id,
       estado: session.estado,
       fecha_inicio: session.fecha_inicio,
+      picking_start_time: pickingStartTime,
       active_assignments_ids: assignIds,
       orders_info: orders.map((o) => ({
         id: o.id,
