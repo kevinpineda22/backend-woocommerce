@@ -177,37 +177,53 @@ exports.getActiveSessionsDashboard = async (req, res) => {
         // D. Matemática de Progreso (Item por Item)
         let completedLines = 0;
         let subLines = 0;
+        let totalUnitsRequired = 0;
+        let totalUnitsProcessed = 0;
+        let notFoundLines = 0;
 
         activeItems.forEach((item) => {
-          // Filtramos logs que pertenecen a este item (Original o Sustituto)
+          // ✅ FIX: Para productos con variaciones, el picker loguea con variation_id
+          // como id_producto/id_producto_original, NO con product_id (padre).
+          // Debemos comparar contra ambos: product_id Y variation_id.
+          const matchIds = [String(item.product_id)];
+          if (item.variation_id) {
+            matchIds.push(String(item.variation_id));
+          }
+
           const itemLogs = logs.filter(
             (l) =>
-              String(l.id_producto) === String(item.product_id) ||
-              String(l.id_producto_original) === String(item.product_id),
+              matchIds.includes(String(l.id_producto)) ||
+              matchIds.includes(String(l.id_producto_original)),
           );
 
-          // Cantidad requerida vs Cantidad procesada (Scan + Sustitución + No Encontrado)
+          // Cantidad requerida vs Cantidad procesada
           const qtyRequired = item.quantity_total;
-          // Filtramos solo las acciones definitivas (recolectado, sustituido, no_encontrado)
-          // 'reset' NO cuenta porque borra el registro, así que no aparecerá aquí.
+          totalUnitsRequired += qtyRequired;
+
+          // Solo acciones definitivas (recolectado, sustituido, no_encontrado)
           const validLogs = itemLogs.filter((l) =>
             ["recolectado", "sustituido", "no_encontrado"].includes(l.accion),
           );
           const qtyProcessed = validLogs.length;
+          totalUnitsProcessed += Math.min(qtyProcessed, qtyRequired);
 
           // ¿Línea Completa? (Solo si procesó TODO lo requerido)
           if (qtyProcessed >= qtyRequired) {
             completedLines++;
-            // ¿Hubo sustitución en alguna unidad?
             if (itemLogs.some((l) => l.es_sustituto)) {
               subLines++;
+            }
+            if (validLogs.every((l) => l.accion === "no_encontrado")) {
+              notFoundLines++;
             }
           }
         });
 
-        // Porcentaje basado en LÍNEAS terminadas
+        // Porcentaje basado en UNIDADES procesadas (más granular que líneas completas)
         const percentage =
-          totalItems > 0 ? Math.round((completedLines / totalItems) * 100) : 0;
+          totalUnitsRequired > 0
+            ? Math.round((totalUnitsProcessed / totalUnitsRequired) * 100)
+            : 0;
 
         // Ubicación Actual (Último movimiento)
         let currentLocation = "Inicio";
@@ -226,9 +242,14 @@ exports.getActiveSessionsDashboard = async (req, res) => {
           sede_nombre: sess.wc_sedes?.nombre || null,
           start_time: sess.fecha_inicio,
 
-          total_items: totalItems, // Total de productos distintos
-          completed_items: completedLines, // Productos completados al 100%
-          substituted_items: subLines, // Productos con cambios
+          total_items: totalItems, // Total de líneas de producto distintas
+          completed_items: completedLines, // Líneas completadas al 100%
+          substituted_items: subLines, // Líneas con sustitución
+          not_found_items: notFoundLines, // Líneas no encontradas (stock insuficiente)
+
+          // Conteo granular por unidades
+          total_units: totalUnitsRequired,
+          processed_units: totalUnitsProcessed,
 
           progress: percentage,
           current_location: currentLocation,
