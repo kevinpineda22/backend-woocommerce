@@ -899,6 +899,7 @@ exports.getSessionLogsDetail = async (req, res) => {
       metadata: {
         session_id: sessionInfo.id,
         picker_name: sessionInfo.wc_pickers?.nombre_completo || "Sin Asignar",
+        picker_email: sessionInfo.wc_pickers?.email || "",
         start_time: sessionInfo.fecha_inicio,
         end_time: sessionInfo.fecha_fin,
         status: sessionInfo.estado,
