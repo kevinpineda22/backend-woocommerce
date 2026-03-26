@@ -372,7 +372,7 @@ exports.getPendingPaymentSessions = async (req, res) => {
     let payQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
       )
       .eq("estado", "auditado")
       .order("fecha_fin", { ascending: false });
@@ -401,11 +401,18 @@ exports.getPendingPaymentSessions = async (req, res) => {
         hour12: true,
       };
 
+      const clientes = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) =>
+            ((o.billing?.first_name || "") + " " + (o.billing?.last_name || "")).trim() || "Cliente"
+          )
+        : [];
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
         sede_nombre: sess.wc_sedes?.nombre || null,
         pedidos: sess.ids_pedidos,
+        clientes: clientes,
         fecha: end.toLocaleDateString("es-CO", optionsDate),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
@@ -449,7 +456,7 @@ exports.getHistorySessions = async (req, res) => {
     let histQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
       )
       .in("estado", ["finalizado"])
       .order("fecha_fin", { ascending: false })
@@ -479,11 +486,18 @@ exports.getHistorySessions = async (req, res) => {
         hour12: true,
       };
 
+      const clientes = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) =>
+            ((o.billing?.first_name || "") + " " + (o.billing?.last_name || "")).trim() || "Cliente"
+          )
+        : [];
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
         sede_nombre: sess.wc_sedes?.nombre || null,
         pedidos: sess.ids_pedidos,
+        clientes: clientes,
         fecha: end.toLocaleDateString("es-CO", optionsDate),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
@@ -509,7 +523,7 @@ exports.getPendingAuditSessions = async (req, res) => {
     let auditQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
       )
       .eq("estado", "pendiente_auditoria")
       .order("fecha_fin", { ascending: false })
@@ -541,11 +555,18 @@ exports.getPendingAuditSessions = async (req, res) => {
         hour12: true,
       };
 
+      const clientes = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) =>
+            ((o.billing?.first_name || "") + " " + (o.billing?.last_name || "")).trim() || "Cliente"
+          )
+        : [];
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
         sede_nombre: sess.wc_sedes?.nombre || null,
         pedidos: sess.ids_pedidos,
+        clientes: clientes,
         fecha: end ? end.toLocaleDateString("es-CO", optionsDate) : "--",
         hora_fin: end ? end.toLocaleTimeString("es-CO", optionsTime) : "--",
         duracion: `${durationMin} min`,
