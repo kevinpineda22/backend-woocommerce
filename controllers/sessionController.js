@@ -501,9 +501,15 @@ exports.getSessionActive = async (req, res) => {
           const siesaGroup = barcodeMapSiesa[f120];
           if (!siesaGroup) return [item.barcode || item.sku];
           // Intentar buscar barcodes de la presentación exacta (P6, UND, KL, etc.)
-          const um = (unidadMedidaFinal || "").toUpperCase();
-          if (um && siesaGroup[um]) return siesaGroup[um];
-          // Fallback: todos los barcodes válidos del producto
+          let um = (unidadMedidaFinal || "").toUpperCase();
+          if (um === "UN" || um === "UNIDAD") um = "UND";
+          else if (um === "KG" || um === "KILO") um = "KL";
+
+          if (um) {
+             // REGLA ESTRICTA: No fallback a _all si tiene unidad
+             return siesaGroup[um] || [item.barcode || item.sku];
+          }
+          // Fallback: todos los barcodes válidos si no tiene presentación
           return siesaGroup._all || [item.barcode || item.sku];
         })(),
 

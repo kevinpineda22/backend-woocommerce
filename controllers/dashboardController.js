@@ -853,8 +853,16 @@ exports.getSessionLogsDetail = async (req, res) => {
 
       if (!isNaN(f120_id) && barcodeMapByF120Id[f120_id]) {
         // ✅ Buscar arreglos de barcodes específicos para la unidad_medida del item
+        let normalizedUm = um;
+        if (um === "UN" || um === "UNIDAD") normalizedUm = "UND";
+        else if (um === "KG" || um === "KILO") normalizedUm = "KL";
+
         const group = barcodeMapByF120Id[f120_id];
-        const specificBarcodes = group[um] || group._default || [];
+        
+        // REGLA ESTRICTA: Si la orden exige una unidad, usar SOLO los barcodes de esa unidad.
+        // Solo usar default si el producto base no tiene unidad de medida.
+        const specificBarcodes = normalizedUm ? (group[normalizedUm] || []) : (group._default || []);
+        
         if (specificBarcodes.length > 0) {
           productDetailsMap[productId].barcode = specificBarcodes;
         }
