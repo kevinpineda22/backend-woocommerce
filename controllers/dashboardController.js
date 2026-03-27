@@ -46,9 +46,10 @@ async function getBarcodesFromSiesa(productIds) {
       const code = (bc.codigo_barras || "").toString().trim();
       const cleaned = code.replace(/\+$/, "");
 
-      // Filtrar códigos válidos (incluyendo prefijos M o N que la cámara/SIESA utilizan)
-      if (!cleaned || cleaned.length < 5) return;
-      if (!/^[MN]?\d+\+?$/i.test(code)) return;
+      // Filtrar códigos válidos (excluyendo explícitamente prefijos M o N)
+      if (!cleaned || cleaned.length < 8) return;
+      if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
+      if (!/^\d+\+?$/.test(code)) return;
 
       if (!barcodesByProduct[bc.f120_id][um]) {
         barcodesByProduct[bc.f120_id][um] = [];

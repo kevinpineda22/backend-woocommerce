@@ -45,9 +45,14 @@ async function getBarcodesFromSiesa(productIds) {
       return codes
         .map((code) => (code || "").toString().trim())
         .filter((cleaned) => {
-          if (!cleaned || cleaned.replace(/\+$/, "").length < 5) return false;
-          // Aceptar prefijos M o N, seguidos de dígitos y un '+' opcional al final
-          return /^[MN]?\d+\+?$/i.test(cleaned);
+          if (!cleaned || cleaned.replace(/\+$/, "").length < 8) return false;
+          if (
+            cleaned.toUpperCase().startsWith("M") ||
+            cleaned.toUpperCase().startsWith("N")
+          )
+            return false;
+          // Aceptar dígitos con '+' opcional al final
+          return /^\d+\+?$/.test(cleaned);
         });
     };
 

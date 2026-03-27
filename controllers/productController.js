@@ -23,8 +23,9 @@ async function getBarcodesFromSiesa(productIds) {
     barcodes.forEach((bc) => {
       const code = (bc.codigo_barras || "").toString().trim();
       const cleaned = code.replace(/\+$/, "");
-      if (!cleaned || cleaned.length < 5) return;
-      if (!/^[MN]?\d+\+?$/i.test(code)) return;
+      if (!cleaned || cleaned.length < 8) return;
+      if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
+      if (!/^\d+\+?$/.test(code)) return;
 
       // Priorizar EAN-13
       if (!barcodeMap[bc.f120_id] || cleaned.length === 13) {
