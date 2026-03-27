@@ -1,0 +1,1141 @@
+/* ManifestSheet.css - Componente Reutilizable de Manifiesto de Salida */
+@import url("https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
+
+/* =========================================
+   HOJA DE MANIFIESTO — A4 contenida
+   ========================================= */
+.manifest-sheet {
+  background: white;
+  width: 100%;
+  max-width: 210mm;
+  padding: 12mm 10mm;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  font-family: "Cabin", Helvetica, sans-serif;
+  font-size: 16px;
+  color: #1e293b;
+  margin: 0 auto 30px;
+  page-break-after: always;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.manifest-sheet:last-of-type {
+  margin-bottom: 0;
+  page-break-after: auto;
+}
+
+/* Permitir que la hoja ocupe mucho más espacio en pantallas grandes cuando solo muestra el QR */
+@media screen and (min-width: 769px) {
+  .manifest-sheet.qr-only-mode {
+    max-width: 1000px;
+    padding: 30px;
+  }
+}
+
+/* =========================================
+   HEADER
+   ========================================= */
+.manifest-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.manifest-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.manifest-logo-img {
+  height: 38px;
+  width: auto;
+  object-fit: contain;
+}
+
+.manifest-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: -0.5px;
+}
+
+.manifest-info {
+  text-align: right;
+}
+
+.manifest-info h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.manifest-info p {
+  margin: 2px 0 0 0;
+  color: #94a3b8;
+  font-weight: 500;
+  font-size: 0.7rem;
+}
+
+/* =========================================
+   META WRAPPER (Cliente + QR)
+   ========================================= */
+.manifest-meta-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 15px;
+  width: 100%;
+}
+
+.manifest-meta-wrapper.manifest-meta-qr-only {
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+/* =========================================
+   INFORMACIÓN DEL CLIENTE
+   ========================================= */
+.manifest-customer {
+  margin-bottom: 10px;
+  font-size: 0.72rem;
+  color: #334155;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.manifest-customer-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.manifest-customer-field {
+  display: flex;
+  gap: 5px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.manifest-customer-field .manifest-field-label {
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.manifest-customer-field .manifest-field-value {
+  font-weight: 500;
+  color: #475569;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================================
+   SECCIÓN QR CODE
+   ========================================= */
+.manifest-qr-section {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border: 1.5px solid #e2e8f0;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  page-break-inside: avoid;
+  background: #fafbfc;
+  flex-shrink: 0;
+}
+
+/* Modo: Solo QR — ocupa todo el espacio disponible */
+.manifest-qr-section.manifest-qr-only {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 24px;
+  border: none;
+  background: transparent;
+  margin-top: 10px;
+  gap: 16px;
+  min-height: 60vh;
+}
+
+.qr-wrapper {
+  background: white;
+  padding: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  flex-shrink: 0;
+  max-width: 150px;
+  max-height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-wrapper svg {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 130px;
+  max-height: 130px;
+}
+
+/* QR-only: expandir para llenar la hoja */
+.manifest-sheet .manifest-qr-section.manifest-qr-only .qr-wrapper {
+  max-width: 100%;
+  max-height: none;
+  padding: 0;
+  border: none;
+  background: transparent;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.manifest-sheet .manifest-qr-section.manifest-qr-only .qr-wrapper svg {
+  max-width: 500px;
+  max-height: 40vh;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.qr-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.qr-info h4 {
+  margin: 0 0 6px 0;
+  color: #0f172a;
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.qr-info p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.manifest-sheet .manifest-qr-section.manifest-qr-only .qr-info h4 {
+  font-size: 1.8rem;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+
+.manifest-sheet .manifest-qr-section.manifest-qr-only .qr-info p {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: #64748b;
+}
+
+/* =========================================
+   TABLA DE PRODUCTOS
+   ========================================= */
+.manifest-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+  font-size: 0.75rem;
+  table-layout: fixed;
+}
+
+.manifest-table thead {
+  background: #f8fafc;
+}
+
+.manifest-table th {
+  color: #64748b;
+  padding: 6px 8px;
+  text-transform: uppercase;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.manifest-table th.col-num {
+  text-align: center;
+  width: 30px;
+}
+
+.manifest-table th.col-qty {
+  text-align: center;
+  width: 50px;
+}
+
+.manifest-table th.col-ref {
+  text-align: right;
+  width: 110px;
+}
+
+.manifest-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.manifest-table tbody tr:last-child {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.manifest-table td {
+  padding: 4px 8px;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Celda numeración */
+.cell-num {
+  text-align: center;
+  font-size: 0.6rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Celda de Cantidad */
+.cell-qty {
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #1e293b;
+  white-space: nowrap;
+}
+
+/* Celda de Item */
+.cell-item {
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.item-name {
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: #1e293b;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
+  max-width: calc(100% - 65px);
+}
+
+.item-substitute-badge {
+  font-size: 0.5rem;
+  color: #b45309;
+  font-weight: 800;
+  display: inline-block;
+  background: #fef3c7;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+/* Celda de referencia (barcode/sku) */
+.cell-ref {
+  text-align: right;
+  font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  font-size: 0.62rem;
+  color: #64748b;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =========================================
+   FILAS DE SUSTITUCIÓN EN TABLA
+   ========================================= */
+.manifest-row-original-replaced {
+  background: #fef2f2 !important;
+}
+
+.manifest-row-original-replaced td {
+  border-bottom: none !important;
+  padding-top: 6px !important;
+  padding-bottom: 2px !important;
+}
+
+.original-replaced-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.original-icon {
+  color: #dc2626;
+  font-weight: 900;
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.original-name-strikethrough {
+  text-decoration: line-through;
+  color: #9ca3af;
+  font-size: 0.68rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.original-replaced-label {
+  font-size: 0.5rem;
+  font-weight: 800;
+  color: #dc2626;
+  background: #fee2e2;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.original-qty-badge {
+  font-size: 0.65rem;
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.manifest-row-substitute {
+  background: #fffbeb !important;
+}
+
+.manifest-row-substitute td {
+  border-bottom: 1px solid #fde68a !important;
+}
+
+/* =========================================
+   RESUMEN DE SUSTITUCIONES
+   ========================================= */
+.manifest-substitutions-summary {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #fbbf24;
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fffbeb;
+  page-break-inside: avoid;
+}
+
+.substitutions-summary-title {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #fde68a;
+}
+
+.substitutions-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.substitution-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.65rem;
+  padding: 3px 0;
+}
+
+.sub-summary-original {
+  color: #9ca3af;
+  text-decoration: line-through;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub-summary-arrow {
+  color: #d97706;
+  font-weight: 900;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.sub-summary-new {
+  color: #92400e;
+  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub-summary-qty {
+  color: #b45309;
+  font-weight: 800;
+  font-size: 0.6rem;
+  flex-shrink: 0;
+}
+
+/* =========================================
+   FOOTER TOTALES
+   ========================================= */
+.manifest-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 6px;
+  margin-top: 4px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.manifest-footer-total {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.manifest-footer-total span {
+  color: #64748b;
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+/* =========================================
+   MODOS DE DENSIDAD
+   ========================================= */
+
+/* COMPACT: 16-25 productos */
+.manifest-sheet.compact {
+  padding: 6mm 10mm;
+}
+
+.manifest-sheet.compact .manifest-header {
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.manifest-sheet.compact .manifest-logo-img {
+  height: 34px;
+}
+
+.manifest-sheet.compact .manifest-title {
+  font-size: 1.05rem;
+}
+
+/* VERY COMPACT: 26-40 productos */
+.manifest-sheet.very-compact {
+  padding: 5mm 8mm;
+}
+
+.manifest-sheet.very-compact .manifest-header {
+  padding-bottom: 5px;
+  margin-bottom: 6px;
+}
+
+.manifest-sheet.very-compact .manifest-logo-img {
+  height: 30px;
+}
+
+.manifest-sheet.very-compact .manifest-title {
+  font-size: 0.95rem;
+}
+
+.manifest-sheet.very-compact .manifest-table {
+  font-size: 0.7rem;
+}
+
+.manifest-sheet.very-compact .manifest-table td {
+  padding: 2px 6px;
+}
+
+.manifest-sheet.very-compact .qr-wrapper {
+  max-width: 90px;
+  max-height: 90px;
+}
+
+.manifest-sheet.very-compact .qr-wrapper svg {
+  max-width: 80px;
+  max-height: 80px;
+}
+
+/* ULTRA COMPACT: 40+ productos */
+.manifest-sheet.ultra-compact {
+  padding: 4mm 6mm;
+}
+
+.manifest-sheet.ultra-compact .manifest-header {
+  padding-bottom: 4px;
+  margin-bottom: 5px;
+}
+
+.manifest-sheet.ultra-compact .manifest-logo-img {
+  height: 26px;
+}
+
+.manifest-sheet.ultra-compact .manifest-title {
+  font-size: 0.9rem;
+}
+
+.manifest-sheet.ultra-compact .manifest-table {
+  font-size: 0.65rem;
+}
+
+.manifest-sheet.ultra-compact .manifest-table td {
+  padding: 1px 4px;
+}
+
+.manifest-sheet.ultra-compact .item-name {
+  font-size: 0.62rem;
+}
+
+.manifest-sheet.ultra-compact .manifest-qr-section {
+  padding: 6px;
+  gap: 8px;
+}
+
+.manifest-sheet.ultra-compact .qr-wrapper {
+  max-width: 75px;
+  max-height: 75px;
+}
+
+.manifest-sheet.ultra-compact .qr-wrapper svg {
+  max-width: 65px;
+  max-height: 65px;
+}
+
+/* =========================================
+   SEDE LABEL & CODE CORRECTED
+   ========================================= */
+.manifest-sede-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #4338ca;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+}
+
+.manifest-code-corrected-dot {
+  color: #16a34a;
+  margin-left: 4px;
+  font-weight: bold;
+  font-size: 0.8em;
+}
+
+/* =========================================
+   RESPONSIVE — MOBILE
+   ========================================= */
+@media screen and (max-width: 768px) {
+  .manifest-sheet {
+    max-width: 100%;
+    padding: 16px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    margin-bottom: 80px;
+  }
+
+  .manifest-header {
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 8px;
+  }
+
+  .manifest-info {
+    text-align: left;
+  }
+
+  .manifest-info h2 {
+    font-size: 0.9rem;
+  }
+
+  .manifest-logo-img {
+    height: 32px;
+  }
+
+  .manifest-title {
+    font-size: 1rem;
+  }
+
+  .manifest-customer {
+    font-size: 0.72rem;
+  }
+
+  .manifest-customer-row {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .manifest-qr-section {
+    flex-direction: column;
+    text-align: center;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .manifest-qr-section.manifest-qr-only {
+    padding: 16px 12px;
+    min-height: 50vh;
+  }
+
+  .qr-wrapper {
+    max-width: 120px;
+    max-height: 120px;
+    margin: 0 auto;
+  }
+
+  .qr-wrapper svg {
+    max-width: 100px;
+    max-height: 100px;
+  }
+
+  .manifest-sheet .manifest-qr-section.manifest-qr-only .qr-wrapper {
+    max-width: none;
+    max-height: none;
+    width: 100%;
+  }
+
+  .manifest-sheet .manifest-qr-section.manifest-qr-only .qr-wrapper svg {
+    max-width: 320px;
+    max-height: 320px;
+    width: 320px !important;
+    height: 320px !important;
+  }
+
+  .qr-info {
+    text-align: center;
+  }
+
+  /* Table responsive */
+  .manifest-table {
+    font-size: 0.7rem;
+  }
+
+  .manifest-table th {
+    padding: 4px 4px;
+    font-size: 0.55rem;
+  }
+
+  .manifest-table td {
+    padding: 3px 4px;
+  }
+
+  .manifest-table th.col-ref,
+  .manifest-table td.cell-ref {
+    display: none;
+  }
+
+  .cell-qty {
+    font-size: 0.8rem;
+  }
+
+  .item-name {
+    font-size: 0.68rem;
+    white-space: normal;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .item-substitute-badge {
+    font-size: 0.5rem;
+    margin-left: 3px;
+    padding: 1px 4px;
+  }
+
+  /* Substitutions summary */
+  .manifest-substitutions-summary {
+    padding: 8px;
+  }
+
+  .substitution-summary-row {
+    font-size: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  /* Original replaced rows */
+  .original-replaced-info {
+    flex-wrap: wrap;
+  }
+
+  .original-name-strikethrough {
+    font-size: 0.62rem;
+  }
+}
+
+@media screen and (max-width: 400px) {
+  .manifest-sheet {
+    padding: 12px 8px;
+    font-size: 13px;
+  }
+
+  .manifest-table {
+    font-size: 0.65rem;
+  }
+
+  .cell-qty {
+    font-size: 0.75rem;
+  }
+
+  .item-name {
+    font-size: 0.62rem;
+  }
+
+  .manifest-sheet .manifest-qr-section.manifest-qr-only .qr-wrapper svg {
+    max-width: 260px;
+    max-height: 260px;
+    width: 260px !important;
+    height: 260px !important;
+  }
+}
+
+/* =========================================
+   ESTILOS DE IMPRESIÓN
+   ========================================= */
+@media print {
+  /* Ocultar elementos no imprimibles */
+  .no-print,
+  .manifest-controls,
+  .pedidos-layout-sidebar,
+  .pedidos-layout-content,
+  .history-table-container,
+  .hv-table,
+  .pedidos-table-container,
+  table:not(.manifest-table),
+  .admin-sidebar,
+  nav,
+  .navbar,
+  header:not(.manifest-header) {
+    display: none !important;
+  }
+
+  body,
+  html {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hoja base */
+  .manifest-sheet {
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 210mm !important;
+    min-height: auto !important;
+    padding: 10mm 10mm !important;
+    border: none !important;
+    border-radius: 0 !important;
+    page-break-after: always !important;
+    overflow: hidden !important;
+  }
+
+  .manifest-sheet:last-of-type {
+    page-break-after: auto !important;
+  }
+
+  /* Header Minimalista */
+  .manifest-header {
+    padding-bottom: 4px !important;
+    margin-bottom: 6px !important;
+    border-bottom: 1px solid #ddd !important;
+    align-items: center !important;
+  }
+
+  .manifest-logo-img {
+    height: 24px !important; /* Más pequeño y discreto */
+  }
+
+  .manifest-title {
+    font-size: 0.95rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .manifest-info h2 {
+    font-size: 0.85rem !important;
+    margin: 0 !important;
+  }
+
+  .manifest-info p {
+    font-size: 0.65rem !important;
+    margin: 0 !important;
+  }
+
+  /* Wrapper Metadatos y Cliente Ultra-compacto */
+  .manifest-meta-wrapper:not(.manifest-meta-qr-only) {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    margin-bottom: 6px !important;
+    border-bottom: none !important;
+  }
+
+  /* Cliente Ultra-compacto */
+  .manifest-customer {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+    font-size: 0.68rem !important;
+    border-bottom: none !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 4px 12px !important;
+    flex: 1 !important;
+  }
+  
+  .manifest-customer-row {
+    margin: 0 !important;
+    gap: 12px !important;
+  }
+
+  /* QR - modo normal posicionado a la derecha orgánicamente */
+  .manifest-qr-section:not(.manifest-qr-only) {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    gap: 4px !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    text-align: right !important;
+    flex-shrink: 0 !important;
+  }
+
+  .manifest-qr-section:not(.manifest-qr-only) .qr-wrapper {
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    max-width: 65px !important;
+    max-height: 65px !important;
+  }
+
+  .manifest-qr-section:not(.manifest-qr-only) .qr-wrapper svg {
+    max-width: 65px !important;
+    max-height: 65px !important;
+  }
+  
+  .manifest-qr-section:not(.manifest-qr-only) .qr-info h4 {
+    font-size: 0.65rem !important;
+    margin: 0 !important;
+  }
+  
+  .manifest-qr-section:not(.manifest-qr-only) .qr-info p {
+    font-size: 0.55rem !important;
+    margin: 0 !important;
+    max-width: 120px;
+  }
+  
+  .manifest-qr-section:not(.manifest-qr-only) .qr-info div {
+    display: none !important; /* Ocultar alerta roja */
+  }
+
+  /* QR - modo solo QR: ocupar toda la hoja */
+  .manifest-sheet .manifest-qr-section.manifest-qr-only {
+    border: none !important;
+    background: transparent !important;
+    padding: 20px !important;
+    min-height: 200mm !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .manifest-sheet .manifest-qr-section.manifest-qr-only .qr-wrapper {
+    max-width: none !important;
+    max-height: none !important;
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  .manifest-sheet .manifest-qr-section.manifest-qr-only .qr-wrapper svg {
+    max-width: 140mm !important;
+    max-height: 140mm !important;
+    width: 140mm !important;
+    height: 140mm !important;
+  }
+
+  .manifest-sheet .manifest-qr-section.manifest-qr-only .qr-info h4 {
+    font-size: 1.1rem !important;
+    font-weight: 800 !important;
+  }
+
+  .manifest-sheet .manifest-qr-section.manifest-qr-only .qr-info p {
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+  }
+
+  /* Tabla Minimalista Directo al Grano */
+  .manifest-table {
+    margin-top: 15px !important; /* Espacio separando del header que ahora es compacto */
+    margin-bottom: 4px !important;
+    font-size: 0.65rem !important;
+    table-layout: fixed !important;
+  }
+
+  .manifest-table thead {
+    background: transparent !important;
+    display: table-header-group;
+  }
+
+  .manifest-table th {
+    padding: 3px 4px !important;
+    font-size: 0.55rem !important;
+    color: #000 !important;
+    border-bottom: 1px solid #000 !important;
+    text-transform: uppercase;
+  }
+
+  .manifest-table td {
+    padding: 3px 4px !important;
+    border-bottom: 0.5px solid #eee !important; /* Líneas ultra sutiles */
+    vertical-align: top !important;
+  }
+
+  .manifest-table tbody tr:nth-child(even) {
+    background-color: transparent !important; /* Sin cebra para máxima tinta/espacio */
+  }
+
+  .manifest-table tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .cell-qty {
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+  }
+
+  .item-name {
+    font-size: 0.65rem !important;
+  }
+  
+  .cell-ref {
+    font-size: 0.6rem !important;
+    color: #555 !important;
+  }
+
+  .item-substitute-badge {
+    font-size: 0.45rem !important;
+    background: transparent !important;
+    border: 0.5px solid #000 !important;
+    color: #000 !important;
+    padding: 1px 3px !important;
+  }
+
+  .manifest-row-original-replaced {
+    background: transparent !important;
+    color: #666 !important;
+  }
+  
+  .manifest-row-original-replaced .original-qty-badge,
+  .manifest-row-original-replaced .original-replaced-label {
+    background: transparent !important;
+    color: #000 !important;
+    border: 0.5px dotted #000 !important;
+  }
+
+  .manifest-row-substitute {
+    background: #fffbeb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-substitutions-summary {
+    background: #fffbeb !important;
+    border-color: #fbbf24 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .original-replaced-label {
+    background: #fee2e2 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Footer */
+  .manifest-footer {
+    border-top: 1px solid #ccc !important;
+  }
+
+  /* Secciones que no deben partirse */
+  .manifest-header,
+  .manifest-qr-section,
+  .manifest-customer {
+    page-break-inside: avoid;
+  }
+
+  .manifest-table {
+    page-break-inside: auto;
+  }
+
+  /* Densidades en impresión */
+  .manifest-sheet.compact {
+    padding: 8mm 9mm !important;
+  }
+
+  .manifest-sheet.very-compact {
+    padding: 6mm 8mm !important;
+  }
+
+  .manifest-sheet.very-compact .manifest-table td {
+    padding: 1.5px 5px !important;
+  }
+
+  .manifest-sheet.very-compact .item-name {
+    font-size: 0.62rem !important;
+  }
+
+  .manifest-sheet.ultra-compact {
+    padding: 4mm 6mm !important;
+  }
+
+  .manifest-sheet.ultra-compact .manifest-table td {
+    padding: 1px 3px !important;
+  }
+
+  .manifest-sheet.ultra-compact .item-name {
+    font-size: 0.55rem !important;
+  }
+
+  .manifest-sheet.ultra-compact .cell-qty {
+    font-size: 0.7rem !important;
+  }
+
+  .manifest-sheet.ultra-compact .qr-wrapper {
+    max-width: 65px !important;
+    max-height: 65px !important;
+  }
+
+  .manifest-sheet.ultra-compact .qr-wrapper svg {
+    max-width: 55px !important;
+    max-height: 55px !important;
+  }
+}

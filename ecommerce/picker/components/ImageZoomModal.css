@@ -1,0 +1,107 @@
+/* ImageZoomModal.css – Lightbox para imágenes de producto */
+
+.ec-zoom-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: zoomFadeIn 0.2s ease-out;
+}
+
+@keyframes zoomFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ec-zoom-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  color: white;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3001;
+  transition: background 0.15s;
+}
+
+.ec-zoom-close:active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.ec-zoom-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 90vw;
+  max-height: 85vh;
+}
+
+.ec-zoom-img {
+  max-width: 90vw;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: 12px;
+  background: white;
+  padding: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  animation: zoomScaleIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes zoomScaleIn {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.ec-zoom-name {
+  color: white;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  max-width: 80vw;
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 374px) {
+  .ec-zoom-overlay {
+    padding: 12px;
+  }
+  .ec-zoom-img {
+    padding: 8px;
+    border-radius: 8px;
+  }
+  .ec-zoom-name {
+    font-size: 0.88rem;
+  }
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+  .ec-zoom-close {
+    top: calc(16px + env(safe-area-inset-top));
+  }
+}

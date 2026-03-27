@@ -1,0 +1,508 @@
+/* ========================================
+   SEDE SELECTOR — Componente Unificado Rol + Sede
+   Minimalista · Profesional · Panel Admin
+   Paleta: #210d65 / #3b1a9a / #5c3eb8
+   ======================================== */
+
+/* ─── Variables locales ─── */
+.ecom-sede-selector,
+.ecom-sede-card {
+  --sede-purple-deep: #210d65;
+  --sede-purple-mid: #3b1a9a;
+  --sede-purple-soft: #5c3eb8;
+  --sede-purple-ghost: rgba(59, 26, 154, 0.06);
+  --sede-purple-glow: rgba(92, 62, 184, 0.12);
+  --sede-accent: #2196f3;
+  --sede-text: #1f2933;
+  --sede-text-muted: #64748b;
+  --sede-border: #e2e8f0;
+  --sede-bg: #ffffff;
+  --sede-radius: 10px;
+  --sede-font: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ─────────────────────────────────────────
+   1. CARD UNIFICADO (usuarios NO super_admin)
+   Muestra rol + sede en un solo elemento
+   ───────────────────────────────────────── */
+.ecom-sede-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: var(--sede-radius);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: var(--sede-font);
+  transition: background 0.2s ease;
+}
+
+.ecom-sede-card:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+/* Rol row */
+.ecom-sede-card-role {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ecom-sede-card-role-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.ecom-sede-card-role-text {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+/* Sede row */
+.ecom-sede-card-sede {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding-left: 2px;
+}
+
+.ecom-sede-card-sede-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+  flex-shrink: 0;
+  animation: ecom-sede-pulse 2.5s ease infinite;
+}
+
+.ecom-sede-card-sede-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+/* Role-variant accents */
+.ecom-sede-card--ecommerce_admin_sede {
+  border-color: rgba(59, 130, 246, 0.25);
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.08),
+    rgba(59, 130, 246, 0.03)
+  );
+}
+.ecom-sede-card--ecommerce_admin_sede:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.12),
+    rgba(59, 130, 246, 0.05)
+  );
+}
+.ecom-sede-card--ecommerce_picker {
+  border-color: rgba(16, 185, 129, 0.25);
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.08),
+    rgba(16, 185, 129, 0.03)
+  );
+}
+.ecom-sede-card--ecommerce_picker:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.12),
+    rgba(16, 185, 129, 0.05)
+  );
+}
+.ecom-sede-card--ecommerce_auditor {
+  border-color: rgba(245, 158, 11, 0.25);
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.08),
+    rgba(245, 158, 11, 0.03)
+  );
+}
+.ecom-sede-card--ecommerce_auditor:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.12),
+    rgba(245, 158, 11, 0.05)
+  );
+}
+
+@keyframes ecom-sede-pulse {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* ─────────────────────────────────────────
+   2. SELECTOR COMPLETO (Super Admin)
+   ───────────────────────────────────────── */
+.ecom-sede-selector {
+  position: relative;
+  z-index: 1000;
+  font-family: var(--sede-font);
+}
+
+/* ─── Trigger Button ─── */
+.ecom-sede-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--sede-radius);
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.92);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.15px;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.ecom-sede-trigger:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ecom-sede-trigger:focus-visible {
+  box-shadow: 0 0 0 2px rgba(92, 62, 184, 0.5);
+}
+
+/* Icono de tienda */
+.ecom-sede-trigger-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+/* Label de la sede */
+.ecom-sede-trigger-label {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.35;
+}
+
+.ecom-sede-trigger-rol {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  opacity: 0.6;
+  letter-spacing: 0.5px;
+  margin-bottom: 1px;
+}
+
+.ecom-sede-trigger-name {
+  display: block;
+}
+
+/* Flecha */
+.ecom-sede-trigger-arrow {
+  font-size: 0.5rem;
+  opacity: 0.45;
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+}
+
+.ecom-sede-trigger-arrow.ecom-sede-open {
+  transform: rotate(180deg);
+}
+
+/* ─── Compact variant ─── */
+.ecom-sede-selector--compact .ecom-sede-trigger {
+  padding: 5px 10px;
+  gap: 8px;
+}
+
+.ecom-sede-selector--compact .ecom-sede-trigger-icon {
+  width: 24px;
+  height: 24px;
+  font-size: 0.78rem;
+}
+
+.ecom-sede-selector--compact .ecom-sede-trigger-rol {
+  display: none;
+}
+
+.ecom-sede-selector--compact .ecom-sede-trigger-label {
+  font-size: 0.78rem;
+  max-width: 110px;
+}
+
+/* ─────────────────────────────────────────
+   3. BACKDROP
+   ───────────────────────────────────────── */
+.ecom-sede-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+/* ─────────────────────────────────────────
+   4. DROPDOWN
+   ───────────────────────────────────────── */
+.ecom-sede-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 240px;
+  background: var(--sede-bg);
+  border-radius: 12px;
+  box-shadow:
+    0 12px 48px rgba(33, 13, 101, 0.16),
+    0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e8eaf0;
+  padding: 5px;
+  animation: ecom-sede-dropIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1001;
+  overflow: hidden;
+}
+
+@keyframes ecom-sede-dropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── Dropdown Header ─── */
+.ecom-sede-dropdown-header {
+  padding: 10px 12px 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--sede-text-muted);
+  user-select: none;
+}
+
+/* ─── Option Item ─── */
+.ecom-sede-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--sede-text);
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease;
+  outline: none;
+  position: relative;
+}
+
+.ecom-sede-option:hover {
+  background: var(--sede-purple-ghost);
+}
+
+.ecom-sede-option:active {
+  transform: scale(0.99);
+}
+
+.ecom-sede-option:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--sede-purple-soft);
+}
+
+/* Active state */
+.ecom-sede-option.ecom-sede-active {
+  background: var(--sede-purple-ghost);
+}
+
+.ecom-sede-option.ecom-sede-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--sede-purple-soft);
+  border-radius: 0 3px 3px 0;
+}
+
+/* Option icon */
+.ecom-sede-option-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sede-purple-ghost);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.ecom-sede-option:hover .ecom-sede-option-icon {
+  background: var(--sede-purple-glow);
+}
+
+.ecom-sede-option.ecom-sede-active .ecom-sede-option-icon {
+  background: var(--sede-purple-glow);
+}
+
+/* "Todas" special icon */
+.ecom-sede-option--all .ecom-sede-option-icon {
+  background: linear-gradient(
+    135deg,
+    rgba(33, 150, 243, 0.08),
+    rgba(33, 150, 243, 0.04)
+  );
+}
+
+.ecom-sede-option--all:hover .ecom-sede-option-icon {
+  background: linear-gradient(
+    135deg,
+    rgba(33, 150, 243, 0.14),
+    rgba(33, 150, 243, 0.08)
+  );
+}
+
+/* Option info */
+.ecom-sede-option-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.ecom-sede-option-name {
+  font-weight: 600;
+  font-size: 0.84rem;
+  color: var(--sede-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ecom-sede-option-desc {
+  font-size: 0.7rem;
+  color: var(--sede-text-muted);
+  margin-top: 1px;
+}
+
+/* Checkmark */
+.ecom-sede-option-check {
+  color: var(--sede-purple-soft);
+  font-size: 0.85rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.ecom-sede-active .ecom-sede-option-check {
+  opacity: 1;
+}
+
+/* Divider */
+.ecom-sede-divider {
+  height: 1px;
+  background: #eef0f4;
+  margin: 4px 10px;
+}
+
+/* ─────────────────────────────────────────
+   5. RESPONSIVE
+   ───────────────────────────────────────── */
+@media (max-width: 768px) {
+  .ecom-sede-trigger-label {
+    max-width: 100px;
+    font-size: 0.78rem;
+  }
+
+  .ecom-sede-dropdown {
+    right: 0;
+    left: auto;
+    min-width: 220px;
+  }
+
+  .ecom-sede-trigger-rol {
+    display: none;
+  }
+}
+
+/* ─────────────────────────────────────────
+   6. DARK CONTEXT (dentro del sidebar)
+   Para cuando el selector vive en un fondo
+   oscuro (sidebar del panel)
+   ───────────────────────────────────────── */
+.ecom-sede-selector--dark .ecom-sede-trigger {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.ecom-sede-selector--dark .ecom-sede-trigger:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.ecom-sede-selector--dark .ecom-sede-trigger-icon {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ─────────────────────────────────────────
+   7. LIGHT CONTEXT (fondo claro, fuera del sidebar)
+   ───────────────────────────────────────── */
+.ecom-sede-selector--light .ecom-sede-trigger {
+  background: var(--sede-bg);
+  border: 1.5px solid var(--sede-border);
+  color: var(--sede-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.ecom-sede-selector--light .ecom-sede-trigger:hover {
+  border-color: var(--sede-purple-soft);
+  box-shadow: 0 2px 10px rgba(92, 62, 184, 0.1);
+}
+
+.ecom-sede-selector--light .ecom-sede-trigger-icon {
+  background: var(--sede-purple-ghost);
+  color: var(--sede-purple-soft);
+}
+
+.ecom-sede-selector--light .ecom-sede-trigger-sublabel {
+  color: var(--sede-text-muted);
+}

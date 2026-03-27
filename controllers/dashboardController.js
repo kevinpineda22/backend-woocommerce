@@ -36,29 +36,31 @@ async function getBarcodesFromSiesa(productIds) {
     }
 
     // ✅ Agrupar por f120_id + unidad_medida
-    // Estructura: { f120_id: { unidad_medida: barcode, _default: barcode } }
+    // Estructura: { f120_id: { unidad_medida: [barcode1, barcode2], _default: [barcode1, barcode2] } }
     const barcodesByProduct = {};
     barcodes.forEach((bc) => {
       if (!barcodesByProduct[bc.f120_id]) {
-        barcodesByProduct[bc.f120_id] = {};
+        barcodesByProduct[bc.f120_id] = { _default: [] };
       }
       const um = (bc.unidad_medida || "_unknown").toUpperCase();
       const code = (bc.codigo_barras || "").toString().trim();
       const cleaned = code.replace(/\+$/, "");
 
-      // Filtrar códigos válidos
-      if (!cleaned || cleaned.length < 8) return;
-      if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
-      if (!/^\d+\+?$/.test(code)) return;
+      // Filtrar códigos válidos (incluyendo prefijos M o N que la cámara/SIESA utilizan)
+      if (!cleaned || cleaned.length < 5) return;
+      if (!/^[MN]?\d+\+?$/i.test(code)) return;
 
-      // Priorizar EAN-13
-      const existing = barcodesByProduct[bc.f120_id][um];
-      if (!existing || cleaned.length === 13) {
-        barcodesByProduct[bc.f120_id][um] = cleaned;
+      if (!barcodesByProduct[bc.f120_id][um]) {
+        barcodesByProduct[bc.f120_id][um] = [];
       }
-      // También guardar un default
-      if (!barcodesByProduct[bc.f120_id]._default || cleaned.length === 13) {
-        barcodesByProduct[bc.f120_id]._default = cleaned;
+      
+      // Añadir la lista de códigos válidos para esta unidad de medida específica
+      if (!barcodesByProduct[bc.f120_id][um].includes(cleaned)) {
+        barcodesByProduct[bc.f120_id][um].push(cleaned);
+      }
+      // También guardar en un array genérico por defecto
+      if (!barcodesByProduct[bc.f120_id]._default.includes(cleaned)) {
+        barcodesByProduct[bc.f120_id]._default.push(cleaned);
       }
     });
 
@@ -849,11 +851,11 @@ exports.getSessionLogsDetail = async (req, res) => {
       const um = (productDetailsMap[productId].unidad_medida || "").toUpperCase();
 
       if (!isNaN(f120_id) && barcodeMapByF120Id[f120_id]) {
-        // ✅ Buscar barcode específico para la unidad_medida del item
+        // ✅ Buscar arreglos de barcodes específicos para la unidad_medida del item
         const group = barcodeMapByF120Id[f120_id];
-        const specificBarcode = (um && group[um]) || group._default || null;
-        if (specificBarcode) {
-          productDetailsMap[productId].barcode = specificBarcode;
+        const specificBarcodes = group[um] || group._default || [];
+        if (specificBarcodes.length > 0) {
+          productDetailsMap[productId].barcode = specificBarcodes;
         }
       }
     });
