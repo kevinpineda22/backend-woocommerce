@@ -27,7 +27,7 @@ async function getBarcodesFromSiesa(productIds) {
 
     const { data: barcodes, error } = await supabase
       .from("siesa_codigos_barras")
-      .select("f120_id, codigo_barras")
+      .select("f120_id, codigo_barras, unidad_medida")
       .in("f120_id", productIds);
 
     if (error) {
@@ -35,45 +35,34 @@ async function getBarcodesFromSiesa(productIds) {
       return {};
     }
 
-    // Agrupar por producto y filtrar códigos válidos
+    // ✅ Agrupar por f120_id + unidad_medida
+    // Estructura: { f120_id: { unidad_medida: barcode, _default: barcode } }
     const barcodesByProduct = {};
     barcodes.forEach((bc) => {
       if (!barcodesByProduct[bc.f120_id]) {
-        barcodesByProduct[bc.f120_id] = [];
+        barcodesByProduct[bc.f120_id] = {};
       }
-      barcodesByProduct[bc.f120_id].push(bc.codigo_barras);
+      const um = (bc.unidad_medida || "_unknown").toUpperCase();
+      const code = (bc.codigo_barras || "").toString().trim();
+      const cleaned = code.replace(/\+$/, "");
+
+      // Filtrar códigos válidos
+      if (!cleaned || cleaned.length < 8) return;
+      if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
+      if (!/^\d+\+?$/.test(code)) return;
+
+      // Priorizar EAN-13
+      const existing = barcodesByProduct[bc.f120_id][um];
+      if (!existing || cleaned.length === 13) {
+        barcodesByProduct[bc.f120_id][um] = cleaned;
+      }
+      // También guardar un default
+      if (!barcodesByProduct[bc.f120_id]._default || cleaned.length === 13) {
+        barcodesByProduct[bc.f120_id]._default = cleaned;
+      }
     });
 
-    // Seleccionar el mejor código de barras por producto
-    const barcodeMap = {};
-    Object.keys(barcodesByProduct).forEach((productId) => {
-      const codes = barcodesByProduct[productId];
-
-      // Limpiar y filtrar códigos válidos:
-      // 1. Preservar '+' del final (algunos productos SIESA lo necesitan en POS)
-      // 2. Eliminar códigos que empiecen con 'M' o 'N'
-      // 3. Aceptar códigos numéricos puros o numéricos con '+' al final
-      const validCodes = codes
-        .map((code) => (code || "").toString().trim())
-        .filter((cleaned) => {
-          if (!cleaned || cleaned.replace(/\+$/, "").length < 8) return false;
-          if (
-            cleaned.toUpperCase().startsWith("M") ||
-            cleaned.toUpperCase().startsWith("N")
-          )
-            return false;
-          // Aceptar dígitos con '+' opcional al final
-          return /^\d+\+?$/.test(cleaned);
-        });
-
-      // Priorizar EAN-13 (parte numérica = 13 dígitos), luego cualquier código válido
-      const ean13 = validCodes.find((c) => c.replace(/\+$/, "").length === 13);
-      const firstValid = validCodes[0];
-
-      barcodeMap[productId] = ean13 || firstValid || null;
-    });
-
-    return barcodeMap;
+    return barcodesByProduct;
   } catch (error) {
     console.error("Error en getBarcodesFromSiesa:", error);
     return {};
@@ -853,21 +842,19 @@ exports.getSessionLogsDetail = async (req, res) => {
       Object.keys(barcodeMapByF120Id).length,
     );
 
-    // Agregar códigos de barras al productDetailsMap cruzando el f120_id
+    // Agregar códigos de barras al productDetailsMap cruzando el f120_id + unidad_medida
     Object.keys(productDetailsMap).forEach((productId) => {
       const sku = productDetailsMap[productId].sku;
       const f120_id = parseInt(sku);
+      const um = (productDetailsMap[productId].unidad_medida || "").toUpperCase();
 
       if (!isNaN(f120_id) && barcodeMapByF120Id[f120_id]) {
-        // Strip "+" suffix que SIESA agrega a algunos códigos (ej: "7702004001012+" → "7702004001012")
-        productDetailsMap[productId].barcode = barcodeMapByF120Id[f120_id].replace(/\+$/, "");
-        console.log(
-          `✅ Producto ${productId} (SKU ${sku} -> Maestro ${f120_id}): código = ${barcodeMapByF120Id[f120_id]}`,
-        );
-      } else {
-        console.log(
-          `⚠️ Producto ${productId} (SKU ${sku}): sin código válido en SIESA`,
-        );
+        // ✅ Buscar barcode específico para la unidad_medida del item
+        const group = barcodeMapByF120Id[f120_id];
+        const specificBarcode = (um && group[um]) || group._default || null;
+        if (specificBarcode) {
+          productDetailsMap[productId].barcode = specificBarcode;
+        }
       }
     });
 

@@ -10,14 +10,14 @@ const {
 // Multi-sede WooCommerce (WordPress Multisite)
 const { getWooClient } = require("../services/wooMultiService");
 
-// ✅ HELPER: Obtener códigos de barras desde SIESA (con filtrado inteligente)
+// ✅ HELPER: Obtener códigos de barras desde SIESA (con filtrado por unidad_medida)
 async function getBarcodesFromSiesa(productIds) {
   try {
     if (!productIds || productIds.length === 0) return {};
 
     const { data: barcodes, error } = await supabase
       .from("siesa_codigos_barras")
-      .select("f120_id, codigo_barras")
+      .select("f120_id, codigo_barras, unidad_medida")
       .in("f120_id", productIds);
 
     if (error) {
@@ -25,25 +25,24 @@ async function getBarcodesFromSiesa(productIds) {
       return {};
     }
 
-    // Agrupar por producto y filtrar códigos válidos
+    // ✅ Agrupar por f120_id + unidad_medida para no mezclar presentaciones
+    // Estructura: { f120_id: { unidad_medida: [barcodes], _all: [todos] } }
     const barcodesByProduct = {};
     barcodes.forEach((bc) => {
       if (!barcodesByProduct[bc.f120_id]) {
-        barcodesByProduct[bc.f120_id] = [];
+        barcodesByProduct[bc.f120_id] = { _all: [] };
       }
-      barcodesByProduct[bc.f120_id].push(bc.codigo_barras);
+      const um = (bc.unidad_medida || "_unknown").toUpperCase();
+      if (!barcodesByProduct[bc.f120_id][um]) {
+        barcodesByProduct[bc.f120_id][um] = [];
+      }
+      barcodesByProduct[bc.f120_id][um].push(bc.codigo_barras);
+      barcodesByProduct[bc.f120_id]._all.push(bc.codigo_barras);
     });
 
-    // Seleccionar el mejor código de barras por producto
-    const barcodeMap = {};
-    Object.keys(barcodesByProduct).forEach((productId) => {
-      const codes = barcodesByProduct[productId];
-
-      // Limpiar y filtrar códigos válidos:
-      // 1. Preservar '+' del final (algunos productos SIESA lo necesitan en POS)
-      // 2. Eliminar códigos que empiecen con 'M' o 'N'
-      // 3. Aceptar códigos numéricos puros o numéricos con '+' al final
-      const validCodes = codes
+    // Filtrar códigos válidos por grupo
+    const filterValidCodes = (codes) => {
+      return codes
         .map((code) => (code || "").toString().trim())
         .filter((cleaned) => {
           if (!cleaned || cleaned.replace(/\+$/, "").length < 8) return false;
@@ -55,9 +54,19 @@ async function getBarcodesFromSiesa(productIds) {
           // Aceptar dígitos con '+' opcional al final
           return /^\d+\+?$/.test(cleaned);
         });
+    };
 
-      // Devolver todos los códigos válidos en un array, en lugar de solo uno
-      barcodeMap[productId] = validCodes.length > 0 ? validCodes : null;
+    // Construir mapa final con códigos filtrados
+    const barcodeMap = {};
+    Object.keys(barcodesByProduct).forEach((productId) => {
+      const groups = barcodesByProduct[productId];
+      barcodeMap[productId] = {};
+      Object.keys(groups).forEach((um) => {
+        const valid = filterValidCodes(groups[um]);
+        if (valid.length > 0) {
+          barcodeMap[productId][um] = valid;
+        }
+      });
     });
 
     return barcodeMap;
@@ -256,7 +265,7 @@ exports.getSessionActive = async (req, res) => {
     const { data: logsData, error: logsError } = await supabase
       .from("wc_log_picking")
       .select(
-        "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original, peso_real, fecha_registro",
+        "id_producto, accion, es_sustituto, nombre_sustituto, precio_nuevo, id_producto_original, peso_real, fecha_registro, id_pedido",
       )
       .in("id_asignacion", assignIds)
       .order("fecha_registro", { ascending: true });
@@ -402,14 +411,22 @@ exports.getSessionActive = async (req, res) => {
       // ✅ Usar variation_id para distinguir variaciones del mismo producto padre
       // ✅ FIX: Usar String() para evitar mismatch de tipo (number vs string de Supabase)
       const itemEffectiveId = String(item.variation_id || item.product_id);
+      const itemOrderId = item.order_id ? String(item.order_id) : null;
       const itemLogs = logs.filter(
-        (l) =>
-          String(l.id_producto) === itemEffectiveId ||
-          String(l.id_producto_original) === itemEffectiveId ||
-          // Fallback para logs antiguos que usaban product_id sin variation_id
-          (!item.variation_id &&
-            (String(l.id_producto) === String(item.product_id) ||
-              String(l.id_producto_original) === String(item.product_id))),
+        (l) => {
+          // ✅ Si el item tiene order_id, solo aceptar logs de ESE pedido
+          if (itemOrderId && l.id_pedido && String(l.id_pedido) !== itemOrderId) {
+            return false;
+          }
+          return (
+            String(l.id_producto) === itemEffectiveId ||
+            String(l.id_producto_original) === itemEffectiveId ||
+            // Fallback para logs antiguos que usaban product_id sin variation_id
+            (!item.variation_id &&
+              (String(l.id_producto) === String(item.product_id) ||
+                String(l.id_producto_original) === String(item.product_id)))
+          );
+        }
       );
 
       // Contadores Reales
@@ -478,10 +495,17 @@ exports.getSessionActive = async (req, res) => {
         // ✅ NUEVO: Indica si el producto tiene variaciones (múltiples unidad_medida)
         tiene_variaciones: tieneVariaciones,
 
-        // ✅ CÓDIGOS DE BARRAS: Prioridad SIESA (Array) > WooCommerce (Array[1]) > SKU (Array[1])
-        barcode: barcodeMapSiesa[parseInt(item.sku)] || [
-          item.barcode || item.sku,
-        ],
+        // ✅ CÓDIGOS DE BARRAS: Filtrados por unidad_medida para no mezclar presentaciones
+        barcode: (() => {
+          const f120 = parseInt(item.sku);
+          const siesaGroup = barcodeMapSiesa[f120];
+          if (!siesaGroup) return [item.barcode || item.sku];
+          // Intentar buscar barcodes de la presentación exacta (P6, UND, KL, etc.)
+          const um = (unidadMedidaFinal || "").toUpperCase();
+          if (um && siesaGroup[um]) return siesaGroup[um];
+          // Fallback: todos los barcodes válidos del producto
+          return siesaGroup._ALL || [item.barcode || item.sku];
+        })(),
 
         sustituto: lastSub
           ? {

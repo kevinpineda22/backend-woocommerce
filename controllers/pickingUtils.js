@@ -11,10 +11,12 @@ const agruparItemsParaPicking = (orders) => {
     );
 
     order.line_items.forEach((item) => {
-      // Usar product_id y variation_id como clave para no mezclar variaciones
-      const key = item.variation_id
+      // ✅ NUNCA agrupar productos de pedidos distintos.
+      // Cada pedido tiene su propia ProductCard para evitar fusión de pesos/cantidades en facturación.
+      const baseKey = item.variation_id
         ? `${item.product_id}-${item.variation_id}`
         : item.product_id;
+      const key = `${baseKey}-${order.id}`;
 
       // ✅ 1. EXTRAER NOTA DEL CLIENTE
       const noteMeta = item.meta_data?.find(
@@ -34,6 +36,7 @@ const agruparItemsParaPicking = (orders) => {
           product_id: item.product_id,
           variation_id: item.variation_id || null, // Guardamos el variation_id
           key: key, // Guardamos la clave compuesta
+          order_id: order.id, // ✅ ID del pedido al que pertenece esta tarjeta
           name: item.name,
           sku: item.sku,
           image_src: item.image?.src || "",

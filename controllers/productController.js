@@ -4,14 +4,14 @@ const { supabase } = require("../services/supabaseClient");
 // Multi-sede WooCommerce (WordPress Multisite)
 const { getWooClient } = require("../services/wooMultiService");
 
-// ✅ HELPER: Obtener códigos de barras desde SIESA (con filtrado inteligente)
+// ✅ HELPER: Obtener códigos de barras desde SIESA (un barcode EAN-13 preferido por f120_id)
 async function getBarcodesFromSiesa(productIds) {
   try {
     if (!productIds || productIds.length === 0) return {};
 
     const { data: barcodes, error } = await supabase
       .from("siesa_codigos_barras")
-      .select("f120_id, codigo_barras")
+      .select("f120_id, codigo_barras, unidad_medida")
       .in("f120_id", productIds);
 
     if (error) {
@@ -19,42 +19,18 @@ async function getBarcodesFromSiesa(productIds) {
       return {};
     }
 
-    // Agrupar por producto y filtrar códigos válidos
-    const barcodesByProduct = {};
-    barcodes.forEach((bc) => {
-      if (!barcodesByProduct[bc.f120_id]) {
-        barcodesByProduct[bc.f120_id] = [];
-      }
-      barcodesByProduct[bc.f120_id].push(bc.codigo_barras);
-    });
-
-    // Seleccionar el mejor código de barras por producto
     const barcodeMap = {};
-    Object.keys(barcodesByProduct).forEach((productId) => {
-      const codes = barcodesByProduct[productId];
+    barcodes.forEach((bc) => {
+      const code = (bc.codigo_barras || "").toString().trim();
+      const cleaned = code.replace(/\+$/, "");
+      if (!cleaned || cleaned.length < 8) return;
+      if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
+      if (!/^\d+\+?$/.test(code)) return;
 
-      // Limpiar y filtrar códigos válidos:
-      // 1. Preservar '+' del final (algunos productos SIESA lo necesitan en POS)
-      // 2. Eliminar códigos que empiecen con 'M' o 'N'
-      // 3. Aceptar códigos numéricos puros o numéricos con '+' al final
-      const validCodes = codes
-        .map((code) => (code || "").toString().trim())
-        .filter((cleaned) => {
-          if (!cleaned || cleaned.replace(/\+$/, "").length < 8) return false;
-          if (
-            cleaned.toUpperCase().startsWith("M") ||
-            cleaned.toUpperCase().startsWith("N")
-          )
-            return false;
-          // Aceptar dígitos con '+' opcional al final
-          return /^\d+\+?$/.test(cleaned);
-        });
-
-      // Priorizar EAN-13 (parte numérica = 13 dígitos), luego cualquier código válido
-      const ean13 = validCodes.find((c) => c.replace(/\+$/, "").length === 13);
-      const firstValid = validCodes[0];
-
-      barcodeMap[productId] = ean13 || firstValid || null;
+      // Priorizar EAN-13
+      if (!barcodeMap[bc.f120_id] || cleaned.length === 13) {
+        barcodeMap[bc.f120_id] = cleaned;
+      }
     });
 
     return barcodeMap;
@@ -65,13 +41,10 @@ async function getBarcodesFromSiesa(productIds) {
 }
 
 // ✅ Consulta SIESA para obtener el código GS1 real (prefijo "29") de un producto pesable.
-// Busca en siesa_codigos_barras por f120_id y devuelve el codigo_barras que empieza por "29".
-// Si no existe en SIESA, construye uno como fallback: "29" + f120_id padded.
 exports.getBaseEanFruver = async (req, res) => {
   const { sku } = req.params;
   if (!sku) return res.status(400).json({ error: "SKU requerido" });
 
-  // Extraer solo la parte numérica del SKU (ej: "6857-LB" → "6857", "5106KL" → "5106")
   const numericMatch = sku.match(/^(\d+)/);
   const numericSku = numericMatch ? numericMatch[1] : sku.split("-")[0];
 
@@ -80,7 +53,6 @@ exports.getBaseEanFruver = async (req, res) => {
   }
 
   try {
-    // Consultar SIESA para obtener TODOS los códigos de barras de este producto
     const { data: siesaRows, error } = await supabase
       .from("siesa_codigos_barras")
       .select("codigo_barras, unidad_medida")
@@ -90,7 +62,6 @@ exports.getBaseEanFruver = async (req, res) => {
       console.error("Error consultando SIESA para base EAN fruver:", error);
     }
 
-    // Buscar el código que empieza por "29" (GS1 de peso variable)
     let gs1Code = null;
     if (siesaRows && siesaRows.length > 0) {
       const gs1Row = siesaRows.find((row) => {
@@ -103,31 +74,21 @@ exports.getBaseEanFruver = async (req, res) => {
     }
 
     if (gs1Code) {
-      // Código GS1 real de SIESA (ej: "2900002" para item 4736)
-      // Este es el prefijo — el picker solo agrega peso + dígito verificador
-      return res.status(200).json({
-        baseEAN: gs1Code,
-        source: "siesa",
-      });
+      return res.status(200).json({ baseEAN: gs1Code, source: "siesa" });
     }
 
-    // Fallback: construir prefijo manualmente si no hay código "29" en SIESA
     const baseEAN = "29" + numericSku.padStart(5, "0").slice(-5);
-    return res.status(200).json({
-      baseEAN,
-      source: "generated",
-    });
+    return res.status(200).json({ baseEAN, source: "generated" });
   } catch (err) {
     console.error("Error en getBaseEanFruver:", err);
-    // Fallback en caso de error
     const baseEAN = "29" + numericSku.padStart(5, "0").slice(-5);
-    return res.status(200).json({
-      baseEAN,
-      source: "fallback",
-    });
+    return res.status(200).json({ baseEAN, source: "fallback" });
   }
 };
 
+// ✅ BÚSQUEDA INTELIGENTE DE SUSTITUTOS
+// Busca por: nombre, SKU/item, código de barras (SIESA)
+// Devuelve stock real incluso para productos con variaciones
 exports.searchProduct = async (req, res) => {
   const { query, original_id } = req.query;
   try {
@@ -136,7 +97,7 @@ exports.searchProduct = async (req, res) => {
     // Multi-sede: usar el cliente WC de la sede actual
     const prodClient = await getWooClient(req.sedeId);
 
-    // SMART SUBSTITUTION
+    // === SUGERENCIAS AUTOMÁTICAS (sin query, con original_id) ===
     if (original_id && !query) {
       const { data: original } = await prodClient.get(
         `products/${original_id}`,
@@ -186,64 +147,123 @@ exports.searchProduct = async (req, res) => {
           Math.abs(parseFloat(a.price || 0) - originalPrice) -
           Math.abs(parseFloat(b.price || 0) - originalPrice),
       );
-    } else if (query) {
-      let isBarcodeSearch = false;
 
-      // ✅ Si parece un código de barras (solo números y largo > 7), buscar en SIESA primero
-      if (/^\d{7,}$/.test(query)) {
-        try {
-          const { data: siesaBarcodes } = await supabase
+    // === BÚSQUEDA MANUAL ===
+    } else if (query) {
+      const cleanQuery = query.trim();
+      const isNumeric = /^\d+$/.test(cleanQuery);
+      let found = false;
+
+      // ✅ RUTA 1: Si es numérico → buscar por SKU en WooCommerce Y por barcode en SIESA
+      if (isNumeric) {
+        const [skuResponse, siesaResponse] = await Promise.all([
+          // Buscar por SKU directo en WooCommerce
+          prodClient.get("products", {
+            sku: cleanQuery,
+            status: "publish",
+          }).catch(() => ({ data: [] })),
+          // Buscar por código de barras exacto en SIESA (con y sin +)
+          supabase
             .from("siesa_codigos_barras")
             .select("f120_id")
-            .eq("codigo_barras", query)
-            .limit(1);
+            .or(`codigo_barras.eq.${cleanQuery},codigo_barras.eq.${cleanQuery}+`)
+            .limit(5)
+            .then((r) => r.data || [])
+            .catch(() => []),
+        ]);
 
-          if (siesaBarcodes && siesaBarcodes.length > 0) {
-            // Encontramos el SKU en SIESA, consultamos Woo por ese SKU (o Sku list si hay varios, usando sku del primero)
-            const targetSku = siesaBarcodes[0].f120_id;
-            const { data: searchResults } = await prodClient.get("products", {
-              sku: targetSku,
-              status: "publish",
-              stock_status: "instock",
-            });
-            if (searchResults && searchResults.length > 0) {
-              products = searchResults;
-              isBarcodeSearch = true;
+        const skuResults = skuResponse.data || [];
+        if (skuResults.length > 0) {
+          products = skuResults;
+          found = true;
+        }
+
+        // Si barcode encontrado en SIESA, buscar por f120_id como SKU en WooCommerce
+        if (!found && siesaResponse.length > 0) {
+          const f120Ids = [...new Set(siesaResponse.map((r) => r.f120_id))];
+          for (const f120Id of f120Ids) {
+            try {
+              const { data: wooProducts } = await prodClient.get("products", {
+                sku: String(f120Id),
+                status: "publish",
+              });
+              if (wooProducts && wooProducts.length > 0) {
+                products.push(...wooProducts);
+                found = true;
+              }
+            } catch (e) {
+              console.warn(`Error buscando f120_id ${f120Id} en WC:`, e.message);
             }
           }
-        } catch (e) {
-          console.error("Error buscando por barcode en SIESA", e);
         }
       }
 
-      // Fallback a búsqueda normal por texto si no era código de barras o no se encontró
-      if (!isBarcodeSearch) {
+      // ✅ RUTA 2: Búsqueda por texto (nombre del producto)
+      if (!found) {
         const { data: searchResults } = await prodClient.get("products", {
-          search: query,
+          search: cleanQuery,
           per_page: 20,
           status: "publish",
-          stock_status: "instock",
         });
 
-        // Si no se encontraron por `search`, y parece un código de producto exacto (SKU), intentamos exacto
-        if (searchResults.length === 0 && /^[a-zA-Z0-9]+$/.test(query)) {
+        if (searchResults && searchResults.length > 0) {
+          products = searchResults;
+        } else if (/^[a-zA-Z0-9\-]+$/.test(cleanQuery)) {
+          // Último intento: búsqueda exacta por SKU alfanumérico
           const { data: skuResults } = await prodClient.get("products", {
-            sku: query,
+            sku: cleanQuery,
             status: "publish",
-            stock_status: "instock",
           });
           if (skuResults && skuResults.length > 0) {
             products = skuResults;
-          } else {
-            products = [];
           }
-        } else {
-          products = searchResults;
         }
       }
+
+      // Deduplicar por ID
+      const seen = new Set();
+      products = products.filter((p) => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      });
     }
 
-    // ✅ OBTENER CÓDIGOS DE BARRAS DE SIESA (por SKU, no por product_id)
+    // ✅ STOCK REAL: Para productos variables, sumar stock de sus variaciones
+    const variableProducts = products.filter(
+      (p) =>
+        p.type === "variable" &&
+        (p.stock_quantity === null || p.stock_quantity === undefined),
+    );
+    if (variableProducts.length > 0) {
+      await Promise.all(
+        variableProducts.map(async (vp) => {
+          try {
+            const { data: variations } = await prodClient.get(
+              `products/${vp.id}/variations`,
+              { per_page: 100, _fields: "id,stock_quantity,stock_status" },
+            );
+            if (variations && variations.length > 0) {
+              const totalStock = variations.reduce(
+                (sum, v) => sum + (parseInt(v.stock_quantity) || 0),
+                0,
+              );
+              vp.stock_quantity = totalStock;
+            } else {
+              vp.stock_quantity = 0;
+            }
+          } catch (e) {
+            console.warn(
+              `Error obteniendo variaciones de producto ${vp.id}:`,
+              e.message,
+            );
+            vp.stock_quantity = 0;
+          }
+        }),
+      );
+    }
+
+    // ✅ OBTENER CÓDIGOS DE BARRAS DE SIESA
     const skuList = Array.from(
       new Set(
         products.map((p) => parseInt(p.sku)).filter((sku) => !isNaN(sku)),
@@ -256,11 +276,14 @@ exports.searchProduct = async (req, res) => {
         id: p.id,
         name: p.name,
         price: p.price,
-        image: p.images[0]?.src || null,
-        stock: p.stock_quantity,
+        image: p.images?.[0]?.src || null,
+        stock: p.stock_quantity ?? 0,
         sku: p.sku,
         categories: p.categories,
-        // ✅ PRIORIDAD: SIESA (por SKU) > WooCommerce meta_data > SKU
+        unidad_medida:
+          p.meta_data?.find((m) => m.key === "pa_unidad-de-medida-aproximado")
+            ?.display_value || null,
+        // ✅ PRIORIDAD: SIESA > WooCommerce meta_data > SKU
         barcode:
           barcodeMapSiesa[parseInt(p.sku)] ||
           p.meta_data?.find((m) =>
@@ -270,7 +293,7 @@ exports.searchProduct = async (req, res) => {
           )?.value ||
           p.sku,
       }))
-      .slice(0, 10);
+      .slice(0, 15);
 
     res.status(200).json(results);
   } catch (error) {

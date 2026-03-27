@@ -14,6 +14,7 @@ exports.registerAction = async (req, res) => {
     codigo_barras_escaneado, // ✅ Código de barras exacto que se escaneó
     f120_id_siesa, // ✅ NUEVO: f120_id encontrado en SIESA
     unidad_medida_siesa, // ✅ NUEVO: unidad_medida encontrada en SIESA
+    id_pedido, // ✅ NUEVO: Para desambiguar cuando el mismo producto está en varios pedidos
   } = req.body;
 
   try {
@@ -32,18 +33,28 @@ exports.registerAction = async (req, res) => {
       throw new Error("Sesión inválida o sin asignaciones");
     }
 
-    // Lógica de Match (Buscar a qué pedido pertenece el producto)
+    // ✅ Si el frontend envía id_pedido, usarlo directamente para encontrar la asignación correcta
     let targetAssignment = assignments[0];
-    for (let assign of assignments) {
-      const items = assign.reporte_snapshot?.line_items || [];
-      const found = items.find(
-        (i) =>
-          String(i.product_id) === String(id_producto_original) ||
-          String(i.variation_id) === String(id_producto_original),
+    if (id_pedido) {
+      const exactMatch = assignments.find(
+        (a) => String(a.id_pedido) === String(id_pedido),
       );
-      if (found) {
-        targetAssignment = assign;
-        break;
+      if (exactMatch) {
+        targetAssignment = exactMatch;
+      }
+    } else {
+      // Fallback: buscar a qué pedido pertenece el producto
+      for (let assign of assignments) {
+        const items = assign.reporte_snapshot?.line_items || [];
+        const found = items.find(
+          (i) =>
+            String(i.product_id) === String(id_producto_original) ||
+            String(i.variation_id) === String(id_producto_original),
+        );
+        if (found) {
+          targetAssignment = assign;
+          break;
+        }
       }
     }
 
