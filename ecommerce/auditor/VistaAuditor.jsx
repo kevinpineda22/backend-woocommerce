@@ -43,7 +43,7 @@ const VistaAuditor = () => {
 
   const [requiredItems, setRequiredItems] = useState(new Set());
   const [verifiedItems, setVerifiedItems] = useState(new Set());
-  const [barcodeMap, setBarcodeMap] = useState({}); // codigo_barras → f120_id
+  const [barcodeMap, setBarcodeMap] = useState({}); // codigo_barras → { f120_id, unidad_medida }
   const [manualVerifyCode, setManualVerifyCode] = useState("");
   const [showInvoices, setShowInvoices] = useState(false);
   const [scanFeedback, setScanFeedback] = useState(null);
@@ -129,17 +129,36 @@ const VistaAuditor = () => {
   const verifyProductScan = async (code) => {
     const cleanCode = code.trim().replace(/\+$/, "").toUpperCase();
 
+    // Helper: normalizar unidad de medida para comparación
+    const normalizeUM = (um) => {
+      const u = (um || "").toUpperCase().trim();
+      if (u === "UN" || u === "UNIDAD") return "UND";
+      if (u === "KG" || u === "KILO") return "KL";
+      if (u === "LIBRA") return "LB";
+      return u;
+    };
+
     try {
       // Buscar el código en el mapa de barcodes cargado de SIESA
-      let f120_id = barcodeMap[cleanCode];
+      const barcodeEntry = barcodeMap[cleanCode]; // { f120_id, unidad_medida } o legacy f120_id
+      let f120_id = null;
+      let scannedUM = null; // Unidad de medida del código escaneado
+
+      if (barcodeEntry) {
+        if (typeof barcodeEntry === "object" && barcodeEntry !== null) {
+          f120_id = barcodeEntry.f120_id;
+          scannedUM = barcodeEntry.unidad_medida;
+        } else {
+          f120_id = barcodeEntry;
+        }
+      }
 
       // Fallback: si no está en el mapa, intentar parsear como SKU (ej: "1032P2" → f120=1032, um=P2)
-      let skuParsedUM = null;
       if (!f120_id) {
         const skuMatch = cleanCode.match(/^(\d+)([A-Z]+\d*)$/);
         if (skuMatch) {
           const parsedF120 = parseInt(skuMatch[1]);
-          skuParsedUM = skuMatch[2];
+          scannedUM = skuMatch[2];
           // Verificar que este f120_id existe en algún item del audit
           const itemExists = auditData?.items?.some((item) => {
             const itemF120 = parseInt((item.sku || "").replace(/-/g, ""));
@@ -153,7 +172,6 @@ const VistaAuditor = () => {
 
       // Fallback final: consultar el backend
       if (!f120_id) {
-        // Intentar buscar en el backend como último recurso
         try {
           const firstPendingItem = auditData?.items?.find(
             (i) =>
@@ -175,6 +193,7 @@ const VistaAuditor = () => {
               });
               if (resp.data?.valid && resp.data?.f120_id) {
                 f120_id = resp.data.f120_id;
+                scannedUM = resp.data.unidad_medida || itemUM;
               }
             }
           }
@@ -188,8 +207,9 @@ const VistaAuditor = () => {
         return;
       }
 
-      // Buscar el item pendiente que corresponda a este f120_id
+      // Buscar el item pendiente que corresponda a este f120_id Y validar unidad_medida
       let targetItem = null;
+      let umMismatchMsg = null;
       for (const itemId of requiredItems) {
         if (verifiedItems.has(itemId)) continue;
         const item = auditData.items.find(
@@ -200,12 +220,18 @@ const VistaAuditor = () => {
         // 1. Match por SKU del item (sku = f120_id en WooCommerce)
         const itemF120 = parseInt((item.sku || "").replace(/-/g, ""));
         if (!isNaN(itemF120) && itemF120 === f120_id) {
+          // ✅ Validar unidad_medida: el barcode escaneado debe coincidir con la UM del producto
+          const expectedUM = normalizeUM(item.unidad_medida);
+          const actualUM = normalizeUM(scannedUM);
+          if (scannedUM && expectedUM && actualUM !== expectedUM) {
+            umMismatchMsg = `❌ El código "${cleanCode}" es para presentación ${actualUM}, pero se esperaba ${expectedUM}.`;
+            continue; // Seguir buscando por si hay otro item con la UM correcta
+          }
           targetItem = item;
           break;
         }
 
         // 2. Match por barcodes que el picker escaneó para este item
-        //    (vincula WooCommerce product_id con f120_id de SIESA)
         const scannedCodes = auditData.scannedBarcodes?.[item.id];
         if (scannedCodes) {
           const codes =
@@ -214,14 +240,27 @@ const VistaAuditor = () => {
               : Object.values(scannedCodes);
           const match = codes.some((sc) => {
             const scClean = (sc || "").trim().replace(/\+$/, "").toUpperCase();
-            const scF120 = barcodeMap[scClean];
+            const entry = barcodeMap[scClean];
+            const scF120 = typeof entry === "object" ? entry?.f120_id : entry;
             return scF120 === f120_id;
           });
           if (match) {
+            // También validar UM aquí
+            const expectedUM = normalizeUM(item.unidad_medida);
+            const actualUM = normalizeUM(scannedUM);
+            if (scannedUM && expectedUM && actualUM !== expectedUM) {
+              umMismatchMsg = `❌ El código "${cleanCode}" es para presentación ${actualUM}, pero se esperaba ${expectedUM}.`;
+              continue;
+            }
             targetItem = item;
             break;
           }
         }
+      }
+
+      if (!targetItem && umMismatchMsg) {
+        showFeedback("error", umMismatchMsg);
+        return;
       }
 
       if (!targetItem) {
@@ -394,22 +433,26 @@ const VistaAuditor = () => {
 
       // Construir barcodeMap universal con todos los códigos de la tabla SIESA (audit_barcode_map)
       // y normalizarlos igual que el input del usuario
+      // Formato: { codigo_normalizado: { f120_id, unidad_medida } }
       const normalizedBarcodeMap = {};
       if (audit_barcode_map) {
-        Object.entries(audit_barcode_map).forEach(([raw, f120]) => {
+        Object.entries(audit_barcode_map).forEach(([raw, value]) => {
           const normalized = (raw || "")
             .trim()
             .replace(/\+$/, "")
             .toUpperCase();
-          normalizedBarcodeMap[normalized] = f120;
+          // Soportar formato viejo (solo f120_id) y nuevo ({ f120_id, unidad_medida })
+          normalizedBarcodeMap[normalized] =
+            typeof value === "object"
+              ? value
+              : { f120_id: value, unidad_medida: null };
         });
       }
       // También incluir los barcodes escaneados por el picker (por si hay alguno que no está en audit_barcode_map)
       allBarcodesSet.forEach((code) => {
         if (!(code in normalizedBarcodeMap)) {
-          // Buscar el f120_id correspondiente en barcodeMap original si existe
-          // (esto es defensivo, normalmente audit_barcode_map debe tener todos)
-          normalizedBarcodeMap[code] = barcodeMap[code] || null;
+          const existing = barcodeMap[code];
+          normalizedBarcodeMap[code] = existing || null;
         }
       });
       setBarcodeMap(normalizedBarcodeMap);

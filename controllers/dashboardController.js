@@ -1199,19 +1199,20 @@ exports.getSessionLogsDetail = async (req, res) => {
     // Enviar TODOS los logs sin filtrar
     const auditableLogs = logs;
 
-    // Mapa codigo_barras → f120_id para validación del auditor
+    // Mapa codigo_barras → { f120_id, unidad_medida } para validación del auditor
     const auditBarcodeMap = {};
     if (allSiesaBarcodes) {
       allSiesaBarcodes.forEach((bc) => {
+        const um = (bc.unidad_medida || "").toUpperCase();
         const clean = bc.codigo_barras
           .toString()
           .trim()
           .replace(/\+$/, "")
           .toUpperCase();
-        auditBarcodeMap[clean] = bc.f120_id;
+        auditBarcodeMap[clean] = { f120_id: bc.f120_id, unidad_medida: um };
         // También con el original (con +)
         const original = bc.codigo_barras.toString().trim().toUpperCase();
-        auditBarcodeMap[original] = bc.f120_id;
+        auditBarcodeMap[original] = { f120_id: bc.f120_id, unidad_medida: um };
       });
     }
 

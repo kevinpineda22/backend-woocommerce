@@ -230,7 +230,12 @@ exports.validateManualCode = async (req, res) => {
 
 // ✅ FUNCIÓN PRIVADA COMPARTIDA - Validación unificada
 // Picker y Auditor usan esta función con parámetro allowGS1 diferente
-async function _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_esperada, { allowGS1 = false } = {}) {
+async function _validateSiesaCode(
+  codigo,
+  f120_id_esperado,
+  unidad_medida_esperada,
+  { allowGS1 = false } = {},
+) {
   const codigoLimpio = codigo.toString().trim().toUpperCase();
   const isValidBarcode = /^\d{8,}\+?$/.test(codigoLimpio);
   const isValidSku = /^\d+[A-Z]+\d*$/.test(codigoLimpio);
@@ -240,7 +245,8 @@ async function _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_espera
       status: 200,
       body: {
         valid: false,
-        message: "❌ Código inválido. Escanea el código de barras del producto.",
+        message:
+          "❌ Código inválido. Escanea el código de barras del producto.",
         codigo_existe: false,
       },
     };
@@ -254,7 +260,9 @@ async function _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_espera
       const umIngresada = skuMatch[2];
       const skuIngresado = `${f120Ingresado}${umIngresada}`;
       const cleanSku = (s) => s.replace(/-/g, "");
-      const skuEsperado = cleanSku(`${f120_id_esperado}${unidad_medida_esperada}`);
+      const skuEsperado = cleanSku(
+        `${f120_id_esperado}${unidad_medida_esperada}`,
+      );
 
       if (skuIngresado === skuEsperado) {
         return {
@@ -281,14 +289,18 @@ async function _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_espera
 
       return {
         status: 200,
-        body: { valid: false, message: "❌ El SKU no corresponde a este producto" },
+        body: {
+          valid: false,
+          message: "❌ El SKU no corresponde a este producto",
+        },
       };
     }
   }
 
   // RUTA 2A: GS1 variable (solo si allowGS1 = true, ej: picker)
   if (allowGS1) {
-    const isGS1Variable = /^\d{13,14}$/.test(codigoLimpio) && codigoLimpio.startsWith("2");
+    const isGS1Variable =
+      /^\d{13,14}$/.test(codigoLimpio) && codigoLimpio.startsWith("2");
     if (isGS1Variable) {
       const gs1Prefix = codigoLimpio.substring(0, 7);
       const { data: siesaBarcodes } = await supabase
@@ -297,8 +309,15 @@ async function _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_espera
         .eq("f120_id", f120_id_esperado);
 
       const gs1Match = (siesaBarcodes || []).some((bc) => {
-        const cleanBarcode = (bc.codigo_barras || "").toString().trim().replace(/\+$/, "");
-        return cleanBarcode.startsWith("2") && cleanBarcode.length >= 7 && gs1Prefix === cleanBarcode.substring(0, 7);
+        const cleanBarcode = (bc.codigo_barras || "")
+          .toString()
+          .trim()
+          .replace(/\+$/, "");
+        return (
+          cleanBarcode.startsWith("2") &&
+          cleanBarcode.length >= 7 &&
+          gs1Prefix === cleanBarcode.substring(0, 7)
+        );
       });
 
       if (gs1Match) {
@@ -316,7 +335,11 @@ async function _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_espera
 
       return {
         status: 200,
-        body: { valid: false, message: "❌ El código GS1 no corresponde a este producto", codigo_existe: false },
+        body: {
+          valid: false,
+          message: "❌ El código GS1 no corresponde a este producto",
+          codigo_existe: false,
+        },
       };
     }
   }
@@ -331,12 +354,18 @@ async function _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_espera
   if (siesaError || !siesaData) {
     return {
       status: 200,
-      body: { valid: false, message: "❌ Código no encontrado en el sistema", codigo_existe: false },
+      body: {
+        valid: false,
+        message: "❌ Código no encontrado en el sistema",
+        codigo_existe: false,
+      },
     };
   }
 
   const cleanSku = (sku) => sku.replace(/-/g, "");
-  const skuEscaneado = cleanSku(`${siesaData.f120_id}${siesaData.unidad_medida}`);
+  const skuEscaneado = cleanSku(
+    `${siesaData.f120_id}${siesaData.unidad_medida}`,
+  );
   const skuEsperado = cleanSku(`${f120_id_esperado}${unidad_medida_esperada}`);
 
   if (skuEscaneado !== skuEsperado) {
@@ -390,11 +419,22 @@ exports.validateCodeWithSiesa = async (req, res) => {
   }
 
   try {
-    const result = await _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_esperada, { allowGS1: true });
+    const result = await _validateSiesaCode(
+      codigo,
+      f120_id_esperado,
+      unidad_medida_esperada,
+      { allowGS1: true },
+    );
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("Error en validateCodeWithSiesa:", error.message);
-    return res.status(500).json({ valid: false, message: "Error al validar código", error: error.message });
+    return res
+      .status(500)
+      .json({
+        valid: false,
+        message: "Error al validar código",
+        error: error.message,
+      });
   }
 };
 
@@ -415,40 +455,58 @@ exports.validateCodeForAuditor = async (req, res) => {
   }
 
   try {
-    const result = await _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_esperada, { allowGS1: false });
+    const result = await _validateSiesaCode(
+      codigo,
+      f120_id_esperado,
+      unidad_medida_esperada,
+      { allowGS1: false },
+    );
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("Error en validateCodeForAuditor:", error.message);
-    return res.status(500).json({ valid: false, message: "Error al validar código", error: error.message });
+    return res
+      .status(500)
+      .json({
+        valid: false,
+        message: "Error al validar código",
+        error: error.message,
+      });
   }
 };
 
 /**
  * AUDITOR: Cargar todos los codigo_barras para una lista de f120_ids.
- * Retorna un mapa { codigo_barras: f120_id } para validación local en el frontend.
+ * Retorna un mapa { codigo_barras: { f120_id, unidad_medida } } para validación local en el frontend.
  */
 exports.loadBarcodesForAudit = async (req, res) => {
   const { f120_ids } = req.body;
   if (!f120_ids || !Array.isArray(f120_ids) || f120_ids.length === 0) {
-    return res.status(400).json({ error: "f120_ids requerido (array de enteros)" });
+    return res
+      .status(400)
+      .json({ error: "f120_ids requerido (array de enteros)" });
   }
 
   try {
     const { data, error } = await supabase
       .from("siesa_codigos_barras")
-      .select("f120_id, codigo_barras")
+      .select("f120_id, codigo_barras, unidad_medida")
       .in("f120_id", f120_ids);
 
     if (error) throw error;
 
-    // Mapa: codigo_barras (normalizado) → f120_id
+    // Mapa: codigo_barras (normalizado) → { f120_id, unidad_medida }
     const barcodeMap = {};
     (data || []).forEach((row) => {
-      const cleanCode = row.codigo_barras.toString().trim().replace(/\+$/, "").toUpperCase();
-      barcodeMap[cleanCode] = row.f120_id;
+      const um = (row.unidad_medida || "").toUpperCase();
+      const cleanCode = row.codigo_barras
+        .toString()
+        .trim()
+        .replace(/\+$/, "")
+        .toUpperCase();
+      barcodeMap[cleanCode] = { f120_id: row.f120_id, unidad_medida: um };
       // También guardar versión original (con +) por si acaso
       const original = row.codigo_barras.toString().trim().toUpperCase();
-      barcodeMap[original] = row.f120_id;
+      barcodeMap[original] = { f120_id: row.f120_id, unidad_medida: um };
     });
 
     return res.json({ barcodeMap });
