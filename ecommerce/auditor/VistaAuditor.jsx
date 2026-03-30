@@ -43,6 +43,7 @@ const VistaAuditor = () => {
 
   const [requiredItems, setRequiredItems] = useState(new Set());
   const [verifiedItems, setVerifiedItems] = useState(new Set());
+  const [barcodeMap, setBarcodeMap] = useState({}); // codigo_barras → f120_id
   const [manualVerifyCode, setManualVerifyCode] = useState("");
   const [showInvoices, setShowInvoices] = useState(false);
   const [scanFeedback, setScanFeedback] = useState(null);
@@ -129,52 +130,22 @@ const VistaAuditor = () => {
     const cleanCode = code.trim().replace(/\+$/, "").toUpperCase();
 
     try {
-      // 1. Buscar el código en SIESA para obtener f120_id y unidad_medida
-      const lookupRes = await ecommerceApi.post(`/lookup-siesa`, { codigo: cleanCode });
+      // Buscar el código en el mapa de barcodes cargado de SIESA
+      const f120_id = barcodeMap[cleanCode];
 
-      if (!lookupRes.data.found) {
+      if (!f120_id) {
         showFeedback("error", `El código "${cleanCode}" no existe en SIESA.`);
         return;
       }
 
-      const { f120_id, unidad_medida } = lookupRes.data;
-
-      // 2. Buscar el item pendiente cuyo f120_id coincida (por SKU, barcode o id)
+      // Buscar el item pendiente cuyo SKU (f120_id) coincida
       let targetItem = null;
-      const extractF120 = (s) => {
-        if (!s) return null;
-        const match = s.toString().replace(/-/g, "").match(/^(\d+)/);
-        return match ? parseInt(match[1]) : null;
-      };
-
       for (const itemId of requiredItems) {
         if (verifiedItems.has(itemId)) continue;
         const item = auditData.items.find((i) => String(i.id) === String(itemId));
         if (!item) continue;
-
-        // Match por f120_id extraído del SKU del item
-        const itemF120 = extractF120(item.sku);
-        if (itemF120 && itemF120 === f120_id) {
-          targetItem = item;
-          break;
-        }
-
-        // Match por barcode del item (el backend ya cruzó con SIESA)
-        if (item.barcode) {
-          const barcodes = Array.isArray(item.barcode) ? item.barcode : [item.barcode];
-          const barcodeMatch = barcodes.some((b) => {
-            const cleanB = (b || "").toString().trim().replace(/\+$/, "").toUpperCase();
-            const bF120 = extractF120(cleanB);
-            return bF120 && bF120 === f120_id;
-          });
-          if (barcodeMatch) {
-            targetItem = item;
-            break;
-          }
-        }
-
-        // Match por id del item (WooCommerce product_id) contra f120_id
-        if (parseInt(item.id) === f120_id) {
+        const itemF120 = parseInt((item.sku || "").replace(/-/g, ""));
+        if (!isNaN(itemF120) && itemF120 === f120_id) {
           targetItem = item;
           break;
         }
@@ -183,30 +154,17 @@ const VistaAuditor = () => {
       if (!targetItem) {
         showFeedback(
           "error",
-          `El código "${cleanCode}" (SIESA: ${f120_id}) no corresponde a ningún producto por validar en este pedido.`,
+          `El código "${cleanCode}" existe en SIESA (item ${f120_id}), pero no corresponde a ningún producto por validar.`,
         );
         return;
       }
 
-      // 3. Validar el código contra SIESA con f120_id y unidad_medida obtenidos
-      const res = await ecommerceApi.post(`/validar-codigo-auditor`, {
-        codigo: cleanCode,
-        f120_id_esperado: f120_id,
-        unidad_medida_esperada: unidad_medida,
-      });
-
-      if (res.data.valid) {
-        setVerifiedItems((prev) => new Set(prev).add(targetItem.id));
-        showFeedback(
-          "success",
-          `✅ ${targetItem.name} verificado correctamente`,
-        );
-      } else {
-        showFeedback(
-          "error",
-          res.data.message || `Código inválido para ${targetItem.name}`,
-        );
-      }
+      // Código existe en SIESA y corresponde a un item pendiente → verificado
+      setVerifiedItems((prev) => new Set(prev).add(targetItem.id));
+      showFeedback(
+        "success",
+        `✅ ${targetItem.name} verificado correctamente`,
+      );
     } catch (error) {
       console.error("Error validando código:", error.message);
       showFeedback(
@@ -445,6 +403,19 @@ const VistaAuditor = () => {
           duration,
         },
       });
+
+      // Cargar todos los codigo_barras de SIESA para los f120_ids de los items
+      try {
+        const f120_ids = [...new Set(
+          itemsArray.map((i) => parseInt((i.sku || "").replace(/-/g, ""))).filter((n) => !isNaN(n))
+        )];
+        if (f120_ids.length > 0) {
+          const bcRes = await ecommerceApi.post("/load-barcodes-audit", { f120_ids });
+          setBarcodeMap(bcRes.data.barcodeMap || {});
+        }
+      } catch (e) {
+        console.warn("No se pudieron cargar barcodes de SIESA:", e.message);
+      }
     } catch (error) {
       setErrorMsg("Error consultando la sesión.");
     } finally {

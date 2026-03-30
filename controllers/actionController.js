@@ -424,58 +424,36 @@ exports.validateCodeForAuditor = async (req, res) => {
 };
 
 /**
- * AUDITOR: Buscar un código en SIESA por codigo_barras o formato SKU.
- * Retorna el f120_id y unidad_medida sin validar contra un producto esperado.
- * El frontend usa el f120_id para matchear contra los items pendientes.
+ * AUDITOR: Cargar todos los codigo_barras para una lista de f120_ids.
+ * Retorna un mapa { codigo_barras: f120_id } para validación local en el frontend.
  */
-exports.lookupSiesaCode = async (req, res) => {
-  const { codigo } = req.body;
-  if (!codigo) {
-    return res.status(400).json({ found: false, message: "Código requerido" });
+exports.loadBarcodesForAudit = async (req, res) => {
+  const { f120_ids } = req.body;
+  if (!f120_ids || !Array.isArray(f120_ids) || f120_ids.length === 0) {
+    return res.status(400).json({ error: "f120_ids requerido (array de enteros)" });
   }
 
-  const codigoLimpio = codigo.toString().trim().toUpperCase();
-
   try {
-    // 1. Buscar como codigo_barras exacto (PRIORIDAD: el auditor siempre digita un codigo_barras)
-    const { data: byBarcode } = await supabase
+    const { data, error } = await supabase
       .from("siesa_codigos_barras")
-      .select("f120_id, unidad_medida")
-      .eq("codigo_barras", codigoLimpio)
-      .single();
-    if (byBarcode) {
-      return res.json({ found: true, f120_id: byBarcode.f120_id, unidad_medida: byBarcode.unidad_medida });
-    }
+      .select("f120_id, codigo_barras")
+      .in("f120_id", f120_ids);
 
-    // 2. Intentar con "+" al final (convención SIESA)
-    const { data: byBarcodePlus } = await supabase
-      .from("siesa_codigos_barras")
-      .select("f120_id, unidad_medida")
-      .eq("codigo_barras", codigoLimpio + "+")
-      .single();
-    if (byBarcodePlus) {
-      return res.json({ found: true, f120_id: byBarcodePlus.f120_id, unidad_medida: byBarcodePlus.unidad_medida });
-    }
+    if (error) throw error;
 
-    // 3. Fallback: parsear como formato SKU (ej: "1032P2" → f120=1032, um=P2)
-    const skuMatch = codigoLimpio.match(/^(\d+)([A-Z]+\d*)$/);
-    if (skuMatch) {
-      const f120Id = parseInt(skuMatch[1]);
-      const um = skuMatch[2];
-      const { data } = await supabase
-        .from("siesa_codigos_barras")
-        .select("f120_id, unidad_medida")
-        .eq("f120_id", f120Id)
-        .eq("unidad_medida", um)
-        .limit(1);
-      if (data && data.length > 0) {
-        return res.json({ found: true, f120_id: f120Id, unidad_medida: um });
-      }
-    }
+    // Mapa: codigo_barras (normalizado) → f120_id
+    const barcodeMap = {};
+    (data || []).forEach((row) => {
+      const cleanCode = row.codigo_barras.toString().trim().replace(/\+$/, "").toUpperCase();
+      barcodeMap[cleanCode] = row.f120_id;
+      // También guardar versión original (con +) por si acaso
+      const original = row.codigo_barras.toString().trim().toUpperCase();
+      barcodeMap[original] = row.f120_id;
+    });
 
-    return res.json({ found: false, message: "Código no encontrado en SIESA" });
+    return res.json({ barcodeMap });
   } catch (error) {
-    console.error("Error en lookupSiesaCode:", error.message);
-    return res.status(500).json({ found: false, message: "Error buscando código" });
+    console.error("Error en loadBarcodesForAudit:", error.message);
+    return res.status(500).json({ error: "Error cargando códigos de barras" });
   }
 };

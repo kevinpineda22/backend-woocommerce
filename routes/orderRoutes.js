@@ -36,7 +36,7 @@ router.post("/registrar-accion", actionCtrl.registerAction);
 router.post("/validar-codigo", actionCtrl.validateManualCode);
 router.post("/validar-codigo-siesa", actionCtrl.validateCodeWithSiesa);
 router.post("/validar-codigo-auditor", actionCtrl.validateCodeForAuditor);
-router.post("/lookup-siesa", actionCtrl.lookupSiesaCode);
+router.post("/load-barcodes-audit", actionCtrl.loadBarcodesForAudit);
 
 // Rutas de Producto
 router.get("/buscar-producto", productCtrl.searchProduct);
