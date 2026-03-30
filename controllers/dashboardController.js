@@ -48,15 +48,23 @@ async function getBarcodesFromSiesaByUnitMeasure(pairs) {
 
       // Filtrar códigos válidos
       if (!cleaned || cleaned.length < 8) return;
-      if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
+      if (
+        cleaned.toUpperCase().startsWith("M") ||
+        cleaned.toUpperCase().startsWith("N")
+      )
+        return;
       if (!/^\d+\+?$/.test(code)) return;
 
       // Normalizar unidad de medida
       let normalizedUm = (bc.unidad_medida || "DEFAULT").toUpperCase();
-      if (normalizedUm === "UN" || normalizedUm === "UNIDAD") normalizedUm = "UND";
-      else if (normalizedUm === "KG" || normalizedUm === "KILO") normalizedUm = "KL";
-      else if (normalizedUm === "LB" || normalizedUm === "LIBRA") normalizedUm = "LB";
-      else if (normalizedUm === "" || normalizedUm === "NULL") normalizedUm = "DEFAULT";
+      if (normalizedUm === "UN" || normalizedUm === "UNIDAD")
+        normalizedUm = "UND";
+      else if (normalizedUm === "KG" || normalizedUm === "KILO")
+        normalizedUm = "KL";
+      else if (normalizedUm === "LB" || normalizedUm === "LIBRA")
+        normalizedUm = "LB";
+      else if (normalizedUm === "" || normalizedUm === "NULL")
+        normalizedUm = "DEFAULT";
 
       const key = `${bc.f120_id}|${normalizedUm}`;
 
@@ -70,7 +78,10 @@ async function getBarcodesFromSiesaByUnitMeasure(pairs) {
       }
     });
 
-    console.log(`📊 Códigos organizados por f120_id|UM:`, Object.keys(barcodesByKey).slice(0, 10));
+    console.log(
+      `📊 Códigos organizados por f120_id|UM:`,
+      Object.keys(barcodesByKey).slice(0, 10),
+    );
     return barcodesByKey;
   } catch (error) {
     console.error("Error en getBarcodesFromSiesaByUnitMeasure:", error);
@@ -106,7 +117,11 @@ async function getBarcodesFromSiesa(productIds) {
 
       // Filtrar códigos válidos (excluyendo explícitamente prefijos M o N)
       if (!cleaned || cleaned.length < 8) return;
-      if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
+      if (
+        cleaned.toUpperCase().startsWith("M") ||
+        cleaned.toUpperCase().startsWith("N")
+      )
+        return;
       if (!/^\d+\+?$/.test(code)) return;
 
       if (!barcodesByProduct[bc.f120_id][um]) {
@@ -322,11 +337,9 @@ exports.getActiveSessionsDashboard = async (req, res) => {
     res.status(200).json(dashboardData);
   } catch (error) {
     console.error("Error getActiveSessionsDashboard:", error.message);
-    res
-      .status(500)
-      .json({
-        error: `Error al cargar el dashboard de sesiones activas: ${error.message}`,
-      });
+    res.status(500).json({
+      error: `Error al cargar el dashboard de sesiones activas: ${error.message}`,
+    });
   }
 };
 
@@ -452,8 +465,13 @@ exports.getPendingPaymentSessions = async (req, res) => {
       };
 
       const clientes = sess.snapshot_pedidos
-        ? sess.snapshot_pedidos.map((o) =>
-            ((o.billing?.first_name || "") + " " + (o.billing?.last_name || "")).trim() || "Cliente"
+        ? sess.snapshot_pedidos.map(
+            (o) =>
+              (
+                (o.billing?.first_name || "") +
+                " " +
+                (o.billing?.last_name || "")
+              ).trim() || "Cliente",
           )
         : [];
 
@@ -472,11 +490,9 @@ exports.getPendingPaymentSessions = async (req, res) => {
     res.status(200).json(pendingData);
   } catch (error) {
     console.error("Error getPendingPaymentSessions:", error.message);
-    res
-      .status(500)
-      .json({
-        error: `Error al cargar sesiones pendientes de pago: ${error.message}`,
-      });
+    res.status(500).json({
+      error: `Error al cargar sesiones pendientes de pago: ${error.message}`,
+    });
   }
 };
 
@@ -537,8 +553,13 @@ exports.getHistorySessions = async (req, res) => {
       };
 
       const clientes = sess.snapshot_pedidos
-        ? sess.snapshot_pedidos.map((o) =>
-            ((o.billing?.first_name || "") + " " + (o.billing?.last_name || "")).trim() || "Cliente"
+        ? sess.snapshot_pedidos.map(
+            (o) =>
+              (
+                (o.billing?.first_name || "") +
+                " " +
+                (o.billing?.last_name || "")
+              ).trim() || "Cliente",
           )
         : [];
 
@@ -557,11 +578,9 @@ exports.getHistorySessions = async (req, res) => {
     res.status(200).json(historyData);
   } catch (error) {
     console.error("Error getHistorySessions:", error.message);
-    res
-      .status(500)
-      .json({
-        error: `Error al cargar historial de sesiones: ${error.message}`,
-      });
+    res.status(500).json({
+      error: `Error al cargar historial de sesiones: ${error.message}`,
+    });
   }
 };
 
@@ -606,8 +625,13 @@ exports.getPendingAuditSessions = async (req, res) => {
       };
 
       const clientes = sess.snapshot_pedidos
-        ? sess.snapshot_pedidos.map((o) =>
-            ((o.billing?.first_name || "") + " " + (o.billing?.last_name || "")).trim() || "Cliente"
+        ? sess.snapshot_pedidos.map(
+            (o) =>
+              (
+                (o.billing?.first_name || "") +
+                " " +
+                (o.billing?.last_name || "")
+              ).trim() || "Cliente",
           )
         : [];
 
@@ -626,11 +650,9 @@ exports.getPendingAuditSessions = async (req, res) => {
     res.status(200).json(pendingData);
   } catch (error) {
     console.error("Error getPendingAuditSessions:", error.message);
-    res
-      .status(500)
-      .json({
-        error: `Error al cargar sesiones pendientes de auditoría: ${error.message}`,
-      });
+    res.status(500).json({
+      error: `Error al cargar sesiones pendientes de auditoría: ${error.message}`,
+    });
   }
 };
 
@@ -784,15 +806,15 @@ exports.getSessionLogsDetail = async (req, res) => {
             );
             const unitMeasure = unitMeta ? unitMeta.display_value : null;
             productDetailsMap[item.product_id] = {
-              name: item.name,  // 🔧 Añadir nombre del producto
+              name: item.name, // 🔧 Añadir nombre del producto
               image: imgUrl,
               sku: item.sku,
-              price: item.price,  // 🔧 Incluir precio también
+              price: item.price, // 🔧 Incluir precio también
               unidad_medida: unitMeasure,
             };
             if (item.variation_id)
               productDetailsMap[item.variation_id] = {
-                name: item.name,  // 🔧 Añadir nombre del producto
+                name: item.name, // 🔧 Añadir nombre del producto
                 image: imgUrl,
                 sku: item.sku,
                 price: item.price,
@@ -902,19 +924,33 @@ exports.getSessionLogsDetail = async (req, res) => {
     });
 
     console.log(
-      `🔍 Buscando códigos de barras para ${uniquePairs.size} pares f120_id|unidad_medida`
+      `🔍 Buscando códigos de barras para ${uniquePairs.size} pares f120_id|unidad_medida`,
     );
 
     const barcodeMapByF120IdAndUm = await getBarcodesFromSiesaByUnitMeasure(
-      Array.from(uniquePairs.values())
+      Array.from(uniquePairs.values()),
     );
 
     // 🔧 FALLBACK: Obtener TODAS las unidades disponibles en SIESA para cada f120_id
     // para poder hacer matching cuando WooCommerce tiene la unidad incorrecta
-    const { data: allSiesaBarcodes, error: siesaError } = await supabase
-      .from("siesa_codigos_barras")
-      .select("f120_id, codigo_barras, unidad_medida")
-      .in("f120_id", Array.from(f120IdOnlySet));
+    // Paginar para evitar el límite default de 1000 filas de Supabase
+    const f120IdArray = Array.from(f120IdOnlySet);
+    let allSiesaBarcodes = [];
+    let siesaError = null;
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < f120IdArray.length; i += BATCH_SIZE) {
+      const batch = f120IdArray.slice(i, i + BATCH_SIZE);
+      const { data: batchData, error: batchError } = await supabase
+        .from("siesa_codigos_barras")
+        .select("f120_id, codigo_barras, unidad_medida")
+        .in("f120_id", batch)
+        .limit(10000);
+      if (batchError) {
+        siesaError = batchError;
+        break;
+      }
+      if (batchData) allSiesaBarcodes = allSiesaBarcodes.concat(batchData);
+    }
 
     const barcodesByF120IdOnly = {};
     if (allSiesaBarcodes && !siesaError) {
@@ -922,7 +958,11 @@ exports.getSessionLogsDetail = async (req, res) => {
         const code = (bc.codigo_barras || "").toString().trim();
         const cleaned = code.replace(/\+$/, "");
         if (!cleaned || cleaned.length < 8) return;
-        if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
+        if (
+          cleaned.toUpperCase().startsWith("M") ||
+          cleaned.toUpperCase().startsWith("N")
+        )
+          return;
         if (!/^\d+\+?$/.test(code)) return;
 
         const f120 = bc.f120_id;
@@ -981,7 +1021,9 @@ exports.getSessionLogsDetail = async (req, res) => {
       const sku = productDetailsMap[productId].sku;
       const productName = productDetailsMap[productId].name || "";
       const f120_id = parseInt(sku);
-      const um = (productDetailsMap[productId].unidad_medida || "").toUpperCase() || "DEFAULT";
+      const um =
+        (productDetailsMap[productId].unidad_medida || "").toUpperCase() ||
+        "DEFAULT";
 
       if (!isNaN(f120_id)) {
         // Normalizar unidad de medida para búsqueda
@@ -995,9 +1037,12 @@ exports.getSessionLogsDetail = async (req, res) => {
 
         // ✅ INTENTO 1: Usar SOLO el código específico para esa combinación f120_id + unidad_medida
         if (barcodeMapByF120IdAndUm[key]) {
-          productDetailsMap[productId].barcode = barcodeMapByF120IdAndUm[key][0] || null;
+          productDetailsMap[productId].barcode =
+            barcodeMapByF120IdAndUm[key][0] || null;
           productDetailsMap[productId].unidad_medida = normalizedUm; // Guardar la UM normalizada
-          console.log(`✅ ${productId}: f120_id=${f120_id}, UM=${normalizedUm} → ${productDetailsMap[productId].barcode} (búsqueda exacta)`);
+          console.log(
+            `✅ ${productId}: f120_id=${f120_id}, UM=${normalizedUm} → ${productDetailsMap[productId].barcode} (búsqueda exacta)`,
+          );
         } else {
           // 🔧 IMPORTANTE: Si WooCommerce tiene UM incorrecta, consultar SIESA para obtener la correcta
           // La UM en SIESA es la ÚNICA fuente de verdad
@@ -1005,7 +1050,10 @@ exports.getSessionLogsDetail = async (req, res) => {
           // Si está como UND/P2/P3/P4/P6 → Requiere validación
         }
 
-        if (barcodesByF120IdOnly[f120_id] && barcodesByF120IdOnly[f120_id].length > 0) {
+        if (
+          barcodesByF120IdOnly[f120_id] &&
+          barcodesByF120IdOnly[f120_id].length > 0
+        ) {
           // ✅ INTENTO 2 (FALLBACK): Si no encuentra con esa UM exacta, usar lo que haya en SIESA para ese f120_id
           // Esto pasa cuando WooCommerce tiene "UND" pero SIESA tiene "P2" o "P6"
 
@@ -1017,12 +1065,18 @@ exports.getSessionLogsDetail = async (req, res) => {
               .filter((bc) => bc.f120_id === f120_id)
               .forEach((bc) => {
                 let um_normalized = (bc.unidad_medida || "").toUpperCase();
-                if (um_normalized === "UN" || um_normalized === "UNIDAD") um_normalized = "UND";
-                else if (um_normalized === "KG" || um_normalized === "KILO") um_normalized = "KL";
-                else if (um_normalized === "LB" || um_normalized === "LIBRA") um_normalized = "LB";
+                if (um_normalized === "UN" || um_normalized === "UNIDAD")
+                  um_normalized = "UND";
+                else if (um_normalized === "KG" || um_normalized === "KILO")
+                  um_normalized = "KL";
+                else if (um_normalized === "LB" || um_normalized === "LIBRA")
+                  um_normalized = "LB";
 
                 if (!barcodesByUM[um_normalized]) {
-                  barcodesByUM[um_normalized] = bc.codigo_barras.replace(/\+$/, "");
+                  barcodesByUM[um_normalized] = bc.codigo_barras.replace(
+                    /\+$/,
+                    "",
+                  );
                 }
               });
             Object.assign(barcodesByUM, {});
@@ -1030,40 +1084,54 @@ exports.getSessionLogsDetail = async (req, res) => {
           }
 
           // Hacer matching inteligente por nombre del producto
-          const bestUM = inferUnitMeasureFromName(productName, availableUMsForThisF120);
+          const bestUM = inferUnitMeasureFromName(
+            productName,
+            availableUMsForThisF120,
+          );
 
           if (bestUM) {
             // Buscar el código de barras para esa UM específica
-            const siesaItemForBestUM = allSiesaBarcodes.find(
-              (bc) => {
-                const bc_um = (bc.unidad_medida || "").toUpperCase();
-                let bc_um_normalized = bc_um;
-                if (bc_um_normalized === "UN" || bc_um_normalized === "UNIDAD") bc_um_normalized = "UND";
-                else if (bc_um_normalized === "KG" || bc_um_normalized === "KILO") bc_um_normalized = "KL";
-                else if (bc_um_normalized === "LB" || bc_um_normalized === "LIBRA") bc_um_normalized = "LB";
-                return bc.f120_id === f120_id && bc_um_normalized === bestUM;
-              }
-            );
+            const siesaItemForBestUM = allSiesaBarcodes.find((bc) => {
+              const bc_um = (bc.unidad_medida || "").toUpperCase();
+              let bc_um_normalized = bc_um;
+              if (bc_um_normalized === "UN" || bc_um_normalized === "UNIDAD")
+                bc_um_normalized = "UND";
+              else if (bc_um_normalized === "KG" || bc_um_normalized === "KILO")
+                bc_um_normalized = "KL";
+              else if (
+                bc_um_normalized === "LB" ||
+                bc_um_normalized === "LIBRA"
+              )
+                bc_um_normalized = "LB";
+              return bc.f120_id === f120_id && bc_um_normalized === bestUM;
+            });
 
             if (siesaItemForBestUM) {
-              productDetailsMap[productId].barcode = siesaItemForBestUM.codigo_barras.replace(/\+$/, "");
+              productDetailsMap[productId].barcode =
+                siesaItemForBestUM.codigo_barras.replace(/\+$/, "");
               productDetailsMap[productId].unidad_medida = bestUM;
               console.log(
-                `⚠️  ${productId}: f120_id=${f120_id}, UM por nombre="${bestUM}" (WooCommerce tenía "${normalizedUm}") → ${productDetailsMap[productId].barcode}`
+                `⚠️  ${productId}: f120_id=${f120_id}, UM por nombre="${bestUM}" (WooCommerce tenía "${normalizedUm}") → ${productDetailsMap[productId].barcode}`,
               );
             }
           } else {
-            console.warn(`❌ ${productId}: No se pudo inferir UM para f120_id=${f120_id}`);
+            console.warn(
+              `❌ ${productId}: No se pudo inferir UM para f120_id=${f120_id}`,
+            );
           }
         } else {
-          console.warn(`❌ ${productId}: No hay código en SIESA para f120_id=${f120_id}`);
+          console.warn(
+            `❌ ${productId}: No hay código en SIESA para f120_id=${f120_id}`,
+          );
         }
       }
     });
 
     // ✅ OBTENER CATEGORÍAS REALES para detección fruver/carnicería en auditor
     try {
-      const productIdsForCat = Object.keys(productDetailsMap).map(Number).filter((id) => !isNaN(id));
+      const productIdsForCat = Object.keys(productDetailsMap)
+        .map(Number)
+        .filter((id) => !isNaN(id));
       if (productIdsForCat.length > 0) {
         const catClient = await getWooClient(sessionInfo.sede_id || req.sedeId);
         const { data: productsWithCats } = await catClient.get("products", {
@@ -1082,7 +1150,10 @@ exports.getSessionLogsDetail = async (req, res) => {
         }
       }
     } catch (e) {
-      console.warn("⚠️ No se pudieron obtener categorías para auditor:", e.message);
+      console.warn(
+        "⚠️ No se pudieron obtener categorías para auditor:",
+        e.message,
+      );
     }
 
     // 🔧 CAMBIO DE ESTRATEGIA:
@@ -1095,7 +1166,7 @@ exports.getSessionLogsDetail = async (req, res) => {
     Object.entries(productDetailsMap).forEach(([id, detail]) => {
       const um = (detail.unidad_medida || "").toLowerCase();
       if (WEIGHT_UNITS.includes(um)) {
-        detail._isWeighable = true;  // Marcar para que frontend lo detecte
+        detail._isWeighable = true; // Marcar para que frontend lo detecte
       }
     });
 
@@ -1106,7 +1177,11 @@ exports.getSessionLogsDetail = async (req, res) => {
     const auditBarcodeMap = {};
     if (allSiesaBarcodes) {
       allSiesaBarcodes.forEach((bc) => {
-        const clean = bc.codigo_barras.toString().trim().replace(/\+$/, "").toUpperCase();
+        const clean = bc.codigo_barras
+          .toString()
+          .trim()
+          .replace(/\+$/, "")
+          .toUpperCase();
         auditBarcodeMap[clean] = bc.f120_id;
         // También con el original (con +)
         const original = bc.codigo_barras.toString().trim().toUpperCase();
@@ -1127,7 +1202,7 @@ exports.getSessionLogsDetail = async (req, res) => {
       orders_info: ordersData,
       products_map: productDetailsMap,
       audit_barcode_map: auditBarcodeMap,
-      logs: auditableLogs,  // 🔧 TODOS los logs sin filtrar (frontend decide qué validar)
+      logs: auditableLogs, // 🔧 TODOS los logs sin filtrar (frontend decide qué validar)
       final_snapshot: sessionInfo.datos_salida || null,
     });
   } catch (error) {

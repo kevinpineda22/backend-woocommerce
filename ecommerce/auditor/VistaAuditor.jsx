@@ -131,7 +131,57 @@ const VistaAuditor = () => {
 
     try {
       // Buscar el código en el mapa de barcodes cargado de SIESA
-      const f120_id = barcodeMap[cleanCode];
+      let f120_id = barcodeMap[cleanCode];
+
+      // Fallback: si no está en el mapa, intentar parsear como SKU (ej: "1032P2" → f120=1032, um=P2)
+      let skuParsedUM = null;
+      if (!f120_id) {
+        const skuMatch = cleanCode.match(/^(\d+)([A-Z]+\d*)$/);
+        if (skuMatch) {
+          const parsedF120 = parseInt(skuMatch[1]);
+          skuParsedUM = skuMatch[2];
+          // Verificar que este f120_id existe en algún item del audit
+          const itemExists = auditData?.items?.some((item) => {
+            const itemF120 = parseInt((item.sku || "").replace(/-/g, ""));
+            return !isNaN(itemF120) && itemF120 === parsedF120;
+          });
+          if (itemExists) {
+            f120_id = parsedF120;
+          }
+        }
+      }
+
+      // Fallback final: consultar el backend
+      if (!f120_id) {
+        // Intentar buscar en el backend como último recurso
+        try {
+          const firstPendingItem = auditData?.items?.find(
+            (i) =>
+              requiredItems.has(String(i.id)) &&
+              !verifiedItems.has(String(i.id)),
+          );
+          if (firstPendingItem) {
+            const itemF120 = parseInt(
+              (firstPendingItem.sku || "").replace(/-/g, ""),
+            );
+            const itemUM = (
+              firstPendingItem.unidad_medida || "UND"
+            ).toUpperCase();
+            if (!isNaN(itemF120)) {
+              const resp = await ecommerceApi.post("/validar-codigo-auditor", {
+                codigo: cleanCode,
+                f120_id_esperado: itemF120,
+                unidad_medida_esperada: itemUM,
+              });
+              if (resp.data?.valid && resp.data?.f120_id) {
+                f120_id = resp.data.f120_id;
+              }
+            }
+          }
+        } catch (e) {
+          // Silently fall through to error below
+        }
+      }
 
       if (!f120_id) {
         showFeedback("error", `El código "${cleanCode}" no existe en SIESA.`);
@@ -454,10 +504,8 @@ const VistaAuditor = () => {
         },
       });
 
-      // Usar el mapa de barcodes que ya viene del backend
-      if (audit_barcode_map) {
-        setBarcodeMap(audit_barcode_map);
-      }
+      // ✅ Ya se usó audit_barcode_map arriba en normalizedBarcodeMap (línea setBarcodeMap)
+      // NO sobreescribir con el mapa raw — el normalizado ya incluye todo
     } catch (error) {
       setErrorMsg("Error consultando la sesión.");
     } finally {
