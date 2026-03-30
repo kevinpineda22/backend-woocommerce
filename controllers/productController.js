@@ -290,21 +290,32 @@ exports.searchProduct = async (req, res) => {
 
     const results = products
       .map((p) => {
-        // Para variaciones, obtener unidad_medida de attributes; para productos simples, de meta_data
+        // 🔧 Para variaciones, obtener unidad_medida del SKU (ej: "1039P2" → "P2")
+        // SIESA siempre usa P2, P3, P4, UND, no nombres como "Dúo"
         let unidadMedida = null;
-        if (p.attributes && Array.isArray(p.attributes)) {
-          // Es una variación: buscar en attributes (ej: "Presentación: Dúo")
+        const sku = (p.sku || "").toUpperCase().trim();
+
+        // RUTA 1: Extraer unidad_medida del SKU (ej: "1039P2" → "P2", "1039UND" → "UND")
+        if (sku.match(/^\d+([A-Z]+\d*)$/)) {
+          const match = sku.match(/^(\d+)([A-Z]+\d*)$/);
+          if (match && match[2]) {
+            unidadMedida = match[2]; // ej: "P2", "UND", "LB", "KL"
+          }
+        }
+
+        // RUTA 2 (fallback): Buscar en attributes WooCommerce
+        if (!unidadMedida && p.attributes && Array.isArray(p.attributes)) {
           const presentationAttr = p.attributes.find(
             (a) =>
               a.name?.toLowerCase().includes("presentación") ||
               a.slug?.includes("presentacion"),
           );
           if (presentationAttr) {
-            // ✅ Normalizar a mayúsculas para consistencia con SIESA
             unidadMedida = (presentationAttr.option || "").toUpperCase().trim();
           }
         }
-        // Si no encontró en attributes, buscar en meta_data
+
+        // RUTA 3 (fallback): Buscar en meta_data
         if (!unidadMedida) {
           const metaUM = p.meta_data?.find((m) => m.key === "pa_unidad-de-medida-aproximado")
             ?.display_value || null;

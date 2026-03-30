@@ -208,6 +208,7 @@ const SubstituteModal = ({
 
     let isValid = false;
     let isFastPass = false;
+    let hasDetailedError = false;  // 🔧 Rastrear si SIESA devolvió un error específico
     let cleanCode = code.trim().toUpperCase();
     const expectedSku = (pendingSub.sku || "").toUpperCase();
 
@@ -273,7 +274,37 @@ const SubstituteModal = ({
         return;
       }
     } else {
-      isValid = validateCode(code, pendingSub);
+      // 🔧 PRODUCTOS POR UNIDAD: Validar contra SIESA (como auditor/picker)
+      try {
+        // Extraer f120_id y unidad_medida del SKU (ej: "1039P2" → f120_id=1039, um=P2)
+        const skuMatch = expectedSku.match(/^(\d+)([A-Z]+\d*)$/);
+        const f120Id = skuMatch ? parseInt(skuMatch[1]) : null;
+        // Usar unidad_medida del SKU si está disponible, sino usar la del producto
+        const umEsperada = (skuMatch && skuMatch[2]) || pendingSub.unidad_medida || "UND";
+
+        if (f120Id) {
+          // Usar el mismo endpoint de validación que auditor
+          const res = await ecommerceApi.post(`/validar-codigo-auditor`, {
+            codigo: cleanCode,
+            f120_id_esperado: f120Id,
+            unidad_medida_esperada: umEsperada,
+          });
+          isValid = res.data.valid;
+
+          if (!isValid) {
+            // 🔧 Mostrar mensaje de error específico de SIESA
+            setSubError(res.data.message || `❌ Código incorrecto. Verifica que estés escaneando el producto correcto.`);
+            hasDetailedError = true;  // Marcar que hay error específico
+          }
+        } else {
+          // Fallback a validación local si no hay f120_id
+          isValid = validateCode(code, pendingSub);
+        }
+      } catch (error) {
+        console.warn("Error validando código en SIESA:", error.message);
+        // Fallback a validación local en caso de error
+        isValid = validateCode(code, pendingSub);
+      }
     }
 
     if (isValid) {
@@ -315,10 +346,15 @@ const SubstituteModal = ({
         // Carnes: listo para enviar
       }
     } else {
-      if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-      setSubError(
-        `❌ Código incorrecto. Verifica que estés escaneando el producto correcto.`,
-      );
+      // 🔧 Si no hay error detallado de SIESA, mostrar genérico
+      if (!hasDetailedError) {
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        setSubError(
+          `❌ Código incorrecto. Verifica que estés escaneando el producto correcto.`,
+        );
+      } else if (navigator.vibrate) {
+        navigator.vibrate([100, 50, 100]);
+      }
       setIsSubCodeValidated(false);
       setVerifyCode("");
       verifyInputRef.current?.focus();
