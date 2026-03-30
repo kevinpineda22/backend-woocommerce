@@ -348,7 +348,7 @@ const VistaAuditor = () => {
 
     try {
       const res = await ecommerceApi.get(`/historial-detalle?session_id=${id}`);
-      const { metadata, logs, orders_info, products_map, final_snapshot } =
+      const { metadata, logs, allLogs, orders_info, products_map, final_snapshot } =
         res.data;
 
       if (!logs || logs.length === 0) {
@@ -417,6 +417,17 @@ const VistaAuditor = () => {
       if (products_map) {
         Object.entries(products_map).forEach(([prodId, prodDetail]) => {
           if (prodDetail._isTrusted && !itemsMap[prodId]) {
+            // 🔧 Buscar el pedido a que pertenece este producto en TODOS los logs (incluyendo fruver/carnes)
+            let relatedOrderId = null;
+            const logsToSearch = allLogs || logs;  // Usar allLogs si está disponible
+            const relatedLog = logsToSearch.find((log) => {
+              const logProdId = String(log.es_sustituto ? log.id_producto_final : log.id_producto);
+              return logProdId === String(prodId);
+            });
+            if (relatedLog) {
+              relatedOrderId = relatedLog.id_pedido;
+            }
+
             // Producto pesable confiable sin logs de auditoría
             itemsArray.push({
               id: prodId,
@@ -426,7 +437,7 @@ const VistaAuditor = () => {
               peso_total: 0,
               is_sub: false,
               price: prodDetail.price || 0,
-              order_id: null,  // No pertenece a pedido específico
+              order_id: relatedOrderId,  // 🔧 Usar pedido del log original
               image: prodDetail.image || null,
               sku: prodDetail.sku || null,
               barcode: prodDetail.barcode || null,

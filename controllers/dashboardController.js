@@ -1000,7 +1000,8 @@ exports.getSessionLogsDetail = async (req, res) => {
       },
       orders_info: ordersData,
       products_map: productDetailsMap,
-      logs: auditableLogs,
+      logs: auditableLogs,  // Logs para validar (excluye fruver/carnes)
+      allLogs: logs,         // 🔧 TODOS los logs (incluyendo fruver/carnes) para encontrar pedidos
       final_snapshot: sessionInfo.datos_salida || null,
     });
   } catch (error) {
