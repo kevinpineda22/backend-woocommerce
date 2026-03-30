@@ -125,156 +125,74 @@ const VistaAuditor = () => {
     }, 200);
   };
 
-  const verifyProductScan = (code) => {
+  const verifyProductScan = async (code) => {
     const cleanCode = code.trim().replace(/\+$/, "").toUpperCase();
-    let matchId = null;
-    let matchPriority = 0; // 0=none, 1=non-required, 2=required+verified, 3=required+unverified
-    let foundInOrder = false;
-    let matchedName = "";
 
-    auditData.items.forEach((item) => {
-      const scannedBarcodes = auditData.scannedBarcodes?.[item.id];
+    // 🔧 NUEVA LÓGICA: Validar contra SIESA como picker y SubstituteModal
+    // El auditor ingresa un código, el sistema valida contra SIESA usando f120_id + unidad_medida
 
-      // ✅ Comparar contra scannedBarcodes (stripping "+" suffix de SIESA)
-      let hasScannedBarcode = false;
-      if (scannedBarcodes) {
-        if (scannedBarcodes.has(cleanCode)) {
-          hasScannedBarcode = true;
-        } else {
-          // Intentar match sin "+" por si el código almacenado tiene "+"
-          for (const bc of scannedBarcodes) {
-            if (bc.replace(/\+$/, "") === cleanCode) {
-              hasScannedBarcode = true;
-              break;
-            }
-          }
+    try {
+      // 1. Intentar encontrar qué producto quiere validar basado en matching simple del código
+      let targetItem = null;
+
+      for (const itemId of requiredItems) {
+        if (verifiedItems.has(itemId)) continue;
+        const item = auditData.items.find((i) => String(i.id) === String(itemId));
+        if (!item) continue;
+
+        // Intentar match del código contra el SKU del item
+        const itemSku = (item.sku || "").toUpperCase();
+        if (
+          cleanCode === itemSku ||
+          itemSku.includes(cleanCode) ||
+          cleanCode.includes(itemSku)
+        ) {
+          targetItem = item;
+          break;
         }
       }
 
-      // ✅ Comparar contra SIESA barcode (stripping "+" suffix)
-      const siesaClean = item.barcode
-        ? item.barcode.trim().replace(/\+$/, "").toUpperCase()
-        : "";
-      const hasSiesaBarcode = siesaClean && siesaClean === cleanCode;
-
-      const itemSku = (item.id || "").toString().toUpperCase();
-      const hasSkuMatch =
-        itemSku === cleanCode ||
-        (item.sku && item.sku.toUpperCase() === cleanCode);
-
-      // ✅ Match por prefijo GS1: si el código escaneado es GS1 (13-14 dígitos, empieza con "2"),
-      // y el producto tiene un barcode SIESA que comparte los primeros 7 dígitos (29+SKU+0),
-      // es el mismo producto (solo difiere el peso codificado).
-      let hasGS1PrefixMatch = false;
-      const isCleanCodeGS1 =
-        /^\d{13,14}$/.test(cleanCode) && cleanCode.startsWith("2");
-      if (isCleanCodeGS1 && siesaClean && /^\d{13,14}$/.test(siesaClean) && siesaClean.startsWith("2")) {
-        // Comparar prefijo (primeros 7-8 dígitos: "29" + item + "0")
-        if (cleanCode.substring(0, 7) === siesaClean.substring(0, 7)) {
-          hasGS1PrefixMatch = true;
-        }
-      }
-
-      // Comprobamos si el picker escaneó un código GS1 para este producto
-      let pickerScannedGS1 = false;
-      if (scannedBarcodes) {
-        for (const bc of scannedBarcodes) {
-          if (/^\d{13,14}$/.test(bc) && bc.startsWith("2")) {
-            pickerScannedGS1 = true;
-            break;
-          }
-        }
-      }
-
-      // Si el picker escaneó un GS1 (ej. etiqueta de báscula de carnes),
-      // forzamos al auditor a escanear exactamente la misma etiqueta o al menos un GS1 válido.
-      if (pickerScannedGS1) {
-        const isGS1 =
-          /^\d{13,14}$/.test(cleanCode) && cleanCode.startsWith("2");
-        if (!isGS1) return; // Ignorar coincidencias si el auditor intenta escanear el SKU corto normal
-
-        // ✅ Para GS1, aceptar: barcode exacto del picker, o match por prefijo GS1 (mismo producto, peso distinto)
-        let gs1MatchFound = hasScannedBarcode;
-        if (!gs1MatchFound && scannedBarcodes) {
-          for (const bc of scannedBarcodes) {
-            if (/^\d{13,14}$/.test(bc) && bc.startsWith("2") &&
-                cleanCode.substring(0, 7) === bc.substring(0, 7)) {
-              gs1MatchFound = true;
-              break;
-            }
-          }
-        }
-
-        if (gs1MatchFound) {
-          foundInOrder = true;
-          const isReq = requiredItems.has(item.id);
-          const isVer = verifiedItems.has(item.id);
-          const pri = isReq && !isVer ? 3 : isReq && isVer ? 2 : 1;
-          if (pri > matchPriority) {
-            matchId = item.id;
-            matchedName = item.name;
-            matchPriority = pri;
-          }
-        }
+      if (!targetItem) {
+        showFeedback(
+          "error",
+          `El código "${cleanCode}" no corresponde a ningún producto por validar en este pedido.`,
+        );
         return;
       }
 
-      if (hasScannedBarcode || hasSiesaBarcode || hasSkuMatch || hasGS1PrefixMatch) {
-        foundInOrder = true;
-        const isReq = requiredItems.has(item.id);
-        const isVer = verifiedItems.has(item.id);
-        const pri = isReq && !isVer ? 3 : isReq && isVer ? 2 : 1;
-        if (pri > matchPriority) {
-          matchId = item.id;
-          matchedName = item.name;
-          matchPriority = pri;
-        }
-      }
-    });
+      // 2. Extraer f120_id y unidad_medida del item
+      const skuMatch = (targetItem.sku || "").match(/^(\d+)([A-Z]+\d*)$/);
+      const f120Id = skuMatch ? parseInt(skuMatch[1]) : parseInt(targetItem.sku);
+      const umEsperada = (targetItem.unidad_medida || "UND").toUpperCase();
 
-    if (matchId) {
-      if (!verifiedItems.has(matchId)) {
-        setVerifiedItems((prev) => new Set(prev).add(matchId));
-        const isRequired = requiredItems.has(matchId);
-        showFeedback(
-          "success",
-          isRequired
-            ? `Producto verificado: ${matchedName}`
-            : `Producto verificado (extra): ${matchedName}`,
-        );
-      } else {
-        showFeedback("warning", `${matchedName} ya había sido verificado.`);
-      }
-    } else if (foundInOrder) {
-      // Esto solo debería pasar si el producto necesita GS1 y el auditor usó SKU corto
-      showFeedback(
-        "info",
-        "Producto encontrado, pero requiere escanear la etiqueta GS1 completa.",
-      );
-    } else {
-      // Check if the rejected code was a short code for a meat/weighable item
-      const itemRequiringGS1 = auditData.items.find((item) => {
-        if (verifiedItems.has(item.id)) return false;
-        const scans = auditData.scannedBarcodes?.[item.id];
-        if (scans) {
-          for (const bc of scans) {
-            if (/^\d{13,14}$/.test(bc) && bc.startsWith("2")) return true;
-          }
-        }
-        return false;
+      // 3. Validar el código contra SIESA
+      const res = await ecommerceApi.post(`/validar-codigo-auditor`, {
+        codigo: cleanCode,
+        f120_id_esperado: f120Id,
+        unidad_medida_esperada: umEsperada,
       });
 
-      if (itemRequiringGS1) {
+      if (res.data.valid) {
+        // ✅ Válido, marcar como verificado
+        setVerifiedItems((prev) => new Set(prev).add(targetItem.id));
         showFeedback(
-          "error",
-          `⚖️ Producto pesado detectado. Debes escanear la etiqueta GS1 completa que capturó el picker.`,
+          "success",
+          `✅ ${targetItem.name} verificado correctamente`,
         );
       } else {
+        // ❌ Inválido, mostrar mensaje específico de SIESA
         showFeedback(
           "error",
-          `El código "${cleanCode}" no pertenece a este pedido.`,
+          res.data.message || `Código inválido para ${targetItem.name}`,
         );
       }
+    } catch (error) {
+      console.error("Error validando código:", error.message);
+      showFeedback(
+        "error",
+        `Error al validar: ${error.message}`,
+      );
+      return;
     }
   };
 

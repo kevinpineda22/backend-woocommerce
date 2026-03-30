@@ -941,9 +941,40 @@ exports.getSessionLogsDetail = async (req, res) => {
       `(fallback: ${Object.keys(barcodesByF120IdOnly).length} f120_ids)`,
     );
 
+    // 🔧 FUNCIÓN HELPER: Hacer matching inteligente de unidad_medida usando pistas del nombre
+    const inferUnitMeasureFromName = (productName, availableUMs) => {
+      if (!availableUMs || availableUMs.length === 0) return null;
+      if (availableUMs.length === 1) return availableUMs[0]; // Si hay solo una, esa es
+
+      const nameUpper = (productName || "").toUpperCase();
+
+      // Pistas por patrón de nombre
+      const patterns = {
+        P2: ["DÚO", "DOS", "2UN", "X2", "PAIR"],
+        P3: ["TRÍO", "TRES", "3UN", "X3", "TRIPLO"],
+        P4: ["CUATRO", "4UN", "X4", "QUADRO"],
+        P6: ["SEIS", "SIX", "6UN", "X6", "PACK", "SIXPACK"],
+        P12: ["DOCE", "TWELVE", "12UN", "X12", "DOCENA"],
+        UND: ["UNIDAD", "UNITARIO", "SOLO", "INDIVIDUAL"],
+        KL: ["KILO", "KG", "LIBRA", "LB", "PESO"],
+      };
+
+      for (const [um, keywords] of Object.entries(patterns)) {
+        if (availableUMs.includes(um)) {
+          if (keywords.some((kw) => nameUpper.includes(kw))) {
+            return um;
+          }
+        }
+      }
+
+      // Si no encontramos pista en el nombre, retornar la primera disponible
+      return availableUMs[0];
+    };
+
     // Agregar códigos de barras al productDetailsMap usando el cruce exacto f120_id + unidad_medida
     Object.keys(productDetailsMap).forEach((productId) => {
       const sku = productDetailsMap[productId].sku;
+      const productName = productDetailsMap[productId].name || "";
       const f120_id = parseInt(sku);
       const um = (productDetailsMap[productId].unidad_medida || "").toUpperCase() || "DEFAULT";
 
@@ -964,25 +995,53 @@ exports.getSessionLogsDetail = async (req, res) => {
           console.log(`✅ ${productId}: f120_id=${f120_id}, UM=${normalizedUm} → ${productDetailsMap[productId].barcode} (búsqueda exacta)`);
         } else if (barcodesByF120IdOnly[f120_id] && barcodesByF120IdOnly[f120_id].length > 0) {
           // ✅ INTENTO 2 (FALLBACK): Si no encuentra con esa UM exacta, usar lo que haya en SIESA para ese f120_id
-          // Esto pasa cuando WooCommerce tiene "UND" pero SIESA tiene "P2"
-          productDetailsMap[productId].barcode = barcodesByF120IdOnly[f120_id][0];
+          // Esto pasa cuando WooCommerce tiene "UND" pero SIESA tiene "P2" o "P6"
 
-          // 🔧 IMPORTANTE: Actualizar unidad_medida a lo que está en SIESA
-          // Buscar cuál es la UM correcta en SIESA para ese barcode
+          // 🔧 IMPORTANTE: Obtener TODAS las unidades disponibles en SIESA para este f120_id
+          const availableUMsForThisF120 = [];
           if (allSiesaBarcodes) {
-            const siesaItem = allSiesaBarcodes.find(
-              (bc) => bc.f120_id === f120_id &&
-                      bc.codigo_barras.replace(/\+$/, "") === productDetailsMap[productId].barcode
-            );
-            if (siesaItem) {
-              let correctUM = (siesaItem.unidad_medida || "").toUpperCase();
-              if (correctUM === "UN" || correctUM === "UNIDAD") correctUM = "UND";
-              else if (correctUM === "KG" || correctUM === "KILO") correctUM = "KL";
-              else if (correctUM === "LB" || correctUM === "LIBRA") correctUM = "LB";
+            const barcodesByUM = {};
+            allSiesaBarcodes
+              .filter((bc) => bc.f120_id === f120_id)
+              .forEach((bc) => {
+                let um_normalized = (bc.unidad_medida || "").toUpperCase();
+                if (um_normalized === "UN" || um_normalized === "UNIDAD") um_normalized = "UND";
+                else if (um_normalized === "KG" || um_normalized === "KILO") um_normalized = "KL";
+                else if (um_normalized === "LB" || um_normalized === "LIBRA") um_normalized = "LB";
 
-              productDetailsMap[productId].unidad_medida = correctUM;
-              console.log(`⚠️  ${productId}: f120_id=${f120_id}, UM correcta=${correctUM} (WooCommerce tenía ${normalizedUm}) → ${productDetailsMap[productId].barcode}`);
+                if (!barcodesByUM[um_normalized]) {
+                  barcodesByUM[um_normalized] = bc.codigo_barras.replace(/\+$/, "");
+                }
+              });
+            Object.assign(barcodesByUM, {});
+            availableUMsForThisF120.push(...Object.keys(barcodesByUM));
+          }
+
+          // Hacer matching inteligente por nombre del producto
+          const bestUM = inferUnitMeasureFromName(productName, availableUMsForThisF120);
+
+          if (bestUM) {
+            // Buscar el código de barras para esa UM específica
+            const siesaItemForBestUM = allSiesaBarcodes.find(
+              (bc) => {
+                const bc_um = (bc.unidad_medida || "").toUpperCase();
+                let bc_um_normalized = bc_um;
+                if (bc_um_normalized === "UN" || bc_um_normalized === "UNIDAD") bc_um_normalized = "UND";
+                else if (bc_um_normalized === "KG" || bc_um_normalized === "KILO") bc_um_normalized = "KL";
+                else if (bc_um_normalized === "LB" || bc_um_normalized === "LIBRA") bc_um_normalized = "LB";
+                return bc.f120_id === f120_id && bc_um_normalized === bestUM;
+              }
+            );
+
+            if (siesaItemForBestUM) {
+              productDetailsMap[productId].barcode = siesaItemForBestUM.codigo_barras.replace(/\+$/, "");
+              productDetailsMap[productId].unidad_medida = bestUM;
+              console.log(
+                `⚠️  ${productId}: f120_id=${f120_id}, UM por nombre="${bestUM}" (WooCommerce tenía "${normalizedUm}") → ${productDetailsMap[productId].barcode}`
+              );
             }
+          } else {
+            console.warn(`❌ ${productId}: No se pudo inferir UM para f120_id=${f120_id}`);
           }
         } else {
           console.warn(`❌ ${productId}: No hay código en SIESA para f120_id=${f120_id}`);

@@ -16,7 +16,9 @@
       "Bash(find /c/Users/1/Desktop/BACKEND/backend-woocommerce/ecommerce -type f -name *.js -o -name *.jsx -o -name *.tsx -o -name *.ts)",
       "Bash(grep -r ManifestInvoiceModal ecommerce --include=*.jsx --include=*.js)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"Fix syntax error in actionController.js:*)"
+      "Bash(git commit -m \"Fix syntax error in actionController.js:*)",
+      "Bash(npm list:*)",
+      "Bash(pkill:*)"
     ]
   }
 }
