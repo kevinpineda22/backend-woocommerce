@@ -139,7 +139,7 @@ const VistaAuditor = () => {
 
       const { f120_id, unidad_medida } = lookupRes.data;
 
-      // 2. Buscar el item pendiente cuyo f120_id coincida
+      // 2. Buscar el item pendiente cuyo f120_id coincida (por SKU, barcode o id)
       let targetItem = null;
       const extractF120 = (s) => {
         if (!s) return null;
@@ -152,8 +152,29 @@ const VistaAuditor = () => {
         const item = auditData.items.find((i) => String(i.id) === String(itemId));
         if (!item) continue;
 
+        // Match por f120_id extraído del SKU del item
         const itemF120 = extractF120(item.sku);
         if (itemF120 && itemF120 === f120_id) {
+          targetItem = item;
+          break;
+        }
+
+        // Match por barcode del item (el backend ya cruzó con SIESA)
+        if (item.barcode) {
+          const barcodes = Array.isArray(item.barcode) ? item.barcode : [item.barcode];
+          const barcodeMatch = barcodes.some((b) => {
+            const cleanB = (b || "").toString().trim().replace(/\+$/, "").toUpperCase();
+            const bF120 = extractF120(cleanB);
+            return bF120 && bF120 === f120_id;
+          });
+          if (barcodeMatch) {
+            targetItem = item;
+            break;
+          }
+        }
+
+        // Match por id del item (WooCommerce product_id) contra f120_id
+        if (parseInt(item.id) === f120_id) {
           targetItem = item;
           break;
         }

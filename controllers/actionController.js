@@ -437,24 +437,7 @@ exports.lookupSiesaCode = async (req, res) => {
   const codigoLimpio = codigo.toString().trim().toUpperCase();
 
   try {
-    // 1. Intentar parsear como SKU (ej: "1032P2" → f120=1032, um=P2)
-    const skuMatch = codigoLimpio.match(/^(\d+)([A-Z]+\d*)$/);
-    if (skuMatch) {
-      const f120Id = parseInt(skuMatch[1]);
-      const um = skuMatch[2];
-      // Verificar que existe en SIESA
-      const { data } = await supabase
-        .from("siesa_codigos_barras")
-        .select("f120_id, unidad_medida, codigo_barras")
-        .eq("f120_id", f120Id)
-        .eq("unidad_medida", um)
-        .limit(1);
-      if (data && data.length > 0) {
-        return res.json({ found: true, f120_id: f120Id, unidad_medida: um });
-      }
-    }
-
-    // 2. Buscar como codigo_barras exacto
+    // 1. Buscar como codigo_barras exacto (PRIORIDAD: el auditor siempre digita un codigo_barras)
     const { data: byBarcode } = await supabase
       .from("siesa_codigos_barras")
       .select("f120_id, unidad_medida")
@@ -464,7 +447,7 @@ exports.lookupSiesaCode = async (req, res) => {
       return res.json({ found: true, f120_id: byBarcode.f120_id, unidad_medida: byBarcode.unidad_medida });
     }
 
-    // 3. Intentar con "+" al final (convención SIESA)
+    // 2. Intentar con "+" al final (convención SIESA)
     const { data: byBarcodePlus } = await supabase
       .from("siesa_codigos_barras")
       .select("f120_id, unidad_medida")
@@ -472,6 +455,22 @@ exports.lookupSiesaCode = async (req, res) => {
       .single();
     if (byBarcodePlus) {
       return res.json({ found: true, f120_id: byBarcodePlus.f120_id, unidad_medida: byBarcodePlus.unidad_medida });
+    }
+
+    // 3. Fallback: parsear como formato SKU (ej: "1032P2" → f120=1032, um=P2)
+    const skuMatch = codigoLimpio.match(/^(\d+)([A-Z]+\d*)$/);
+    if (skuMatch) {
+      const f120Id = parseInt(skuMatch[1]);
+      const um = skuMatch[2];
+      const { data } = await supabase
+        .from("siesa_codigos_barras")
+        .select("f120_id, unidad_medida")
+        .eq("f120_id", f120Id)
+        .eq("unidad_medida", um)
+        .limit(1);
+      if (data && data.length > 0) {
+        return res.json({ found: true, f120_id: f120Id, unidad_medida: um });
+      }
     }
 
     return res.json({ found: false, message: "Código no encontrado en SIESA" });
