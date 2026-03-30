@@ -958,10 +958,10 @@ exports.getSessionLogsDetail = async (req, res) => {
     }
 
     // 🔧 LÓGICA CORRECTA:
-    // 1. CONFIABLES: Frutas/verduras/carnes (KL, KG, LB) - ya validadas con GS1 en picking
-    // 2. REQUIEREN VALIDACIÓN: Variaciones (UND, P2, P3, P4) - auditor verifica presentación correcta
+    // 1. AUDITOR SOLO VALIDA: Variaciones (UND, P2, P3, P4, P5, P6)
+    // 2. CONFIABLES AUTOMÁTICAMENTE: Frutas/verduras/carnes (KG, KL, LB) - GS1 del picker
 
-    // Productos CONFIABLES - Pesables con GS1 (ya validados en picking)
+    // Identificar productos PESABLES (fruver/carnes) que son CONFIABLES
     const WEIGHT_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
     const trustedProductIds = new Set(
       Object.entries(productDetailsMap)
@@ -972,27 +972,21 @@ exports.getSessionLogsDetail = async (req, res) => {
         .map(([id]) => parseInt(id))
     );
 
-    // Productos que REQUIEREN VALIDACIÓN - Variaciones por unidad
-    const VARIABLE_UNITS = ["p2", "p3", "p4", "p5", "p6", "und"];
-    const validateProductIds = new Set(
-      Object.entries(productDetailsMap)
-        .filter(([_, detail]) => {
-          const um = (detail.unidad_medida || "").toLowerCase();
-          return VARIABLE_UNITS.includes(um);
-        })
-        .map(([id]) => parseInt(id))
-    );
+    // 🔧 FILTRAR LOGS: Excluir fruver/carnes pesables de auditoría
+    // Solo incluir productos con variación (UND, P2, P3, P4, etc.)
+    const auditableLogs = logs.filter((log) => {
+      const prodId = String(log.es_sustituto ? log.id_producto_final : log.id_producto);
+      // EXCLUIR si es producto pesable (confiable)
+      if (trustedProductIds.has(parseInt(prodId))) {
+        return false;
+      }
+      return true;
+    });
 
-    // Marcar productos correctamente
+    // Marcar productos pesables como confiables
     trustedProductIds.forEach((id) => {
-      productDetailsMap[id]._isTrusted = true;      // Confiable, sin validación
+      productDetailsMap[id]._isTrusted = true;
     });
-    validateProductIds.forEach((id) => {
-      productDetailsMap[id]._requiresValidation = true;  // Debe validarse
-    });
-
-    // Todos los logs se incluyen (no filtrar)
-    const auditableLogs = logs;
 
     res.status(200).json({
       metadata: {

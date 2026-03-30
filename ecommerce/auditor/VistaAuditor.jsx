@@ -411,6 +411,34 @@ const VistaAuditor = () => {
       });
 
       const itemsArray = Object.values(itemsMap);
+
+      // 🔧 NUEVO: Añadir productos CONFIABLES (pesables/GS1) que no tengan logs de auditoría
+      // Estos ya fueron validados con GS1 en picking, aparecen automáticamente como confiables
+      if (products_map) {
+        Object.entries(products_map).forEach(([prodId, prodDetail]) => {
+          if (prodDetail._isTrusted && !itemsMap[prodId]) {
+            // Producto pesable confiable sin logs de auditoría
+            itemsArray.push({
+              id: prodId,
+              name: prodDetail.name || "Producto",
+              original_name: prodDetail.name,
+              count: 0,  // No hay cantidad porque no fue escaneado por auditor
+              peso_total: 0,
+              is_sub: false,
+              price: prodDetail.price || 0,
+              order_id: null,  // No pertenece a pedido específico
+              image: prodDetail.image || null,
+              sku: prodDetail.sku || null,
+              barcode: prodDetail.barcode || null,
+              unidad_medida: prodDetail.unidad_medida || null,
+              categorias_reales: prodDetail.categorias_reales || null,
+              _isTrusted: true,  // Marcar como confiable
+              _gs1: prodDetail.barcode,  // GS1 que el picker escaneó
+            });
+          }
+        });
+      }
+
       const storedStateStr = localStorage.getItem("auditor_state");
       let loadedFromStorage = false;
 
