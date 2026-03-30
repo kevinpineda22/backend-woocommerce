@@ -4,10 +4,12 @@ const { supabase } = require("../services/supabaseClient");
 // Multi-sede WooCommerce (WordPress Multisite)
 const { getWooClient } = require("../services/wooMultiService");
 
-// ✅ HELPER: Obtener códigos de barras desde SIESA (un barcode EAN-13 preferido por f120_id)
+// ✅ HELPER: Obtener códigos de barras desde SIESA
+// Retorna un mapa de { "f120_id": barcode } para búsqueda general
+// Y también permite búsqueda por f120_id + unidad_medida para variaciones
 async function getBarcodesFromSiesa(productIds) {
   try {
-    if (!productIds || productIds.length === 0) return {};
+    if (!productIds || productIds.length === 0) return { byF120: {}, byF120AndUM: {} };
 
     const { data: barcodes, error } = await supabase
       .from("siesa_codigos_barras")
@@ -16,10 +18,12 @@ async function getBarcodesFromSiesa(productIds) {
 
     if (error) {
       console.error("Error obteniendo códigos de barras SIESA:", error);
-      return {};
+      return { byF120: {}, byF120AndUM: {} };
     }
 
-    const barcodeMap = {};
+    const byF120 = {};      // Mapeo por f120_id (para búsquedas generales)
+    const byF120AndUM = {}; // Mapeo por f120_id + unidad_medida (para variaciones específicas)
+
     barcodes.forEach((bc) => {
       const code = (bc.codigo_barras || "").toString().trim();
       const cleaned = code.replace(/\+$/, "");
@@ -27,16 +31,27 @@ async function getBarcodesFromSiesa(productIds) {
       if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
       if (!/^\d+\+?$/.test(code)) return;
 
-      // Priorizar EAN-13
-      if (!barcodeMap[bc.f120_id] || cleaned.length === 13) {
-        barcodeMap[bc.f120_id] = cleaned;
+      const f120Id = bc.f120_id;
+      const um = (bc.unidad_medida || "").toUpperCase().trim();
+
+      // Mapeo por f120_id (priorizar EAN-13)
+      if (!byF120[f120Id] || cleaned.length === 13) {
+        byF120[f120Id] = cleaned;
+      }
+
+      // Mapeo por f120_id + unidad_medida (para variaciones)
+      if (um) {
+        const key = `${f120Id}|${um}`;
+        if (!byF120AndUM[key] || cleaned.length === 13) {
+          byF120AndUM[key] = cleaned;
+        }
       }
     });
 
-    return barcodeMap;
+    return { byF120, byF120AndUM };
   } catch (error) {
     console.error("Error en getBarcodesFromSiesa:", error);
-    return {};
+    return { byF120: {}, byF120AndUM: {} };
   }
 }
 
@@ -246,6 +261,8 @@ exports.searchProduct = async (req, res) => {
               // Agregar cada variación como producto separado
               variations.forEach((v) => {
                 if (v.status === "publish") {
+                  // 🔧 Guardar referencia al producto padre para usar en el mapeo
+                  v._parentProduct = vp;
                   expandedProducts.push(v);
                 }
               });
@@ -269,7 +286,7 @@ exports.searchProduct = async (req, res) => {
         products.map((p) => parseInt(p.sku)).filter((sku) => !isNaN(sku)),
       ),
     );
-    const barcodeMapSiesa = await getBarcodesFromSiesa(skuList);
+    const { byF120, byF120AndUM } = await getBarcodesFromSiesa(skuList);
 
     const results = products
       .map((p) => {
@@ -293,24 +310,50 @@ exports.searchProduct = async (req, res) => {
               ?.display_value || null;
         }
 
-        return {
-          id: p.id,
-          name: p.name,
-          price: p.price,
-          image: p.images?.[0]?.src || null,
-          stock: p.stock_quantity ?? 0,
-          sku: p.sku,
-          categories: p.categories,
-          unidad_medida: unidadMedida,
-          // ✅ PRIORIDAD: SIESA > WooCommerce meta_data > SKU
-          barcode:
-            barcodeMapSiesa[parseInt(p.sku)] ||
+        // 🔧 CORRECCIÓN: Si es una variación, incluir el nombre del producto padre
+        let displayName = p.name;
+        let displayImage = p.images?.[0]?.src || null;
+        if (p._parentProduct) {
+          // Es una variación: concatenar nombre padre + nombre variación
+          displayName = `${p._parentProduct.name} - ${p.name}`;
+          // Usar imagen del padre si la variación no tiene
+          if (!displayImage && p._parentProduct.images?.[0]?.src) {
+            displayImage = p._parentProduct.images[0].src;
+          }
+        }
+
+        // 🔧 Para variaciones, buscar barcode por f120_id + unidad_medida
+        let barcode;
+        const f120Id = parseInt(p.sku);
+        if (unidadMedida && !isNaN(f120Id)) {
+          // Buscar por f120_id + unidad_medida (variación específica)
+          const keyWithUM = `${f120Id}|${unidadMedida}`;
+          barcode = byF120AndUM[keyWithUM] || byF120[f120Id];
+        } else if (!isNaN(f120Id)) {
+          // Buscar solo por f120_id (producto simple o fallback)
+          barcode = byF120[f120Id];
+        }
+
+        // Fallback a WooCommerce meta_data o SKU
+        if (!barcode) {
+          barcode =
             p.meta_data?.find((m) =>
               ["ean", "barcode", "_ean", "_barcode"].includes(
                 m.key.toLowerCase(),
               ),
-            )?.value ||
-            p.sku,
+            )?.value || p.sku;
+        }
+
+        return {
+          id: p.id,
+          name: displayName,
+          price: p.price,
+          image: displayImage,
+          stock: p.stock_quantity ?? 0,
+          sku: p.sku,
+          categories: p.categories || p._parentProduct?.categories,
+          unidad_medida: unidadMedida,
+          barcode,
         };
       })
       .slice(0, 15);

@@ -174,6 +174,7 @@ const SubstituteModal = ({
     let cleanInput = rawInput;
     const sku = (product.sku || "").toUpperCase();
     const unidad = (product.unidad_medida || "").toUpperCase();
+    const barcode = (product.barcode || "").toString().trim().toUpperCase();
 
     if (unidad === "LB" || unidad === "LIBRA") {
       if (!cleanInput.endsWith("-LB")) cleanInput += "-LB";
@@ -181,14 +182,24 @@ const SubstituteModal = ({
       if (!cleanInput.endsWith("-KL")) cleanInput += "-KL";
     }
 
-    return (
+    // 🔧 Validar contra SKU y contra BARCODE (que incluye unidad_medida de SIESA)
+    const skuMatch =
       rawInput === sku ||
       cleanInput === sku ||
       rawInput.includes(sku) ||
       sku.includes(rawInput) ||
       cleanInput.includes(sku) ||
-      sku.includes(cleanInput)
-    );
+      sku.includes(cleanInput);
+
+    const barcodeMatch =
+      rawInput === barcode ||
+      cleanInput === barcode ||
+      rawInput.includes(barcode) ||
+      barcode.includes(rawInput) ||
+      cleanInput.includes(barcode) ||
+      barcode.includes(cleanInput);
+
+    return skuMatch || barcodeMatch;
   };
 
   const handleVerify = async (manualInput = null) => {
