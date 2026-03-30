@@ -784,14 +784,18 @@ exports.getSessionLogsDetail = async (req, res) => {
             );
             const unitMeasure = unitMeta ? unitMeta.display_value : null;
             productDetailsMap[item.product_id] = {
+              name: item.name,  // 🔧 Añadir nombre del producto
               image: imgUrl,
               sku: item.sku,
+              price: item.price,  // 🔧 Incluir precio también
               unidad_medida: unitMeasure,
             };
             if (item.variation_id)
               productDetailsMap[item.variation_id] = {
+                name: item.name,  // 🔧 Añadir nombre del producto
                 image: imgUrl,
                 sku: item.sku,
+                price: item.price,
                 unidad_medida: unitMeasure,
               };
           });

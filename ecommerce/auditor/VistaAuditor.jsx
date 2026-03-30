@@ -491,7 +491,21 @@ const VistaAuditor = () => {
         });
       }
 
+      // 🔧 DEDUPLICAR: Si hay dos items con el mismo ID, mantener el que tiene order_id válido
+      const itemsByIdMap = {};
       itemsArray.forEach((item) => {
+        if (!itemsByIdMap[item.id]) {
+          itemsByIdMap[item.id] = item;
+        } else {
+          // Si el nuevo item tiene order_id y el anterior no, reemplazar
+          if (item.order_id && !itemsByIdMap[item.id].order_id) {
+            itemsByIdMap[item.id] = item;
+          }
+        }
+      });
+      const deduplicatedArray = Object.values(itemsByIdMap);
+
+      deduplicatedArray.forEach((item) => {
         if (groupedGroups[item.order_id]) {
           groupedGroups[item.order_id].items.push(item);
         } else {
