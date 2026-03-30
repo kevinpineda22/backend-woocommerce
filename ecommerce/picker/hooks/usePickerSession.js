@@ -368,7 +368,17 @@ export const usePickerSession = () => {
       }
       return i;
     });
-    const newSessionData = { ...sessionData, items: newItems };
+
+    // Si es la primera acción de picking, inicializar picking_start_time localmente
+    // para que el contador se muestre de inmediato sin esperar al refresh del servidor
+    const pickingStartTime =
+      !sessionData.picking_start_time &&
+      status !== "pendiente" &&
+      qty > 0
+        ? new Date().toISOString()
+        : sessionData.picking_start_time;
+
+    const newSessionData = { ...sessionData, items: newItems, picking_start_time: pickingStartTime };
     setSessionData(newSessionData);
     localStorage.setItem(
       "session_active_cache",

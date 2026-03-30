@@ -128,25 +128,32 @@ const VistaAuditor = () => {
   const verifyProductScan = async (code) => {
     const cleanCode = code.trim().replace(/\+$/, "").toUpperCase();
 
-    // 🔧 NUEVA LÓGICA: Validar contra SIESA como picker y SubstituteModal
-    // El auditor ingresa un código, el sistema valida contra SIESA usando f120_id + unidad_medida
-
     try {
-      // 1. Intentar encontrar qué producto quiere validar basado en matching simple del código
+      // 1. Buscar el código en SIESA para obtener f120_id y unidad_medida
+      const lookupRes = await ecommerceApi.post(`/lookup-siesa`, { codigo: cleanCode });
+
+      if (!lookupRes.data.found) {
+        showFeedback("error", `El código "${cleanCode}" no existe en SIESA.`);
+        return;
+      }
+
+      const { f120_id, unidad_medida } = lookupRes.data;
+
+      // 2. Buscar el item pendiente cuyo f120_id coincida
       let targetItem = null;
+      const extractF120 = (s) => {
+        if (!s) return null;
+        const match = s.toString().replace(/-/g, "").match(/^(\d+)/);
+        return match ? parseInt(match[1]) : null;
+      };
 
       for (const itemId of requiredItems) {
         if (verifiedItems.has(itemId)) continue;
         const item = auditData.items.find((i) => String(i.id) === String(itemId));
         if (!item) continue;
 
-        // Intentar match del código contra el SKU del item
-        const itemSku = (item.sku || "").toUpperCase();
-        if (
-          cleanCode === itemSku ||
-          itemSku.includes(cleanCode) ||
-          cleanCode.includes(itemSku)
-        ) {
+        const itemF120 = extractF120(item.sku);
+        if (itemF120 && itemF120 === f120_id) {
           targetItem = item;
           break;
         }
@@ -155,41 +162,25 @@ const VistaAuditor = () => {
       if (!targetItem) {
         showFeedback(
           "error",
-          `El código "${cleanCode}" no corresponde a ningún producto por validar en este pedido.`,
+          `El código "${cleanCode}" (SIESA: ${f120_id}) no corresponde a ningún producto por validar en este pedido.`,
         );
         return;
       }
 
-      // 2. Extraer f120_id y unidad_medida del item
-      const skuMatch = (targetItem.sku || "").match(/^(\d+)([A-Z]+\d*)$/);
-      const f120Id = skuMatch ? parseInt(skuMatch[1]) : parseInt(targetItem.sku);
-      const umEsperada = (targetItem.unidad_medida || "UND").toUpperCase();
-
-      // 🔧 Validar que los parámetros sean válidos antes de enviar
-      if (isNaN(f120Id) || !umEsperada) {
-        showFeedback(
-          "error",
-          `Error: Datos incompletos para ${targetItem.name}. No se puede validar.`,
-        );
-        return;
-      }
-
-      // 3. Validar el código contra SIESA
+      // 3. Validar el código contra SIESA con f120_id y unidad_medida obtenidos
       const res = await ecommerceApi.post(`/validar-codigo-auditor`, {
         codigo: cleanCode,
-        f120_id_esperado: f120Id,
-        unidad_medida_esperada: umEsperada,
+        f120_id_esperado: f120_id,
+        unidad_medida_esperada: unidad_medida,
       });
 
       if (res.data.valid) {
-        // ✅ Válido, marcar como verificado
         setVerifiedItems((prev) => new Set(prev).add(targetItem.id));
         showFeedback(
           "success",
           `✅ ${targetItem.name} verificado correctamente`,
         );
       } else {
-        // ❌ Inválido, mostrar mensaje específico de SIESA
         showFeedback(
           "error",
           res.data.message || `Código inválido para ${targetItem.name}`,

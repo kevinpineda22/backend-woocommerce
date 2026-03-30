@@ -422,3 +422,61 @@ exports.validateCodeForAuditor = async (req, res) => {
     return res.status(500).json({ valid: false, message: "Error al validar código", error: error.message });
   }
 };
+
+/**
+ * AUDITOR: Buscar un código en SIESA por codigo_barras o formato SKU.
+ * Retorna el f120_id y unidad_medida sin validar contra un producto esperado.
+ * El frontend usa el f120_id para matchear contra los items pendientes.
+ */
+exports.lookupSiesaCode = async (req, res) => {
+  const { codigo } = req.body;
+  if (!codigo) {
+    return res.status(400).json({ found: false, message: "Código requerido" });
+  }
+
+  const codigoLimpio = codigo.toString().trim().toUpperCase();
+
+  try {
+    // 1. Intentar parsear como SKU (ej: "1032P2" → f120=1032, um=P2)
+    const skuMatch = codigoLimpio.match(/^(\d+)([A-Z]+\d*)$/);
+    if (skuMatch) {
+      const f120Id = parseInt(skuMatch[1]);
+      const um = skuMatch[2];
+      // Verificar que existe en SIESA
+      const { data } = await supabase
+        .from("siesa_codigos_barras")
+        .select("f120_id, unidad_medida, codigo_barras")
+        .eq("f120_id", f120Id)
+        .eq("unidad_medida", um)
+        .limit(1);
+      if (data && data.length > 0) {
+        return res.json({ found: true, f120_id: f120Id, unidad_medida: um });
+      }
+    }
+
+    // 2. Buscar como codigo_barras exacto
+    const { data: byBarcode } = await supabase
+      .from("siesa_codigos_barras")
+      .select("f120_id, unidad_medida")
+      .eq("codigo_barras", codigoLimpio)
+      .single();
+    if (byBarcode) {
+      return res.json({ found: true, f120_id: byBarcode.f120_id, unidad_medida: byBarcode.unidad_medida });
+    }
+
+    // 3. Intentar con "+" al final (convención SIESA)
+    const { data: byBarcodePlus } = await supabase
+      .from("siesa_codigos_barras")
+      .select("f120_id, unidad_medida")
+      .eq("codigo_barras", codigoLimpio + "+")
+      .single();
+    if (byBarcodePlus) {
+      return res.json({ found: true, f120_id: byBarcodePlus.f120_id, unidad_medida: byBarcodePlus.unidad_medida });
+    }
+
+    return res.json({ found: false, message: "Código no encontrado en SIESA" });
+  } catch (error) {
+    console.error("Error en lookupSiesaCode:", error.message);
+    return res.status(500).json({ found: false, message: "Error buscando código" });
+  }
+};

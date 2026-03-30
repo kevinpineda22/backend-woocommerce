@@ -84,11 +84,15 @@ const ManifestSheet = ({
     return sku.toString().replace(/-/g, "");
   };
 
-  // Helper: Validar si un código es un barcode real (8+ dígitos numéricos, opcionalmente con '+' al final)
+  // Helper: Validar si un código es aceptable para la caja
+  // 🔧 Acepta cualquier código que esté en SIESA (excepto M/N)
   const isValidBarcode = (code) => {
     if (!code || code === "N/A" || code === "ADMIN_OVERRIDE") return false;
-    const cleaned = code.toString().trim().replace(/\+$/, "");
-    return /^\d+$/.test(cleaned) && cleaned.length >= 8;
+    const upper = code.toString().trim().toUpperCase();
+    // Rechazar solo códigos que inician con M o N
+    if (upper.startsWith("M") || upper.startsWith("N")) return false;
+    // Aceptar cualquier código que tenga contenido
+    return code.toString().trim().length > 0;
   };
 
   // Helper: Detectar si un producto es multipack (presentación especial)
