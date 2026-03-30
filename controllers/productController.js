@@ -300,14 +300,15 @@ exports.searchProduct = async (req, res) => {
               a.slug?.includes("presentacion"),
           );
           if (presentationAttr) {
-            unidadMedida = presentationAttr.option;
+            // ✅ Normalizar a mayúsculas para consistencia con SIESA
+            unidadMedida = (presentationAttr.option || "").toUpperCase().trim();
           }
         }
         // Si no encontró en attributes, buscar en meta_data
         if (!unidadMedida) {
-          unidadMedida =
-            p.meta_data?.find((m) => m.key === "pa_unidad-de-medida-aproximado")
-              ?.display_value || null;
+          const metaUM = p.meta_data?.find((m) => m.key === "pa_unidad-de-medida-aproximado")
+            ?.display_value || null;
+          unidadMedida = metaUM ? metaUM.toUpperCase().trim() : null;
         }
 
         // 🔧 CORRECCIÓN: Si es una variación, incluir el nombre del producto padre
@@ -327,7 +328,9 @@ exports.searchProduct = async (req, res) => {
         const f120Id = parseInt(p.sku);
         if (unidadMedida && !isNaN(f120Id)) {
           // Buscar por f120_id + unidad_medida (variación específica)
-          const keyWithUM = `${f120Id}|${unidadMedida}`;
+          // ✅ IMPORTANTE: normalizar a mayúsculas para coincidir con SIESA
+          const normalizedUM = unidadMedida.toUpperCase().trim();
+          const keyWithUM = `${f120Id}|${normalizedUM}`;
           barcode = byF120AndUM[keyWithUM] || byF120[f120Id];
         } else if (!isNaN(f120Id)) {
           // Buscar solo por f120_id (producto simple o fallback)
