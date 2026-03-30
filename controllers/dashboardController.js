@@ -923,8 +923,34 @@ exports.getSessionLogsDetail = async (req, res) => {
       }
     });
 
+    // 🔧 TAMBIÉN incluir f120_ids de los barcodes que el picker escaneó
+    // Esto cubre el caso donde el SKU de WooCommerce no coincide con el f120_id de SIESA
+    const scannedBarcodes = [
+      ...new Set(
+        logs
+          .filter((l) => l.codigo_barras_escaneado)
+          .map((l) => l.codigo_barras_escaneado.toString().trim()),
+      ),
+    ];
+    if (scannedBarcodes.length > 0) {
+      try {
+        const { data: scannedSiesa } = await supabase
+          .from("siesa_codigos_barras")
+          .select("f120_id")
+          .in("codigo_barras", scannedBarcodes);
+        if (scannedSiesa) {
+          scannedSiesa.forEach((bc) => f120IdOnlySet.add(bc.f120_id));
+        }
+      } catch (e) {
+        console.warn(
+          "⚠️ Error buscando f120_ids de barcodes escaneados:",
+          e.message,
+        );
+      }
+    }
+
     console.log(
-      `🔍 Buscando códigos de barras para ${uniquePairs.size} pares f120_id|unidad_medida`,
+      `🔍 Buscando códigos de barras para ${uniquePairs.size} pares f120_id|unidad_medida (${f120IdOnlySet.size} f120_ids totales incluyendo escaneados)`,
     );
 
     const barcodeMapByF120IdAndUm = await getBarcodesFromSiesaByUnitMeasure(
