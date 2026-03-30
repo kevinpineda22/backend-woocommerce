@@ -649,7 +649,21 @@ const VistaAuditor = () => {
         <h1>
           <FaClipboardCheck /> Auditoría
         </h1>
-        <div className="aud-header-right"></div>
+        <div className="aud-header-right">
+          {auditData && auditData.meta?.status !== "auditado" && (
+            <button
+              className="aud-exit-session-btn"
+              title="Salir de la sesión"
+              onClick={() => {
+                if (window.confirm("¿Salir de esta sesión? Podrás retomar la auditoría más tarde.")) {
+                  clearAudit();
+                }
+              }}
+            >
+              <FaTimes /> Salir
+            </button>
+          )}
+        </div>
       </header>
 
       <EscanerBarras

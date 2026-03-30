@@ -187,9 +187,7 @@ const SubstituteModal = ({
       rawInput.includes(sku) ||
       sku.includes(rawInput) ||
       cleanInput.includes(sku) ||
-      sku.includes(cleanInput) ||
-      rawInput === "OK" ||
-      rawInput.length > 4
+      sku.includes(cleanInput)
     );
   };
 

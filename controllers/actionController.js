@@ -228,12 +228,156 @@ exports.validateManualCode = async (req, res) => {
   res.json({ valid: skuMatch || barcodeMatch });
 };
 
+// ✅ FUNCIÓN PRIVADA COMPARTIDA - Validación unificada
+// Picker y Auditor usan esta función con parámetro allowGS1 diferente
+async function _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_esperada, { allowGS1 = false } = {}) {
+  const codigoLimpio = codigo.toString().trim().toUpperCase();
+  const isValidBarcode = /^\d{8,}\+?$/.test(codigoLimpio);
+  const isValidSku = /^\d+[A-Z]+\d*$/.test(codigoLimpio);
+
+  if (!isValidBarcode && !isValidSku) {
+    return {
+      status: 200,
+      body: {
+        valid: false,
+        message: "❌ Código inválido. Escanea el código de barras del producto.",
+        codigo_existe: false,
+      },
+    };
+  }
+
+  // RUTA 1: SKU directo (ej: "1032P2")
+  if (isValidSku) {
+    const skuMatch = codigoLimpio.match(/^(\d+)([A-Z]+\d*)$/);
+    if (skuMatch) {
+      const f120Ingresado = parseInt(skuMatch[1]);
+      const umIngresada = skuMatch[2];
+      const skuIngresado = `${f120Ingresado}${umIngresada}`;
+      const cleanSku = (s) => s.replace(/-/g, "");
+      const skuEsperado = cleanSku(`${f120_id_esperado}${unidad_medida_esperada}`);
+
+      if (skuIngresado === skuEsperado) {
+        return {
+          status: 200,
+          body: {
+            valid: true,
+            message: "✅ SKU validado correctamente",
+            sku_encontrado: skuIngresado,
+            f120_id: f120Ingresado,
+            unidad_medida: umIngresada,
+          },
+        };
+      }
+
+      if (f120Ingresado === f120_id_esperado) {
+        return {
+          status: 200,
+          body: {
+            valid: false,
+            message: `❌ Presentación incorrecta: digitaste ${umIngresada}, pero se esperaba ${unidad_medida_esperada}`,
+          },
+        };
+      }
+
+      return {
+        status: 200,
+        body: { valid: false, message: "❌ El SKU no corresponde a este producto" },
+      };
+    }
+  }
+
+  // RUTA 2A: GS1 variable (solo si allowGS1 = true, ej: picker)
+  if (allowGS1) {
+    const isGS1Variable = /^\d{13,14}$/.test(codigoLimpio) && codigoLimpio.startsWith("2");
+    if (isGS1Variable) {
+      const gs1Prefix = codigoLimpio.substring(0, 7);
+      const { data: siesaBarcodes } = await supabase
+        .from("siesa_codigos_barras")
+        .select("f120_id, unidad_medida, codigo_barras")
+        .eq("f120_id", f120_id_esperado);
+
+      const gs1Match = (siesaBarcodes || []).some((bc) => {
+        const cleanBarcode = (bc.codigo_barras || "").toString().trim().replace(/\+$/, "");
+        return cleanBarcode.startsWith("2") && cleanBarcode.length >= 7 && gs1Prefix === cleanBarcode.substring(0, 7);
+      });
+
+      if (gs1Match) {
+        return {
+          status: 200,
+          body: {
+            valid: true,
+            message: "✅ Código GS1 validado correctamente",
+            sku_encontrado: `${f120_id_esperado}${unidad_medida_esperada}`,
+            f120_id: f120_id_esperado,
+            unidad_medida: unidad_medida_esperada,
+          },
+        };
+      }
+
+      return {
+        status: 200,
+        body: { valid: false, message: "❌ El código GS1 no corresponde a este producto", codigo_existe: false },
+      };
+    }
+  }
+
+  // RUTA 2B: Barcode exacto en SIESA
+  const { data: siesaData, error: siesaError } = await supabase
+    .from("siesa_codigos_barras")
+    .select("f120_id, unidad_medida")
+    .eq("codigo_barras", codigoLimpio)
+    .single();
+
+  if (siesaError || !siesaData) {
+    return {
+      status: 200,
+      body: { valid: false, message: "❌ Código no encontrado en el sistema", codigo_existe: false },
+    };
+  }
+
+  const cleanSku = (sku) => sku.replace(/-/g, "");
+  const skuEscaneado = cleanSku(`${siesaData.f120_id}${siesaData.unidad_medida}`);
+  const skuEsperado = cleanSku(`${f120_id_esperado}${unidad_medida_esperada}`);
+
+  if (skuEscaneado !== skuEsperado) {
+    if (siesaData.f120_id === f120_id_esperado) {
+      return {
+        status: 200,
+        body: {
+          valid: false,
+          message: `❌ El código que escaneaste es para ${siesaData.unidad_medida}, pero se esperaba ${unidad_medida_esperada}`,
+          f120_id_coincide: true,
+          unidad_media_encontrada: siesaData.unidad_medida,
+          unidad_medida_esperada,
+        },
+      };
+    }
+    return {
+      status: 200,
+      body: {
+        valid: false,
+        message: "❌ El código pertenece a un producto diferente",
+        f120_id_encontrado: siesaData.f120_id,
+        f120_id_esperado,
+      },
+    };
+  }
+
+  return {
+    status: 200,
+    body: {
+      valid: true,
+      message: "✅ Código validado correctamente",
+      sku_encontrado: skuEscaneado,
+      f120_id: siesaData.f120_id,
+      unidad_medida: siesaData.unidad_medida,
+    },
+  };
+}
+
 /**
- * Validar código contra SIESA considerando presentaciones
- * - Busca el código en siesa_codigos_barras
- * - Construye el SKU esperado (f120_id + unidad_medida)
- * - Compara con el SKU esperado del producto
- * - Si no coincide la presentación, retorna error específico
+ * PICKER: Validar código contra SIESA considerando presentaciones
+ * Acepta códigos GS1 de peso variable (carnicería: etiquetas de báscula)
  */
 exports.validateCodeWithSiesa = async (req, res) => {
   const { codigo, f120_id_esperado, unidad_medida_esperada } = req.body;
@@ -246,176 +390,12 @@ exports.validateCodeWithSiesa = async (req, res) => {
   }
 
   try {
-    const codigoLimpio = codigo.toString().trim().toUpperCase();
-
-    // ✅ VALIDACIÓN: Rechazar códigos demasiado cortos (f120_id desnudo sin presentación)
-    // Un código de barras real tiene 8+ dígitos. Un SKU válido tiene dígitos + letras (ej: 11420P6)
-    const isValidBarcode = /^\d{8,}\+?$/.test(codigoLimpio); // 8+ dígitos (con + opcional)
-    const isValidSku = /^\d+[A-Z]+\d*$/.test(codigoLimpio); // dígitos + letras (ej: 11420P6)
-
-    if (!isValidBarcode && !isValidSku) {
-      return res.status(200).json({
-        valid: false,
-        message:
-          "❌ Código inválido. Escanea el código de barras del producto.",
-        codigo_existe: false,
-      });
-    }
-
-    // ✅ RUTA 1: Si es formato SKU (ej: "11420P6"), validar directo sin buscar en SIESA
-    if (isValidSku) {
-      const skuMatch = codigoLimpio.match(/^(\d+)([A-Z]+\d*)$/);
-      if (skuMatch) {
-        const f120Ingresado = parseInt(skuMatch[1]);
-        const umIngresada = skuMatch[2];
-        const skuIngresado = `${f120Ingresado}${umIngresada}`;
-        const cleanSku = (s) => s.replace(/-/g, "");
-        const skuEsperado = cleanSku(
-          `${f120_id_esperado}${unidad_medida_esperada}`,
-        );
-
-        if (skuIngresado === skuEsperado) {
-          return res.status(200).json({
-            valid: true,
-            message: "✅ SKU validado correctamente",
-            sku_encontrado: skuIngresado,
-            f120_id: f120Ingresado,
-            unidad_medida: umIngresada,
-          });
-        }
-
-        // SKU digitado no coincide
-        if (f120Ingresado === f120_id_esperado) {
-          return res.status(200).json({
-            valid: false,
-            message: `❌ Presentación incorrecta: digitaste ${umIngresada}, pero se esperaba ${unidad_medida_esperada}`,
-          });
-        }
-        return res.status(200).json({
-          valid: false,
-          message: "❌ El SKU no corresponde a este producto",
-        });
-      }
-    }
-
-    // ✅ RUTA 2A: Si es código GS1 de peso variable (empieza con "2", 13-14 dígitos),
-    // buscar por PREFIJO en SIESA en lugar de coincidencia exacta
-    const isGS1Variable =
-      /^\d{13,14}$/.test(codigoLimpio) && codigoLimpio.startsWith("2");
-
-    if (isGS1Variable) {
-      // Formato GS1 carnicería: 29(item5dígitos)[0padding](peso5dígitos)(check1dígito)
-      // El prefijo SIEMPRE son los primeros 7 dígitos: "29" + item(5 dígitos)
-      const gs1Prefix = codigoLimpio.substring(0, 7);
-
-      // Buscar barcodes del producto esperado que sean GS1 con el mismo prefijo
-      const { data: siesaBarcodes } = await supabase
-        .from("siesa_codigos_barras")
-        .select("f120_id, unidad_medida, codigo_barras")
-        .eq("f120_id", f120_id_esperado);
-
-      let gs1Match = false;
-      if (siesaBarcodes && siesaBarcodes.length > 0) {
-        gs1Match = siesaBarcodes.some((bc) => {
-          const cleanBarcode = (bc.codigo_barras || "")
-            .toString()
-            .trim()
-            .replace(/\+$/, "");
-          // Verificar si el barcode conocido comparte los primeros 7 dígitos (29 + item)
-          if (cleanBarcode.startsWith("2") && cleanBarcode.length >= 7) {
-            const knownPrefix = cleanBarcode.substring(0, 7);
-            return gs1Prefix === knownPrefix;
-          }
-          return false;
-        });
-
-        // Si no hay barcodes GS1 en SIESA para este producto pero el f120_id coincide,
-        // aceptar el código GS1 confiando en que el prefijo corresponde
-        if (!gs1Match && siesaBarcodes.length > 0) {
-          // Al menos confirmar que el producto existe con ese f120_id
-          gs1Match = true;
-        }
-      }
-
-      if (gs1Match) {
-        return res.status(200).json({
-          valid: true,
-          message: "✅ Código GS1 validado correctamente",
-          sku_encontrado: `${f120_id_esperado}${unidad_medida_esperada}`,
-          f120_id: f120_id_esperado,
-          unidad_medida: unidad_medida_esperada,
-        });
-      }
-
-      return res.status(200).json({
-        valid: false,
-        message:
-          "❌ El código GS1 no corresponde a este producto",
-        codigo_existe: false,
-      });
-    }
-
-    // ✅ RUTA 2B: Buscar código de barras EXACTO en SIESA (códigos normales)
-    const { data: siesaData, error: siesaError } = await supabase
-      .from("siesa_codigos_barras")
-      .select("f120_id, unidad_medida")
-      .eq("codigo_barras", codigoLimpio)
-      .single();
-
-    // Código NO existe en SIESA
-    if (siesaError || !siesaData) {
-      return res.status(200).json({
-        valid: false,
-        message: "❌ Código no encontrado en el sistema",
-        codigo_existe: false,
-      });
-    }
-
-    // 2. Construir SKUs para comparar
-    const skuEscaneado = `${siesaData.f120_id}${siesaData.unidad_medida}`;
-    const skuEsperado = `${f120_id_esperado}${unidad_medida_esperada}`;
-    const cleanSku = (sku) => sku.replace(/-/g, "");
-    const skuEscaneadoLimpio = cleanSku(skuEscaneado);
-    const skuEsperadoLimpio = cleanSku(skuEsperado);
-
-    // 3. Comparar presentaciones
-    if (skuEscaneadoLimpio !== skuEsperadoLimpio) {
-      // El f120_id coincide, pero la presentación es diferente
-      if (siesaData.f120_id === f120_id_esperado) {
-        return res.status(200).json({
-          valid: false,
-          message: `❌ El código que escaneaste es para ${siesaData.unidad_medida}, pero se esperaba ${unidad_medida_esperada}`,
-          f120_id_coincide: true,
-          unidad_media_encontrada: siesaData.unidad_medida,
-          unidad_medida_esperada: unidad_medida_esperada,
-        });
-      }
-      // El f120_id no coincide (producto completamente diferente)
-      return res.status(200).json({
-        valid: false,
-        message: `❌ El código pertenece a un producto diferente`,
-        f120_id_encontrado: siesaData.f120_id,
-        f120_id_esperado: f120_id_esperado,
-      });
-    }
-
-    // 4. Validación exitosa
-    return res.status(200).json({
-      valid: true,
-      message: "✅ Código validado correctamente",
-      sku_encontrado: skuEscaneadoLimpio,
-      f120_id: siesaData.f120_id,
-      unidad_medida: siesaData.unidad_medida,
-    });
+    const result = await _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_esperada, { allowGS1: true });
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("Error en validateCodeWithSiesa:", error.message);
-    return res.status(500).json({
-      valid: false,
-      message: "Error al validar código",
-      error: error.message,
-    });
+    return res.status(500).json({ valid: false, message: "Error al validar código", error: error.message });
   }
-};
 
 /**
  * Validar código para AUDITOR - IGUAL DE RESTRICTIVO QUE PICKER
@@ -434,113 +414,10 @@ exports.validateCodeForAuditor = async (req, res) => {
   }
 
   try {
-    const codigoLimpio = codigo.toString().trim().toUpperCase();
-
-    // ✅ VALIDACIÓN: Rechazar códigos demasiado cortos (f120_id desnudo sin presentación)
-    const isValidBarcode = /^\d{8,}\+?$/.test(codigoLimpio);
-    const isValidSku = /^\d+[A-Z]+\d*$/.test(codigoLimpio);
-
-    if (!isValidBarcode && !isValidSku) {
-      return res.status(200).json({
-        valid: false,
-        message:
-          "❌ Código inválido. Escanea el código de barras del producto.",
-        codigo_existe: false,
-      });
-    }
-
-    // ✅ RUTA 1: Si es formato SKU (ej: "11420P6"), validar directo
-    if (isValidSku) {
-      const skuMatch = codigoLimpio.match(/^(\d+)([A-Z]+\d*)$/);
-      if (skuMatch) {
-        const f120Ingresado = parseInt(skuMatch[1]);
-        const umIngresada = skuMatch[2];
-        const skuIngresado = `${f120Ingresado}${umIngresada}`;
-        const cleanSku = (s) => s.replace(/-/g, "");
-        const skuEsperado = cleanSku(
-          `${f120_id_esperado}${unidad_medida_esperada}`,
-        );
-
-        if (skuIngresado === skuEsperado) {
-          return res.status(200).json({
-            valid: true,
-            message: "✅ SKU validado correctamente",
-            sku_encontrado: skuIngresado,
-            f120_id: f120Ingresado,
-            unidad_medida: umIngresada,
-          });
-        }
-
-        if (f120Ingresado === f120_id_esperado) {
-          return res.status(200).json({
-            valid: false,
-            message: `❌ Presentación incorrecta: digitaste ${umIngresada}, pero se esperaba ${unidad_medida_esperada}`,
-          });
-        }
-        return res.status(200).json({
-          valid: false,
-          message: "❌ El SKU no corresponde a este producto",
-        });
-      }
-    }
-
-    // ✅ RUTA 2: Buscar código de barras EXACTO en SIESA (igual que picker)
-    // Nota: No se validan códigos GS1 variable (carnicería/fruver) en auditor
-    const { data: siesaData, error: siesaError } = await supabase
-      .from("siesa_codigos_barras")
-      .select("f120_id, unidad_medida")
-      .eq("codigo_barras", codigoLimpio)
-      .single();
-
-    // Código NO existe en SIESA
-    if (siesaError || !siesaData) {
-      return res.status(200).json({
-        valid: false,
-        message: "❌ Código no encontrado en el sistema",
-        codigo_existe: false,
-      });
-    }
-
-    // 2. Construir SKUs para comparar (EXACTAMENTE IGUAL QUE PICKER)
-    const skuEscaneado = `${siesaData.f120_id}${siesaData.unidad_medida}`;
-    const skuEsperado = `${f120_id_esperado}${unidad_medida_esperada}`;
-    const cleanSku = (sku) => sku.replace(/-/g, "");
-    const skuEscaneadoLimpio = cleanSku(skuEscaneado);
-    const skuEsperadoLimpio = cleanSku(skuEsperado);
-
-    // 3. Comparar presentaciones - MISMO CRITERIO QUE PICKER
-    if (skuEscaneadoLimpio !== skuEsperadoLimpio) {
-      if (siesaData.f120_id === f120_id_esperado) {
-        return res.status(200).json({
-          valid: false,
-          message: `❌ El código que escaneaste es para ${siesaData.unidad_medida}, pero se esperaba ${unidad_medida_esperada}`,
-          f120_id_coincide: true,
-          unidad_media_encontrada: siesaData.unidad_medida,
-          unidad_medida_esperada: unidad_medida_esperada,
-        });
-      }
-      return res.status(200).json({
-        valid: false,
-        message: `❌ El código pertenece a un producto diferente`,
-        f120_id_encontrado: siesaData.f120_id,
-        f120_id_esperado: f120_id_esperado,
-      });
-    }
-
-    // 4. Validación exitosa - Presentación correcta
-    return res.status(200).json({
-      valid: true,
-      message: "✅ Código validado correctamente",
-      sku_encontrado: skuEscaneadoLimpio,
-      f120_id: siesaData.f120_id,
-      unidad_medida: siesaData.unidad_medida,
-    });
+    const result = await _validateSiesaCode(codigo, f120_id_esperado, unidad_medida_esperada, { allowGS1: false });
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("Error en validateCodeForAuditor:", error.message);
-    return res.status(500).json({
-      valid: false,
-      message: "Error al validar código",
-      error: error.message,
-    });
+    return res.status(500).json({ valid: false, message: "Error al validar código", error: error.message });
   }
 };

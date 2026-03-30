@@ -957,6 +957,28 @@ exports.getSessionLogsDetail = async (req, res) => {
       console.warn("⚠️ No se pudieron obtener categorías para auditor:", e.message);
     }
 
+    // ✅ FILTRO: Excluir productos pesables (fruver/carnicería) del auditor
+    // El auditor SOLO valida productos por unidad, no por peso
+    const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
+    const weighableProductIds = new Set(
+      Object.entries(productDetailsMap)
+        .filter(([_, detail]) => {
+          const um = (detail.unidad_medida || "").toLowerCase();
+          return WEIGHABLE_UNITS.includes(um);
+        })
+        .map(([id]) => parseInt(id))
+    );
+
+    // Remover productos pesables del mapa
+    weighableProductIds.forEach((id) => {
+      delete productDetailsMap[id];
+    });
+
+    // Remover logs de productos pesables
+    const auditableLogs = logs.filter(
+      (log) => !weighableProductIds.has(log.id_producto_original)
+    );
+
     res.status(200).json({
       metadata: {
         session_id: sessionInfo.id,
@@ -969,7 +991,7 @@ exports.getSessionLogsDetail = async (req, res) => {
       },
       orders_info: ordersData,
       products_map: productDetailsMap,
-      logs: logs,
+      logs: auditableLogs,
       final_snapshot: sessionInfo.datos_salida || null,
     });
   } catch (error) {
