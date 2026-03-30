@@ -889,12 +889,15 @@ exports.getSessionLogsDetail = async (req, res) => {
     // ✅ OBTENER CÓDIGOS DE BARRAS DESDE SIESA CON UNIDAD_MEDIDA COMO CLAVE COMPUESTA
     // Crear lista de pares [f120_id, unidad_medida] únicos para consulta eficiente
     const uniquePairs = new Map();
+    const f120IdOnlySet = new Set(); // Para fallback: buscar TODAS las unidades de cada f120_id
+
     Object.values(productDetailsMap).forEach((p) => {
       const f120_id = parseInt(p.sku);
       const um = (p.unidad_medida || "").toUpperCase() || "DEFAULT";
       if (!isNaN(f120_id)) {
         const key = `${f120_id}|${um}`;
         uniquePairs.set(key, { f120_id, um });
+        f120IdOnlySet.add(f120_id); // También guardar solo el f120_id para fallback
       }
     });
 
@@ -905,9 +908,37 @@ exports.getSessionLogsDetail = async (req, res) => {
     const barcodeMapByF120IdAndUm = await getBarcodesFromSiesaByUnitMeasure(
       Array.from(uniquePairs.values())
     );
+
+    // 🔧 FALLBACK: Obtener TODAS las unidades disponibles en SIESA para cada f120_id
+    // para poder hacer matching cuando WooCommerce tiene la unidad incorrecta
+    const { data: allSiesaBarcodes, error: siesaError } = await supabase
+      .from("siesa_codigos_barras")
+      .select("f120_id, codigo_barras, unidad_medida")
+      .in("f120_id", Array.from(f120IdOnlySet));
+
+    const barcodesByF120IdOnly = {};
+    if (allSiesaBarcodes && !siesaError) {
+      allSiesaBarcodes.forEach((bc) => {
+        const code = (bc.codigo_barras || "").toString().trim();
+        const cleaned = code.replace(/\+$/, "");
+        if (!cleaned || cleaned.length < 8) return;
+        if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
+        if (!/^\d+\+?$/.test(code)) return;
+
+        const f120 = bc.f120_id;
+        if (!barcodesByF120IdOnly[f120]) {
+          barcodesByF120IdOnly[f120] = [];
+        }
+        if (!barcodesByF120IdOnly[f120].includes(cleaned)) {
+          barcodesByF120IdOnly[f120].push(cleaned);
+        }
+      });
+    }
+
     console.log(
       `📦 Códigos encontrados:`,
       Object.keys(barcodeMapByF120IdAndUm).length,
+      `(fallback: ${Object.keys(barcodesByF120IdOnly).length} f120_ids)`,
     );
 
     // Agregar códigos de barras al productDetailsMap usando el cruce exacto f120_id + unidad_medida
@@ -926,13 +957,35 @@ exports.getSessionLogsDetail = async (req, res) => {
 
         const key = `${f120_id}|${normalizedUm}`;
 
-        // ✅ REGLA ESTRICTA: Usar SOLO el código específico para esa combinación f120_id + unidad_medida
+        // ✅ INTENTO 1: Usar SOLO el código específico para esa combinación f120_id + unidad_medida
         if (barcodeMapByF120IdAndUm[key]) {
-          // Tomar el primer código disponible para esa unidad específica
           productDetailsMap[productId].barcode = barcodeMapByF120IdAndUm[key][0] || null;
-          console.log(`✅ ${productId}: f120_id=${f120_id}, UM=${normalizedUm} → ${productDetailsMap[productId].barcode}`);
+          productDetailsMap[productId].unidad_medida = normalizedUm; // Guardar la UM normalizada
+          console.log(`✅ ${productId}: f120_id=${f120_id}, UM=${normalizedUm} → ${productDetailsMap[productId].barcode} (búsqueda exacta)`);
+        } else if (barcodesByF120IdOnly[f120_id] && barcodesByF120IdOnly[f120_id].length > 0) {
+          // ✅ INTENTO 2 (FALLBACK): Si no encuentra con esa UM exacta, usar lo que haya en SIESA para ese f120_id
+          // Esto pasa cuando WooCommerce tiene "UND" pero SIESA tiene "P2"
+          productDetailsMap[productId].barcode = barcodesByF120IdOnly[f120_id][0];
+
+          // 🔧 IMPORTANTE: Actualizar unidad_medida a lo que está en SIESA
+          // Buscar cuál es la UM correcta en SIESA para ese barcode
+          if (allSiesaBarcodes) {
+            const siesaItem = allSiesaBarcodes.find(
+              (bc) => bc.f120_id === f120_id &&
+                      bc.codigo_barras.replace(/\+$/, "") === productDetailsMap[productId].barcode
+            );
+            if (siesaItem) {
+              let correctUM = (siesaItem.unidad_medida || "").toUpperCase();
+              if (correctUM === "UN" || correctUM === "UNIDAD") correctUM = "UND";
+              else if (correctUM === "KG" || correctUM === "KILO") correctUM = "KL";
+              else if (correctUM === "LB" || correctUM === "LIBRA") correctUM = "LB";
+
+              productDetailsMap[productId].unidad_medida = correctUM;
+              console.log(`⚠️  ${productId}: f120_id=${f120_id}, UM correcta=${correctUM} (WooCommerce tenía ${normalizedUm}) → ${productDetailsMap[productId].barcode}`);
+            }
+          }
         } else {
-          console.warn(`⚠️ ${productId}: No hay código para f120_id=${f120_id}, UM=${normalizedUm}`);
+          console.warn(`❌ ${productId}: No hay código en SIESA para f120_id=${f120_id}`);
         }
       }
     });
