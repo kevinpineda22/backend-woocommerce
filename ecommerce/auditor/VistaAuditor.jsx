@@ -294,13 +294,20 @@ const VistaAuditor = () => {
     scannedBarcodesMap = {},
   ) => {
     // 🔧 LÓGICA CORRECTA: Solo incluir productos que REQUIEREN validación
-    // Excluir: Frutas/verduras/carnes (GS1) que ya fueron validadas
+    // Excluir: Frutas/verduras/carnes (pesables) que ya fueron validadas con GS1
     // Incluir: Variaciones (UND, P2, P3, P4) que deben verificarse
     const eligibleItems = items.filter((item) => {
-      // Si está marcado como "confiable" (GS1 ya validado), NO requiere auditoría
-      if (item._isTrusted) return false;
+      // Adjuntamos los barcodes escaneados para la detección
+      const itemWithBarcodes = {
+        ...item,
+        _scannedBarcodes: scannedBarcodesMap[item.id]
+          ? Array.from(scannedBarcodesMap[item.id])
+          : [],
+      };
+      // Excluir pesables (fruver/carnes) - ya validados con GS1
+      if (isFruverOrMeatItem(itemWithBarcodes)) return false;
 
-      // Todos los demás items requieren validación
+      // Incluir variaciones que requieren validación
       return true;
     });
 
@@ -348,7 +355,7 @@ const VistaAuditor = () => {
 
     try {
       const res = await ecommerceApi.get(`/historial-detalle?session_id=${id}`);
-      const { metadata, logs, allLogs, orders_info, products_map, final_snapshot } =
+      const { metadata, logs, orders_info, products_map, final_snapshot } =
         res.data;
 
       if (!logs || logs.length === 0) {
@@ -411,44 +418,6 @@ const VistaAuditor = () => {
       });
 
       const itemsArray = Object.values(itemsMap);
-
-      // 🔧 NUEVO: Añadir productos CONFIABLES (pesables/GS1) que no tengan logs de auditoría
-      // Estos ya fueron validados con GS1 en picking, aparecen automáticamente como confiables
-      if (products_map) {
-        Object.entries(products_map).forEach(([prodId, prodDetail]) => {
-          if (prodDetail._isTrusted && !itemsMap[prodId]) {
-            // 🔧 Buscar el pedido a que pertenece este producto en TODOS los logs (incluyendo fruver/carnes)
-            let relatedOrderId = null;
-            const logsToSearch = allLogs || logs;  // Usar allLogs si está disponible
-            const relatedLog = logsToSearch.find((log) => {
-              const logProdId = String(log.es_sustituto ? log.id_producto_final : log.id_producto);
-              return logProdId === String(prodId);
-            });
-            if (relatedLog) {
-              relatedOrderId = relatedLog.id_pedido;
-            }
-
-            // Producto pesable confiable sin logs de auditoría
-            itemsArray.push({
-              id: prodId,
-              name: prodDetail.name || "Producto",
-              original_name: prodDetail.name,
-              count: 0,  // No hay cantidad porque no fue escaneado por auditor
-              peso_total: 0,
-              is_sub: false,
-              price: prodDetail.price || 0,
-              order_id: relatedOrderId,  // 🔧 Usar pedido del log original
-              image: prodDetail.image || null,
-              sku: prodDetail.sku || null,
-              barcode: prodDetail.barcode || null,
-              unidad_medida: prodDetail.unidad_medida || null,
-              categorias_reales: prodDetail.categorias_reales || null,
-              _isTrusted: true,  // Marcar como confiable
-              _gs1: prodDetail.barcode,  // GS1 que el picker escaneó
-            });
-          }
-        });
-      }
 
       const storedStateStr = localStorage.getItem("auditor_state");
       let loadedFromStorage = false;

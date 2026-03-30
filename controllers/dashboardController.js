@@ -961,36 +961,22 @@ exports.getSessionLogsDetail = async (req, res) => {
       console.warn("⚠️ No se pudieron obtener categorías para auditor:", e.message);
     }
 
-    // 🔧 LÓGICA CORRECTA:
-    // 1. AUDITOR SOLO VALIDA: Variaciones (UND, P2, P3, P4, P5, P6)
-    // 2. CONFIABLES AUTOMÁTICAMENTE: Frutas/verduras/carnes (KG, KL, LB) - GS1 del picker
+    // 🔧 CAMBIO DE ESTRATEGIA:
+    // Enviar TODOS los logs y productos como están (sin filtrar)
+    // El filtrado se hace en el FRONTEND (VistaAuditor)
+    // que decidirá qué mostrar en "Por verificar" vs "Productos confiables"
 
-    // Identificar productos PESABLES (fruver/carnes) que son CONFIABLES
+    // Identificar productos PESABLES (fruver/carnes) para marcar en el frontend
     const WEIGHT_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
-    const trustedProductIds = new Set(
-      Object.entries(productDetailsMap)
-        .filter(([_, detail]) => {
-          const um = (detail.unidad_medida || "").toLowerCase();
-          return WEIGHT_UNITS.includes(um);
-        })
-        .map(([id]) => parseInt(id))
-    );
-
-    // 🔧 FILTRAR LOGS: Excluir fruver/carnes pesables de auditoría
-    // Solo incluir productos con variación (UND, P2, P3, P4, etc.)
-    const auditableLogs = logs.filter((log) => {
-      const prodId = String(log.es_sustituto ? log.id_producto_final : log.id_producto);
-      // EXCLUIR si es producto pesable (confiable)
-      if (trustedProductIds.has(parseInt(prodId))) {
-        return false;
+    Object.entries(productDetailsMap).forEach(([id, detail]) => {
+      const um = (detail.unidad_medida || "").toLowerCase();
+      if (WEIGHT_UNITS.includes(um)) {
+        detail._isWeighable = true;  // Marcar para que frontend lo detecte
       }
-      return true;
     });
 
-    // Marcar productos pesables como confiables
-    trustedProductIds.forEach((id) => {
-      productDetailsMap[id]._isTrusted = true;
-    });
+    // Enviar TODOS los logs sin filtrar
+    const auditableLogs = logs;
 
     res.status(200).json({
       metadata: {
@@ -1004,8 +990,7 @@ exports.getSessionLogsDetail = async (req, res) => {
       },
       orders_info: ordersData,
       products_map: productDetailsMap,
-      logs: auditableLogs,  // Logs para validar (excluye fruver/carnes)
-      allLogs: logs,         // 🔧 TODOS los logs (incluyendo fruver/carnes) para encontrar pedidos
+      logs: auditableLogs,  // 🔧 TODOS los logs sin filtrar (frontend decide qué validar)
       final_snapshot: sessionInfo.datos_salida || null,
     });
   } catch (error) {
