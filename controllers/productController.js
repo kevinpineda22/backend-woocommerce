@@ -229,39 +229,39 @@ exports.searchProduct = async (req, res) => {
       });
     }
 
-    // ✅ STOCK REAL: Para productos variables, sumar stock de sus variaciones
-    const variableProducts = products.filter(
-      (p) =>
-        p.type === "variable" &&
-        (p.stock_quantity === null || p.stock_quantity === undefined),
-    );
+    // ✅ REEMPLAZAR PRODUCTOS VARIABLES CON SUS VARIACIONES
+    // En lugar de sumar stock (que es impreciso), mostrar cada variación como producto separado
+    const variableProducts = products.filter((p) => p.type === "variable");
+    const expandedProducts = [...products.filter((p) => p.type !== "variable")];
+
     if (variableProducts.length > 0) {
       await Promise.all(
         variableProducts.map(async (vp) => {
           try {
             const { data: variations } = await prodClient.get(
               `products/${vp.id}/variations`,
-              { per_page: 100, _fields: "id,stock_quantity,stock_status" },
+              { per_page: 100 },
             );
             if (variations && variations.length > 0) {
-              const totalStock = variations.reduce(
-                (sum, v) => sum + (parseInt(v.stock_quantity) || 0),
-                0,
-              );
-              vp.stock_quantity = totalStock;
-            } else {
-              vp.stock_quantity = 0;
+              // Agregar cada variación como producto separado
+              variations.forEach((v) => {
+                if (v.status === "publish") {
+                  expandedProducts.push(v);
+                }
+              });
             }
           } catch (e) {
             console.warn(
               `Error obteniendo variaciones de producto ${vp.id}:`,
               e.message,
             );
-            vp.stock_quantity = 0;
           }
         }),
       );
     }
+
+    // Reemplazar products con la lista expandida
+    products = expandedProducts;
 
     // ✅ OBTENER CÓDIGOS DE BARRAS DE SIESA
     const skuList = Array.from(
@@ -272,27 +272,47 @@ exports.searchProduct = async (req, res) => {
     const barcodeMapSiesa = await getBarcodesFromSiesa(skuList);
 
     const results = products
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        image: p.images?.[0]?.src || null,
-        stock: p.stock_quantity ?? 0,
-        sku: p.sku,
-        categories: p.categories,
-        unidad_medida:
-          p.meta_data?.find((m) => m.key === "pa_unidad-de-medida-aproximado")
-            ?.display_value || null,
-        // ✅ PRIORIDAD: SIESA > WooCommerce meta_data > SKU
-        barcode:
-          barcodeMapSiesa[parseInt(p.sku)] ||
-          p.meta_data?.find((m) =>
-            ["ean", "barcode", "_ean", "_barcode"].includes(
-              m.key.toLowerCase(),
-            ),
-          )?.value ||
-          p.sku,
-      }))
+      .map((p) => {
+        // Para variaciones, obtener unidad_medida de attributes; para productos simples, de meta_data
+        let unidadMedida = null;
+        if (p.attributes && Array.isArray(p.attributes)) {
+          // Es una variación: buscar en attributes (ej: "Presentación: Dúo")
+          const presentationAttr = p.attributes.find(
+            (a) =>
+              a.name?.toLowerCase().includes("presentación") ||
+              a.slug?.includes("presentacion"),
+          );
+          if (presentationAttr) {
+            unidadMedida = presentationAttr.option;
+          }
+        }
+        // Si no encontró en attributes, buscar en meta_data
+        if (!unidadMedida) {
+          unidadMedida =
+            p.meta_data?.find((m) => m.key === "pa_unidad-de-medida-aproximado")
+              ?.display_value || null;
+        }
+
+        return {
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          image: p.images?.[0]?.src || null,
+          stock: p.stock_quantity ?? 0,
+          sku: p.sku,
+          categories: p.categories,
+          unidad_medida: unidadMedida,
+          // ✅ PRIORIDAD: SIESA > WooCommerce meta_data > SKU
+          barcode:
+            barcodeMapSiesa[parseInt(p.sku)] ||
+            p.meta_data?.find((m) =>
+              ["ean", "barcode", "_ean", "_barcode"].includes(
+                m.key.toLowerCase(),
+              ),
+            )?.value ||
+            p.sku,
+        };
+      })
       .slice(0, 15);
 
     res.status(200).json(results);

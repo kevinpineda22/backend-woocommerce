@@ -1029,6 +1029,7 @@
   box-sizing: border-box;
   height: 48px;
   /* Ocultar flechas de number input */
+  appearance: textfield;
   -moz-appearance: textfield;
 }
 .wm-concat-weight-input::-webkit-outer-spin-button,

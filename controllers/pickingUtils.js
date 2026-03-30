@@ -1,4 +1,12 @@
 // --- HELPER: Agrupar items de múltiples pedidos (Batch Picking) ---
+const normalizeUM = (um) => {
+  if (!um) return "_UNKNOWN";
+  let nom = um.toString().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  if (nom === "UN" || nom === "UNIDAD") return "UND";
+  if (nom === "KG" || nom === "KILO") return "KL";
+  return nom;
+};
+
 const agruparItemsParaPicking = (orders) => {
   const mapaProductos = {};
 
@@ -91,4 +99,4 @@ const agruparItemsParaPicking = (orders) => {
   return Object.values(mapaProductos);
 };
 
-module.exports = { agruparItemsParaPicking };
+module.exports = { agruparItemsParaPicking, normalizeUM };

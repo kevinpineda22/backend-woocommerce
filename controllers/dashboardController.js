@@ -21,6 +21,64 @@ const {
 // =========================================================
 // HELPER: Obtener códigos de barras desde SIESA
 // =========================================================
+// ✅ NUEVA FUNCIÓN: Obtiene códigos de barras discriminados ESTRICTAMENTE por unidad_medida
+async function getBarcodesFromSiesaByUnitMeasure(pairs) {
+  try {
+    if (!pairs || pairs.length === 0) return {};
+
+    const f120_ids = [...new Set(pairs.map((p) => p.f120_id))];
+
+    const { data: barcodes, error } = await supabase
+      .from("siesa_codigos_barras")
+      .select("f120_id, codigo_barras, unidad_medida")
+      .in("f120_id", f120_ids);
+
+    if (error) {
+      console.error("Error obteniendo códigos de barras SIESA:", error);
+      return {};
+    }
+
+    // ✅ Estructura ESTRICTA: { "f120_id|UNIDAD_MEDIDA": [barcode1, barcode2] }
+    // Esto asegura que cada unidad_medida tiene SOLO sus códigos específicos
+    const barcodesByKey = {};
+
+    barcodes.forEach((bc) => {
+      const code = (bc.codigo_barras || "").toString().trim();
+      const cleaned = code.replace(/\+$/, "");
+
+      // Filtrar códigos válidos
+      if (!cleaned || cleaned.length < 8) return;
+      if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
+      if (!/^\d+\+?$/.test(code)) return;
+
+      // Normalizar unidad de medida
+      let normalizedUm = (bc.unidad_medida || "DEFAULT").toUpperCase();
+      if (normalizedUm === "UN" || normalizedUm === "UNIDAD") normalizedUm = "UND";
+      else if (normalizedUm === "KG" || normalizedUm === "KILO") normalizedUm = "KL";
+      else if (normalizedUm === "LB" || normalizedUm === "LIBRA") normalizedUm = "LB";
+      else if (normalizedUm === "" || normalizedUm === "NULL") normalizedUm = "DEFAULT";
+
+      const key = `${bc.f120_id}|${normalizedUm}`;
+
+      if (!barcodesByKey[key]) {
+        barcodesByKey[key] = [];
+      }
+
+      // Evitar duplicados
+      if (!barcodesByKey[key].includes(cleaned)) {
+        barcodesByKey[key].push(cleaned);
+      }
+    });
+
+    console.log(`📊 Códigos organizados por f120_id|UM:`, Object.keys(barcodesByKey).slice(0, 10));
+    return barcodesByKey;
+  } catch (error) {
+    console.error("Error en getBarcodesFromSiesaByUnitMeasure:", error);
+    return {};
+  }
+}
+
+// ✅ FUNCIÓN LEGACY: Mantener para compatibilidad
 async function getBarcodesFromSiesa(productIds) {
   try {
     if (!productIds || productIds.length === 0) return {};
@@ -54,7 +112,7 @@ async function getBarcodesFromSiesa(productIds) {
       if (!barcodesByProduct[bc.f120_id][um]) {
         barcodesByProduct[bc.f120_id][um] = [];
       }
-      
+
       // Añadir la lista de códigos válidos para esta unidad de medida específica
       if (!barcodesByProduct[bc.f120_id][um].includes(cleaned)) {
         barcodesByProduct[bc.f120_id][um].push(cleaned);
@@ -824,47 +882,53 @@ exports.getSessionLogsDetail = async (req, res) => {
       } catch (e) {}
     }
 
-    // ✅ OBTENER CÓDIGOS DE BARRAS DESDE SIESA (extrayendo el f120_id maestro numérico del SKU)
-    const f120IdList = Array.from(
-      new Set(
-        Object.values(productDetailsMap)
-          .map((p) => p.sku)
-          .filter(Boolean)
-          .map((sku) => parseInt(sku)) // Extrae "188407" automáticamente desde "188407-P6"
-          .filter((id) => !isNaN(id)),
-      ),
-    );
+    // ✅ OBTENER CÓDIGOS DE BARRAS DESDE SIESA CON UNIDAD_MEDIDA COMO CLAVE COMPUESTA
+    // Crear lista de pares [f120_id, unidad_medida] únicos para consulta eficiente
+    const uniquePairs = new Map();
+    Object.values(productDetailsMap).forEach((p) => {
+      const f120_id = parseInt(p.sku);
+      const um = (p.unidad_medida || "").toUpperCase() || "DEFAULT";
+      if (!isNaN(f120_id)) {
+        const key = `${f120_id}|${um}`;
+        uniquePairs.set(key, { f120_id, um });
+      }
+    });
 
     console.log(
-      `🔍 Buscando códigos de barras para ${f120IdList.length} f120_ids:`,
-      f120IdList,
+      `🔍 Buscando códigos de barras para ${uniquePairs.size} pares f120_id|unidad_medida`
     );
-    const barcodeMapByF120Id = await getBarcodesFromSiesa(f120IdList);
+
+    const barcodeMapByF120IdAndUm = await getBarcodesFromSiesaByUnitMeasure(
+      Array.from(uniquePairs.values())
+    );
     console.log(
       `📦 Códigos encontrados:`,
-      Object.keys(barcodeMapByF120Id).length,
+      Object.keys(barcodeMapByF120IdAndUm).length,
     );
 
-    // Agregar códigos de barras al productDetailsMap cruzando el f120_id + unidad_medida
+    // Agregar códigos de barras al productDetailsMap usando el cruce exacto f120_id + unidad_medida
     Object.keys(productDetailsMap).forEach((productId) => {
       const sku = productDetailsMap[productId].sku;
       const f120_id = parseInt(sku);
-      const um = (productDetailsMap[productId].unidad_medida || "").toUpperCase();
+      const um = (productDetailsMap[productId].unidad_medida || "").toUpperCase() || "DEFAULT";
 
-      if (!isNaN(f120_id) && barcodeMapByF120Id[f120_id]) {
-        // ✅ Buscar arreglos de barcodes específicos para la unidad_medida del item
+      if (!isNaN(f120_id)) {
+        // Normalizar unidad de medida para búsqueda
         let normalizedUm = um;
         if (um === "UN" || um === "UNIDAD") normalizedUm = "UND";
         else if (um === "KG" || um === "KILO") normalizedUm = "KL";
+        else if (um === "LB" || um === "LIBRA") normalizedUm = "LB";
+        else if (um === "DEFAULT" || um === "") normalizedUm = "DEFAULT";
 
-        const group = barcodeMapByF120Id[f120_id];
-        
-        // REGLA ESTRICTA: Si la orden exige una unidad, usar SOLO los barcodes de esa unidad.
-        // Solo usar default si el producto base no tiene unidad de medida.
-        const specificBarcodes = normalizedUm ? (group[normalizedUm] || []) : (group._default || []);
-        
-        if (specificBarcodes.length > 0) {
-          productDetailsMap[productId].barcode = specificBarcodes;
+        const key = `${f120_id}|${normalizedUm}`;
+
+        // ✅ REGLA ESTRICTA: Usar SOLO el código específico para esa combinación f120_id + unidad_medida
+        if (barcodeMapByF120IdAndUm[key]) {
+          // Tomar el primer código disponible para esa unidad específica
+          productDetailsMap[productId].barcode = barcodeMapByF120IdAndUm[key][0] || null;
+          console.log(`✅ ${productId}: f120_id=${f120_id}, UM=${normalizedUm} → ${productDetailsMap[productId].barcode}`);
+        } else {
+          console.warn(`⚠️ ${productId}: No hay código para f120_id=${f120_id}, UM=${normalizedUm}`);
         }
       }
     });
