@@ -957,27 +957,41 @@ exports.getSessionLogsDetail = async (req, res) => {
       console.warn("⚠️ No se pudieron obtener categorías para auditor:", e.message);
     }
 
-    // 🔧 MARCAR productos pesables como confiables (no requieren validación)
-    // Fruver y carnicería se consideran "confiables" porque se validaron durante picking
-    // El auditor las vera en la sección de "productos confiables", no en "por verificar"
-    const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra", "p2", "p3", "p4"];
-    const weighableProductIds = new Set(
+    // 🔧 LÓGICA CORRECTA:
+    // 1. CONFIABLES: Frutas/verduras/carnes (KL, KG, LB) - ya validadas con GS1 en picking
+    // 2. REQUIEREN VALIDACIÓN: Variaciones (UND, P2, P3, P4) - auditor verifica presentación correcta
+
+    // Productos CONFIABLES - Pesables con GS1 (ya validados en picking)
+    const WEIGHT_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
+    const trustedProductIds = new Set(
       Object.entries(productDetailsMap)
         .filter(([_, detail]) => {
           const um = (detail.unidad_medida || "").toLowerCase();
-          return WEIGHABLE_UNITS.includes(um);
+          return WEIGHT_UNITS.includes(um);
         })
         .map(([id]) => parseInt(id))
     );
 
-    // 🔧 NO eliminar productos pesables - marcarlos como confiables
-    // Esto permite que aparezcan en la sección "Productos confiables" sin requerir validación
-    weighableProductIds.forEach((id) => {
-      productDetailsMap[id]._isWeighable = true;
-      productDetailsMap[id]._isTrusted = true;  // Marcar como confiable
+    // Productos que REQUIEREN VALIDACIÓN - Variaciones por unidad
+    const VARIABLE_UNITS = ["p2", "p3", "p4", "p5", "p6", "und"];
+    const validateProductIds = new Set(
+      Object.entries(productDetailsMap)
+        .filter(([_, detail]) => {
+          const um = (detail.unidad_medida || "").toLowerCase();
+          return VARIABLE_UNITS.includes(um);
+        })
+        .map(([id]) => parseInt(id))
+    );
+
+    // Marcar productos correctamente
+    trustedProductIds.forEach((id) => {
+      productDetailsMap[id]._isTrusted = true;      // Confiable, sin validación
+    });
+    validateProductIds.forEach((id) => {
+      productDetailsMap[id]._requiresValidation = true;  // Debe validarse
     });
 
-    // Todas los logs se incluyen (no filtrar por peso)
+    // Todos los logs se incluyen (no filtrar)
     const auditableLogs = logs;
 
     res.status(200).json({

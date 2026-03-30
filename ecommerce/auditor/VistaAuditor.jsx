@@ -61,8 +61,9 @@ const VistaAuditor = () => {
   };
 
   // ─── DETECCIÓN DE TIPO DE PRODUCTO (por unidad de medida del pedido WooCommerce) ───
-  // 🔧 Incluir presentaciones (P2, P3, P4) que son productos pesables en SIESA
-  const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra", "p2", "p3", "p4"];
+  // 🔧 Solo productos pesados por PESO real (KL, KG, LB)
+  // P2, P3, P4 son variaciones, NO son pesables, aparecen como "confiables"
+  const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
 
   // ✅ Determina si un producto es pesable: únicamente por la unidad_medida del pedido WooCommerce.
   // Si el cliente pidió KL o LB, es pesable. Si pidió unidades o no tiene, no lo es.
@@ -292,16 +293,15 @@ const VistaAuditor = () => {
     metadata,
     scannedBarcodesMap = {},
   ) => {
-    // ✅ Excluir productos fruver y carnicería de la muestra de auditoría
+    // 🔧 LÓGICA CORRECTA: Solo incluir productos que REQUIEREN validación
+    // Excluir: Frutas/verduras/carnes (GS1) que ya fueron validadas
+    // Incluir: Variaciones (UND, P2, P3, P4) que deben verificarse
     const eligibleItems = items.filter((item) => {
-      // Adjuntamos los barcodes escaneados para la detección
-      const itemWithBarcodes = {
-        ...item,
-        _scannedBarcodes: scannedBarcodesMap[item.id]
-          ? Array.from(scannedBarcodesMap[item.id])
-          : [],
-      };
-      return !isFruverOrMeatItem(itemWithBarcodes);
+      // Si está marcado como "confiable" (GS1 ya validado), NO requiere auditoría
+      if (item._isTrusted) return false;
+
+      // Todos los demás items requieren validación
+      return true;
     });
 
     const groupedByOrder = {};
