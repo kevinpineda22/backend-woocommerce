@@ -1102,6 +1102,18 @@ exports.getSessionLogsDetail = async (req, res) => {
     // Enviar TODOS los logs sin filtrar
     const auditableLogs = logs;
 
+    // Mapa codigo_barras → f120_id para validación del auditor
+    const auditBarcodeMap = {};
+    if (allSiesaBarcodes) {
+      allSiesaBarcodes.forEach((bc) => {
+        const clean = bc.codigo_barras.toString().trim().replace(/\+$/, "").toUpperCase();
+        auditBarcodeMap[clean] = bc.f120_id;
+        // También con el original (con +)
+        const original = bc.codigo_barras.toString().trim().toUpperCase();
+        auditBarcodeMap[original] = bc.f120_id;
+      });
+    }
+
     res.status(200).json({
       metadata: {
         session_id: sessionInfo.id,
@@ -1114,6 +1126,7 @@ exports.getSessionLogsDetail = async (req, res) => {
       },
       orders_info: ordersData,
       products_map: productDetailsMap,
+      audit_barcode_map: auditBarcodeMap,
       logs: auditableLogs,  // 🔧 TODOS los logs sin filtrar (frontend decide qué validar)
       final_snapshot: sessionInfo.datos_salida || null,
     });

@@ -138,16 +138,39 @@ const VistaAuditor = () => {
         return;
       }
 
-      // Buscar el item pendiente cuyo SKU (f120_id) coincida
+      // Buscar el item pendiente que corresponda a este f120_id
       let targetItem = null;
       for (const itemId of requiredItems) {
         if (verifiedItems.has(itemId)) continue;
-        const item = auditData.items.find((i) => String(i.id) === String(itemId));
+        const item = auditData.items.find(
+          (i) => String(i.id) === String(itemId),
+        );
         if (!item) continue;
+
+        // 1. Match por SKU del item (sku = f120_id en WooCommerce)
         const itemF120 = parseInt((item.sku || "").replace(/-/g, ""));
         if (!isNaN(itemF120) && itemF120 === f120_id) {
           targetItem = item;
           break;
+        }
+
+        // 2. Match por barcodes que el picker escaneó para este item
+        //    (vincula WooCommerce product_id con f120_id de SIESA)
+        const scannedCodes = auditData.scannedBarcodes?.[item.id];
+        if (scannedCodes) {
+          const codes =
+            scannedCodes instanceof Set
+              ? Array.from(scannedCodes)
+              : Object.values(scannedCodes);
+          const match = codes.some((sc) => {
+            const scClean = (sc || "").trim().replace(/\+$/, "").toUpperCase();
+            const scF120 = barcodeMap[scClean];
+            return scF120 === f120_id;
+          });
+          if (match) {
+            targetItem = item;
+            break;
+          }
         }
       }
 
@@ -161,16 +184,10 @@ const VistaAuditor = () => {
 
       // Código existe en SIESA y corresponde a un item pendiente → verificado
       setVerifiedItems((prev) => new Set(prev).add(targetItem.id));
-      showFeedback(
-        "success",
-        `✅ ${targetItem.name} verificado correctamente`,
-      );
+      showFeedback("success", `✅ ${targetItem.name} verificado correctamente`);
     } catch (error) {
       console.error("Error validando código:", error.message);
-      showFeedback(
-        "error",
-        `Error al validar: ${error.message}`,
-      );
+      showFeedback("error", `Error al validar: ${error.message}`);
       return;
     }
   };
@@ -252,8 +269,14 @@ const VistaAuditor = () => {
 
     try {
       const res = await ecommerceApi.get(`/historial-detalle?session_id=${id}`);
-      const { metadata, logs, orders_info, products_map, final_snapshot } =
-        res.data;
+      const {
+        metadata,
+        logs,
+        orders_info,
+        products_map,
+        audit_barcode_map,
+        final_snapshot,
+      } = res.data;
 
       if (!logs || logs.length === 0) {
         setErrorMsg("Sesión vacía o no encontrada.");
@@ -264,6 +287,7 @@ const VistaAuditor = () => {
       const itemsMap = {};
       let substitutedCount = 0;
       const scannedBarcodesMap = {}; // ✅ NUEVO: Mapa de códigos escaneados por producto
+      const allBarcodesSet = new Set(); // Para construir el barcodeMap universal
 
       logs.forEach((log) => {
         if (log.accion === "recolectado" || log.accion === "sustituido") {
@@ -275,12 +299,15 @@ const VistaAuditor = () => {
 
           // ✅ GUARDAR código de barras escaneado si existe (strip "+" de SIESA)
           if (log.codigo_barras_escaneado) {
+            const normalized = log.codigo_barras_escaneado
+              .trim()
+              .replace(/\+$/, "")
+              .toUpperCase();
             if (!scannedBarcodesMap[key]) {
               scannedBarcodesMap[key] = new Set();
             }
-            scannedBarcodesMap[key].add(
-              log.codigo_barras_escaneado.trim().replace(/\+$/, "").toUpperCase(),
-            );
+            scannedBarcodesMap[key].add(normalized);
+            allBarcodesSet.add(normalized);
           }
 
           if (!itemsMap[key]) {
@@ -308,11 +335,34 @@ const VistaAuditor = () => {
           itemsMap[key].count += cantAfectada;
           // ✅ Acumular peso real si existe (peso_real es por unidad × cantidad)
           if (log.peso_real) {
-            itemsMap[key].peso_total += parseFloat(log.peso_real) * cantAfectada;
+            itemsMap[key].peso_total +=
+              parseFloat(log.peso_real) * cantAfectada;
           }
           if (log.es_sustituto) substitutedCount += 1;
         }
       });
+
+      // Construir barcodeMap universal con todos los códigos de la tabla SIESA (audit_barcode_map)
+      // y normalizarlos igual que el input del usuario
+      const normalizedBarcodeMap = {};
+      if (audit_barcode_map) {
+        Object.entries(audit_barcode_map).forEach(([raw, f120]) => {
+          const normalized = (raw || "")
+            .trim()
+            .replace(/\+$/, "")
+            .toUpperCase();
+          normalizedBarcodeMap[normalized] = f120;
+        });
+      }
+      // También incluir los barcodes escaneados por el picker (por si hay alguno que no está en audit_barcode_map)
+      allBarcodesSet.forEach((code) => {
+        if (!(code in normalizedBarcodeMap)) {
+          // Buscar el f120_id correspondiente en barcodeMap original si existe
+          // (esto es defensivo, normalmente audit_barcode_map debe tener todos)
+          normalizedBarcodeMap[code] = barcodeMap[code] || null;
+        }
+      });
+      setBarcodeMap(normalizedBarcodeMap);
 
       const itemsArray = Object.values(itemsMap);
 
@@ -404,17 +454,9 @@ const VistaAuditor = () => {
         },
       });
 
-      // Cargar todos los codigo_barras de SIESA para los f120_ids de los items
-      try {
-        const f120_ids = [...new Set(
-          itemsArray.map((i) => parseInt((i.sku || "").replace(/-/g, ""))).filter((n) => !isNaN(n))
-        )];
-        if (f120_ids.length > 0) {
-          const bcRes = await ecommerceApi.post("/load-barcodes-audit", { f120_ids });
-          setBarcodeMap(bcRes.data.barcodeMap || {});
-        }
-      } catch (e) {
-        console.warn("No se pudieron cargar barcodes de SIESA:", e.message);
+      // Usar el mapa de barcodes que ya viene del backend
+      if (audit_barcode_map) {
+        setBarcodeMap(audit_barcode_map);
       }
     } catch (error) {
       setErrorMsg("Error consultando la sesión.");
@@ -460,12 +502,10 @@ const VistaAuditor = () => {
 
         if (scannedSet && scannedSet.size > 0) {
           // Tomar lo que se escaneó, filtrando SOLO códigos que inician con M o N
-          const validBarcodes = Array.from(scannedSet).filter(
-            (code) => {
-              const upper = code.toUpperCase();
-              return !upper.startsWith("M") && !upper.startsWith("N");
-            }
-          );
+          const validBarcodes = Array.from(scannedSet).filter((code) => {
+            const upper = code.toUpperCase();
+            return !upper.startsWith("M") && !upper.startsWith("N");
+          });
           // Usar lo que quedó después de filtrar M/N
           if (validBarcodes.length > 0) {
             exactScannedBarcode = validBarcodes.join(",");
@@ -576,10 +616,7 @@ const VistaAuditor = () => {
     };
 
     return (
-      <ManifestInvoiceModal
-        manifestData={manifestData}
-        onClose={clearAudit}
-      />
+      <ManifestInvoiceModal manifestData={manifestData} onClose={clearAudit} />
     );
   }
 
@@ -587,7 +624,11 @@ const VistaAuditor = () => {
     <div className="auditor-layout">
       <header className="auditor-header">
         <div className="aud-header-left">
-          <Link to="/acceso" className="aud-back-button" title="Volver al panel">
+          <Link
+            to="/acceso"
+            className="aud-back-button"
+            title="Volver al panel"
+          >
             <FaArrowLeft />
           </Link>
         </div>
@@ -600,7 +641,11 @@ const VistaAuditor = () => {
               className="aud-exit-session-btn"
               title="Salir de la sesión"
               onClick={() => {
-                if (window.confirm("¿Salir de esta sesión? Podrás retomar la auditoría más tarde.")) {
+                if (
+                  window.confirm(
+                    "¿Salir de esta sesión? Podrás retomar la auditoría más tarde.",
+                  )
+                ) {
                   clearAudit();
                 }
               }}
@@ -730,9 +775,7 @@ const VistaAuditor = () => {
             ).length;
             const progress =
               requiredItems.size > 0
-                ? Math.round(
-                    (verifiedRequiredCount / requiredItems.size) * 100,
-                  )
+                ? Math.round((verifiedRequiredCount / requiredItems.size) * 100)
                 : 0;
             const allDone = isAuditComplete();
 
