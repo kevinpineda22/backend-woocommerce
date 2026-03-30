@@ -396,6 +396,7 @@ exports.validateCodeWithSiesa = async (req, res) => {
     console.error("Error en validateCodeWithSiesa:", error.message);
     return res.status(500).json({ valid: false, message: "Error al validar código", error: error.message });
   }
+};
 
 /**
  * Validar código para AUDITOR - IGUAL DE RESTRICTIVO QUE PICKER
