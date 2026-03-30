@@ -165,6 +165,15 @@ const VistaAuditor = () => {
       const f120Id = skuMatch ? parseInt(skuMatch[1]) : parseInt(targetItem.sku);
       const umEsperada = (targetItem.unidad_medida || "UND").toUpperCase();
 
+      // 🔧 Validar que los parámetros sean válidos antes de enviar
+      if (isNaN(f120Id) || !umEsperada) {
+        showFeedback(
+          "error",
+          `Error: Datos incompletos para ${targetItem.name}. No se puede validar.`,
+        );
+        return;
+      }
+
       // 3. Validar el código contra SIESA
       const res = await ecommerceApi.post(`/validar-codigo-auditor`, {
         codigo: cleanCode,
@@ -461,12 +470,24 @@ const VistaAuditor = () => {
       billing: group.billing,
       shipping: group.shipping,
       items: group.items.map((i) => {
-        // Encontrar los códigos exactos escaneados para este producto
+        // 🔧 SIMPLIFICADO: Usar EXACTAMENTE lo que el picker o auditor escaneó
+        // Sin validaciones, sin consultas, sin fallbacks
         const scannedSet = auditData.scannedBarcodes[i.id];
-        const exactScannedBarcode =
-          scannedSet && scannedSet.size > 0
-            ? Array.from(scannedSet).join(",")
-            : i.barcode || i.sku || i.id;
+        let exactScannedBarcode = null;
+
+        if (scannedSet && scannedSet.size > 0) {
+          // Tomar lo que se escaneó, filtrando SOLO códigos que inician con M o N
+          const validBarcodes = Array.from(scannedSet).filter(
+            (code) => {
+              const upper = code.toUpperCase();
+              return !upper.startsWith("M") && !upper.startsWith("N");
+            }
+          );
+          // Usar lo que quedó después de filtrar M/N
+          if (validBarcodes.length > 0) {
+            exactScannedBarcode = validBarcodes.join(",");
+          }
+        }
 
         return {
           id: i.id,

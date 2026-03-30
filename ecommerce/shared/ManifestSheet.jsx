@@ -349,7 +349,14 @@ const ManifestSheet = ({
                 }}
               >
                 <strong>Advertencia:</strong> {omittedItems.length} producto(s)
-                omitidos del QR por falta de código de barras válido.
+                omitidos del QR:
+                <ul style={{ margin: "3px 0 0 16px", paddingLeft: 0 }}>
+                  {omittedItems.map((item, idx) => (
+                    <li key={idx}>
+                      {item.name} {item.qty && `(x${item.qty})`}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>

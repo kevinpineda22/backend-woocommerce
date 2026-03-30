@@ -942,6 +942,7 @@ exports.getSessionLogsDetail = async (req, res) => {
     );
 
     // 🔧 FUNCIÓN HELPER: Hacer matching inteligente de unidad_medida usando pistas del nombre
+    // Solo se usa como fallback cuando SIESA tiene múltiples opciones
     const inferUnitMeasureFromName = (productName, availableUMs) => {
       if (!availableUMs || availableUMs.length === 0) return null;
       if (availableUMs.length === 1) return availableUMs[0]; // Si hay solo una, esa es
@@ -971,6 +972,10 @@ exports.getSessionLogsDetail = async (req, res) => {
       return availableUMs[0];
     };
 
+    // 🔧 SIMPLIFICADO: La UM en SIESA es la ÚNICA fuente de verdad
+    // Si SIESA dice KL/LB → es pesable/confiable
+    // Si SIESA dice UND/P2/P3/P4/P6 → requiere validación
+
     // Agregar códigos de barras al productDetailsMap usando el cruce exacto f120_id + unidad_medida
     Object.keys(productDetailsMap).forEach((productId) => {
       const sku = productDetailsMap[productId].sku;
@@ -993,7 +998,14 @@ exports.getSessionLogsDetail = async (req, res) => {
           productDetailsMap[productId].barcode = barcodeMapByF120IdAndUm[key][0] || null;
           productDetailsMap[productId].unidad_medida = normalizedUm; // Guardar la UM normalizada
           console.log(`✅ ${productId}: f120_id=${f120_id}, UM=${normalizedUm} → ${productDetailsMap[productId].barcode} (búsqueda exacta)`);
-        } else if (barcodesByF120IdOnly[f120_id] && barcodesByF120IdOnly[f120_id].length > 0) {
+        } else {
+          // 🔧 IMPORTANTE: Si WooCommerce tiene UM incorrecta, consultar SIESA para obtener la correcta
+          // La UM en SIESA es la ÚNICA fuente de verdad
+          // Si en SIESA está como KL/LB → Es pesable/confiable
+          // Si está como UND/P2/P3/P4/P6 → Requiere validación
+        }
+
+        if (barcodesByF120IdOnly[f120_id] && barcodesByF120IdOnly[f120_id].length > 0) {
           // ✅ INTENTO 2 (FALLBACK): Si no encuentra con esa UM exacta, usar lo que haya en SIESA para ese f120_id
           // Esto pasa cuando WooCommerce tiene "UND" pero SIESA tiene "P2" o "P6"
 
