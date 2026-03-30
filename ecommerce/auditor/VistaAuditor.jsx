@@ -61,7 +61,8 @@ const VistaAuditor = () => {
   };
 
   // ─── DETECCIÓN DE TIPO DE PRODUCTO (por unidad de medida del pedido WooCommerce) ───
-  const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
+  // 🔧 Incluir presentaciones (P2, P3, P4) que son productos pesables en SIESA
+  const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra", "p2", "p3", "p4"];
 
   // ✅ Determina si un producto es pesable: únicamente por la unidad_medida del pedido WooCommerce.
   // Si el cliente pidió KL o LB, es pesable. Si pidió unidades o no tiene, no lo es.

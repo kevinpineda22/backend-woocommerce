@@ -957,9 +957,10 @@ exports.getSessionLogsDetail = async (req, res) => {
       console.warn("⚠️ No se pudieron obtener categorías para auditor:", e.message);
     }
 
-    // ✅ FILTRO: Excluir productos pesables (fruver/carnicería) del auditor
-    // El auditor SOLO valida productos por unidad, no por peso
-    const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
+    // 🔧 MARCAR productos pesables como confiables (no requieren validación)
+    // Fruver y carnicería se consideran "confiables" porque se validaron durante picking
+    // El auditor las vera en la sección de "productos confiables", no en "por verificar"
+    const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra", "p2", "p3", "p4"];
     const weighableProductIds = new Set(
       Object.entries(productDetailsMap)
         .filter(([_, detail]) => {
@@ -969,15 +970,15 @@ exports.getSessionLogsDetail = async (req, res) => {
         .map(([id]) => parseInt(id))
     );
 
-    // Remover productos pesables del mapa
+    // 🔧 NO eliminar productos pesables - marcarlos como confiables
+    // Esto permite que aparezcan en la sección "Productos confiables" sin requerir validación
     weighableProductIds.forEach((id) => {
-      delete productDetailsMap[id];
+      productDetailsMap[id]._isWeighable = true;
+      productDetailsMap[id]._isTrusted = true;  // Marcar como confiable
     });
 
-    // Remover logs de productos pesables
-    const auditableLogs = logs.filter(
-      (log) => !weighableProductIds.has(log.id_producto_original)
-    );
+    // Todas los logs se incluyen (no filtrar por peso)
+    const auditableLogs = logs;
 
     res.status(200).json({
       metadata: {
