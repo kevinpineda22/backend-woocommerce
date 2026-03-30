@@ -127,7 +127,7 @@ const VistaAuditor = () => {
   };
 
   const verifyProductScan = async (code) => {
-    const cleanCode = code.trim().replace(/\+$/, "").toUpperCase();
+    const inputCode = code.trim().toUpperCase();
 
     // Helper: normalizar unidad de medida para comparación
     const normalizeUM = (um) => {
@@ -138,9 +138,20 @@ const VistaAuditor = () => {
       return u;
     };
 
+    // Helper: buscar en barcodeMap con fallback "+" (scanners pueden perder el "+")
+    const lookupBarcode = (c) => {
+      const entry = barcodeMap[c];
+      if (entry) return entry;
+      // Fallback: intentar con "+" por si el scanner lo omitió
+      const entryPlus = barcodeMap[c + "+"];
+      if (entryPlus) return entryPlus;
+      return null;
+    };
+
     try {
-      // Buscar el código en el mapa de barcodes cargado de SIESA
-      const barcodeEntry = barcodeMap[cleanCode]; // { f120_id, unidad_medida } o legacy f120_id
+      // Buscar el código EXACTO en el mapa de barcodes cargado de SIESA
+      // ⚠️ No quitar "+" — "1032" y "1032+" son códigos DIFERENTES
+      const barcodeEntry = lookupBarcode(inputCode);
       let f120_id = null;
       let scannedUM = null; // Unidad de medida del código escaneado
 
@@ -153,21 +164,32 @@ const VistaAuditor = () => {
         }
       }
 
-      // Fallback: si no está en el mapa, intentar parsear como SKU (ej: "1032P2" → f120=1032, um=P2)
+      // Ruta 2: Parsear como SKU compuesto (ej: "1032P2" → f120=1032, um=P2)
+      // Esto NO es un codigo_barras, pero es un formato válido para el auditor
       if (!f120_id) {
-        const skuMatch = cleanCode.match(/^(\d+)([A-Z]+\d*)$/);
+        const skuMatch = inputCode.match(/^(\d+)([A-Z]+\d*)$/);
         if (skuMatch) {
           const parsedF120 = parseInt(skuMatch[1]);
-          scannedUM = skuMatch[2];
-          // Verificar que este f120_id existe en algún item del audit
-          const itemExists = auditData?.items?.some((item) => {
-            const itemF120 = parseInt((item.sku || "").replace(/-/g, ""));
-            return !isNaN(itemF120) && itemF120 === parsedF120;
-          });
-          if (itemExists) {
-            f120_id = parsedF120;
+          const parsedUM = skuMatch[2];
+          // Solo aceptar si "1032P2" existe como codigo_barras en la tabla SIESA
+          const skuAsBarcode = lookupBarcode(inputCode);
+          if (skuAsBarcode) {
+            f120_id = skuAsBarcode.f120_id || parsedF120;
+            scannedUM = skuAsBarcode.unidad_medida || parsedUM;
+          } else {
+            // Verificar que este f120_id+UM existe en algún item del audit
+            const itemExists = auditData?.items?.some((item) => {
+              const itemF120 = parseInt((item.sku || "").replace(/-/g, ""));
+              return !isNaN(itemF120) && itemF120 === parsedF120;
+            });
+            if (itemExists) {
+              f120_id = parsedF120;
+              scannedUM = parsedUM;
+            }
           }
         }
+        // ⚠️ Solo dígitos sin letras (ej: "1032") = f120_id puro → NO es un codigo_barras válido
+        // No hacer nada — dejar que caiga al error
       }
 
       // Fallback final: consultar el backend
@@ -187,7 +209,7 @@ const VistaAuditor = () => {
             ).toUpperCase();
             if (!isNaN(itemF120)) {
               const resp = await ecommerceApi.post("/validar-codigo-auditor", {
-                codigo: cleanCode,
+                codigo: inputCode,
                 f120_id_esperado: itemF120,
                 unidad_medida_esperada: itemUM,
               });
@@ -203,7 +225,7 @@ const VistaAuditor = () => {
       }
 
       if (!f120_id) {
-        showFeedback("error", `El código "${cleanCode}" no existe en SIESA.`);
+        showFeedback("error", `El código "${inputCode}" no existe en SIESA.`);
         return;
       }
 
@@ -220,12 +242,18 @@ const VistaAuditor = () => {
         // 1. Match por SKU del item (sku = f120_id en WooCommerce)
         const itemF120 = parseInt((item.sku || "").replace(/-/g, ""));
         if (!isNaN(itemF120) && itemF120 === f120_id) {
-          // ✅ Validar unidad_medida: el barcode escaneado debe coincidir con la UM del producto
+          // ✅ Validar unidad_medida OBLIGATORIAMENTE
           const expectedUM = normalizeUM(item.unidad_medida);
           const actualUM = normalizeUM(scannedUM);
-          if (scannedUM && expectedUM && actualUM !== expectedUM) {
-            umMismatchMsg = `❌ El código "${cleanCode}" es para presentación ${actualUM}, pero se esperaba ${expectedUM}.`;
-            continue; // Seguir buscando por si hay otro item con la UM correcta
+          // Si conocemos la UM escaneada, debe coincidir con la esperada
+          if (scannedUM && actualUM && expectedUM && actualUM !== expectedUM) {
+            umMismatchMsg = `❌ El código "${inputCode}" es para presentación ${actualUM}, pero se esperaba ${expectedUM}.`;
+            continue;
+          }
+          // Si NO conocemos la UM del código escaneado, rechazar — el auditor debe usar un código específico
+          if (!scannedUM && expectedUM) {
+            umMismatchMsg = `❌ El código "${inputCode}" no especifica presentación. Usa un código de barras específico para ${expectedUM}.`;
+            continue;
           }
           targetItem = item;
           break;
@@ -239,17 +267,25 @@ const VistaAuditor = () => {
               ? Array.from(scannedCodes)
               : Object.values(scannedCodes);
           const match = codes.some((sc) => {
-            const scClean = (sc || "").trim().replace(/\+$/, "").toUpperCase();
-            const entry = barcodeMap[scClean];
+            const scUpper = (sc || "").trim().toUpperCase();
+            const entry = lookupBarcode(scUpper);
             const scF120 = typeof entry === "object" ? entry?.f120_id : entry;
             return scF120 === f120_id;
           });
           if (match) {
-            // También validar UM aquí
             const expectedUM = normalizeUM(item.unidad_medida);
             const actualUM = normalizeUM(scannedUM);
-            if (scannedUM && expectedUM && actualUM !== expectedUM) {
-              umMismatchMsg = `❌ El código "${cleanCode}" es para presentación ${actualUM}, pero se esperaba ${expectedUM}.`;
+            if (
+              scannedUM &&
+              actualUM &&
+              expectedUM &&
+              actualUM !== expectedUM
+            ) {
+              umMismatchMsg = `❌ El código "${inputCode}" es para presentación ${actualUM}, pero se esperaba ${expectedUM}.`;
+              continue;
+            }
+            if (!scannedUM && expectedUM) {
+              umMismatchMsg = `❌ El código "${inputCode}" no especifica presentación. Usa un código de barras específico para ${expectedUM}.`;
               continue;
             }
             targetItem = item;
@@ -266,7 +302,7 @@ const VistaAuditor = () => {
       if (!targetItem) {
         showFeedback(
           "error",
-          `El código "${cleanCode}" existe en SIESA (item ${f120_id}), pero no corresponde a ningún producto por validar.`,
+          `El código "${inputCode}" existe en SIESA (item ${f120_id}), pero no corresponde a ningún producto por validar.`,
         );
         return;
       }
@@ -432,17 +468,13 @@ const VistaAuditor = () => {
       });
 
       // Construir barcodeMap universal con todos los códigos de la tabla SIESA (audit_barcode_map)
-      // y normalizarlos igual que el input del usuario
-      // Formato: { codigo_normalizado: { f120_id, unidad_medida } }
+      // ⚠️ NO quitar "+" de las claves — el "+" es parte del codigo_barras real en SIESA
+      // Formato: { codigo_barras_original: { f120_id, unidad_medida } }
       const normalizedBarcodeMap = {};
       if (audit_barcode_map) {
         Object.entries(audit_barcode_map).forEach(([raw, value]) => {
-          const normalized = (raw || "")
-            .trim()
-            .replace(/\+$/, "")
-            .toUpperCase();
-          // Soportar formato viejo (solo f120_id) y nuevo ({ f120_id, unidad_medida })
-          normalizedBarcodeMap[normalized] =
+          const key = (raw || "").trim().toUpperCase();
+          normalizedBarcodeMap[key] =
             typeof value === "object"
               ? value
               : { f120_id: value, unidad_medida: null };

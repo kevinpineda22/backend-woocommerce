@@ -1200,17 +1200,11 @@ exports.getSessionLogsDetail = async (req, res) => {
     const auditableLogs = logs;
 
     // Mapa codigo_barras → { f120_id, unidad_medida } para validación del auditor
+    // ⚠️ Guardar SOLO el codigo_barras ORIGINAL (sin quitar "+") — el "+" es significativo
     const auditBarcodeMap = {};
     if (allSiesaBarcodes) {
       allSiesaBarcodes.forEach((bc) => {
         const um = (bc.unidad_medida || "").toUpperCase();
-        const clean = bc.codigo_barras
-          .toString()
-          .trim()
-          .replace(/\+$/, "")
-          .toUpperCase();
-        auditBarcodeMap[clean] = { f120_id: bc.f120_id, unidad_medida: um };
-        // También con el original (con +)
         const original = bc.codigo_barras.toString().trim().toUpperCase();
         auditBarcodeMap[original] = { f120_id: bc.f120_id, unidad_medida: um };
       });
