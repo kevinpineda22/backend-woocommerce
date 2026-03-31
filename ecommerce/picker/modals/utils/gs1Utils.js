@@ -26,7 +26,6 @@ export const calcularDigitoVerificador = (codigo) => {
   return ((10 - (sum % 10)) % 10).toString();
 };
 
-
 /**
  * Determina si un código es GS1 de peso variable.
  * @param {string} code - Código limpio (solo dígitos).
@@ -85,6 +84,9 @@ export const toKgForValidation = (requested, unidad) => {
   return um === "LB" || um === "LIBRA" ? requested / 2 : requested;
 };
 
+/** Tolerancia de peso GS1 en Kg (±50g). */
+export const GS1_WEIGHT_TOLERANCE_KG = 0.05;
+
 /**
  * Valida que un peso esté dentro de la tolerancia ±50g.
  * @param {number} actualWeightKg - Peso real en Kg.
@@ -92,8 +94,8 @@ export const toKgForValidation = (requested, unidad) => {
  * @returns {{ valid: boolean, error: string|null }}
  */
 export const validateWeightTolerance = (actualWeightKg, requestedKg) => {
-  const minAllowed = requestedKg - 0.05;
-  const maxAllowed = requestedKg + 0.05;
+  const minAllowed = requestedKg - GS1_WEIGHT_TOLERANCE_KG;
+  const maxAllowed = requestedKg + GS1_WEIGHT_TOLERANCE_KG;
 
   if (actualWeightKg < minAllowed) {
     return {

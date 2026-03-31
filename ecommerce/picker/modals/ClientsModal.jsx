@@ -1,5 +1,6 @@
 import React from "react";
 import { FaTimes, FaPhone, FaWhatsapp } from "react-icons/fa";
+import { WHATSAPP_COUNTRY_CODE } from "../utils/pickerConstants";
 import "../Modals.css";
 
 const ClientsModal = ({ isOpen, orders, onClose }) => {
@@ -30,7 +31,7 @@ const ClientsModal = ({ isOpen, orders, onClose }) => {
                       <FaPhone />
                     </a>
                     <a
-                      href={`https://wa.me/57${order.phone.replace(/\D/g, "")}`}
+                      href={`https://wa.me/${WHATSAPP_COUNTRY_CODE}${order.phone.replace(/\D/g, "")}`}
                       target="_blank"
                       rel="noreferrer"
                       className="ec-contact-btn whatsapp"

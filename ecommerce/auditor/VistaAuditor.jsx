@@ -618,20 +618,33 @@ const VistaAuditor = () => {
       billing: group.billing,
       shipping: group.shipping,
       items: group.items.map((i) => {
-        // 🔧 SIMPLIFICADO: Usar EXACTAMENTE lo que el picker o auditor escaneó
-        // Sin validaciones, sin consultas, sin fallbacks
         const scannedSet = auditData.scannedBarcodes[i.id];
         let exactScannedBarcode = null;
 
         if (scannedSet && scannedSet.size > 0) {
-          // Tomar lo que se escaneó, filtrando SOLO códigos que inician con M o N
-          const validBarcodes = Array.from(scannedSet).filter((code) => {
+          // Tomar lo que se escaneó, eliminando prefijo M/N (la caja no los acepta)
+          const cleanedBarcodes = Array.from(scannedSet).map((code) => {
             const upper = code.toUpperCase();
-            return !upper.startsWith("M") && !upper.startsWith("N");
+            if (upper.startsWith("M") || upper.startsWith("N")) {
+              return upper.substring(1);
+            }
+            return code;
           });
-          // Usar lo que quedó después de filtrar M/N
-          if (validBarcodes.length > 0) {
-            exactScannedBarcode = validBarcodes.join(",");
+          if (cleanedBarcodes.length > 0) {
+            exactScannedBarcode = cleanedBarcodes.join(",");
+          }
+        }
+
+        // Fallback: si no hay barcode escaneado, construir desde SKU + unidad_medida
+        // Esto genera códigos como "1039UND" que ManifestSheet puede usar
+        // ⚠️ SKU de variaciones WooCommerce puede ser "1039-UND" → extraer solo la parte numérica
+        if (!exactScannedBarcode && i.sku) {
+          const numSku = ((i.sku || "").match(/^(\d+)/) || [])[1] || "";
+          const um = (i.unidad_medida || "").toUpperCase();
+          if (numSku && um) {
+            exactScannedBarcode = `${numSku}${um}`;
+          } else if (numSku) {
+            exactScannedBarcode = numSku;
           }
         }
 
@@ -641,11 +654,17 @@ const VistaAuditor = () => {
           name: i.name,
           original_name: i.original_name || null,
           qty: i.count,
-          peso_total: i.peso_total || 0, // ✅ Peso real acumulado (Kg)
+          peso_total: i.peso_total || 0,
           price: i.price,
           is_sub: i.is_sub,
-          barcode: exactScannedBarcode,
+          barcode: (() => {
+            let bc = exactScannedBarcode || i.barcode || "";
+            if (typeof bc === "string" && /^[MNmn]/.test(bc))
+              bc = bc.substring(1);
+            return bc;
+          })(),
           unidad_medida: i.unidad_medida || "",
+          tiene_variaciones: i.tiene_variaciones || false,
         };
       }),
     }));

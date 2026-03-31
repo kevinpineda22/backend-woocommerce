@@ -75,10 +75,12 @@ exports.registerAction = async (req, res) => {
     // CASO REVERT SHORT PICK: BORRAR SÓLO LOGS DE "no_encontrado"
     // =================================================================
     if (accion === "revert_short_pick") {
+      // ✅ Usar targetAssignment.id si id_pedido fue proporcionado, para no afectar otros pedidos
+      const scopeIds = id_pedido ? [targetAssignment.id] : allAssignmentIds;
       const { error: delError } = await supabase
         .from("wc_log_picking")
         .delete()
-        .in("id_asignacion", allAssignmentIds)
+        .in("id_asignacion", scopeIds)
         .eq("id_producto_original", id_producto_original)
         .eq("accion", "no_encontrado");
 
@@ -94,11 +96,12 @@ exports.registerAction = async (req, res) => {
     // CASO RESET (DESHACER): BORRAR LOGS FÍSICAMENTE
     // =================================================================
     if (accion === "reset") {
-      // Buscamos los últimos logs de este producto en toda la sesión (ignorando los de "no_encontrado" que se manejan aparte)
+      // ✅ Usar targetAssignment.id si id_pedido fue proporcionado, para no afectar otros pedidos
+      const scopeIds = id_pedido ? [targetAssignment.id] : allAssignmentIds;
       let query = supabase
         .from("wc_log_picking")
         .select("id")
-        .in("id_asignacion", allAssignmentIds)
+        .in("id_asignacion", scopeIds)
         .neq("accion", "no_encontrado")
         .eq("id_producto_original", id_producto_original)
         .order("fecha_registro", { ascending: false });
@@ -132,10 +135,12 @@ exports.registerAction = async (req, res) => {
     // CASO RESET_SUSTITUTO: Solo borrar logs de sustitución (mantener recolectados)
     // =================================================================
     if (accion === "reset_sustituto") {
+      // ✅ Usar targetAssignment.id si id_pedido fue proporcionado, para no afectar otros pedidos
+      const scopeIds = id_pedido ? [targetAssignment.id] : allAssignmentIds;
       const { data: subLogs, error: subErr } = await supabase
         .from("wc_log_picking")
         .select("id")
-        .in("id_asignacion", allAssignmentIds)
+        .in("id_asignacion", scopeIds)
         .eq("id_producto_original", id_producto_original)
         .eq("accion", "sustituido");
 
@@ -428,13 +433,11 @@ exports.validateCodeWithSiesa = async (req, res) => {
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("Error en validateCodeWithSiesa:", error.message);
-    return res
-      .status(500)
-      .json({
-        valid: false,
-        message: "Error al validar código",
-        error: error.message,
-      });
+    return res.status(500).json({
+      valid: false,
+      message: "Error al validar código",
+      error: error.message,
+    });
   }
 };
 
@@ -464,13 +467,11 @@ exports.validateCodeForAuditor = async (req, res) => {
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("Error en validateCodeForAuditor:", error.message);
-    return res
-      .status(500)
-      .json({
-        valid: false,
-        message: "Error al validar código",
-        error: error.message,
-      });
+    return res.status(500).json({
+      valid: false,
+      message: "Error al validar código",
+      error: error.message,
+    });
   }
 };
 

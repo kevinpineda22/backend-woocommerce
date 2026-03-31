@@ -15,6 +15,7 @@ import {
   validateWeightTolerance,
   formatCOP,
 } from "./utils/gs1Utils";
+import { normalizeSku } from "../utils/pickerConstants";
 import "../Modals.css";
 
 // --- MODAL DE PESO INTELIGENTE (CARNES VS FRUVER CON PRECIO EN VIVO) ---
@@ -87,8 +88,11 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
               }, 150);
             }
           })
-          .catch(() => {
-            // Si falla SIESA, el picker verá el error al intentar confirmar
+          .catch((err) => {
+            console.warn("Error cargando EAN Fruver desde SIESA:", err.message);
+            setError(
+              "⚠️ No se pudo cargar el código SIESA. Contacta al supervisor.",
+            );
           })
           .finally(() => {
             setLoadingBaseEan(false);
@@ -114,12 +118,8 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
     const expectedBarcode = item.barcode || "";
     const unidad = (item.unidad_medida || "").toUpperCase();
 
-    // Si digitan el código corto, le agregamos el sufijo esperado
-    if (unidad === "LB" || unidad === "LIBRA") {
-      if (!cleanCode.endsWith("-LB")) cleanCode += "-LB";
-    } else if (unidad === "KL" || unidad === "KILO" || unidad === "KG") {
-      if (!cleanCode.endsWith("-KL")) cleanCode += "-KL";
-    }
+    // Normalizar código con sufijo de unidad si corresponde
+    cleanCode = normalizeSku(cleanCode, unidad);
 
     let isValidCode = false;
     let isFastPass = false;
@@ -282,7 +282,9 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
       if (checkDigit) {
         finalCodeToSave = `${codigoSinCheck}${checkDigit}`;
       } else {
-        setError(`❌ Error generando código GS1. Prefijo: ${gs1Prefix}, Peso: ${pesoGramosStr}`);
+        setError(
+          `❌ Error generando código GS1. Prefijo: ${gs1Prefix}, Peso: ${pesoGramosStr}`,
+        );
         return;
       }
     }
@@ -336,8 +338,13 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
           )}
           {isFruver && !loadingBaseEan && !baseEanFruver && (
             <div className="wm-error-alert">
-              <div className="wm-error-icon"><FaExclamationTriangle /></div>
-              <div>No se encontró código GS1 en SIESA para este producto. Contacta al supervisor.</div>
+              <div className="wm-error-icon">
+                <FaExclamationTriangle />
+              </div>
+              <div>
+                No se encontró código GS1 en SIESA para este producto. Contacta
+                al supervisor.
+              </div>
             </div>
           )}
         </div>
@@ -376,11 +383,15 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
                   setError("");
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !isCodeValidated) handleValidateCode();
+                  if (e.key === "Enter" && !isCodeValidated)
+                    handleValidateCode();
                 }}
               />
               {!isCodeValidated && code.length > 0 && (
-                <button className="wm-validate-btn" onClick={handleValidateCode}>
+                <button
+                  className="wm-validate-btn"
+                  onClick={handleValidateCode}
+                >
                   Validar
                 </button>
               )}
@@ -436,11 +447,21 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
                 <span className="wm-concat-weight-unit">g</span>
               </div>
               <div className="wm-concat-separator">+</div>
-              <div className="wm-concat-check" title="Dígito verificador (auto)">
+              <div
+                className="wm-concat-check"
+                title="Dígito verificador (auto)"
+              >
                 {(() => {
-                  if (!weight || isNaN(parseFloat(weight)) || parseFloat(weight) <= 0) return "?";
+                  if (
+                    !weight ||
+                    isNaN(parseFloat(weight)) ||
+                    parseFloat(weight) <= 0
+                  )
+                    return "?";
                   const prefix = baseEanFruver.replace(/\+$/, "");
-                  const pesoStr = Math.round(parseFloat(weight)).toString().padStart(5, "0");
+                  const pesoStr = Math.round(parseFloat(weight))
+                    .toString()
+                    .padStart(5, "0");
                   const sinCheck = `${prefix}${pesoStr}`;
                   const chk = calcularDigitoVerificador(sinCheck);
                   return chk || "?";
@@ -455,7 +476,9 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
                 <span className="wm-concat-preview-code">
                   {(() => {
                     const prefix = baseEanFruver.replace(/\+$/, "");
-                    const pesoStr = Math.round(parseFloat(weight)).toString().padStart(5, "0");
+                    const pesoStr = Math.round(parseFloat(weight))
+                      .toString()
+                      .padStart(5, "0");
                     const sinCheck = `${prefix}${pesoStr}`;
                     const chk = calcularDigitoVerificador(sinCheck);
                     return chk ? `${sinCheck}${chk}` : sinCheck;
@@ -463,7 +486,6 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
                 </span>
               </div>
             )}
-
           </div>
         )}
 

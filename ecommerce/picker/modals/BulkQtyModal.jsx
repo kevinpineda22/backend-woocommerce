@@ -19,7 +19,10 @@ const BulkQtyModal = ({ isOpen, item, onClose, onConfirm }) => {
 
   if (!isOpen || !item) return null;
 
-  const remaining = item.quantity_total - (item.qty_scanned || 0);
+  const remaining = Math.max(
+    0,
+    (item.quantity_total || 0) - (item.qty_scanned || 0),
+  );
 
   const handleSubmit = () => {
     const val = parseInt(qty);

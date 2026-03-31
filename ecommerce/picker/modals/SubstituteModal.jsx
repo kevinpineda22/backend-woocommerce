@@ -20,6 +20,7 @@ import {
   extractWeightFromGS1,
 } from "./utils/gs1Utils";
 import { isWeighable } from "../utils/isWeighable";
+import { normalizeSku } from "../utils/pickerConstants";
 import "../Modals.css";
 
 // --- MODAL DE SUSTITUCIÓN (ADAPTADO A CANTIDAD) ---
@@ -171,18 +172,12 @@ const SubstituteModal = ({
 
   const validateCode = (codeToCheck, product) => {
     const rawInput = codeToCheck.trim().toUpperCase();
-    let cleanInput = rawInput;
     const sku = (product.sku || "").toUpperCase();
     const unidad = (product.unidad_medida || "").toUpperCase();
     const barcode = (product.barcode || "").toString().trim().toUpperCase();
+    const cleanInput = normalizeSku(rawInput, unidad);
 
-    if (unidad === "LB" || unidad === "LIBRA") {
-      if (!cleanInput.endsWith("-LB")) cleanInput += "-LB";
-    } else if (unidad === "KL" || unidad === "KILO" || unidad === "KG") {
-      if (!cleanInput.endsWith("-KL")) cleanInput += "-KL";
-    }
-
-    // 🔧 Validar contra SKU y contra BARCODE (que incluye unidad_medida de SIESA)
+    // Validar contra SKU y BARCODE
     const skuMatch =
       rawInput === sku ||
       cleanInput === sku ||
@@ -208,7 +203,7 @@ const SubstituteModal = ({
 
     let isValid = false;
     let isFastPass = false;
-    let hasDetailedError = false;  // 🔧 Rastrear si SIESA devolvió un error específico
+    let hasDetailedError = false;
     let cleanCode = code.trim().toUpperCase();
     const expectedSku = (pendingSub.sku || "").toUpperCase();
 
@@ -220,7 +215,9 @@ const SubstituteModal = ({
         const gs1Sku = extractGS1Sku(cleanCode);
 
         // Verificar contra barcodes conocidos del sustituto
-        const barcodes = Array.isArray(pendingSub.barcode) ? pendingSub.barcode : [pendingSub.barcode];
+        const barcodes = Array.isArray(pendingSub.barcode)
+          ? pendingSub.barcode
+          : [pendingSub.barcode];
         let prefixMatch = barcodes.some((b) => {
           if (!b) return false;
           const bStr = b.toString().toUpperCase().replace(/\+$/, "");
@@ -254,7 +251,10 @@ const SubstituteModal = ({
               }
             }
           } catch (e) {
-            console.warn("Error validando GS1 sustituto en backend:", e.message);
+            console.warn(
+              "Error validando GS1 sustituto en backend:",
+              e.message,
+            );
           }
         }
 
@@ -274,13 +274,14 @@ const SubstituteModal = ({
         return;
       }
     } else {
-      // 🔧 PRODUCTOS POR UNIDAD: Validar contra SIESA (como auditor/picker)
+      // Productos por unidad: Validar contra SIESA
       try {
         // Extraer f120_id y unidad_medida del SKU (ej: "1039P2" → f120_id=1039, um=P2)
         const skuMatch = expectedSku.match(/^(\d+)([A-Z]+\d*)$/);
         const f120Id = skuMatch ? parseInt(skuMatch[1]) : null;
         // Usar unidad_medida del SKU si está disponible, sino usar la del producto
-        const umEsperada = (skuMatch && skuMatch[2]) || pendingSub.unidad_medida || "UND";
+        const umEsperada =
+          (skuMatch && skuMatch[2]) || pendingSub.unidad_medida || "UND";
 
         if (f120Id) {
           // Usar el mismo endpoint de validación que auditor
@@ -289,12 +290,14 @@ const SubstituteModal = ({
             f120_id_esperado: f120Id,
             unidad_medida_esperada: umEsperada,
           });
-          isValid = res.data.valid;
+          isValid = res.data?.valid ?? false;
 
           if (!isValid) {
-            // 🔧 Mostrar mensaje de error específico de SIESA
-            setSubError(res.data.message || `❌ Código incorrecto. Verifica que estés escaneando el producto correcto.`);
-            hasDetailedError = true;  // Marcar que hay error específico
+            setSubError(
+              res.data?.message ||
+                `❌ Código incorrecto. Verifica que estés escaneando el producto correcto.`,
+            );
+            hasDetailedError = true;
           }
         } else {
           // Fallback a validación local si no hay f120_id
@@ -311,13 +314,10 @@ const SubstituteModal = ({
       setSubError("");
       setIsSubCodeValidated(true);
 
-      const unidad = (pendingSub.unidad_medida || "").toUpperCase();
-      let expectedSuffixCode = cleanCode;
-      if (unidad === "LB" || unidad === "LIBRA") {
-        if (!expectedSuffixCode.endsWith("-LB")) expectedSuffixCode += "-LB";
-      } else if (unidad === "KL" || unidad === "KILO" || unidad === "KG") {
-        if (!expectedSuffixCode.endsWith("-KL")) expectedSuffixCode += "-KL";
-      }
+      const expectedSuffixCode = normalizeSku(
+        cleanCode,
+        (pendingSub.unidad_medida || "").toUpperCase(),
+      );
 
       if (
         !isFastPass &&
@@ -346,7 +346,7 @@ const SubstituteModal = ({
         // Carnes: listo para enviar
       }
     } else {
-      // 🔧 Si no hay error detallado de SIESA, mostrar genérico
+      // Si no hay error detallado de SIESA, mostrar genérico
       if (!hasDetailedError) {
         if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         setSubError(
@@ -373,7 +373,9 @@ const SubstituteModal = ({
         return;
       }
       if (!baseEanFruver) {
-        setSubError("❌ No se encontró código GS1 en SIESA para este producto. Contacta al supervisor.");
+        setSubError(
+          "❌ No se encontró código GS1 en SIESA para este producto. Contacta al supervisor.",
+        );
         return;
       }
       const gs1Prefix = baseEanFruver.replace(/\+$/, "");
@@ -383,7 +385,9 @@ const SubstituteModal = ({
       if (checkDigit) {
         finalCodeToSave = `${codigoSinCheck}${checkDigit}`;
       } else {
-        setSubError(`❌ Error generando código GS1. Prefijo: ${gs1Prefix}, Peso: ${pesoGramosStr}`);
+        setSubError(
+          `❌ Error generando código GS1. Prefijo: ${gs1Prefix}, Peso: ${pesoGramosStr}`,
+        );
         return;
       }
     } else if (isMeat) {
@@ -459,7 +463,11 @@ const SubstituteModal = ({
                 ref={verifyInputRef}
                 type="text"
                 className="wm-verify-input"
-                placeholder={isMeat && isWeighable(pendingSub) ? "Escanear Etiqueta GS1" : "Escanear código de barras"}
+                placeholder={
+                  isMeat && isWeighable(pendingSub)
+                    ? "Escanear Etiqueta GS1"
+                    : "Escanear código de barras"
+                }
                 value={verifyCode}
                 onChange={(e) => {
                   setVerifyCode(e.target.value);
@@ -471,24 +479,27 @@ const SubstituteModal = ({
           )}
 
           {/* CARNES PESABLES: Feedback GS1 aprobado */}
-          {isMeat && isWeighable(pendingSub) && isSubCodeValidated && subMeatLabel && (
-            <div className="wm-gs1-success-feedback wm-gs1-success-feedback--sub">
-              <div className="wm-gs1-icon">✅</div>
-              <div className="wm-gs1-details">
-                <span className="wm-gs1-title">Sustituto Aprobado</span>
-                <span className="wm-gs1-code">{subMeatLabel}</span>
-                <span className="wm-gs1-extracted-weight">
-                  Peso Extraído:{" "}
-                  <strong>
-                    {isGS1Variable(subMeatLabel)
-                      ? extractWeightFromGS1(subMeatLabel).toFixed(3)
-                      : "0.000"}{" "}
-                    Kg
-                  </strong>
-                </span>
+          {isMeat &&
+            isWeighable(pendingSub) &&
+            isSubCodeValidated &&
+            subMeatLabel && (
+              <div className="wm-gs1-success-feedback wm-gs1-success-feedback--sub">
+                <div className="wm-gs1-icon">✅</div>
+                <div className="wm-gs1-details">
+                  <span className="wm-gs1-title">Sustituto Aprobado</span>
+                  <span className="wm-gs1-code">{subMeatLabel}</span>
+                  <span className="wm-gs1-extracted-weight">
+                    Peso Extraído:{" "}
+                    <strong>
+                      {isGS1Variable(subMeatLabel)
+                        ? extractWeightFromGS1(subMeatLabel).toFixed(3)
+                        : "0.000"}{" "}
+                      Kg
+                    </strong>
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* FRUVER: Prefijo SIESA bloqueado + peso en gramos */}
           {isFruver && baseEanFruver && (
@@ -518,11 +529,21 @@ const SubstituteModal = ({
                   <span className="wm-concat-weight-unit">g</span>
                 </div>
                 <div className="wm-concat-separator">+</div>
-                <div className="wm-concat-check" title="Dígito verificador (auto)">
+                <div
+                  className="wm-concat-check"
+                  title="Dígito verificador (auto)"
+                >
                   {(() => {
-                    if (!subWeight || isNaN(parseFloat(subWeight)) || parseFloat(subWeight) <= 0) return "?";
+                    if (
+                      !subWeight ||
+                      isNaN(parseFloat(subWeight)) ||
+                      parseFloat(subWeight) <= 0
+                    )
+                      return "?";
                     const prefix = baseEanFruver.replace(/\+$/, "");
-                    const pesoStr = Math.round(parseFloat(subWeight)).toString().padStart(5, "0");
+                    const pesoStr = Math.round(parseFloat(subWeight))
+                      .toString()
+                      .padStart(5, "0");
                     const sinCheck = `${prefix}${pesoStr}`;
                     const chk = calcularDigitoVerificador(sinCheck);
                     return chk || "?";
@@ -531,28 +552,39 @@ const SubstituteModal = ({
               </div>
 
               {/* Preview código final */}
-              {subWeight && !isNaN(parseFloat(subWeight)) && parseFloat(subWeight) > 0 && (
-                <div className="wm-concat-preview">
-                  <span className="wm-concat-preview-label">Código final:</span>
-                  <span className="wm-concat-preview-code">
-                    {(() => {
-                      const prefix = baseEanFruver.replace(/\+$/, "");
-                      const pesoStr = Math.round(parseFloat(subWeight)).toString().padStart(5, "0");
-                      const sinCheck = `${prefix}${pesoStr}`;
-                      const chk = calcularDigitoVerificador(sinCheck);
-                      return chk ? `${sinCheck}${chk}` : sinCheck;
-                    })()}
-                  </span>
-                </div>
-              )}
+              {subWeight &&
+                !isNaN(parseFloat(subWeight)) &&
+                parseFloat(subWeight) > 0 && (
+                  <div className="wm-concat-preview">
+                    <span className="wm-concat-preview-label">
+                      Código final:
+                    </span>
+                    <span className="wm-concat-preview-code">
+                      {(() => {
+                        const prefix = baseEanFruver.replace(/\+$/, "");
+                        const pesoStr = Math.round(parseFloat(subWeight))
+                          .toString()
+                          .padStart(5, "0");
+                        const sinCheck = `${prefix}${pesoStr}`;
+                        const chk = calcularDigitoVerificador(sinCheck);
+                        return chk ? `${sinCheck}${chk}` : sinCheck;
+                      })()}
+                    </span>
+                  </div>
+                )}
             </div>
           )}
 
           {/* FRUVER: Error si no se encontró SIESA */}
           {isFruver && !baseEanFruver && (
             <div className="wm-error-alert">
-              <div className="wm-error-icon"><FaExclamationTriangle /></div>
-              <div>No se encontró código GS1 en SIESA para este producto. Contacta al supervisor.</div>
+              <div className="wm-error-icon">
+                <FaExclamationTriangle />
+              </div>
+              <div>
+                No se encontró código GS1 en SIESA para este producto. Contacta
+                al supervisor.
+              </div>
             </div>
           )}
 

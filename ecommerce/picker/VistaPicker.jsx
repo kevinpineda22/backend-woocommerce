@@ -110,6 +110,19 @@ const VistaPicker = () => {
   // ✅ Helper: ID efectivo que distingue variaciones del mismo producto padre
   const effectiveId = (item) => item.variation_id || item.product_id;
 
+  // ✅ Helper: Clave única compuesta que distingue el mismo producto en distintos pedidos
+  // Formato: "productId-variationId-orderId" — viene del backend (pickingUtils)
+  const itemKey = (item) =>
+    item.key || `${effectiveId(item)}-${item.order_id || ""}`;
+
+  // ✅ Helper: Extraer el order_id del item (para enviar al backend)
+  const itemOrderId = (item) => {
+    if (item.order_id) return item.order_id;
+    if (item.pedidos_involucrados?.length === 1)
+      return item.pedidos_involucrados[0].id_pedido;
+    return null;
+  };
+
   const handleCardAction = (item, type) => {
     setCurrentItem(item);
     if (type === "scan") {
@@ -162,8 +175,10 @@ const VistaPicker = () => {
               cantidad_afectada: missing,
               motivo: "Stock Insuficiente",
               pasillo: item.pasillo,
+              id_pedido: itemOrderId(item),
+              item_key: itemKey(item),
             });
-            updateLocalSessionState(effectiveId(item), scanned, "recolectado");
+            updateLocalSessionState(itemKey(item), scanned, "recolectado");
             showToast(`Enviado incompleto (${scanned}/${total})`, "warning");
           },
         },
@@ -191,6 +206,8 @@ const VistaPicker = () => {
           accion: "revert_short_pick",
           cantidad_afectada: 0,
           pasillo: item.pasillo,
+          id_pedido: itemOrderId(item),
+          item_key: itemKey(item),
         });
       }
       if (scanned > 0) {
@@ -200,9 +217,11 @@ const VistaPicker = () => {
           accion: "reset",
           cantidad_afectada: 9999,
           pasillo: item.pasillo,
+          id_pedido: itemOrderId(item),
+          item_key: itemKey(item),
         });
       }
-      updateLocalSessionState(effectiveId(item), 0, "pendiente", null);
+      updateLocalSessionState(itemKey(item), 0, "pendiente", null);
       showToast(
         isItemWeighable
           ? "Devuelto a pendientes (peso borrado)"
@@ -221,6 +240,8 @@ const VistaPicker = () => {
           accion: "revert_short_pick",
           cantidad_afectada: 0,
           pasillo: item.pasillo,
+          id_pedido: itemOrderId(item),
+          item_key: itemKey(item),
         });
       }
       // Si tiene sustituto, borramos solo los logs de sustitución
@@ -231,10 +252,12 @@ const VistaPicker = () => {
           accion: "reset_sustituto",
           cantidad_afectada: 0,
           pasillo: item.pasillo,
+          id_pedido: itemOrderId(item),
+          item_key: itemKey(item),
         });
       }
       // NO enviamos reset de los recolectados: se mantienen en la BD
-      updateLocalSessionState(effectiveId(item), scanned, "parcial", null);
+      updateLocalSessionState(itemKey(item), scanned, "parcial", null);
       showToast(
         `Devuelto a pendientes (${scanned}/${total} conservadas)`,
         "info",
@@ -355,10 +378,11 @@ const VistaPicker = () => {
       peso_real: pesoToLog,
       cantidad_afectada: qtyToProcess,
       pasillo: itemRef.pasillo,
-      codigo_barras_escaneado: finalBarcode, // ✅ Se guarda en la BD para auditoría
-      // ✅ NUEVO: Datos de SIESA para reconstruir SKU correcto en el manifiesto
+      codigo_barras_escaneado: finalBarcode,
       f120_id_siesa: siesaData?.f120_id_siesa || null,
       unidad_medida_siesa: siesaData?.unidad_medida_siesa || null,
+      id_pedido: itemOrderId(itemRef),
+      item_key: itemKey(itemRef),
     });
 
     // Limpiar datos de SIESA después de usar
@@ -380,7 +404,7 @@ const VistaPicker = () => {
     // ✅ Le pasamos el peso exacto para que lo muestre en pantalla
     const addedWeight = peso !== null ? qtyToProcess * pesoToLog : 0;
     updateLocalSessionState(
-      effectiveId(itemRef),
+      itemKey(itemRef),
       currentScanned,
       isFinished ? "recolectado" : "parcial",
       null,
@@ -403,9 +427,11 @@ const VistaPicker = () => {
       cantidad_afectada: qty || 1,
       pasillo: currentItem.pasillo,
       codigo_barras_escaneado: finalBarcode || newItem.barcode || newItem.sku,
+      id_pedido: itemOrderId(currentItem),
+      item_key: itemKey(currentItem),
     });
     updateLocalSessionState(
-      effectiveId(currentItem),
+      itemKey(currentItem),
       currentItem.qty_scanned || 0,
       "sustituido",
       { name: newItem.name, price: newItem.price },
@@ -563,7 +589,10 @@ const VistaPicker = () => {
         return;
       } catch (e) {
         // Si falla la validación SIESA, continuar con validación local como fallback
-        console.warn("SIESA validation failed, falling back to local:", e.message);
+        console.warn(
+          "SIESA validation failed, falling back to local:",
+          e.message,
+        );
       }
     }
 

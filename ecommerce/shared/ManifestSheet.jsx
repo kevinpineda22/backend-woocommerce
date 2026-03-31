@@ -1,10 +1,6 @@
 import React from "react";
 import QRCode from "react-qr-code";
 import { getAssetUrl } from "../../../config/storage";
-import {
-  checkSiesaBarcodes,
-  convertItemsToBarcodes,
-} from "../../../services/siesaService";
 import { calcularDigitoVerificador } from "../picker/modals/utils/gs1Utils";
 import "./ManifestSheet.css";
 
@@ -39,44 +35,7 @@ const ManifestSheet = ({
     [billing.first_name, billing.last_name].filter(Boolean).join(" ") ||
     "Cliente";
 
-  const [correctedCodes, setCorrectedCodes] = React.useState({});
-  const [itemToBarcodeMap, setItemToBarcodeMap] = React.useState({});
   const [showFullDetails, setShowFullDetails] = React.useState(false);
-
-  React.useEffect(() => {
-    // 1. Corregir códigos SIESA que falte el "+" (sólo para códigos presumiblemente códigos de barras)
-    const barcodesToFix = items
-      .map((item) => item.barcode || item.sku || item.name)
-      .filter(
-        (c) =>
-          c &&
-          c !== "N/A" &&
-          c !== "ADMIN_OVERRIDE" &&
-          c.length >= 8 &&
-          c.length < 13,
-      );
-
-    if (barcodesToFix.length > 0) {
-      checkSiesaBarcodes(barcodesToFix).then((map) => {
-        if (map && Object.keys(map).length > 0) {
-          setCorrectedCodes(map);
-        }
-      });
-    }
-
-    // 2. Convertir Items (4 a 7 caracteres numéricos) escaneados manualmente a su código de barras real
-    const itemsToConvert = items
-      .flatMap((item) => [item.barcode, item.sku])
-      .filter((c) => c && typeof c === "string" && /^\d{1,7}$/.test(c.trim()));
-
-    if (itemsToConvert.length > 0) {
-      convertItemsToBarcodes(itemsToConvert).then((map) => {
-        if (map && Object.keys(map).length > 0) {
-          setItemToBarcodeMap(map);
-        }
-      });
-    }
-  }, [items]);
 
   // Helper: Limpiar SKU removiendo guiones
   const cleanSku = (sku) => {
@@ -84,14 +43,18 @@ const ManifestSheet = ({
     return sku.toString().replace(/-/g, "");
   };
 
+  // Helper: Eliminar prefijo M/N de códigos — la caja registradora no los acepta
+  const stripMN = (code) => {
+    if (!code || typeof code !== "string") return code;
+    const upper = code.trim().toUpperCase();
+    if (upper.startsWith("M") || upper.startsWith("N"))
+      return code.substring(1);
+    return code;
+  };
+
   // Helper: Validar si un código es aceptable para la caja
-  // 🔧 Acepta cualquier código que esté en SIESA (excepto M/N)
   const isValidBarcode = (code) => {
     if (!code || code === "N/A" || code === "ADMIN_OVERRIDE") return false;
-    const upper = code.toString().trim().toUpperCase();
-    // Rechazar solo códigos que inician con M o N
-    if (upper.startsWith("M") || upper.startsWith("N")) return false;
-    // Aceptar cualquier código que tenga contenido
     return code.toString().trim().length > 0;
   };
 
@@ -131,12 +94,14 @@ const ManifestSheet = ({
         let pesoKg = parseFloat(item.peso_total) || 0;
         if (!pesoKg || pesoKg <= 0 || isNaN(pesoKg)) {
           const numericQty = parseFloat(qty) || 0;
-          pesoKg = (um === "LB" || um === "LIBRA") ? numericQty * 0.4536 : numericQty;
+          pesoKg =
+            um === "LB" || um === "LIBRA" ? numericQty * 0.4536 : numericQty;
         }
         if (!isNaN(pesoKg) && pesoKg > 0) {
           const pesoGramos = Math.round(pesoKg * 1000);
           const pesoStr = pesoGramos.toString().padStart(5, "0");
-          const skuPadded = numSku.length < 4 ? numSku.padStart(4, "0") : numSku;
+          const skuPadded =
+            numSku.length < 4 ? numSku.padStart(4, "0") : numSku;
           const separator = skuPadded.length <= 4 ? "0" : "";
           const sinCheck = "29" + skuPadded + separator + pesoStr;
           const chk = calcularDigitoVerificador(sinCheck);
@@ -145,9 +110,8 @@ const ManifestSheet = ({
       }
     }
     if (item.barcode && item.barcode !== "ADMIN_OVERRIDE")
-      return item.barcode;
-    if (item.sku && item.sku !== "ADMIN_OVERRIDE")
-      return cleanSku(item.sku);
+      return stripMN(item.barcode);
+    if (item.sku && item.sku !== "ADMIN_OVERRIDE") return cleanSku(item.sku);
     if (item.id && item.id !== "ADMIN_OVERRIDE") return item.id;
     return "";
   };
@@ -165,13 +129,25 @@ const ManifestSheet = ({
       const unidad_medida = item.unidad_medida || "";
       const tieneVariaciones = item.tiene_variaciones || false;
       const isMP = isMultipack(unidad_medida);
-      let code = item.barcode || "";
-      if (itemToBarcodeMap[code]) code = itemToBarcodeMap[code];
-      if (!isValidBarcode(code) && item.sku && itemToBarcodeMap[item.sku])
-        code = itemToBarcodeMap[item.sku];
-      if (correctedCodes[code]) code = correctedCodes[code];
+      let code = stripMN(item.barcode || "");
       if ((isMP || tieneVariaciones) && item.sku) code = cleanSku(item.sku);
-      if (!isValidBarcode(code) && !isMP && !tieneVariaciones && !isWeighableProduct(unidad_medida)) {
+      // Fallback: si no hay barcode válido, construir desde SKU + unidad_medida (ej: "1039UND")
+      // ⚠️ SKU de variaciones WooCommerce puede ser "1039-UND" → extraer solo la parte numérica
+      if (!isValidBarcode(code) && item.sku) {
+        const numSku = ((item.sku || "").match(/^(\d+)/) || [])[1] || "";
+        const um = (unidad_medida || "").toUpperCase();
+        if (numSku && um) {
+          code = `${numSku}${um}`;
+        } else if (numSku) {
+          code = numSku;
+        }
+      }
+      if (
+        !isValidBarcode(code) &&
+        !isMP &&
+        !tieneVariaciones &&
+        !isWeighableProduct(unidad_medida)
+      ) {
         omittedItems.push(item);
         return [];
       }
@@ -191,7 +167,8 @@ const ManifestSheet = ({
           let pesoKg = parseFloat(item.peso_total) || 0;
           if (!pesoKg || pesoKg <= 0 || isNaN(pesoKg)) {
             const numericQty = parseFloat(qty) || 0;
-            pesoKg = (um === "LB" || um === "LIBRA") ? numericQty * 0.4536 : numericQty;
+            pesoKg =
+              um === "LB" || um === "LIBRA" ? numericQty * 0.4536 : numericQty;
           }
 
           if (isNaN(pesoKg) || pesoKg <= 0) {
@@ -201,9 +178,8 @@ const ManifestSheet = ({
 
           const pesoGramos = Math.round(pesoKg * 1000);
           const pesoStr = pesoGramos.toString().padStart(5, "0");
-          const skuPadded = numericSku.length < 4
-            ? numericSku.padStart(4, "0")
-            : numericSku;
+          const skuPadded =
+            numericSku.length < 4 ? numericSku.padStart(4, "0") : numericSku;
 
           const separator = skuPadded.length <= 4 ? "0" : "";
           const codigoSinCheck = "29" + skuPadded + separator + pesoStr;
@@ -228,10 +204,15 @@ const ManifestSheet = ({
     .join("\r\n");
 
   // Calcular total de items
-  const totalQty = items.reduce((sum, item) => sum + (item.qty || item.count || 1), 0);
+  const totalQty = items.reduce(
+    (sum, item) => sum + (item.qty || item.count || 1),
+    0,
+  );
 
   return (
-    <div className={`manifest-sheet ${densityClass} ${!showFullDetails ? "qr-only-mode" : ""}`.trim()}>
+    <div
+      className={`manifest-sheet ${densityClass} ${!showFullDetails ? "qr-only-mode" : ""}`.trim()}
+    >
       {/* Toggle View Mode (Only visible on screen, not in print) */}
       <div
         className="manifest-controls no-print"
@@ -291,7 +272,9 @@ const ManifestSheet = ({
       </div>
 
       {/* Meta Info Wrapper: Customer Info on Left, QR on Right */}
-      <div className={`manifest-meta-wrapper ${!showFullDetails ? "manifest-meta-qr-only" : ""}`}>
+      <div
+        className={`manifest-meta-wrapper ${!showFullDetails ? "manifest-meta-qr-only" : ""}`}
+      >
         {/* Customer & Shipping Info */}
         <div className="manifest-customer">
           <div className="manifest-customer-row">
@@ -384,11 +367,7 @@ const ManifestSheet = ({
                 const qty = item.qty || item.count || 1;
                 const isSub = item.type === "sustituido" || item.is_sub;
 
-                const rawCode = getDisplayCode(item);
-                const displayCode =
-                  rawCode && correctedCodes[rawCode]
-                    ? correctedCodes[rawCode]
-                    : rawCode;
+                const displayCode = getDisplayCode(item);
 
                 return (
                   <React.Fragment key={idx}>
@@ -418,7 +397,13 @@ const ManifestSheet = ({
                       <td className="cell-qty">
                         {qty}
                         {isWeighableProduct(item.unidad_medida) && (
-                          <span style={{ fontSize: "0.7em", marginLeft: 2, color: "#64748b" }}>
+                          <span
+                            style={{
+                              fontSize: "0.7em",
+                              marginLeft: 2,
+                              color: "#64748b",
+                            }}
+                          >
                             {(item.unidad_medida || "KG").toUpperCase()}
                           </span>
                         )}
@@ -431,17 +416,7 @@ const ManifestSheet = ({
                           </span>
                         )}
                       </td>
-                      <td className="cell-ref">
-                        {displayCode}
-                        {rawCode && correctedCodes[rawCode] && (
-                          <span
-                            className="manifest-code-corrected-dot"
-                            title="Código ajustado (+)"
-                          >
-                            ●
-                          </span>
-                        )}
-                      </td>
+                      <td className="cell-ref">{displayCode}</td>
                     </tr>
                   </React.Fragment>
                 );

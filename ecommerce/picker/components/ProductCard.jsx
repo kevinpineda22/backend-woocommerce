@@ -13,11 +13,23 @@ import {
   FaWeightHanging,
   FaSearchPlus,
 } from "react-icons/fa";
-import { getOrderStyle, formatPrice } from "../utils/pickerConstants";
-import { isWeighable as isWeighableFn } from "../utils/isWeighable";
+import {
+  getOrderStyle,
+  formatPrice,
+  parseMultipack,
+  getPresentationLabel,
+} from "../utils/pickerConstants";
+import { isWeighable } from "../utils/isWeighable";
 import "./ProductCard.css";
 
-export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom, animDelay = 0 }) => {
+export const ProductCard = ({
+  item,
+  orderMap,
+  onAction,
+  isCompleted,
+  onImageZoom,
+  animDelay = 0,
+}) => {
   const scannedRaw = item.qty_scanned || 0;
   const total = item.quantity_total;
 
@@ -29,45 +41,17 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
   const isMixed = scanned > 0 && item.sustituto;
   const isShortPick = isCompleted && scanned < total && !item.sustituto;
 
-  const isWeighable = useMemo(() => isWeighableFn(item), [item]);
+  const itemIsWeighable = useMemo(() => isWeighable(item), [item]);
 
-  const isMultipack = useMemo(() => {
-    if (!item) return false;
-    const uom = item.unidad_medida ? item.unidad_medida.toUpperCase() : "";
-    return uom.startsWith("P") && !isNaN(uom.substring(1));
-  }, [item]);
+  const multipack = useMemo(
+    () => parseMultipack(item.unidad_medida),
+    [item.unidad_medida],
+  );
 
-  const multipackQty = useMemo(() => {
-    if (!isMultipack) return 0;
-    const qtyStr = item.unidad_medida.toUpperCase().substring(1);
-    return parseInt(qtyStr) || 0;
-  }, [isMultipack, item]);
-
-  // Helper para describir la presentación en lenguaje humano
-  const getMultipackLabel = useMemo(() => {
-    if (!isMultipack) return "";
-    const uom = item.unidad_medida?.toUpperCase() || "";
-    if (uom.startsWith("P")) {
-      const num = uom.substring(1);
-      if (num === "2") return "DÚO";
-      if (num === "3") return "TRIPACK";
-      if (num === "4") return "PACK x4";
-      if (num === "6") return "SIXPACK";
-      if (num === "12") return "DOCENA";
-      return `PACK x${num}`;
-    }
-    return uom;
-  }, [isMultipack, item]);
-
-  // Label legible para el badge de cantidad
-  const presentationLabel = useMemo(() => {
-    const uom = item.unidad_medida?.toUpperCase() || "";
-    if (!uom || uom === "UND" || uom === "UN") return "UN";
-    if (uom === "KL" || uom === "KG") return "KILO";
-    if (uom === "LB") return "LIBRA";
-    if (isMultipack) return getMultipackLabel;
-    return uom;
-  }, [item, isMultipack, getMultipackLabel]);
+  const presentationLabel = useMemo(
+    () => getPresentationLabel(item.unidad_medida),
+    [item.unidad_medida],
+  );
 
   const statusIconClass = useMemo(() => {
     if (isFullySubstituted || isMixed) return "ec-card-status-icon--warning";
@@ -92,12 +76,16 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
         isFullySubstituted ? "sustituido-card" : "",
         isMixed ? "mixed-card" : "",
         isShortPick ? "short-pick-mode" : "",
-        isMultipack && !isCompleted ? "multipack-card" : "",
+        multipack.isMultipack && !isCompleted ? "multipack-card" : "",
       ]
         .filter(Boolean)
         .join(" ")}
       style={{
-        ...(!isCompleted && !isPartial && !isFullySubstituted && !isMixed && singleOrderStyle
+        ...(!isCompleted &&
+        !isPartial &&
+        !isFullySubstituted &&
+        !isMixed &&
+        singleOrderStyle
           ? {
               borderLeft: `6px solid ${singleOrderStyle.color}`,
               backgroundColor: singleOrderStyle.bg,
@@ -107,12 +95,18 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
     >
       <div
         className={`ec-img-wrapper ${item.image_src ? "ec-img-zoomable" : ""}`}
-        onClick={() => item.image_src && onImageZoom && onImageZoom(item.image_src, item.name)}
+        onClick={() =>
+          item.image_src &&
+          onImageZoom &&
+          onImageZoom(item.image_src, item.name)
+        }
       >
         {item.image_src ? (
           <>
             <img src={item.image_src} className="ec-prod-img" alt="" />
-            <span className="ec-zoom-icon"><FaSearchPlus /></span>
+            <span className="ec-zoom-icon">
+              <FaSearchPlus />
+            </span>
           </>
         ) : (
           <FaBoxOpen color="#cbd5e1" size={40} />
@@ -138,16 +132,18 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
             )}
           </div>
 
-          <div className={`ec-massive-qty-badge ${isMultipack ? "ec-badge-multipack" : ""}`}>
+          <div
+            className={`ec-massive-qty-badge ${multipack.isMultipack ? "ec-badge-multipack" : ""}`}
+          >
             <span className="mq-num">{total}</span>
             <span className="mq-unit">{presentationLabel}</span>
           </div>
         </div>
 
         {/* ALERTA MULTIPACK */}
-        {isMultipack && !isCompleted && (
+        {multipack.isMultipack && !isCompleted && (
           <div className="ec-multipack-alert">
-            📦 ATENCIÓN: LLEVAR {getMultipackLabel}
+            📦 ATENCIÓN: LLEVAR {multipack.label}
             {total > 1 && ` (${total} unidades)`}
           </div>
         )}
@@ -158,15 +154,13 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
               <span className="ec-label-tiny ec-label-tiny--success">
                 ORIGINAL:
               </span>
-              <strong>{scanned} un.</strong>{" "}
-              {item.name}
+              <strong>{scanned} un.</strong> {item.name}
             </div>
             <div>
               <span className="ec-label-tiny ec-label-tiny--warning">
                 SUSTITUTO:
               </span>
-              <strong>{total - scanned} un.</strong>{" "}
-              {item.sustituto.name}
+              <strong>{total - scanned} un.</strong> {item.sustituto.name}
             </div>
           </div>
         ) : isFullySubstituted ? (
@@ -202,7 +196,8 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
                 {item.notas_cliente.map((n, i) => (
                   <div key={i} className="ec-notes-item">
                     <strong>
-                      El cliente {typeof n === "object" ? n.cliente : ""} indicó:
+                      El cliente {typeof n === "object" ? n.cliente : ""}{" "}
+                      indicó:
                     </strong>{" "}
                     {typeof n === "object" ? n.nota : n}
                   </div>
@@ -279,7 +274,7 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
                 </span>
                 <span className="ec-scan-prog-label">FALTAN {remaining}</span>
               </div>
-            ) : isWeighable ? (
+            ) : itemIsWeighable ? (
               <>
                 <FaWeightHanging size={18} />
                 <span className="ec-scan-label">PESAR</span>
@@ -304,7 +299,7 @@ export const ProductCard = ({ item, orderMap, onAction, isCompleted, onImageZoom
           )}
 
           <div className="ec-action-row">
-            {!isWeighable && (
+            {!itemIsWeighable && (
               <button
                 className="ec-alt-btn"
                 onClick={() => onAction(item, "manual")}

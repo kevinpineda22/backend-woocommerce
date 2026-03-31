@@ -12,7 +12,8 @@ export const usePickerSession = () => {
   const [isFinishing, setIsFinishing] = useState(false);
   const [initError, setInitError] = useState(null);
 
-  // Ref para acceder a pickerSedeId dentro de callbacks sin causar re-creaciones
+  // Ref para debounce del listener de wc_log_picking
+  const logRefreshTimerRef = useRef(null);
   const pickerSedeIdRef = useRef(pickerSedeId);
   useEffect(() => {
     pickerSedeIdRef.current = pickerSedeId;
@@ -36,12 +37,25 @@ export const usePickerSession = () => {
 
     const newItems = data.items.map((item) => {
       const effectiveId = item.variation_id || item.product_id;
-      // Filtrar acciones de la cola que corresponden a este producto y sesión
-      const relatedActions = queue.filter(
-        (a) =>
-          String(a.id_sesion) === String(data.session_id) &&
-          String(a.id_producto_original) === String(effectiveId),
-      );
+      const compositeKey = item.key || `${effectiveId}-${item.order_id || ""}`;
+      // Filtrar acciones de la cola que corresponden a este item y sesión
+      const relatedActions = queue.filter((a) => {
+        if (String(a.id_sesion) !== String(data.session_id)) return false;
+        // Matchear por clave compuesta (incluye order_id) — único mecanismo seguro
+        if (a.item_key) return String(a.item_key) === String(compositeKey);
+        // Acciones legacy sin item_key: solo matchear si coincide producto Y no hay ambigüedad
+        if (
+          !a.item_key &&
+          String(a.id_producto_original) === String(effectiveId)
+        ) {
+          const sameProductCount = data.items.filter(
+            (it) =>
+              String(it.variation_id || it.product_id) === String(effectiveId),
+          ).length;
+          return sameProductCount === 1; // Solo si no hay duplicados del producto
+        }
+        return false;
+      });
       if (!relatedActions.length) return item;
 
       let qtyScanned = parseFloat(item.qty_scanned || 0);
@@ -277,7 +291,14 @@ export const usePickerSession = () => {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "wc_log_picking" },
-        () => refreshSessionData(pickerInfo.id),
+        () => {
+          // Debounce: agrupar múltiples cambios rápidos en un solo refresh
+          // Evita cascada de refreshes cuando un reset borra varios logs simultáneamente
+          clearTimeout(logRefreshTimerRef.current);
+          logRefreshTimerRef.current = setTimeout(() => {
+            refreshSessionData(pickerInfo.id);
+          }, 800);
+        },
       )
       .subscribe();
 
@@ -342,7 +363,7 @@ export const usePickerSession = () => {
 
   // --- ACCIONES DE ESTADO LOCAL ---
   const updateLocalSessionState = (
-    prodId,
+    itemKeyOrProdId,
     qty,
     status,
     sustituto = null,
@@ -350,9 +371,15 @@ export const usePickerSession = () => {
   ) => {
     if (!sessionData) return;
     const newItems = sessionData.items.map((i) => {
-      // ✅ Usar variation_id para distinguir variaciones del mismo producto padre
+      // ✅ Matchear por clave compuesta (incluye order_id) para no afectar otros pedidos
       const effectiveId = i.variation_id || i.product_id;
-      if (effectiveId === prodId) {
+      const compositeKey = i.key || `${effectiveId}-${i.order_id || ""}`;
+      const isMatch =
+        String(compositeKey) === String(itemKeyOrProdId) ||
+        (!i.key &&
+          !itemKeyOrProdId.includes("-") &&
+          String(effectiveId) === String(itemKeyOrProdId));
+      if (isMatch) {
         // Calculamos el peso acumulado localmente
         let newWeight = parseFloat(i.peso_real || 0);
         if (addedWeight !== null) newWeight += parseFloat(addedWeight);
@@ -372,13 +399,15 @@ export const usePickerSession = () => {
     // Si es la primera acción de picking, inicializar picking_start_time localmente
     // para que el contador se muestre de inmediato sin esperar al refresh del servidor
     const pickingStartTime =
-      !sessionData.picking_start_time &&
-      status !== "pendiente" &&
-      qty > 0
+      !sessionData.picking_start_time && status !== "pendiente" && qty > 0
         ? new Date().toISOString()
         : sessionData.picking_start_time;
 
-    const newSessionData = { ...sessionData, items: newItems, picking_start_time: pickingStartTime };
+    const newSessionData = {
+      ...sessionData,
+      items: newItems,
+      picking_start_time: pickingStartTime,
+    };
     setSessionData(newSessionData);
     localStorage.setItem(
       "session_active_cache",
