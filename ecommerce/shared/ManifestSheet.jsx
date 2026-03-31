@@ -155,7 +155,7 @@ const ManifestSheet = ({
       const cleanCodeGS1 = code.toString().replace(/\+$/, "");
       const numericSku = (item.sku || "").match(/^(\d+)/)?.[1];
       const isAlreadyGS1_29 =
-        /^\d{13,14}$/.test(cleanCodeGS1) && cleanCodeGS1.startsWith("29");
+        /^\d{13,14}$/.test(cleanCodeGS1) && cleanCodeGS1.startsWith("2"); // 🚀 Aceptamos cualquier GS1 que empiece con 2
 
       if (isWeighableProduct(unidad_medida) || isAlreadyGS1_29) {
         if (isAlreadyGS1_29) {

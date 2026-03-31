@@ -12,6 +12,8 @@
   },
   "scripts": {
     "dev": "nodemon app.js",
-    "start": "node app.js"
+    "start": "node app.js",
+    "test": "vitest",
+    "test:run": "vitest run"
   }
 }

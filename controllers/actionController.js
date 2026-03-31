@@ -165,6 +165,53 @@ exports.registerAction = async (req, res) => {
     // =================================================================
     // CASO NORMAL (INSERTAR ACCIÓN)
     // =================================================================
+    let finalScannedBarcode = codigo_barras_escaneado || null;
+
+    // 🚀 LÓGICA MAESTRA GS1: Si es pesable y no tenemos código GS1 completo, construirlo
+    if (peso_real && peso_real > 0 && f120_id_siesa) {
+      const isAlreadyGS1 =
+        finalScannedBarcode &&
+        finalScannedBarcode.startsWith("2") &&
+        (finalScannedBarcode.length === 13 || finalScannedBarcode.length === 14);
+
+      if (!isAlreadyGS1) {
+        try {
+          // 1. Buscar código base en SIESA (ej: 2900089 para Yuca)
+          const { data: siesaCodes } = await supabase
+            .from("siesa_codigos_barras")
+            .select("codigo_barras")
+            .eq("f120_id", f120_id_siesa)
+            .startsWith("codigo_barras", "2")
+            .limit(1);
+
+          if (siesaCodes && siesaCodes.length > 0) {
+            const baseBarcode = siesaCodes[0].codigo_barras
+              .toString()
+              .replace(/\+$/, "");
+            if (baseBarcode.length >= 7) {
+              const base7 = baseBarcode.substring(0, 7);
+              const pesoGramos = Math.round(peso_real * 1000);
+              const pesoStr = pesoGramos.toString().padStart(5, "0");
+              const sinCheck = base7 + pesoStr;
+
+              // Calcular Check Digit GS1 (Luhn mod 10)
+              let sum = 0;
+              for (let i = 0; i < 12; i++) {
+                const d = parseInt(sinCheck[i]);
+                const weight = (12 - i) % 2 === 1 ? 3 : 1;
+                sum += d * weight;
+              }
+              const checkDigit = (10 - (sum % 10)) % 10;
+              finalScannedBarcode = `${sinCheck}${checkDigit}`;
+              // console.log(`✅ GS1 Generado: ${finalScannedBarcode} para f120_id ${f120_id_siesa}`);
+            }
+          }
+        } catch (err) {
+          console.error("Error generando GS1 en backend:", err.message);
+        }
+      }
+    }
+
     const logData = {
       id_asignacion: targetAssignment.id,
       id_pedido: targetAssignment.id_pedido,
@@ -176,7 +223,7 @@ exports.registerAction = async (req, res) => {
       peso_real: peso_real || null,
       motivo: motivo || null,
       pasillo: pasillo || "General",
-      codigo_barras_escaneado: codigo_barras_escaneado || null,
+      codigo_barras_escaneado: finalScannedBarcode,
       sede_id: sedeId,
     };
 
@@ -462,7 +509,7 @@ exports.validateCodeForAuditor = async (req, res) => {
       codigo,
       f120_id_esperado,
       unidad_medida_esperada,
-      { allowGS1: false },
+      { allowGS1: true }, // ✅ CAMBIO: Ahora el auditor también acepta GS1
     );
     return res.status(result.status).json(result.body);
   } catch (error) {

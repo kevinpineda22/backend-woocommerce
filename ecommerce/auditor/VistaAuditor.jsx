@@ -491,6 +491,20 @@ const VistaAuditor = () => {
 
       const itemsArray = Object.values(itemsMap);
 
+      // 🚀 LÓGICA MAESTRA AUDITOR: Auto-verificar productos pesables (Fruver/Carnes)
+      const autoVerifiedIds = new Set();
+      itemsArray.forEach((item) => {
+        const itemWithBarcodes = {
+          ...item,
+          _scannedBarcodes: scannedBarcodesMap[item.id]
+            ? Array.from(scannedBarcodesMap[item.id])
+            : [],
+        };
+        if (isFruverOrMeatItem(itemWithBarcodes)) {
+          autoVerifiedIds.add(String(item.id));
+        }
+      });
+
       const storedStateStr = localStorage.getItem("auditor_state");
       let loadedFromStorage = false;
 
@@ -499,7 +513,11 @@ const VistaAuditor = () => {
           const storedState = JSON.parse(storedStateStr);
           if (storedState.sessionId === metadata.session_id) {
             setRequiredItems(new Set(storedState.required.map(String)));
-            setVerifiedItems(new Set(storedState.verified.map(String)));
+            const combinedVerified = new Set([
+              ...storedState.verified.map(String),
+              ...Array.from(autoVerifiedIds),
+            ]);
+            setVerifiedItems(combinedVerified);
             loadedFromStorage = true;
           }
         } catch (e) {}
@@ -513,7 +531,7 @@ const VistaAuditor = () => {
           scannedBarcodesMap,
         );
         setRequiredItems(sampleSet);
-        setVerifiedItems(new Set());
+        setVerifiedItems(autoVerifiedIds);
       }
 
       localStorage.setItem("auditor_session_id", metadata.session_id);
