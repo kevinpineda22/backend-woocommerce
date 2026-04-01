@@ -416,13 +416,14 @@ const VistaAuditor = () => {
 
       logs.forEach((log) => {
         if (log.accion === "recolectado" || log.accion === "sustituido") {
-          // ✅ Normalizar IDs a string para evitar type mismatch number/string en Sets
-          const rawKey = log.es_sustituto
+          const prodId = log.es_sustituto
             ? log.id_producto_final || log.id_producto
             : log.id_producto;
-          const key = String(rawKey);
+          
+          // 🚀 CLAVE MAESTRA COMPUESTA: ID Producto + ID Pedido
+          // Esto evita que la yuca del pedido A se sume a la del pedido B
+          const key = `${prodId}-${log.id_pedido}`;
 
-          // ✅ GUARDAR código de barras escaneado si existe (strip "+" de SIESA)
           if (log.codigo_barras_escaneado) {
             const normalized = log.codigo_barras_escaneado
               .trim()
@@ -436,15 +437,16 @@ const VistaAuditor = () => {
           }
 
           if (!itemsMap[key]) {
-            const prodDetail = products_map ? products_map[key] : null;
+            const prodDetail = products_map ? products_map[prodId] : null;
             itemsMap[key] = {
-              id: key,
+              id: key, // Ahora la ID es la clave compuesta
+              real_prod_id: String(prodId),
               name: log.es_sustituto
                 ? log.nombre_sustituto
                 : log.nombre_producto,
               original_name: log.nombre_producto,
               count: 0,
-              peso_total: 0, // ✅ Peso real acumulado (en Kg)
+              peso_total: 0,
               is_sub: log.es_sustituto,
               price: log.precio_nuevo || 0,
               order_id: log.id_pedido,
@@ -455,10 +457,8 @@ const VistaAuditor = () => {
               categorias_reales: prodDetail?.categorias_reales || null,
             };
           }
-          // ✅ Acumular cantidad real (cantidad_afectada) en vez de +1 por log
           const cantAfectada = log.cantidad_afectada || 1;
           itemsMap[key].count += cantAfectada;
-          // ✅ Acumular peso real si existe (peso_real es por unidad × cantidad)
           if (log.peso_real) {
             itemsMap[key].peso_total +=
               parseFloat(log.peso_real) * cantAfectada;

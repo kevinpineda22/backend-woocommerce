@@ -203,8 +203,11 @@ exports.registerAction = async (req, res) => {
               }
               const checkDigit = (10 - (sum % 10)) % 10;
               finalScannedBarcode = `${sinCheck}${checkDigit}`;
-              // console.log(`✅ GS1 Generado: ${finalScannedBarcode} para f120_id ${f120_id_siesa}`);
             }
+          } else {
+            // 🚀 FALLBACK: Si no hay base 29, mantenemos lo que venga del front 
+            // para no bloquear al picker.
+            console.warn(`⚠️ No se encontró base GS1 para item ${f120_id_siesa}. Usando SKU.`);
           }
         } catch (err) {
           console.error("Error generando GS1 en backend:", err.message);

@@ -265,6 +265,18 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
         return;
       }
 
+      // 🚀 VALIDACIÓN DE TOLERANCIA (Prevención de dedazos)
+      const requestedQty = parseFloat(item.quantity_total) || 0;
+      const pesoKg = valGramos / 1000;
+      const isOverLimit = requestedQty > 0 && pesoKg > requestedQty * 2; // Más del doble
+
+      if (isOverLimit && !error.includes("⚠️")) {
+        setError(
+          `⚠️ ATENCIÓN: El cliente pidió ${requestedQty} Kg y estás ingresando ${pesoKg.toFixed(3)} Kg. ¿Estás seguro? Si es correcto, presiona "Confirmar" de nuevo.`,
+        );
+        return;
+      }
+
       finalWeight = valGramos / 1000;
 
       if (!baseEanFruver) {
@@ -431,14 +443,18 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
               <div className="wm-concat-weight-wrap">
                 <input
                   ref={inputRefWeight}
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   className="wm-concat-weight-input"
-                  placeholder="Peso (g)"
-                  step="1"
+                  placeholder="00000"
                   value={weight}
                   onChange={(e) => {
-                    setWeight(e.target.value);
-                    setError("");
+                    // 🚀 BLOQUEO: Solo números y máximo 5 dígitos
+                    const val = e.target.value.replace(/\D/g, "");
+                    if (val.length <= 5) {
+                      setWeight(val);
+                      setError("");
+                    }
                   }}
                   onKeyDown={(e) =>
                     e.key === "Enter" && weight && validateAndConfirm()
