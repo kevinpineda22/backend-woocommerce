@@ -1,6 +1,5 @@
 const WooCommerce = require("../services/wooService");
 const { supabase } = require("../services/supabaseClient");
-const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 const { agruparItemsParaPicking } = require("./pickingUtils");
 const { syncOrderToWoo } = require("../services/syncWooService");
 const {

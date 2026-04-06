@@ -5,6 +5,7 @@ const { agruparItemsParaPicking } = require("./pickingUtils");
 const {
   getPickerSedeId,
   getSedeFromWooOrder,
+  getSedeById,
 } = require("../services/sedeConfig");
 
 // Multi-sede WooCommerce (WordPress Multisite)
@@ -401,10 +402,14 @@ exports.getSessionActive = async (req, res) => {
     };
 
     // 3. PROCESAMIENTO DE ESTADO ITEM POR ITEM
+    // Multi-sede: obtener slug para mapeo de pasillos correcto
+    const sedeData = await getSedeById(session.sede_id);
+    const sedeSlug = sedeData?.slug || "";
+
     const itemsConRuta = itemsAgrupados.map((item) => {
       const realCategories =
         mapaCategoriasReales[item.product_id] || item.categorias || [];
-      const info = obtenerInfoPasillo(realCategories, item.name);
+      const info = obtenerInfoPasillo(realCategories, item.name, sedeSlug);
 
       // 🔍 FILTRO CLAVE: Buscamos logs donde este producto sea el protagonista (original o target)
       // Usamos id_producto_original para no perder el rastro si fue sustituido

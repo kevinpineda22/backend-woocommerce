@@ -1,5 +1,4 @@
 const { supabase } = require("../services/supabaseClient");
-const { obtenerInfoPasillo } = require("../tools/mapeadorPasillos");
 const dayjs = require("dayjs");
 
 // Coordenadas aproximadas para cálculo de distancias (Basado en WarehouseMap.jsx)
