@@ -1,37 +1,48 @@
 /* PedidosAdmin.css — Layout, Pendientes, Modal PA
    Prefijo: pa- / pedidos- (Panel Admin)
    Variables con scope local al contenedor raíz */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap");
 
 /* =========================================
-   1. LAYOUT PRINCIPAL
+   1. LAYOUT PRINCIPAL — Glass Design System
    ========================================= */
 .pedidos-layout-main-container {
+  /* ─ Palette ─ */
   --pa-admin-dark: #1a0a4e;
   --pa-admin-medium: #2d1578;
   --pa-admin-light: #4f35a1;
-  --pa-admin-accent-blue: #3b82f6;
-  --pa-admin-accent-green: #10b981;
-  --pa-admin-accent-orange: #f59e0b;
-  --pa-admin-accent-red: #ef4444;
-  --pa-admin-bg: #f1f5f9;
-  --pa-admin-card-bg: #ffffff;
-  --pa-admin-text-dark: #0f172a;
-  --pa-admin-text-muted: #64748b;
-  --pa-admin-border: #e2e8f0;
-  --pa-admin-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
-  --pa-admin-shadow-hover: 0 12px 32px rgba(15, 23, 42, 0.12);
-  --pa-admin-radius: 14px;
-  --pa-admin-font: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-  --pa-admin-transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --pa-admin-accent-blue: #0071e3;
+  --pa-admin-accent-green: #30d158;
+  --pa-admin-accent-orange: #ff9f0a;
+  --pa-admin-accent-red: #ff453a;
+
+  /* ─ Surfaces ─ */
+  --pa-admin-bg: #f5f5f7;
+  --pa-admin-card-bg: rgba(255, 255, 255, 0.72);
+  --pa-admin-card-solid: #ffffff;
+  --pa-admin-glass: rgba(255, 255, 255, 0.55);
+  --pa-admin-glass-border: rgba(255, 255, 255, 0.45);
+
+  /* ─ Text ─ */
+  --pa-admin-text-dark: #1d1d1f;
+  --pa-admin-text-secondary: #86868b;
+  --pa-admin-text-muted: #6e6e73;
+
+  /* ─ Structure ─ */
+  --pa-admin-border: rgba(0, 0, 0, 0.06);
+  --pa-admin-separator: rgba(0, 0, 0, 0.04);
+  --pa-admin-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  --pa-admin-shadow-hover: 0 8px 30px rgba(0, 0, 0, 0.08);
+  --pa-admin-radius: 20px;
+  --pa-admin-radius-sm: 14px;
+  --pa-admin-transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
 
   display: flex;
   min-height: 100vh;
   background-color: var(--pa-admin-bg);
-  font-family: var(--pa-admin-font);
   font-size: 15px;
   line-height: 1.6;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.016em;
   color: var(--pa-admin-text-dark);
   position: fixed;
   top: 0;
@@ -49,7 +60,7 @@
   width: 270px;
   background: linear-gradient(
     175deg,
-    #0f0630 0%,
+    #0c0528 0%,
     var(--pa-admin-dark) 35%,
     var(--pa-admin-medium) 100%
   );
@@ -59,35 +70,35 @@
   flex-shrink: 0;
   z-index: 10;
   position: relative;
+  transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  overflow: hidden;
 }
-/* Decorative glow at the top */
-.pedidos-layout-sidebar::before {
+/* Sutil glow decorativo */
+.pedidos-layout-sidebar::after {
   content: "";
   position: absolute;
-  top: -60px;
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: -80px;
+  right: -80px;
   width: 200px;
   height: 200px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(79, 53, 161, 0.25) 0%, transparent 70%);
   pointer-events: none;
 }
 
 .pedidos-layout-sidebar-header {
-  padding: 1.8rem 1.5rem 1.5rem;
+  padding: 2rem 1.5rem 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
   position: relative;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .pedidos-back-button {
   position: absolute;
-  top: 18px;
+  top: 20px;
   left: 18px;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.5);
   transition: var(--pa-admin-transition);
 }
 .pedidos-back-button:hover {
@@ -95,39 +106,54 @@
   transform: translateX(-2px);
 }
 
-.pedidos-layout-logo {
-  width: 52px;
-  height: 52px;
-  background: linear-gradient(135deg, #fff 0%, #e0e7ff 100%);
-  color: var(--pa-admin-dark);
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  font-size: 1.15rem;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
-  letter-spacing: 1px;
+.pedidos-layout-avatar {
+  font-size: 3rem;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .pedidos-layout-sidebar-title {
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 500;
   margin: 0;
-  letter-spacing: 0.5px;
-  opacity: 0.95;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  opacity: 0.55;
 }
 
 .pedidos-layout-sidebar-nav {
   flex: 1;
-  padding: 16px 0;
+  padding: 8px 0;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+/* ─── Section Labels ─── */
+.pedidos-nav-label {
+  padding: 6px 24px 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+}
+.pedidos-layout-sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+.pedidos-layout-sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pedidos-layout-sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
 }
 
 /* Sede Selector Wrapper */
 .pedidos-sede-selector-wrapper {
-  padding: 10px 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 12px 16px;
 }
 .pedidos-sede-selector-wrapper .ecom-sede-selector {
   width: 100%;
@@ -136,95 +162,81 @@
   width: 100%;
 }
 
-.pedidos-nav-label {
-  padding: 0 22px;
-  font-size: 0.65rem;
-  letter-spacing: 1.5px;
-  color: rgba(255, 255, 255, 0.35);
-  font-weight: 700;
-  margin-bottom: 6px;
-  text-transform: uppercase;
-}
-.pedidos-nav-label.spacer {
-  margin-top: 22px;
-}
-
 .pedidos-layout-sidebar-button {
   width: 100%;
-  padding: 11px 22px;
+  padding: 15px 24px;
   background: transparent;
   border: none;
-  border-left: 3px solid transparent;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.45);
   display: flex;
   align-items: center;
-  gap: 13px;
-  font-size: 0.88rem;
-  font-weight: 500;
+  gap: 14px;
+  font-size: 0.9rem;
+  font-weight: 400;
   cursor: pointer;
-  transition: var(--pa-admin-transition);
+  transition: all 0.2s ease;
   position: relative;
   font-family: inherit;
 }
+.pedidos-layout-sidebar-button svg {
+  font-size: 1.05rem;
+  opacity: 0.5;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
 .pedidos-layout-sidebar-button:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.9);
-  padding-left: 26px;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.07);
+}
+.pedidos-layout-sidebar-button:hover svg {
+  opacity: 1;
+  color: rgba(255, 255, 255, 0.8);
 }
 .pedidos-layout-sidebar-button.active {
-  background: rgba(255, 255, 255, 0.1);
   color: white;
-  border-left-color: var(--pa-admin-accent-green);
-  font-weight: 600;
-  box-shadow: inset 0 0 20px rgba(16, 185, 129, 0.05);
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.05);
+}
+.pedidos-layout-sidebar-button.active svg {
+  opacity: 1;
+  color: var(--pa-admin-accent-green);
 }
 
-/* Sidebar Badges */
+/* Sidebar Badges — colores vivos */
 .pedidos-badge-count,
 .pedidos-badge-count-blue,
 .pedidos-badge-count-red {
   margin-left: auto;
-  padding: 3px 9px;
-  border-radius: 20px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  min-width: 22px;
-  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .pedidos-badge-count {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  color: white;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  color: #ff6b6b;
 }
 .pedidos-badge-count-blue {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  color: white;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  color: #74b9ff;
 }
 .pedidos-badge-count-red {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  color: white;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  color: #ff6b6b;
 }
 
-/* Sidebar Footer — Aristotle Quote */
+/* Sidebar Footer — Quote */
 .pedidos-sidebar-footer {
-  padding: 18px 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: auto;
+  padding: 20px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
   font-size: 0.72rem;
-  line-height: 1.5;
-  color: rgba(255, 255, 255, 0.3);
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.22);
   font-style: italic;
-  text-align: center;
 }
 .pedidos-sidebar-footer strong {
   display: block;
   margin-top: 5px;
   font-style: normal;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.45);
-  letter-spacing: 0.3px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.32);
 }
 
 /* =========================================
@@ -236,30 +248,50 @@
   flex-direction: column;
   overflow-y: auto;
   position: relative;
-  background: var(--pa-admin-bg);
+  background:
+    radial-gradient(ellipse at 70% 0%, rgba(79, 53, 161, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 0% 80%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
+    var(--pa-admin-bg);
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.pedidos-layout-content::-webkit-scrollbar {
+  width: 6px;
+}
+.pedidos-layout-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pedidos-layout-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+}
+.pedidos-layout-content::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 .pedidos-layout-header {
-  background: var(--pa-admin-card-bg);
-  padding: 18px 32px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  padding: 20px 36px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--pa-admin-border);
 }
 .pedidos-layout-header h1 {
-  font-size: 1.4rem;
-  font-weight: 800;
+  font-size: 1.5rem;
+  font-weight: 700;
   margin: 0;
-  color: var(--pa-admin-text-dark);
-  letter-spacing: -0.02em;
+  color: var(--pa-admin-dark);
+  letter-spacing: -0.025em;
 }
 /* Motivational subheader */
 .pedidos-header-quote {
-  font-size: 0.78rem;
-  color: var(--pa-admin-text-muted);
-  font-style: italic;
+  font-size: 0.8rem;
+  color: var(--pa-admin-text-secondary);
   font-weight: 400;
-  letter-spacing: 0;
+  letter-spacing: -0.01em;
+  margin-top: 2px;
 }
 
 .pedidos-layout-body {
@@ -275,16 +307,18 @@
    4. FILTROS — Intuitivos y Modernos
    ========================================= */
 .pedidos-admin-filters-container {
-  background: var(--pa-admin-card-bg);
-  padding: 22px 24px;
+  background: var(--pa-admin-glass);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  padding: 20px 22px;
   border-radius: var(--pa-admin-radius);
   box-shadow: var(--pa-admin-shadow);
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
   align-items: flex-end;
-  margin-bottom: 24px;
-  border: 1px solid var(--pa-admin-border);
+  margin-bottom: 20px;
+  border: 1px solid var(--pa-admin-glass-border);
 }
 .pedidos-admin-filter-group {
   flex: 1;
@@ -294,32 +328,33 @@
   gap: 6px;
 }
 .pedidos-admin-filter-group label {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  color: var(--pa-admin-text-muted);
+  color: var(--pa-admin-text-secondary);
   display: flex;
   align-items: center;
-  gap: 6px;
-  letter-spacing: 0.3px;
+  gap: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 .pedidos-admin-filter-input {
-  padding: 11px 14px;
-  border: 1.5px solid var(--pa-admin-border);
-  border-radius: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--pa-admin-radius-sm);
   outline: none;
   font-family: inherit;
   font-size: 0.88rem;
   color: var(--pa-admin-text-dark);
-  background: #f8fafc;
+  background: rgba(255, 255, 255, 0.6);
   transition: var(--pa-admin-transition);
 }
 .pedidos-admin-filter-input::placeholder {
-  color: #94a3b8;
+  color: var(--pa-admin-text-secondary);
 }
 .pedidos-admin-filter-input:focus {
   border-color: var(--pa-admin-accent-blue);
   background: white;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.12);
 }
 
 .pedidos-filter-actions {
@@ -329,45 +364,64 @@
 }
 
 .pedidos-admin-refresh-btn {
-  background: linear-gradient(
-    135deg,
-    var(--pa-admin-light),
-    var(--pa-admin-medium)
-  );
+  background: var(--pa-admin-medium);
   color: white;
   border: none;
-  padding: 11px 22px;
-  border-radius: 10px;
-  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 980px;
+  font-weight: 500;
   font-family: inherit;
-  font-size: 0.88rem;
+  font-size: 0.85rem;
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(45, 21, 120, 0.25);
   transition: var(--pa-admin-transition);
 }
 .pedidos-admin-refresh-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(45, 21, 120, 0.35);
+  background: var(--pa-admin-light);
+  transform: scale(1.02);
+}
+
+.pedidos-btn-sync {
+  background: var(--pa-admin-accent-blue);
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 980px;
+  font-weight: 500;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--pa-admin-transition);
+}
+.pedidos-btn-sync:hover {
+  background: #0077ed;
+  transform: scale(1.02);
+}
+.pedidos-btn-sync:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .pedidos-btn-clear {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.04);
   color: var(--pa-admin-text-muted);
-  border: 1.5px solid var(--pa-admin-border);
+  border: none;
   padding: 10px 18px;
-  border-radius: 10px;
-  font-weight: 600;
+  border-radius: 980px;
+  font-weight: 500;
   font-family: inherit;
   font-size: 0.85rem;
   cursor: pointer;
   transition: var(--pa-admin-transition);
 }
 .pedidos-btn-clear:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: rgba(0, 0, 0, 0.08);
   color: var(--pa-admin-text-dark);
 }
 
@@ -396,43 +450,32 @@
   margin-bottom: 16px;
 }
 
-/* Premium Empty State */
+/* Empty State — Clean */
 .pa-premium-empty-state {
   padding: 60px 20px;
   text-align: center;
-  background: #f8fafc;
-  border-radius: 20px;
-  border: 2px dashed #e2e8f0;
+  background: var(--pa-admin-card-bg);
+  border-radius: var(--pa-admin-radius);
+  border: 1px dashed var(--pa-admin-border);
   grid-column: 1 / -1;
 }
 .pa-premium-empty-icon {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 15px;
   color: #cbd5e1;
-}
-.pa-premium-empty-icon svg {
-  width: 70px;
-  height: 70px;
+  margin-bottom: 16px;
 }
 .pa-premium-empty-title {
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   color: #334155;
   margin: 0 0 8px 0;
   font-weight: 700;
 }
 .pa-premium-empty-text {
-  color: #64748b;
-  font-size: 1rem;
-  margin: 0 0 20px 0;
-}
-.pa-premium-empty-quote {
-  font-style: italic;
-  color: #94a3b8;
-  max-width: 400px;
-  margin: 0 auto;
-  font-size: 0.85rem;
-  line-height: 1.5;
+  color: var(--pa-admin-text-muted);
+  font-size: 0.92rem;
+  margin: 0;
+  max-width: 360px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .pedidos-main-loading {
@@ -455,16 +498,18 @@
 
 .pa-toast-item {
   color: #fff;
-  padding: 12px 20px;
-  border-radius: 12px;
+  padding: 14px 22px;
+  border-radius: 980px;
   font-size: 14px;
-  font-weight: 600;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  font-weight: 500;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
-.pa-toast-success { background: #10b981; }
-.pa-toast-error { background: #ef4444; }
-.pa-toast-warning { background: #f59e0b; }
+.pa-toast-success { background: rgba(48, 209, 88, 0.92); }
+.pa-toast-error { background: rgba(255, 69, 58, 0.92); }
+.pa-toast-warning { background: rgba(255, 159, 10, 0.92); }
 
 .pedidos-spinner-large {
   width: 44px;
@@ -480,70 +525,46 @@
 }
 
 /* =========================================
-   5. TICKET CARDS — Espaciosas y Premium
+   5. TICKET CARDS — Flat & Clean
    ========================================= */
 .pedidos-admin-orders-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
 }
 
 .pa-ticket-card {
   background: var(--pa-admin-card-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-radius: var(--pa-admin-radius);
   box-shadow: var(--pa-admin-shadow);
+  padding: 18px 20px;
   display: flex;
-  overflow: hidden;
+  flex-direction: column;
+  gap: 10px;
   cursor: pointer;
   transition: var(--pa-admin-transition);
-  border: 1px solid var(--pa-admin-border);
+  border: 1px solid var(--pa-admin-glass-border);
   position: relative;
 }
 .pa-ticket-card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-1px);
   box-shadow: var(--pa-admin-shadow-hover);
-  border-color: #cbd5e1;
 }
 .pa-ticket-card.selected {
-  border: 2px solid var(--pa-admin-accent-blue);
-  background: linear-gradient(135deg, #eff6ff 0%, #f8faff 100%);
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.12);
+  background: rgba(0, 113, 227, 0.06);
+  border-color: rgba(0, 113, 227, 0.3);
 }
 
-/* Accent stripe on the left */
-.pa-ticket-left {
-  width: 48px;
-  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
-  border-right: 1px solid var(--pa-admin-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-.pa-ticket-left::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: linear-gradient(180deg, var(--pa-admin-accent-blue), var(--pa-admin-medium));
-  border-radius: 0 4px 4px 0;
-}
 .pa-ticket-checkbox {
   width: 18px;
   height: 18px;
   cursor: pointer;
   accent-color: var(--pa-admin-accent-blue);
+  flex-shrink: 0;
 }
 
-.pa-ticket-content {
-  flex: 1;
-  padding: 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
 .pa-ticket-header {
   display: flex;
   justify-content: space-between;
@@ -557,71 +578,65 @@
   gap: 6px;
 }
 .pa-ticket-id {
-  font-weight: 800;
+  font-weight: 600;
   color: var(--pa-admin-accent-blue);
-  background: #dbeafe;
-  padding: 3px 10px;
-  border-radius: 6px;
-  font-size: 0.82rem;
-  letter-spacing: 0.3px;
+  font-size: 0.85rem;
+  letter-spacing: -0.01em;
 }
 .pa-ticket-date {
-  font-size: 0.73rem;
-  color: var(--pa-admin-text-muted);
+  font-size: 0.75rem;
+  color: var(--pa-admin-text-secondary);
   display: flex;
   align-items: center;
   gap: 4px;
   font-weight: 500;
   white-space: nowrap;
   flex-shrink: 0;
-  margin-top: 2px;
 }
 
 /* Inline tag styles — sede & pickup */
 .pa-ticket-sede-tag {
-  background: #eef2ff;
-  color: #4338ca;
+  background: rgba(99, 102, 241, 0.08);
+  color: #6366f1;
   padding: 3px 8px;
-  border-radius: 5px;
-  font-size: 0.68rem;
-  font-weight: 700;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border: 1px solid #c7d2fe;
   line-height: 1;
 }
 .pa-ticket-pickup-tag {
-  background: linear-gradient(135deg, #d946ef, #c026d3);
-  color: white;
+  background: rgba(168, 85, 247, 0.1);
+  color: #9333ea;
   padding: 3px 8px;
-  border-radius: 5px;
-  font-size: 0.68rem;
-  font-weight: 700;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  box-shadow: 0 2px 6px rgba(217, 70, 239, 0.25);
   line-height: 1;
 }
 
 .pa-ticket-customer {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 1rem;
   color: var(--pa-admin-text-dark);
   line-height: 1.3;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 .pa-ticket-meta {
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 0.85rem;
-  color: var(--pa-admin-text-muted);
+  color: var(--pa-admin-text-secondary);
   font-weight: 500;
-  padding-top: 10px;
-  border-top: 1px solid #f1f5f9;
+  padding-top: 8px;
+  border-top: 1px solid var(--pa-admin-separator);
 }
 .pa-meta-item {
   display: flex;
@@ -630,8 +645,8 @@
 }
 .pa-meta-price {
   color: var(--pa-admin-accent-green);
-  font-weight: 800;
-  font-size: 0.95rem;
+  font-weight: 600;
+  font-size: 0.92rem;
 }
 .pa-ticket-address {
   font-size: 0.78rem;
@@ -674,54 +689,57 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 2000;
 }
 .pedidos-modal-content {
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   width: 90%;
   max-width: 1000px;
   height: 85vh;
   max-height: 900px;
-  border-radius: 16px;
+  border-radius: 20px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.18);
 }
 .animate-fade-in {
-  animation: fadeIn 0.3s ease-out;
+  animation: fadeIn 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: scale(0.97) translateY(8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: scale(1) translateY(0);
   }
 }
 
 /* Header Modal PA */
 .pa-modal-header-custom {
-  background: #1e293b;
+  background: linear-gradient(135deg, var(--pa-admin-dark), var(--pa-admin-medium));
   padding: 20px 32px;
   display: flex;
   align-items: center;
-  border-bottom: 4px solid var(--pa-admin-accent-blue);
   color: white;
   flex-shrink: 0;
 }
 .pa-modal-icon-badge {
-  background: rgba(59, 130, 246, 0.2);
-  color: #60a5fa;
-  width: 45px;
-  height: 45px;
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -773,7 +791,7 @@
 
 /* Cuerpo Modal PA (Flex & Scroll Correcto) */
 .pa-modal-body-custom {
-  background: #f8fafc;
+  background: var(--pa-admin-bg);
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -784,17 +802,18 @@
 .pa-detail-info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 16px;
   padding: 20px 32px;
-  background: #f8fafc;
-  border-bottom: 1px solid var(--pa-admin-border);
+  background: transparent;
+  border-bottom: 1px solid var(--pa-admin-separator);
   flex-shrink: 0;
 }
 .pa-detail-card {
-  background: white;
-  padding: 15px;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 16px;
+  border-radius: var(--pa-admin-radius-sm);
 }
 .pa-section-title {
   color: #64748b;
@@ -878,18 +897,17 @@
 /* Items de Producto PA */
 .pa-product-detailed-row {
   display: grid;
-  grid-template-columns: 70px 1fr;
-  gap: 15px;
+  grid-template-columns: 60px 1fr;
+  gap: 14px;
   padding: 12px;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: var(--pa-admin-radius-sm);
   align-items: center;
 }
 .pa-prod-image-container {
-  width: 70px;
-  height: 70px;
-  background: #f1f5f9;
+  width: 60px;
+  height: 60px;
+  background: rgba(0, 0, 0, 0.03);
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -953,9 +971,9 @@
 
 /* Footer Modal PA */
 .pa-modal-footer-custom {
-  padding: 15px 32px;
-  background: white;
-  border-top: 1px solid #e2e8f0;
+  padding: 16px 32px;
+  background: rgba(255, 255, 255, 0.9);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -967,32 +985,30 @@
   gap: 10px;
 }
 
-/* Botones Genéricos */
-/* Botón Secundario */
+/* Botones Genéricos — Apple Pill Style */
 .pa-btn-secondary {
   padding: 10px 20px;
-  border-radius: 10px;
-  border: 1.5px solid var(--pa-admin-border);
-  background: white;
+  border-radius: 980px;
+  border: none;
+  background: rgba(0, 0, 0, 0.05);
   color: var(--pa-admin-text-muted);
-  font-weight: 600;
+  font-weight: 500;
   font-family: inherit;
   cursor: pointer;
   transition: var(--pa-admin-transition);
 }
 .pa-btn-secondary:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: rgba(0, 0, 0, 0.08);
   color: var(--pa-admin-text-dark);
 }
 
 .pa-btn-toggle {
   padding: 10px 20px;
-  border-radius: 10px;
-  border: 1.5px solid var(--pa-admin-accent-blue);
-  background: transparent;
+  border-radius: 980px;
+  border: none;
+  background: rgba(0, 113, 227, 0.08);
   color: var(--pa-admin-accent-blue);
-  font-weight: 600;
+  font-weight: 500;
   font-family: inherit;
   cursor: pointer;
   display: flex;
@@ -1001,32 +1017,29 @@
   transition: var(--pa-admin-transition);
 }
 .pa-btn-toggle.active {
-  background: #eff6ff;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+  background: var(--pa-admin-accent-blue);
+  color: white;
 }
 .pa-btn-toggle:hover {
-  background: #eff6ff;
-  transform: translateY(-1px);
+  background: rgba(0, 113, 227, 0.14);
 }
 
 .pa-btn-success {
-  padding: 11px 24px;
-  border-radius: 10px;
+  padding: 10px 24px;
+  border-radius: 980px;
   border: none;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: var(--pa-admin-accent-green);
   color: white;
-  font-weight: 700;
+  font-weight: 500;
   font-family: inherit;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
   display: flex;
   align-items: center;
   gap: 8px;
   transition: var(--pa-admin-transition);
 }
 .pa-btn-success:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+  transform: scale(1.03);
 }
 
 /* Batch Action Bar */
@@ -1035,41 +1048,336 @@
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);
-  background: linear-gradient(135deg, var(--pa-admin-dark), #1e1252);
+  background: rgba(29, 29, 31, 0.88);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
   color: white;
-  padding: 16px 32px;
-  border-radius: 16px;
+  padding: 14px 28px;
+  border-radius: 980px;
   display: flex;
   align-items: center;
-  gap: 22px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  gap: 18px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
   z-index: 2500;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 .batch-btn {
   color: white;
   border: none;
-  padding: 10px 22px;
-  border-radius: 10px;
-  font-weight: 700;
+  padding: 9px 20px;
+  border-radius: 980px;
+  font-weight: 500;
   font-family: inherit;
+  font-size: 0.85rem;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   transition: var(--pa-admin-transition);
 }
 .batch-btn:hover {
-  transform: translateY(-1px);
+  transform: scale(1.03);
 }
 .batch-btn.assign {
-  background: linear-gradient(135deg, #10b981, #059669);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  background: var(--pa-admin-accent-green);
 }
 .batch-btn.cancel {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* =========================================
+   MOBILE TOGGLE & OVERLAY
+   ========================================= */
+.pedidos-mobile-toggle {
+  display: none;
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 50;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: none;
+  background: var(--pa-admin-medium);
+  cursor: pointer;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.2);
+  transition: var(--pa-admin-transition);
+}
+.pedidos-mobile-toggle span {
+  display: block;
+  width: 20px;
+  height: 2px;
+  background: white;
+  border-radius: 2px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+}
+.pedidos-mobile-toggle.open span:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+.pedidos-mobile-toggle.open span:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0);
+}
+.pedidos-mobile-toggle.open span:nth-child(3) {
+  transform: rotate(-45deg) translate(5px, -5px);
+}
+
+.pedidos-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(2px);
+  z-index: 9;
+}
+
+/* =========================================
+   FOCUS-VISIBLE (Accesibilidad)
+   ========================================= */
+.pedidos-layout-sidebar-button:focus-visible,
+.pedidos-admin-refresh-btn:focus-visible,
+.pa-btn-secondary:focus-visible,
+.pa-btn-success:focus-visible,
+.pa-btn-toggle:focus-visible,
+.batch-btn:focus-visible {
+  outline: 2px solid var(--pa-admin-accent-blue);
+  outline-offset: 2px;
+}
+
+.pedidos-admin-filter-input:focus-visible {
+  outline: none;
+}
+
+/* =========================================
+   RESPONSIVE — Tablet (<=1024px)
+   ========================================= */
+@media (max-width: 1024px) {
+  .pedidos-layout-sidebar {
+    width: 230px;
+  }
+  .pedidos-layout-sidebar-header {
+    padding: 1.4rem 1.2rem 1.2rem;
+  }
+  .pedidos-layout-logo {
+    width: 42px;
+    height: 42px;
+    font-size: 0.95rem;
+  }
+  .pedidos-layout-sidebar-button {
+    padding: 11px 18px;
+    font-size: 0.84rem;
+    gap: 11px;
+  }
+  .pedidos-nav-label {
+    padding: 0 18px;
+  }
+  .pedidos-layout-header {
+    padding: 16px 24px;
+  }
+  .pedidos-layout-header h1 {
+    font-size: 1.2rem;
+  }
+  .pedidos-layout-body {
+    padding: 20px 24px;
+    padding-bottom: 80px;
+  }
+  .pedidos-admin-orders-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+  }
+}
+
+/* =========================================
+   RESPONSIVE — Mobile (<=768px)
+   ========================================= */
+@media (max-width: 768px) {
+  .pedidos-mobile-toggle {
+    display: flex;
+  }
+  .pedidos-sidebar-overlay {
+    display: block;
+  }
+  .pedidos-layout-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 270px;
+    z-index: 20;
+    transform: translateX(-100%);
+  }
+  .pedidos-layout-sidebar.open {
+    transform: translateX(0);
+  }
+  .pedidos-layout-content {
+    width: 100%;
+  }
+  .pedidos-layout-header {
+    padding: 14px 16px;
+    padding-left: 64px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .pedidos-layout-header h1 {
+    font-size: 1.1rem;
+  }
+  .pedidos-header-quote {
+    font-size: 0.72rem;
+  }
+  .pedidos-layout-body {
+    padding: 16px;
+    padding-bottom: 80px;
+  }
+  .pedidos-admin-orders-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .pedidos-admin-filters-container {
+    padding: 16px;
+    gap: 12px;
+    flex-direction: column;
+  }
+  .pedidos-admin-filter-group {
+    min-width: 100%;
+  }
+  .pedidos-filter-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+  .pedidos-admin-refresh-btn,
+  .pedidos-btn-clear {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Ticket cards — mobile */
+  .pa-ticket-card {
+    padding: 14px 16px;
+    border-left-width: 3px;
+  }
+  .pa-ticket-header {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  /* Batch bar — mobile friendly */
+  .batch-action-bar {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    transform: none;
+    padding: 14px 18px;
+    flex-wrap: wrap;
+    gap: 10px;
+    border-radius: 14px;
+  }
+  .pa-batch-buttons {
+    width: 100%;
+    gap: 8px;
+  }
+  .batch-btn {
+    flex: 1;
+    justify-content: center;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+  }
+
+  /* Modals — full screen on mobile */
+  .pedidos-modal-content {
+    width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  .pa-modal-header-custom {
+    padding: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .pa-modal-id {
+    font-size: 1.1rem;
+  }
+  .pa-detail-info-grid {
+    grid-template-columns: 1fr;
+    padding: 16px;
+    gap: 12px;
+  }
+  .pa-products-section {
+    padding: 16px;
+  }
+  .pa-modal-footer-custom {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .pa-footer-left,
+  .pa-footer-right {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .pa-footer-right button,
+  .pa-footer-left button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Toast — bottom center on mobile */
+  .pa-toast-container {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
+  .pa-toast-item {
+    font-size: 13px;
+    padding: 10px 16px;
+    text-align: center;
+  }
+}
+
+/* =========================================
+   RESPONSIVE — Small Mobile (<=480px)
+   ========================================= */
+@media (max-width: 480px) {
+  .pedidos-layout-header h1 {
+    font-size: 1rem;
+  }
+  .pedidos-header-quote {
+    display: none;
+  }
+  .pa-ticket-customer {
+    font-size: 0.95rem;
+  }
+  .pa-ticket-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .pa-premium-empty-state {
+    padding: 40px 16px;
+  }
+  .pa-premium-empty-icon svg {
+    width: 50px;
+    height: 50px;
+  }
+  .pa-premium-empty-title {
+    font-size: 1.1rem;
+  }
+  .pa-product-detailed-row {
+    grid-template-columns: 50px 1fr;
+    gap: 10px;
+    padding: 10px;
+  }
+  .pa-prod-image-container {
+    width: 50px;
+    height: 50px;
+  }
 }
 
 /* =========================================

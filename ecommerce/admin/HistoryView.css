@@ -1,14 +1,12 @@
 /* =========================================
    HISTORY VIEW - Tabla, Badges, Acciones
    ========================================= */
-@import url("https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
-
 /* --- Estados de Carga y Vacío --- */
 .history-loading-state,
 .history-empty-state {
   text-align: center;
   padding: 50px;
-  color: var(--pa-text-muted, #64748b);
+  color: #86868b;
 }
 
 .history-loading-state .pedidos-spinner-large {
@@ -29,12 +27,14 @@
 
 /* --- Contenedor de Tabla --- */
 .history-table-container {
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-radius: 20px;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
-  margin-top: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  margin-top: 16px;
 }
 
 /* --- Tabla --- */
@@ -45,24 +45,23 @@
 }
 
 .hv-table thead {
-  background: #f8fafc;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .hv-table th {
-  padding: 16px 20px;
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: #64748b;
+  padding: 14px 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #86868b;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.02em;
 }
 
 .hv-table td {
-  padding: 16px 20px;
-  border-bottom: 1px solid #f1f5f9;
-  font-size: 0.95rem;
-  color: #334155;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  font-size: 0.9rem;
+  color: #1d1d1f;
   vertical-align: middle;
 }
 
@@ -71,7 +70,7 @@
 }
 
 .hv-table tr:hover {
-  background-color: #f8fafc;
+  background-color: rgba(0, 0, 0, 0.02);
 }
 
 /* --- Celdas Específicas --- */
@@ -92,98 +91,146 @@
 /* --- Badges de Estado --- */
 .hv-badge {
   display: inline-block;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-weight: bold;
+  padding: 4px 10px;
+  border-radius: 980px;
+  font-weight: 500;
   font-size: 0.75rem;
-  border: 1px solid;
+  border: none;
 }
 
 .hv-badge--pagado {
-  background: #d1fae5;
-  color: #059669;
-  border-color: #10b981;
+  background: rgba(48, 209, 88, 0.12);
+  color: #248a3d;
 }
 
 .hv-badge--pendiente {
-  background: #fff7ed;
-  color: #c2410c;
-  border-color: #f97316;
+  background: rgba(255, 159, 10, 0.12);
+  color: #c93400;
 }
 
 .hv-badge--default {
-  background: #f1f5f9;
-  color: #475569;
-  border-color: #cbd5e1;
+  background: rgba(0, 0, 0, 0.05);
+  color: #6e6e73;
 }
 
 .hv-badge-duracion {
   display: inline-block;
   padding: 4px 10px;
-  border-radius: 20px;
+  border-radius: 980px;
   font-size: 0.8rem;
-  font-weight: 700;
-  background: #e0f2fe;
-  color: #0284c7;
+  font-weight: 500;
+  background: rgba(0, 113, 227, 0.08);
+  color: #0071e3;
 }
 
 /* --- Botones de Acción --- */
 .hv-btn-icon {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: 8px;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s;
-  color: #64748b;
+  transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  color: #86868b;
   background: transparent;
 }
 
 .hv-btn-icon:hover {
-  background: #e2e8f0;
-  color: #0f172a;
+  background: rgba(0, 0, 0, 0.05);
+  color: #1d1d1f;
 }
 
 .hv-btn-icon--warning {
-  color: #f59e0b;
+  color: #ff9f0a;
 }
 
 .hv-btn-icon--warning:hover {
-  background: #fffbeb;
-  color: #d97706;
+  background: rgba(255, 159, 10, 0.08);
+  color: #c93400;
 }
 
 .hv-btn-icon--success {
-  color: #16a34a;
+  color: #30d158;
 }
 
 .hv-btn-icon--success:hover {
-  background: #f0fdf4;
-  color: #15803d;
+  background: rgba(48, 209, 88, 0.08);
+  color: #248a3d;
 }
 
 .hv-btn-paid {
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: #30d158;
   color: white;
   border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-weight: 700;
+  border-radius: 980px;
+  padding: 6px 14px;
+  font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.4);
-  transition: all 0.2s;
-  font-size: 0.85rem;
+  transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  font-size: 0.82rem;
+  font-family: inherit;
 }
 
 .hv-btn-paid:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 12px -2px rgba(16, 185, 129, 0.6);
+  transform: scale(1.03);
+  background: #2ab94d;
+}
+
+/* --- Clases utilitarias (reemplazan inline styles) --- */
+.hv-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.hv-client-name {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.85rem;
+}
+.hv-text-muted {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+.hv-sede-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: #f0f4ff;
+  border: 1px solid #c7d2fe;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #4338ca;
+  white-space: nowrap;
+}
+.hv-order-id {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #334155;
+}
+
+/* --- Responsive Table --- */
+@media (max-width: 768px) {
+  .history-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .hv-table {
+    min-width: 640px;
+  }
+  .hv-table th,
+  .hv-table td {
+    padding: 12px 14px;
+    font-size: 0.85rem;
+  }
 }
 
 /* =========================================

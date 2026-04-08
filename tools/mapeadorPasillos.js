@@ -13,10 +13,11 @@
  */
 
 // ============================================================
-// CATEGORÍAS COMPARTIDAS (iguales en todas las sedes)
+// CATEGORÍAS COMPARTIDAS (atómicas — cada sede las combina a su manera)
 // ============================================================
 
 const CATEGORIAS = {
+  // ── Sin cambios (usadas tal cual en ambas sedes) ──────────
   bebe_adulto_cereales: [
     "bebe",
     "bebes",
@@ -112,144 +113,6 @@ const CATEGORIAS = {
     "insecticida",
     "insecticidas",
   ],
-  refrigerados_carnes_licores: [
-    "refrigerado",
-    "congelado",
-    "congelados",
-    "comidas congeladas",
-    "carne",
-    "carnes",
-    "carniceria",
-    "carnes y proteinas",
-    "pollo",
-    "cerdo",
-    "res y cerdo",
-    "pescado",
-    "pescados",
-    "mariscos",
-    "pescados y mariscos",
-    "jamon",
-    "embutido",
-    "embutidos",
-    "carnes frias",
-    "queso",
-    "quesos",
-    "cuajada",
-    "cuajadas",
-    "queso crema",
-    "sueros",
-    "yogurt",
-    "bebidas lacteas",
-    "lacteos",
-    "arepa",
-    "arepas",
-    "postres",
-    "postres y gelatinas",
-    "cerveza",
-    "cervezas",
-    "licor",
-    "licores",
-    "vino",
-    "vinos",
-    "cigarrillo",
-    "cigarrillos",
-    "helado",
-    "helados",
-    "paleta",
-    "paletas",
-    "chocolates y dulces",
-    "golosinas de chocolate",
-    "golosina",
-    "golosinas",
-    "dulce",
-    "dulces",
-    "mani",
-    "nueces",
-    "frutos secos",
-    "mexicano",
-    "saludable",
-    "alimentos saludables",
-    "suplementos",
-    "vitaminas",
-    "suplementos y vitaminas",
-  ],
-  gaseosas_mecato_fruver: [
-    "fruver",
-    "fruta",
-    "frutas",
-    "verdura",
-    "verduras",
-    "frutas y verduras",
-    "hortaliza",
-    "hortalizas",
-    "tomate",
-    "cebolla",
-    "papa",
-    "gaseosa",
-    "gaseosas",
-    "mecato",
-  ],
-  bebidas_pasabocas: [
-    "jugo",
-    "jugos",
-    "zumo",
-    "zumos",
-    "bebida",
-    "bebidas",
-    "bebidas de cereal",
-    "agua",
-    "hidratante",
-    "hidratantes",
-    "energizante",
-    "energizantes",
-    "snack",
-    "snacks",
-    "pasabocas",
-    "servilletas",
-    "desechable",
-    "desechables",
-    "vaso",
-    "plato",
-    "lonchera",
-    "loncheras",
-    "papel cocina",
-  ],
-  huevos_atunes_pastas: [
-    "huevo",
-    "huevos",
-    "atun",
-    "atunes",
-    "enlatado",
-    "enlatados",
-    "alimentos enlatados",
-    "conservas",
-    "pasta",
-    "pastas",
-    "spaghetti",
-  ],
-  arroz_azucar_granos: [
-    "arroz",
-    "azucar",
-    "panela",
-    "panelas",
-    "endulzante",
-    "endulzantes",
-    "grano",
-    "granos",
-    "sal",
-    "salsa",
-    "salsas",
-    "aderezo",
-    "aderezos",
-    "vinagre",
-    "vinagreta",
-    "vinagretas",
-    "sazonador",
-    "sazonadores",
-    "condimento",
-    "condimentos",
-    "caldos",
-  ],
   harinas_aceites: [
     "aceite",
     "aceites",
@@ -312,6 +175,167 @@ const CATEGORIAS = {
     "carbon",
     "implementos del hogar",
   ],
+
+  // ── Atómicas (split de las antiguas combinadas) ───────────
+
+  // ex refrigerados_carnes_licores → 7 sub-grupos
+  licores_cigarrillos: [
+    "cerveza",
+    "cervezas",
+    "licor",
+    "licores",
+    "vino",
+    "vinos",
+    "cigarrillo",
+    "cigarrillos",
+  ],
+  dulceria_golosinas: [
+    "chocolates y dulces",
+    "golosinas de chocolate",
+    "golosina",
+    "golosinas",
+    "dulce",
+    "dulces",
+    "helado",
+    "helados",
+    "paleta",
+    "paletas",
+    "mexicano",
+  ],
+  mani_bocadillo: ["mani", "nueces", "frutos secos", "bocadillo"],
+  lacteos_refrigerados: [
+    "refrigerado",
+    "queso",
+    "quesos",
+    "cuajada",
+    "cuajadas",
+    "queso crema",
+    "sueros",
+    "yogurt",
+    "bebidas lacteas",
+    "lacteos",
+    "arepa",
+    "arepas",
+    "postres",
+    "postres y gelatinas",
+  ],
+  carnes_frias_congelados: [
+    "jamon",
+    "embutido",
+    "embutidos",
+    "carnes frias",
+    "congelado",
+    "congelados",
+    "comidas congeladas",
+  ],
+  carnes_rojas: [
+    "carne",
+    "carnes",
+    "carniceria",
+    "carnes y proteinas",
+    "cerdo",
+    "res y cerdo",
+  ],
+  pollo_pescado: [
+    "pollo",
+    "pescado",
+    "pescados",
+    "mariscos",
+    "pescados y mariscos",
+  ],
+  saludable_suplementos: [
+    "saludable",
+    "alimentos saludables",
+    "suplementos",
+    "vitaminas",
+    "suplementos y vitaminas",
+  ],
+
+  // ex gaseosas_mecato_fruver → 2 sub-grupos
+  fruver: [
+    "fruver",
+    "fruta",
+    "frutas",
+    "verdura",
+    "verduras",
+    "frutas y verduras",
+    "hortaliza",
+    "hortalizas",
+    "tomate",
+    "cebolla",
+    "papa",
+  ],
+  gaseosas_mecato: ["gaseosa", "gaseosas", "mecato"],
+
+  // ex arroz_azucar_granos → 2 sub-grupos
+  salsas_condimentos: [
+    "salsa",
+    "salsas",
+    "aderezo",
+    "aderezos",
+    "vinagre",
+    "vinagreta",
+    "vinagretas",
+    "sazonador",
+    "sazonadores",
+    "condimento",
+    "condimentos",
+    "caldos",
+  ],
+  arroz_granos: [
+    "arroz",
+    "azucar",
+    "panela",
+    "panelas",
+    "endulzante",
+    "endulzantes",
+    "grano",
+    "granos",
+    "sal",
+  ],
+
+  // ex huevos_atunes_pastas → 2 sub-grupos
+  huevos: ["huevo", "huevos"],
+  atunes_enlatados_pastas: [
+    "atun",
+    "atunes",
+    "enlatado",
+    "enlatados",
+    "alimentos enlatados",
+    "conservas",
+    "pasta",
+    "pastas",
+    "spaghetti",
+  ],
+
+  // ex bebidas_pasabocas → 2 sub-grupos
+  bebidas: [
+    "jugo",
+    "jugos",
+    "zumo",
+    "zumos",
+    "bebida",
+    "bebidas",
+    "bebidas de cereal",
+    "agua",
+    "hidratante",
+    "hidratantes",
+    "energizante",
+    "energizantes",
+  ],
+  pasabocas_desechables: [
+    "snack",
+    "snacks",
+    "pasabocas",
+    "servilletas",
+    "desechable",
+    "desechables",
+    "vaso",
+    "plato",
+    "lonchera",
+    "loncheras",
+    "papel cocina",
+  ],
 };
 
 // ============================================================
@@ -367,27 +391,45 @@ const SEDES_CONFIG = {
       {
         pasillo: "13",
         nombre: "Refrigerados, Carnes, Golosinas y Licores",
-        categorias: CATEGORIAS.refrigerados_carnes_licores,
+        categorias: [
+          ...CATEGORIAS.licores_cigarrillos,
+          ...CATEGORIAS.dulceria_golosinas,
+          ...CATEGORIAS.mani_bocadillo,
+          ...CATEGORIAS.lacteos_refrigerados,
+          ...CATEGORIAS.carnes_frias_congelados,
+          ...CATEGORIAS.carnes_rojas,
+          ...CATEGORIAS.pollo_pescado,
+          ...CATEGORIAS.saludable_suplementos,
+        ],
       },
       {
         pasillo: "14",
         nombre: "Gaseosas, Mecato y Fruver",
-        categorias: CATEGORIAS.gaseosas_mecato_fruver,
+        categorias: [...CATEGORIAS.gaseosas_mecato, ...CATEGORIAS.fruver],
       },
       {
         pasillo: "12",
         nombre: "Bebidas, Pasabocas y Desechables",
-        categorias: CATEGORIAS.bebidas_pasabocas,
+        categorias: [
+          ...CATEGORIAS.bebidas,
+          ...CATEGORIAS.pasabocas_desechables,
+        ],
       },
       {
         pasillo: "2",
         nombre: "Huevos, Atunes, Enlatados y Pastas",
-        categorias: CATEGORIAS.huevos_atunes_pastas,
+        categorias: [
+          ...CATEGORIAS.huevos,
+          ...CATEGORIAS.atunes_enlatados_pastas,
+        ],
       },
       {
         pasillo: "1",
         nombre: "Arroz, Azúcar, Granos y Salsas",
-        categorias: CATEGORIAS.arroz_azucar_granos,
+        categorias: [
+          ...CATEGORIAS.arroz_granos,
+          ...CATEGORIAS.salsas_condimentos,
+        ],
       },
       {
         pasillo: "3",
@@ -414,26 +456,110 @@ const SEDES_CONFIG = {
 
   /**
    * GIRARDOTA
-   * ⚠️ TODO: Completar cuando se tenga el mapeo físico del supermercado.
-   *
-   * Pasos:
-   *   1. Anotar cuántos pasillos hay y qué categorías tiene cada uno
-   *   2. Definir el orden de recorrido (serpentina)
-   *   3. Llenar esta configuración
-   *
-   * Mientras tanto, usa el layout de Copacabana como fallback.
+   * Layout: 11 pasillos (P1-P11)
+   * Recorrido lineal: P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10 → P11
    */
-  // "girardota": {
-  //   orden_ruta: {
-  //     1: 1, 2: 2, 3: 3, ...  // TODO: definir serpentina
-  //     Otros: 99,
-  //   },
-  //   pasillos: [
-  //     { pasillo: "1", nombre: "TODO", categorias: CATEGORIAS.arroz_azucar_granos },
-  //     { pasillo: "2", nombre: "TODO", categorias: CATEGORIAS.huevos_atunes_pastas },
-  //     // ... agregar todos los pasillos
-  //   ],
-  // },
+  girardota: {
+    orden_ruta: {
+      1: 1,
+      2: 2,
+      3: 3,
+      4: 4,
+      5: 5,
+      6: 6,
+      7: 7,
+      8: 8,
+      9: 9,
+      10: 10,
+      11: 11,
+      Otros: 99,
+    },
+    pasillos: [
+      {
+        pasillo: "1",
+        nombre: "Aseo Hogar y Velas",
+        categorias: CATEGORIAS.aseo_hogar,
+      },
+      {
+        pasillo: "2",
+        nombre: "Aseo Ropa, Cuidado Personal y Bebé",
+        categorias: [
+          ...CATEGORIAS.aseo_ropa,
+          ...CATEGORIAS.cuidado_personal,
+          ...CATEGORIAS.bebe_adulto_cereales,
+        ],
+      },
+      {
+        pasillo: "3",
+        nombre: "Café, Aromáticas y Parva",
+        categorias: CATEGORIAS.cafe_aromaticas,
+      },
+      {
+        pasillo: "4",
+        nombre: "Leche, Galletas, Granola y Avenas",
+        categorias: [
+          ...CATEGORIAS.reposteria_leche,
+          ...CATEGORIAS.galletas_avenas,
+        ],
+      },
+      {
+        pasillo: "5",
+        nombre: "Licores y Dulcería",
+        categorias: [
+          ...CATEGORIAS.licores_cigarrillos,
+          ...CATEGORIAS.dulceria_golosinas,
+        ],
+      },
+      {
+        pasillo: "6",
+        nombre: "Mecato, Gaseosas y Refrescos",
+        categorias: [
+          ...CATEGORIAS.gaseosas_mecato,
+          ...CATEGORIAS.pasabocas_desechables,
+        ],
+      },
+      {
+        pasillo: "7",
+        nombre: "Salsas, Atún, Enlatados, Pastas y Condimentos",
+        categorias: [
+          ...CATEGORIAS.salsas_condimentos,
+          ...CATEGORIAS.atunes_enlatados_pastas,
+          ...CATEGORIAS.mani_bocadillo,
+        ],
+      },
+      {
+        pasillo: "8",
+        nombre: "Arroz, Aceites, Huevos, Granos, Panela y Harinas",
+        categorias: [
+          ...CATEGORIAS.arroz_granos,
+          ...CATEGORIAS.harinas_aceites,
+          ...CATEGORIAS.huevos,
+        ],
+      },
+      {
+        pasillo: "9",
+        nombre: "Mascotas, Bebidas, Lácteos y Refrigerados",
+        categorias: [
+          ...CATEGORIAS.mascotas_implementos,
+          ...CATEGORIAS.bebidas,
+          ...CATEGORIAS.lacteos_refrigerados,
+          ...CATEGORIAS.carnes_frias_congelados,
+          ...CATEGORIAS.pollo_pescado,
+          ...CATEGORIAS.saludable_suplementos,
+        ],
+      },
+      {
+        pasillo: "10",
+        nombre: "Frutas y Verduras",
+        categorias: CATEGORIAS.fruver,
+      },
+      {
+        pasillo: "11",
+        nombre: "Carnes",
+        categorias: CATEGORIAS.carnes_rojas,
+      },
+    ],
+  },
 };
 
 // Sede por defecto si no se encuentra la sede solicitada

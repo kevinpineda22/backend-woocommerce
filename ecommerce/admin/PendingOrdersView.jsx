@@ -18,33 +18,6 @@ import {
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
 
-const PA_VIEW_QUOTES = [
-  {
-    text: "Puede que no controles los hechos que ocurren, pero puedes decidir no dejarte derrotar por ellos.",
-    author: "Maya Angelou",
-  },
-  {
-    text: "La innovación diferencia a un líder de un seguidor.",
-    author: "Steve Jobs",
-  },
-  {
-    text: "Aquel que se exige mucho a sí mismo y espera poco de los demás, mantendrá lejos el resentimiento.",
-    author: "Confucio",
-  },
-  {
-    text: "Si hacemos el bien por interés, seremos astutos, pero nunca buenos.",
-    author: "Cicerón",
-  },
-  {
-    text: "Sé un criterio de calidad. Algunas personas no están acostumbradas a un ambiente donde se espera la excelencia.",
-    author: "Steve Jobs",
-  },
-  {
-    text: "La paciencia es amarga, pero sus frutos son dulces.",
-    author: "Aristóteles",
-  },
-];
-
 const formatPrice = (amount) =>
   new Intl.NumberFormat("es-CO", {
     style: "currency",
@@ -68,11 +41,6 @@ const PendingOrdersView = ({
   isFetchingPickers,
   onForceSync,
 }) => {
-  const emptyQuote = useMemo(() => {
-    const idx = Math.floor(Math.random() * PA_VIEW_QUOTES.length);
-    return PA_VIEW_QUOTES[idx];
-  }, []);
-
   const displayedOrders = useMemo(() => {
     return orders.filter((order) => {
       const sLower = searchTerm.toLowerCase();
@@ -121,11 +89,10 @@ const PendingOrdersView = ({
 
   return (
     <>
+      {/* FILTROS — flat, sin wrappers innecesarios */}
       <div className="pedidos-admin-filters-container">
         <div className="pedidos-admin-filter-group">
-          <label>
-            <FaSearch /> Buscar
-          </label>
+          <label><FaSearch /> Buscar</label>
           <input
             type="text"
             className="pedidos-admin-filter-input"
@@ -135,9 +102,7 @@ const PendingOrdersView = ({
           />
         </div>
         <div className="pedidos-admin-filter-group">
-          <label>
-            <FaCalendarAlt /> Fecha
-          </label>
+          <label><FaCalendarAlt /> Fecha</label>
           <input
             type="date"
             className="pedidos-admin-filter-input"
@@ -146,9 +111,7 @@ const PendingOrdersView = ({
           />
         </div>
         <div className="pedidos-admin-filter-group">
-          <label>
-            <FaMapMarkerAlt /> Zona
-          </label>
+          <label><FaMapMarkerAlt /> Zona</label>
           <input
             type="text"
             className="pedidos-admin-filter-input"
@@ -159,59 +122,43 @@ const PendingOrdersView = ({
         </div>
         <div className="pedidos-filter-actions">
           <button
-            className="pedidos-btn-clear"
-            style={{
-              backgroundColor: "#3b82f6",
-              color: "white",
-              marginRight: "8px",
-            }}
+            className="pedidos-btn-sync"
             onClick={onForceSync}
             disabled={loading}
           >
-            {loading ? <FaSpinner className="ec-spin" /> : <FaSync />}{" "}
-            Sincronizar
+            {loading ? <FaSpinner className="ec-spin" /> : <FaSync />} Sincronizar
           </button>
           <button
             className="pedidos-btn-clear"
-            onClick={() => {
-              setSearchTerm("");
-              setFilterDate("");
-              setFilterZone("");
-            }}
+            onClick={() => { setSearchTerm(""); setFilterDate(""); setFilterZone(""); }}
           >
             Limpiar
           </button>
         </div>
       </div>
+
       <div className="pedidos-filter-results">
-        Mostrando <strong>{displayedOrders.length}</strong> de{" "}
-        <strong>{orders.length}</strong> pedidos
+        Mostrando <strong>{displayedOrders.length}</strong> de <strong>{orders.length}</strong> pedidos
       </div>
 
       {loading && orders.length === 0 ? (
         <div className="pedidos-main-loading">
-          <div className="pedidos-spinner-large"></div>
+          <div className="pedidos-spinner-large" />
           <p>Sincronizando pedidos...</p>
         </div>
       ) : (
         <div className="pedidos-admin-orders-grid">
           {displayedOrders.length === 0 ? (
             <div className="pa-premium-empty-state">
-              <div className="pa-premium-empty-icon">
-                <FaBoxOpen size={70} />
-              </div>
+              <FaBoxOpen className="pa-premium-empty-icon" size={56} />
               <h3 className="pa-premium-empty-title">
-                {orders.length === 0 ? "¡Todo al día! 🎉" : "Sin Coincidencias"}
+                {orders.length === 0 ? "Todo al dia" : "Sin Coincidencias"}
               </h3>
               <p className="pa-premium-empty-text">
                 {orders.length === 0
-                  ? "No hay nuevos pedidos pendientes de preparar. ¡Excelente trabajo de campo!"
-                  : "Ningún pedido coincide con tus términos de búsqueda."}
+                  ? "No hay nuevos pedidos pendientes de preparar."
+                  : "Ningun pedido coincide con tus terminos de busqueda."}
               </p>
-              <div className="pa-premium-empty-quote">
-                «{emptyQuote.text}» <br />{" "}
-                <strong>— {emptyQuote.author}</strong>
-              </div>
             </div>
           ) : (
             displayedOrders.map((order) => {
@@ -222,72 +169,59 @@ const PendingOrdersView = ({
                 <div
                   key={order.id}
                   className={`pa-ticket-card ${isSelected ? "selected" : ""}`}
+                  onClick={() => setLocalSelectedOrder(order)}
                 >
-                  <div
-                    className="pa-ticket-left"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleSelection(order.id);
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      className="pa-ticket-checkbox"
-                      checked={isSelected}
-                      readOnly
-                    />
+                  <div className="pa-ticket-header">
+                    <div className="pa-ticket-tags-row">
+                      <input
+                        type="checkbox"
+                        className="pa-ticket-checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelection(order.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <span className="pa-ticket-id">#{order.id}</span>
+                      {order.sede_detected && (
+                        <span className="pa-ticket-sede-tag">
+                          <FaStoreAlt size={9} /> {order.sede_detected}
+                        </span>
+                      )}
+                      {isPickup && (
+                        <span className="pa-ticket-pickup-tag">
+                          <FaWalking /> RECOGIDA
+                        </span>
+                      )}
+                    </div>
+                    <span className="pa-ticket-date">
+                      <FaClock size={11} />
+                      {new Date(order.date_created).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
                   </div>
-                  <div
-                    className="pa-ticket-content"
-                    onClick={() => setLocalSelectedOrder(order)}
-                  >
-                    <div className="pa-ticket-header">
-                      <div className="pa-ticket-tags-row">
-                        <span className="pa-ticket-id">#{order.id}</span>
-                        {order.sede_detected && (
-                          <span className="pa-ticket-sede-tag">
-                            <FaStoreAlt size={9} /> {order.sede_detected}
-                          </span>
-                        )}
-                        {isPickup && (
-                          <span className="pa-ticket-pickup-tag">
-                            <FaWalking /> RECOGIDA
-                          </span>
-                        )}
-                      </div>
-                      <span className="pa-ticket-date">
-                        <FaClock size={11} />
-                        {new Date(order.date_created).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                  <h4 className="pa-ticket-customer">
+                    {order.billing?.first_name} {order.billing?.last_name}
+                  </h4>
+                  <div className="pa-ticket-meta">
+                    <span className="pa-meta-item">
+                      <FaBox /> {order.line_items?.length} items
+                    </span>
+                    <span className="pa-meta-price">
+                      {formatPrice(order.total)}
+                    </span>
+                  </div>
+                  <div className="pa-ticket-address">
+                    {isPickup ? (
+                      <span className="pa-ticket-address-pickup">
+                        Retira el cliente en sede
                       </span>
-                    </div>
-                    <div className="pa-ticket-body">
-                      <h4 className="pa-ticket-customer">
-                        {order.billing?.first_name} {order.billing?.last_name}
-                      </h4>
-                      <div className="pa-ticket-meta">
-                        <span className="pa-meta-item">
-                          <FaBox /> {order.line_items?.length} items
-                        </span>
-                        <span className="pa-meta-price">
-                          {formatPrice(order.total)}
-                        </span>
-                      </div>
-                      <div className="pa-ticket-address">
-                        {isPickup ? (
-                          <span className="pa-ticket-address-pickup">
-                            Retira el cliente en sede
-                          </span>
-                        ) : (
-                          <>
-                            <FaMapMarkerAlt color="#ef4444" />{" "}
-                            {order.billing?.address_1}, {order.billing?.city}
-                          </>
-                        )}
-                      </div>
-                    </div>
+                    ) : (
+                      <>
+                        <FaMapMarkerAlt color="#ef4444" />{" "}
+                        {order.billing?.address_1}, {order.billing?.city}
+                      </>
+                    )}
                   </div>
                 </div>
               );

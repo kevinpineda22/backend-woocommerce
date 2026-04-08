@@ -17,7 +17,6 @@
   background-color: var(--ec-picker-bg);
   min-height: 100vh;
   min-height: 100dvh;
-  font-family: "Cabin", Helvetica, sans-serif;
   font-size: 16px;
   color: var(--ec-picker-text);
   padding-bottom: 160px;
@@ -78,7 +77,6 @@
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.5);
   font-size: 0.75rem;
-  font-family: "Cabin", Helvetica, sans-serif;
   font-weight: 600;
   letter-spacing: 0.2px;
 }

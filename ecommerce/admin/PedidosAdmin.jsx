@@ -11,6 +11,7 @@ import {
   FaHistory,
   FaClipboardCheck,
   FaMoneyBillWave,
+  FaUserCircle,
 } from "react-icons/fa";
 
 import { supabase } from "../../../supabaseClient";
@@ -92,6 +93,9 @@ const formatPrice = (amount) =>
 const PedidosAdmin = () => {
   // --- MULTI-SEDE ---
   const { sedeId, getSedeParam } = useSedeContext();
+
+  // --- MOBILE SIDEBAR ---
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // --- FRASES ROTATIVAS (cambian en cada carga del componente) ---
   const shuffledQuotes = React.useMemo(() => {
@@ -423,82 +427,108 @@ const PedidosAdmin = () => {
 
   return (
     <div className="pedidos-layout-main-container">
+      {/* MOBILE MENU TOGGLE */}
+      <button
+        className={`pedidos-mobile-toggle ${sidebarOpen ? "open" : ""}`}
+        onClick={() => setSidebarOpen((prev) => !prev)}
+        aria-label="Toggle menu"
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+
+      {/* SIDEBAR OVERLAY (mobile) */}
+      {sidebarOpen && (
+        <div
+          className="pedidos-sidebar-overlay"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* SIDEBAR */}
-      <aside className="pedidos-layout-sidebar">
+      <aside className={`pedidos-layout-sidebar ${sidebarOpen ? "open" : ""}`}>
         <div className="pedidos-layout-sidebar-header">
           <Link to="/acceso" className="pedidos-back-button">
             <FaArrowLeft />
           </Link>
-          <div className="pedidos-layout-logo">MK</div>
-          <h2 className="pedidos-layout-sidebar-title">Admin Center</h2>
+          <FaUserCircle className="pedidos-layout-avatar" />
+          <h2 className="pedidos-layout-sidebar-title">Admin Picking</h2>
         </div>
-        {/* SELECTOR DE SEDE (integra rol + sede) */}
+
         <div className="pedidos-sede-selector-wrapper">
           <SedeSelector compact />
         </div>
 
         <nav className="pedidos-layout-sidebar-nav">
-          <div className="pedidos-nav-label">OPERACIÓN</div>
+          <div className="pedidos-nav-label">Operación</div>
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "pending" ? "active" : ""}`}
-            onClick={() => setCurrentView("pending")}
+            onClick={() => { setCurrentView("pending"); setSidebarOpen(false); }}
           >
-            <FaBox /> <span>Por Asignar</span>{" "}
+            <FaBox /> <span>Por Asignar</span>
             <span className="pedidos-badge-count">{stats.pending}</span>
           </button>
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "process" ? "active" : ""}`}
-            onClick={() => setCurrentView("process")}
+            onClick={() => { setCurrentView("process"); setSidebarOpen(false); }}
           >
-            <FaRunning /> <span>En Proceso</span>{" "}
+            <FaRunning /> <span>En Proceso</span>
             <span className="pedidos-badge-count-blue">{stats.process}</span>
           </button>
-          <div className="pedidos-nav-label spacer">AUDITORÍA</div>
+
+          <div className="pedidos-nav-label">Auditoría</div>
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "audit_pending" ? "active" : ""}`}
             onClick={() => {
               setCurrentView("audit_pending");
               fetchPendingAudit();
+              setSidebarOpen(false);
             }}
           >
-            <FaClipboardCheck /> <span>Pendiente Auditoría</span>{" "}
+            <FaClipboardCheck /> <span>Pendiente Auditoría</span>
             <span className="pedidos-badge-count-blue">
               {stats.auditPending || 0}
             </span>
           </button>
-          <div className="pedidos-nav-label spacer">PAGOS</div>
+
+          <div className="pedidos-nav-label">Pagos</div>
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "payment_pending" ? "active" : ""}`}
             onClick={() => {
               setCurrentView("payment_pending");
               fetchPaymentPending();
+              setSidebarOpen(false);
             }}
           >
-            <FaMoneyBillWave /> <span>Pendiente Pago</span>{" "}
+            <FaMoneyBillWave /> <span>Pendiente Pago</span>
             <span className="pedidos-badge-count-red">
               {stats.paymentPending || 0}
             </span>
           </button>
-          <div className="pedidos-nav-label spacer">HISTORIAL</div>
+
+          <div className="pedidos-nav-label">Historial</div>
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "history" ? "active" : ""}`}
             onClick={() => {
               setCurrentView("history");
               fetchHistory();
+              setSidebarOpen(false);
             }}
           >
             <FaHistory /> <span>Historial</span>
           </button>
-          <div className="pedidos-nav-label spacer">ADMINISTRACIÓN</div>
+
+          <div className="pedidos-nav-label">Administración</div>
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "analitica" ? "active" : ""}`}
-            onClick={() => setCurrentView("analitica")}
+            onClick={() => { setCurrentView("analitica"); setSidebarOpen(false); }}
           >
             <FaChartLine /> <span>Inteligencia</span>
           </button>
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "pickers" ? "active" : ""}`}
-            onClick={() => setCurrentView("pickers")}
+            onClick={() => { setCurrentView("pickers"); setSidebarOpen(false); }}
           >
             <FaUserTag /> <span>Pickers</span>
           </button>

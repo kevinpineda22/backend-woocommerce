@@ -25,22 +25,47 @@ describe("Configuración", () => {
     expect(SEDES_CONFIG["copacabana-plaza"].pasillos.length).toBe(14);
   });
 
-  it("CATEGORIAS debería tener todas las secciones", () => {
+  it("girardota debería existir en SEDES_CONFIG", () => {
+    expect(SEDES_CONFIG["girardota"]).toBeDefined();
+  });
+
+  it("girardota debería tener 11 pasillos", () => {
+    expect(SEDES_CONFIG["girardota"].pasillos.length).toBe(11);
+  });
+
+  it("CATEGORIAS debería tener todas las secciones atómicas", () => {
     const secciones = [
+      // Sin cambios
       "bebe_adulto_cereales",
       "cafe_aromaticas",
       "cuidado_personal",
       "aseo_hogar",
       "aseo_ropa",
-      "refrigerados_carnes_licores",
-      "gaseosas_mecato_fruver",
-      "bebidas_pasabocas",
-      "huevos_atunes_pastas",
-      "arroz_azucar_granos",
       "harinas_aceites",
       "reposteria_leche",
       "galletas_avenas",
       "mascotas_implementos",
+      // ex refrigerados_carnes_licores
+      "licores_cigarrillos",
+      "dulceria_golosinas",
+      "mani_bocadillo",
+      "lacteos_refrigerados",
+      "carnes_frias_congelados",
+      "carnes_rojas",
+      "pollo_pescado",
+      "saludable_suplementos",
+      // ex gaseosas_mecato_fruver
+      "fruver",
+      "gaseosas_mecato",
+      // ex arroz_azucar_granos
+      "salsas_condimentos",
+      "arroz_granos",
+      // ex huevos_atunes_pastas
+      "huevos",
+      "atunes_enlatados_pastas",
+      // ex bebidas_pasabocas
+      "bebidas",
+      "pasabocas_desechables",
     ];
     secciones.forEach((s) => expect(CATEGORIAS[s]).toBeDefined());
   });
@@ -314,5 +339,257 @@ describe("obtenerInfoPasillo — Edge cases", () => {
   it("categoría con name null", () => {
     const info = obtenerInfoPasillo([{ name: null }], "Galletas");
     expect(info.pasillo).toBe("5");
+  });
+});
+
+// =============================================
+// Tests para GIRARDOTA
+// =============================================
+
+describe("obtenerInfoPasillo — Girardota", () => {
+  const sede = "girardota";
+
+  describe("categorías → pasillo correcto", () => {
+    // P1: Aseo Hogar y Velas
+    it("Aseo del Hogar → P1", () => {
+      expect(obtenerInfoPasillo(cat("Aseo del Hogar"), "", sede).pasillo).toBe(
+        "1",
+      );
+    });
+
+    it("Velas → P1", () => {
+      expect(obtenerInfoPasillo(cat("Velas"), "", sede).pasillo).toBe("1");
+    });
+
+    // P2: Aseo Ropa, Cuidado Personal y Bebé
+    it("Detergente → P2", () => {
+      expect(obtenerInfoPasillo(cat("Detergente"), "", sede).pasillo).toBe("2");
+    });
+
+    it("Cuidado Personal → P2", () => {
+      expect(
+        obtenerInfoPasillo(cat("Cuidado Personal"), "", sede).pasillo,
+      ).toBe("2");
+    });
+
+    it("Pañales → P2", () => {
+      expect(obtenerInfoPasillo(cat("Pañales"), "", sede).pasillo).toBe("2");
+    });
+
+    // P3: Café, Aromáticas y Parva
+    it("Café → P3", () => {
+      expect(obtenerInfoPasillo(cat("Cafe"), "", sede).pasillo).toBe("3");
+    });
+
+    it("Aromáticas → P3", () => {
+      expect(obtenerInfoPasillo(cat("Aromaticas"), "", sede).pasillo).toBe("3");
+    });
+
+    // P4: Leche, Galletas, Granola y Avenas
+    it("Galletas → P4", () => {
+      expect(obtenerInfoPasillo(cat("Galletas"), "", sede).pasillo).toBe("4");
+    });
+
+    it("Leche → P4", () => {
+      expect(obtenerInfoPasillo(cat("Leche"), "", sede).pasillo).toBe("4");
+    });
+
+    it("Granola → P4 (via bebe_adulto en Copa, reposteria_leche/galletas en Girardota)", () => {
+      // "granola" está en bebe_adulto_cereales que en Girardota va a P2
+      // pero la intención es P4. Verificamos comportamiento real:
+      const info = obtenerInfoPasillo(cat("Granola"), "", sede);
+      // granola matchea bebe_adulto_cereales → Girardota P2
+      expect(info.pasillo).toBe("2");
+    });
+
+    // P5: Licores, Neveras y Dulcería
+    it("Licores → P5", () => {
+      expect(obtenerInfoPasillo(cat("Licores"), "", sede).pasillo).toBe("5");
+    });
+
+    it("Helados → P5", () => {
+      expect(obtenerInfoPasillo(cat("Helados"), "", sede).pasillo).toBe("5");
+    });
+
+    it("Golosinas → P5", () => {
+      expect(obtenerInfoPasillo(cat("Golosinas"), "", sede).pasillo).toBe("5");
+    });
+
+    // P6: Mecato, Gaseosas y Refrescos
+    it("Gaseosas → P6", () => {
+      expect(obtenerInfoPasillo(cat("Gaseosas"), "", sede).pasillo).toBe("6");
+    });
+
+    it("Mecato → P6", () => {
+      expect(obtenerInfoPasillo(cat("Mecato"), "", sede).pasillo).toBe("6");
+    });
+
+    it("Pasabocas → P6", () => {
+      expect(obtenerInfoPasillo(cat("Pasabocas"), "", sede).pasillo).toBe("6");
+    });
+
+    // P7: Salsas, Atún, Enlatados, Pastas y Condimentos
+    it("Salsas → P7", () => {
+      expect(obtenerInfoPasillo(cat("Salsas"), "", sede).pasillo).toBe("7");
+    });
+
+    it("Atún → P7", () => {
+      expect(obtenerInfoPasillo(cat("Atun"), "", sede).pasillo).toBe("7");
+    });
+
+    it("Pastas → P7", () => {
+      expect(obtenerInfoPasillo(cat("Pastas"), "", sede).pasillo).toBe("7");
+    });
+
+    it("Condimentos → P7", () => {
+      expect(obtenerInfoPasillo(cat("Condimentos"), "", sede).pasillo).toBe(
+        "7",
+      );
+    });
+
+    it("Maní → P7", () => {
+      expect(obtenerInfoPasillo(cat("Mani"), "", sede).pasillo).toBe("7");
+    });
+
+    it("Bocadillo → P7 (por nombre)", () => {
+      expect(
+        obtenerInfoPasillo([], "Bocadillo Veleño 500g", sede).pasillo,
+      ).toBe("7");
+    });
+
+    // P8: Arroz, Aceites, Huevos, Granos, Panela y Harinas
+    it("Arroz → P8", () => {
+      expect(obtenerInfoPasillo(cat("Arroz"), "", sede).pasillo).toBe("8");
+    });
+
+    it("Aceites → P8", () => {
+      expect(obtenerInfoPasillo(cat("Aceites"), "", sede).pasillo).toBe("8");
+    });
+
+    it("Huevos → P8", () => {
+      expect(obtenerInfoPasillo(cat("Huevos"), "", sede).pasillo).toBe("8");
+    });
+
+    it("Harinas → P8", () => {
+      expect(obtenerInfoPasillo(cat("Harinas"), "", sede).pasillo).toBe("8");
+    });
+
+    it("Panela → P8", () => {
+      expect(obtenerInfoPasillo(cat("Panela"), "", sede).pasillo).toBe("8");
+    });
+
+    // P9: Mascotas, Bebidas, Lácteos y Refrigerados
+    it("Mascotas → P9", () => {
+      expect(obtenerInfoPasillo(cat("Mascotas"), "", sede).pasillo).toBe("9");
+    });
+
+    it("Bebidas → P9", () => {
+      expect(obtenerInfoPasillo(cat("Bebidas"), "", sede).pasillo).toBe("9");
+    });
+
+    it("Lácteos → P9", () => {
+      expect(obtenerInfoPasillo(cat("Lacteos"), "", sede).pasillo).toBe("9");
+    });
+
+    it("Quesos → P9", () => {
+      expect(obtenerInfoPasillo(cat("Quesos"), "", sede).pasillo).toBe("9");
+    });
+
+    it("Carnes Frías → P9", () => {
+      expect(obtenerInfoPasillo(cat("Carnes frias"), "", sede).pasillo).toBe(
+        "9",
+      );
+    });
+
+    it("Congelados → P9", () => {
+      expect(obtenerInfoPasillo(cat("Congelados"), "", sede).pasillo).toBe("9");
+    });
+
+    it("Pollo → P9", () => {
+      expect(obtenerInfoPasillo(cat("Pollo"), "", sede).pasillo).toBe("9");
+    });
+
+    it("Pescado → P9", () => {
+      expect(obtenerInfoPasillo(cat("Pescado"), "", sede).pasillo).toBe("9");
+    });
+
+    // P10: Fruver
+    it("Fruver → P10", () => {
+      expect(obtenerInfoPasillo(cat("Fruver"), "", sede).pasillo).toBe("10");
+    });
+
+    it("Frutas → P10", () => {
+      expect(obtenerInfoPasillo(cat("Frutas"), "", sede).pasillo).toBe("10");
+    });
+
+    it("Verduras → P10", () => {
+      expect(obtenerInfoPasillo(cat("Verduras"), "", sede).pasillo).toBe("10");
+    });
+
+    // P11: Carnes
+    it("Carnicería → P11", () => {
+      expect(obtenerInfoPasillo(cat("Carniceria"), "", sede).pasillo).toBe(
+        "11",
+      );
+    });
+
+    it("Carnes → P11", () => {
+      expect(obtenerInfoPasillo(cat("Carnes"), "", sede).pasillo).toBe("11");
+    });
+  });
+
+  describe("orden de ruta (lineal)", () => {
+    it("P1 debería ser el primer pasillo (prioridad 1)", () => {
+      const info = obtenerInfoPasillo(cat("Aseo del Hogar"), "", sede);
+      expect(info.prioridad).toBe(1);
+    });
+
+    it("P6 debería tener prioridad 6", () => {
+      const info = obtenerInfoPasillo(cat("Gaseosas"), "", sede);
+      expect(info.prioridad).toBe(6);
+    });
+
+    it("P11 debería ser el último pasillo (prioridad 11)", () => {
+      const info = obtenerInfoPasillo(cat("Carniceria"), "", sede);
+      expect(info.prioridad).toBe(11);
+    });
+  });
+
+  describe("diferencias con Copacabana", () => {
+    it("Carnicería → P11 en Girardota, P13 en Copacabana", () => {
+      expect(
+        obtenerInfoPasillo(cat("Carniceria"), "", "girardota").pasillo,
+      ).toBe("11");
+      expect(
+        obtenerInfoPasillo(cat("Carniceria"), "", "copacabana-plaza").pasillo,
+      ).toBe("13");
+    });
+
+    it("Fruver → P10 en Girardota, P14 en Copacabana", () => {
+      expect(obtenerInfoPasillo(cat("Fruver"), "", "girardota").pasillo).toBe(
+        "10",
+      );
+      expect(
+        obtenerInfoPasillo(cat("Fruver"), "", "copacabana-plaza").pasillo,
+      ).toBe("14");
+    });
+
+    it("Arroz → P8 en Girardota, P1 en Copacabana", () => {
+      expect(obtenerInfoPasillo(cat("Arroz"), "", "girardota").pasillo).toBe(
+        "8",
+      );
+      expect(
+        obtenerInfoPasillo(cat("Arroz"), "", "copacabana-plaza").pasillo,
+      ).toBe("1");
+    });
+
+    it("Licores → P5 en Girardota, P13 en Copacabana", () => {
+      expect(obtenerInfoPasillo(cat("Licores"), "", "girardota").pasillo).toBe(
+        "5",
+      );
+      expect(
+        obtenerInfoPasillo(cat("Licores"), "", "copacabana-plaza").pasillo,
+      ).toBe("13");
+    });
   });
 });

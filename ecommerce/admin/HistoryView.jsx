@@ -68,15 +68,13 @@ const HistoryView = ({
               
               {isPaymentView ? (
                 <td>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <div className="hv-cell-stack">
                     {sess.clientes && sess.clientes.length > 0 ? (
                       sess.clientes.map((c, i) => (
-                        <span key={i} style={{ fontWeight: 600, color: "#1e293b", fontSize: "0.85rem" }}>
-                          👤 {c}
-                        </span>
+                        <span key={i} className="hv-client-name">{c}</span>
                       ))
                     ) : (
-                      <span style={{ color: "#64748b", fontStyle: "italic" }}>Sin datos</span>
+                      <span className="hv-text-muted">Sin datos</span>
                     )}
                   </div>
                 </td>
@@ -86,33 +84,17 @@ const HistoryView = ({
 
               <td>
                 {sess.sede_nombre ? (
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                      padding: "3px 8px",
-                      borderRadius: 5,
-                      background: "#f0f4ff",
-                      border: "1px solid #c7d2fe",
-                      fontSize: "0.75rem",
-                      fontWeight: 600,
-                      color: "#4338ca",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                  <span className="hv-sede-tag">
                     <FaStoreAlt size={10} /> {sess.sede_nombre}
                   </span>
                 ) : (
-                  <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>
-                    —
-                  </span>
+                  <span className="hv-text-muted">—</span>
                 )}
               </td>
               <td>
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                <div className="hv-cell-stack">
                   {sess.pedidos.map((p, i) => (
-                    <span key={p} style={{ fontSize: "0.8rem" }}>
+                    <span key={p} className="hv-order-id">
                       #{p} {isPaymentView ? "" : (sess.clientes?.[i] ? `(${sess.clientes[i].split(" ")[0]})` : "")}
                     </span>
                   ))}
