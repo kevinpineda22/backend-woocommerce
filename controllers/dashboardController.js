@@ -46,13 +46,10 @@ async function getBarcodesFromSiesaByUnitMeasure(pairs) {
       const cleaned = code.replace(/\+$/, "");
 
       // Filtrar códigos válidos
-      if (!cleaned || cleaned.length < 8) return;
-      if (
-        cleaned.toUpperCase().startsWith("M") ||
-        cleaned.toUpperCase().startsWith("N")
-      )
-        return;
-      if (!/^\d+\+?$/.test(code)) return;
+      // Permitir: dígitos puros (EAN), dígitos+UM (SKU+UM como 185325P25), dígitos con +
+      if (!cleaned || cleaned.length < 4) return;
+      if (/^[MN]\d/i.test(cleaned)) return; // Prefijo M/N antes de dígitos → excluir
+      if (!/^\d+([A-Z]*\d*)?\+?$/i.test(code)) return;
 
       // Normalizar unidad de medida
       let normalizedUm = (bc.unidad_medida || "DEFAULT").toUpperCase();
@@ -77,10 +74,6 @@ async function getBarcodesFromSiesaByUnitMeasure(pairs) {
       }
     });
 
-    console.log(
-      `📊 Códigos organizados por f120_id|UM:`,
-      Object.keys(barcodesByKey).slice(0, 10),
-    );
     return barcodesByKey;
   } catch (error) {
     console.error("Error en getBarcodesFromSiesaByUnitMeasure:", error);
@@ -115,13 +108,9 @@ async function getBarcodesFromSiesa(productIds) {
       const cleaned = code.replace(/\+$/, "");
 
       // Filtrar códigos válidos (excluyendo explícitamente prefijos M o N)
-      if (!cleaned || cleaned.length < 8) return;
-      if (
-        cleaned.toUpperCase().startsWith("M") ||
-        cleaned.toUpperCase().startsWith("N")
-      )
-        return;
-      if (!/^\d+\+?$/.test(code)) return;
+      if (!cleaned || cleaned.length < 4) return;
+      if (/^[MN]\d/i.test(cleaned)) return;
+      if (!/^\d+([A-Z]*\d*)?\+?$/i.test(code)) return;
 
       if (!barcodesByProduct[bc.f120_id][um]) {
         barcodesByProduct[bc.f120_id][um] = [];
@@ -949,10 +938,6 @@ exports.getSessionLogsDetail = async (req, res) => {
       }
     }
 
-    console.log(
-      `🔍 Buscando códigos de barras para ${uniquePairs.size} pares f120_id|unidad_medida (${f120IdOnlySet.size} f120_ids totales incluyendo escaneados)`,
-    );
-
     const barcodeMapByF120IdAndUm = await getBarcodesFromSiesaByUnitMeasure(
       Array.from(uniquePairs.values()),
     );
@@ -983,13 +968,9 @@ exports.getSessionLogsDetail = async (req, res) => {
       allSiesaBarcodes.forEach((bc) => {
         const code = (bc.codigo_barras || "").toString().trim();
         const cleaned = code.replace(/\+$/, "");
-        if (!cleaned || cleaned.length < 8) return;
-        if (
-          cleaned.toUpperCase().startsWith("M") ||
-          cleaned.toUpperCase().startsWith("N")
-        )
-          return;
-        if (!/^\d+\+?$/.test(code)) return;
+        if (!cleaned || cleaned.length < 4) return;
+        if (/^[MN]\d/i.test(cleaned)) return;
+        if (!/^\d+([A-Z]*\d*)?\+?$/i.test(code)) return;
 
         const f120 = bc.f120_id;
         if (!barcodesByF120IdOnly[f120]) {
@@ -1001,41 +982,59 @@ exports.getSessionLogsDetail = async (req, res) => {
       });
     }
 
-    console.log(
-      `📦 Códigos encontrados:`,
-      Object.keys(barcodeMapByF120IdAndUm).length,
-      `(fallback: ${Object.keys(barcodesByF120IdOnly).length} f120_ids)`,
-    );
-
     // 🔧 FUNCIÓN HELPER: Hacer matching inteligente de unidad_medida usando pistas del nombre
     // Solo se usa como fallback cuando SIESA tiene múltiples opciones
+    // Retorna { um, confident } — confident=true si un keyword hizo match real
     const inferUnitMeasureFromName = (productName, availableUMs) => {
-      if (!availableUMs || availableUMs.length === 0) return null;
-      if (availableUMs.length === 1) return availableUMs[0]; // Si hay solo una, esa es
+      if (!availableUMs || availableUMs.length === 0)
+        return { um: null, confident: false };
+      if (availableUMs.length === 1)
+        return { um: availableUMs[0], confident: true };
 
       const nameUpper = (productName || "").toUpperCase();
 
-      // Pistas por patrón de nombre
+      // 1. Detección dinámica: "Paca x25" → P25, "X 12" → P12, etc.
+      const dynamicMatch =
+        nameUpper.match(
+          /(?:PACA|PACK|BULTO|BOLSA|CAJA|DISPLAY)\s*(?:X|DE)?\s*(\d+)/i,
+        ) || nameUpper.match(/X\s*(\d+)\s*(?:UN|UND|H|R|\b)/i);
+      if (dynamicMatch) {
+        const n = dynamicMatch[1];
+        const candidateUM = `P${n}`;
+        if (availableUMs.includes(candidateUM)) {
+          return { um: candidateUM, confident: true };
+        }
+      }
+
+      // 2. Pistas estáticas por patrón de nombre
       const patterns = {
-        P2: ["DÚO", "DOS", "2UN", "X2", "PAIR"],
+        P2: ["DÚO", "DOS", "2UN", "X2", "PAIR", "DUPLO"],
         P3: ["TRÍO", "TRES", "3UN", "X3", "TRIPLO"],
         P4: ["CUATRO", "4UN", "X4", "QUADRO"],
-        P6: ["SEIS", "SIX", "6UN", "X6", "PACK", "SIXPACK"],
+        P6: ["SEIS", "SIX", "6UN", "X6", "SIXPACK"],
+        P10: ["DIEZ", "10UN", "X10"],
         P12: ["DOCE", "TWELVE", "12UN", "X12", "DOCENA"],
+        P18: ["DIECIOCHO", "18UN", "X18"],
+        P24: ["VEINTICUATRO", "24UN", "X24"],
+        P25: ["PACA", "VEINTICINCO", "25UN", "X25"],
+        P30: ["TREINTA", "30UN", "X30"],
+        P48: ["CUARENTA Y OCHO", "48UN", "X48"],
         UND: ["UNIDAD", "UNITARIO", "SOLO", "INDIVIDUAL"],
-        KL: ["KILO", "KG", "LIBRA", "LB", "PESO"],
+        KL: ["KILO", "KG"],
+        LB: ["LIBRA", "LB"],
       };
 
       for (const [um, keywords] of Object.entries(patterns)) {
         if (availableUMs.includes(um)) {
           if (keywords.some((kw) => nameUpper.includes(kw))) {
-            return um;
+            return { um, confident: true };
           }
         }
       }
 
-      // Si no encontramos pista en el nombre, retornar la primera disponible
-      return availableUMs[0];
+      // Sin pista en el nombre → baja confianza, retornar UND si disponible, sino la primera
+      const fallbackUm = availableUMs.includes("UND") ? "UND" : availableUMs[0];
+      return { um: fallbackUm, confident: false };
     };
 
     // 🔧 SIMPLIFICADO: La UM en SIESA es la ÚNICA fuente de verdad
@@ -1062,94 +1061,84 @@ exports.getSessionLogsDetail = async (req, res) => {
         const key = `${f120_id}|${normalizedUm}`;
 
         // ✅ INTENTO 1: Usar SOLO el código específico para esa combinación f120_id + unidad_medida
+        let intento1Success = false;
         if (barcodeMapByF120IdAndUm[key]) {
           productDetailsMap[productId].barcode =
             barcodeMapByF120IdAndUm[key][0] || null;
-          productDetailsMap[productId].unidad_medida = normalizedUm; // Guardar la UM normalizada
-          console.log(
-            `✅ ${productId}: f120_id=${f120_id}, UM=${normalizedUm} → ${productDetailsMap[productId].barcode} (búsqueda exacta)`,
-          );
-        } else {
-          // 🔧 IMPORTANTE: Si WooCommerce tiene UM incorrecta, consultar SIESA para obtener la correcta
-          // La UM en SIESA es la ÚNICA fuente de verdad
-          // Si en SIESA está como KL/LB → Es pesable/confiable
-          // Si está como UND/P2/P3/P4/P6 → Requiere validación
+          productDetailsMap[productId].unidad_medida = normalizedUm;
+          intento1Success = true;
         }
 
-        if (
-          barcodesByF120IdOnly[f120_id] &&
-          barcodesByF120IdOnly[f120_id].length > 0
-        ) {
-          // ✅ INTENTO 2 (FALLBACK): Si no encuentra con esa UM exacta, usar lo que haya en SIESA para ese f120_id
-          // Esto pasa cuando WooCommerce tiene "UND" pero SIESA tiene "P2" o "P6"
-
-          // 🔧 IMPORTANTE: Obtener TODAS las unidades disponibles en SIESA para este f120_id
+        // ✅ INTENTO 2: Inferencia por nombre del producto
+        // Solo SOBRESCRIBE si: (a) INTENTO 1 falló, o (b) inferencia tiene ALTA confianza y da UM diferente
+        if (allSiesaBarcodes) {
           const availableUMsForThisF120 = [];
-          if (allSiesaBarcodes) {
-            const barcodesByUM = {};
-            allSiesaBarcodes
-              .filter((bc) => bc.f120_id === f120_id)
-              .forEach((bc) => {
-                let um_normalized = (bc.unidad_medida || "").toUpperCase();
-                if (um_normalized === "UN" || um_normalized === "UNIDAD")
-                  um_normalized = "UND";
-                else if (um_normalized === "KG" || um_normalized === "KILO")
-                  um_normalized = "KL";
-                else if (um_normalized === "LB" || um_normalized === "LIBRA")
-                  um_normalized = "LB";
+          const barcodesByUM = {};
+          allSiesaBarcodes
+            .filter((bc) => bc.f120_id === f120_id)
+            .forEach((bc) => {
+              let um_normalized = (bc.unidad_medida || "").toUpperCase();
+              if (um_normalized === "UN" || um_normalized === "UNIDAD")
+                um_normalized = "UND";
+              else if (um_normalized === "KG" || um_normalized === "KILO")
+                um_normalized = "KL";
+              else if (um_normalized === "LB" || um_normalized === "LIBRA")
+                um_normalized = "LB";
 
-                if (!barcodesByUM[um_normalized]) {
-                  barcodesByUM[um_normalized] = bc.codigo_barras.replace(
-                    /\+$/,
-                    "",
-                  );
-                }
-              });
-            Object.assign(barcodesByUM, {});
-            availableUMsForThisF120.push(...Object.keys(barcodesByUM));
-          }
-
-          // Hacer matching inteligente por nombre del producto
-          const bestUM = inferUnitMeasureFromName(
-            productName,
-            availableUMsForThisF120,
-          );
-
-          if (bestUM) {
-            // Buscar el código de barras para esa UM específica
-            const siesaItemForBestUM = allSiesaBarcodes.find((bc) => {
-              const bc_um = (bc.unidad_medida || "").toUpperCase();
-              let bc_um_normalized = bc_um;
-              if (bc_um_normalized === "UN" || bc_um_normalized === "UNIDAD")
-                bc_um_normalized = "UND";
-              else if (bc_um_normalized === "KG" || bc_um_normalized === "KILO")
-                bc_um_normalized = "KL";
-              else if (
-                bc_um_normalized === "LB" ||
-                bc_um_normalized === "LIBRA"
-              )
-                bc_um_normalized = "LB";
-              return bc.f120_id === f120_id && bc_um_normalized === bestUM;
+              if (!barcodesByUM[um_normalized]) {
+                barcodesByUM[um_normalized] = bc.codigo_barras.replace(
+                  /\+$/,
+                  "",
+                );
+              }
             });
+          availableUMsForThisF120.push(...Object.keys(barcodesByUM));
 
-            if (siesaItemForBestUM) {
-              productDetailsMap[productId].barcode =
-                siesaItemForBestUM.codigo_barras.replace(/\+$/, "");
-              productDetailsMap[productId].unidad_medida = bestUM;
-              console.log(
-                `⚠️  ${productId}: f120_id=${f120_id}, UM por nombre="${bestUM}" (WooCommerce tenía "${normalizedUm}") → ${productDetailsMap[productId].barcode}`,
-              );
-            }
-          } else {
-            console.warn(
-              `❌ ${productId}: No se pudo inferir UM para f120_id=${f120_id}`,
+          if (availableUMsForThisF120.length > 0) {
+            const inference = inferUnitMeasureFromName(
+              productName,
+              availableUMsForThisF120,
             );
+
+            // Solo sobrescribir si: INTENTO 1 falló, O la inferencia es confiable y da UM DIFERENTE
+            const shouldOverride =
+              !intento1Success ||
+              (inference.confident && inference.um !== normalizedUm);
+
+            if (shouldOverride && inference.um) {
+              const siesaItemForBestUM = allSiesaBarcodes.find((bc) => {
+                const bc_um = (bc.unidad_medida || "").toUpperCase();
+                let bc_um_normalized = bc_um;
+                if (bc_um_normalized === "UN" || bc_um_normalized === "UNIDAD")
+                  bc_um_normalized = "UND";
+                else if (
+                  bc_um_normalized === "KG" ||
+                  bc_um_normalized === "KILO"
+                )
+                  bc_um_normalized = "KL";
+                else if (
+                  bc_um_normalized === "LB" ||
+                  bc_um_normalized === "LIBRA"
+                )
+                  bc_um_normalized = "LB";
+                return (
+                  bc.f120_id === f120_id && bc_um_normalized === inference.um
+                );
+              });
+
+              if (siesaItemForBestUM) {
+                productDetailsMap[productId].barcode =
+                  siesaItemForBestUM.codigo_barras.replace(/\+$/, "");
+                productDetailsMap[productId].unidad_medida = inference.um;
+              }
+            }
           }
-        } else {
-          console.warn(
-            `❌ ${productId}: No hay código en SIESA para f120_id=${f120_id}`,
-          );
         }
+
+        // ✅ SIEMPRE generar barcode_sku_um: código {f120_id}{UM} para el manifiesto
+        const finalUm =
+          productDetailsMap[productId].unidad_medida || normalizedUm;
+        productDetailsMap[productId].barcode_sku_um = `${f120_id}${finalUm}`;
       }
     });
 

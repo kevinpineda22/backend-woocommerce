@@ -30,13 +30,10 @@ async function getBarcodeFromSiesa(sku) {
     const validCodes = barcodes
       .map((bc) => (bc.codigo_barras || "").toString().trim())
       .filter((cleaned) => {
-        if (!cleaned || cleaned.replace(/\+$/, "").length < 8) return false;
-        if (
-          cleaned.toUpperCase().startsWith("M") ||
-          cleaned.toUpperCase().startsWith("N")
-        )
-          return false;
-        return /^\d+\+?$/.test(cleaned);
+        const stripped = cleaned.replace(/\+$/, "");
+        if (!stripped || stripped.length < 4) return false;
+        if (/^[MN]\d/i.test(stripped)) return false;
+        return /^\d+([A-Z]*\d*)?\+?$/i.test(cleaned);
       });
 
     const ean13 = validCodes.find((c) => c.replace(/\+$/, "").length === 13);
@@ -291,7 +288,9 @@ exports.cancelOrder = async (req, res) => {
     if (!motivo || !motivo.trim())
       return res.status(400).json({ error: "El motivo es obligatorio" });
     if (!admin_name || !admin_name.trim())
-      return res.status(400).json({ error: "El nombre del admin es obligatorio" });
+      return res
+        .status(400)
+        .json({ error: "El nombre del admin es obligatorio" });
 
     // 1. Verificar que el pedido NO esté en una sesión de picking activa
     const { data: activeAssignments } = await supabase
@@ -368,7 +367,9 @@ exports.cancelOrder = async (req, res) => {
     });
   } catch (error) {
     console.error("Error cancelando pedido:", error.message);
-    res.status(500).json({ error: `Error al cancelar pedido: ${error.message}` });
+    res
+      .status(500)
+      .json({ error: `Error al cancelar pedido: ${error.message}` });
   }
 };
 
@@ -382,7 +383,9 @@ exports.restoreOrder = async (req, res) => {
     if (!cancel_record_id)
       return res.status(400).json({ error: "Falta cancel_record_id" });
     if (!admin_name || !admin_name.trim())
-      return res.status(400).json({ error: "El nombre del admin es obligatorio" });
+      return res
+        .status(400)
+        .json({ error: "El nombre del admin es obligatorio" });
 
     // 1. Buscar el registro de cancelación
     const { data: record, error: findError } = await supabase
@@ -395,7 +398,9 @@ exports.restoreOrder = async (req, res) => {
     if (findError || !record) {
       return res
         .status(404)
-        .json({ error: "Registro de cancelación no encontrado o ya fue restaurado." });
+        .json({
+          error: "Registro de cancelación no encontrado o ya fue restaurado.",
+        });
     }
 
     // 2. Restaurar en WooCommerce

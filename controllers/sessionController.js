@@ -46,14 +46,11 @@ async function getBarcodesFromSiesa(productIds) {
       return codes
         .map((code) => (code || "").toString().trim())
         .filter((cleaned) => {
-          if (!cleaned || cleaned.replace(/\+$/, "").length < 8) return false;
-          if (
-            cleaned.toUpperCase().startsWith("M") ||
-            cleaned.toUpperCase().startsWith("N")
-          )
-            return false;
-          // Aceptar dígitos con '+' opcional al final
-          return /^\d+\+?$/.test(cleaned);
+          const stripped = cleaned.replace(/\+$/, "");
+          if (!stripped || stripped.length < 4) return false;
+          if (/^[MN]\d/i.test(stripped)) return false;
+          // Aceptar dígitos puros, dígitos+UM (ej: 185325P25), dígitos con '+' al final
+          return /^\d+([A-Z]*\d*)?\+?$/i.test(cleaned);
         });
     };
 
@@ -346,14 +343,7 @@ exports.getSessionActive = async (req, res) => {
       ),
     );
 
-    // DEBUG: Ver SKUs de los items agrupados
-    console.log("🔍 SKUs de items agrupados:", itemsAgrupados.map(i => ({ name: i.name?.substring(0, 30), sku: i.sku, um: i.unidad_medida })));
-    console.log(`🔍 Buscando códigos de barras para ${skuList.length} SKUs`);
     const barcodeMapSiesa = await getBarcodesFromSiesa(skuList);
-    console.log(
-      "📊 Códigos de barras obtenidos de SIESA:",
-      Object.keys(barcodeMapSiesa).length,
-    );
 
     // ✅ 2C. DETECTAR PRODUCTOS CON VARIACIONES (múltiples unidad_medida)
     const f120IdList = Array.from(
@@ -383,11 +373,6 @@ exports.getSessionActive = async (req, res) => {
           Object.keys(variacionesMap).forEach((f120_id) => {
             variacionesMap[f120_id] = variacionesMap[f120_id].size > 1;
           });
-
-          console.log(
-            "📦 Productos con variaciones detectados:",
-            variacionesMap,
-          );
         }
       } catch (e) {
         console.error("Error detectando variaciones:", e.message);
@@ -418,22 +403,20 @@ exports.getSessionActive = async (req, res) => {
       // ✅ FIX: Usar String() para evitar mismatch de tipo (number vs string de Supabase)
       const itemEffectiveId = String(item.variation_id || item.product_id);
       const itemOrderId = item.order_id ? String(item.order_id) : null;
-      const itemLogs = logs.filter(
-        (l) => {
-          // ✅ Si el item tiene order_id, solo aceptar logs de ESE pedido
-          if (itemOrderId && l.id_pedido && String(l.id_pedido) !== itemOrderId) {
-            return false;
-          }
-          return (
-            String(l.id_producto) === itemEffectiveId ||
-            String(l.id_producto_original) === itemEffectiveId ||
-            // Fallback para logs antiguos que usaban product_id sin variation_id
-            (!item.variation_id &&
-              (String(l.id_producto) === String(item.product_id) ||
-                String(l.id_producto_original) === String(item.product_id)))
-          );
+      const itemLogs = logs.filter((l) => {
+        // ✅ Si el item tiene order_id, solo aceptar logs de ESE pedido
+        if (itemOrderId && l.id_pedido && String(l.id_pedido) !== itemOrderId) {
+          return false;
         }
-      );
+        return (
+          String(l.id_producto) === itemEffectiveId ||
+          String(l.id_producto_original) === itemEffectiveId ||
+          // Fallback para logs antiguos que usaban product_id sin variation_id
+          (!item.variation_id &&
+            (String(l.id_producto) === String(item.product_id) ||
+              String(l.id_producto_original) === String(item.product_id)))
+        );
+      });
 
       // Contadores Reales
       const pickedLogs = itemLogs.filter((l) => l.accion === "recolectado");
@@ -512,8 +495,8 @@ exports.getSessionActive = async (req, res) => {
           else if (um === "KG" || um === "KILO") um = "KL";
 
           if (um) {
-             // REGLA ESTRICTA: No fallback a _all si tiene unidad
-             return siesaGroup[um] || [item.barcode || item.sku];
+            // REGLA ESTRICTA: No fallback a _all si tiene unidad
+            return siesaGroup[um] || [item.barcode || item.sku];
           }
           // Fallback: todos los barcodes válidos si no tiene presentación
           return siesaGroup._all || [item.barcode || item.sku];

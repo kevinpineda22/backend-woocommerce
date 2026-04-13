@@ -9,7 +9,8 @@ const { getWooClient } = require("../services/wooMultiService");
 // Y también permite búsqueda por f120_id + unidad_medida para variaciones
 async function getBarcodesFromSiesa(productIds) {
   try {
-    if (!productIds || productIds.length === 0) return { byF120: {}, byF120AndUM: {} };
+    if (!productIds || productIds.length === 0)
+      return { byF120: {}, byF120AndUM: {} };
 
     const { data: barcodes, error } = await supabase
       .from("siesa_codigos_barras")
@@ -21,15 +22,15 @@ async function getBarcodesFromSiesa(productIds) {
       return { byF120: {}, byF120AndUM: {} };
     }
 
-    const byF120 = {};      // Mapeo por f120_id (para búsquedas generales)
+    const byF120 = {}; // Mapeo por f120_id (para búsquedas generales)
     const byF120AndUM = {}; // Mapeo por f120_id + unidad_medida (para variaciones específicas)
 
     barcodes.forEach((bc) => {
       const code = (bc.codigo_barras || "").toString().trim();
       const cleaned = code.replace(/\+$/, "");
-      if (!cleaned || cleaned.length < 8) return;
-      if (cleaned.toUpperCase().startsWith("M") || cleaned.toUpperCase().startsWith("N")) return;
-      if (!/^\d+\+?$/.test(code)) return;
+      if (!cleaned || cleaned.length < 4) return;
+      if (/^[MN]\d/i.test(cleaned)) return;
+      if (!/^\d+([A-Z]*\d*)?\+?$/i.test(code)) return;
 
       const f120Id = bc.f120_id;
       const um = (bc.unidad_medida || "").toUpperCase().trim();
@@ -64,7 +65,9 @@ exports.getBaseEanFruver = async (req, res) => {
   const numericSku = numericMatch ? numericMatch[1] : sku.split("-")[0];
 
   if (!numericSku || isNaN(parseInt(numericSku))) {
-    return res.status(400).json({ error: "SKU no contiene un f120_id numérico válido." });
+    return res
+      .status(400)
+      .json({ error: "SKU no contiene un f120_id numérico válido." });
   }
 
   try {
@@ -80,7 +83,10 @@ exports.getBaseEanFruver = async (req, res) => {
     let gs1Code = null;
     if (siesaRows && siesaRows.length > 0) {
       const gs1Row = siesaRows.find((row) => {
-        const code = (row.codigo_barras || "").toString().trim().replace(/\+$/, "");
+        const code = (row.codigo_barras || "")
+          .toString()
+          .trim()
+          .replace(/\+$/, "");
         return code.startsWith("29") && /^\d+$/.test(code);
       });
       if (gs1Row) {
@@ -163,7 +169,7 @@ exports.searchProduct = async (req, res) => {
           Math.abs(parseFloat(b.price || 0) - originalPrice),
       );
 
-    // === BÚSQUEDA MANUAL ===
+      // === BÚSQUEDA MANUAL ===
     } else if (query) {
       const cleanQuery = query.trim();
       const isNumeric = /^\d+$/.test(cleanQuery);
@@ -173,15 +179,19 @@ exports.searchProduct = async (req, res) => {
       if (isNumeric) {
         const [skuResponse, siesaResponse] = await Promise.all([
           // Buscar por SKU directo en WooCommerce
-          prodClient.get("products", {
-            sku: cleanQuery,
-            status: "publish",
-          }).catch(() => ({ data: [] })),
+          prodClient
+            .get("products", {
+              sku: cleanQuery,
+              status: "publish",
+            })
+            .catch(() => ({ data: [] })),
           // Buscar por código de barras exacto en SIESA (con y sin +)
           supabase
             .from("siesa_codigos_barras")
             .select("f120_id")
-            .or(`codigo_barras.eq.${cleanQuery},codigo_barras.eq.${cleanQuery}+`)
+            .or(
+              `codigo_barras.eq.${cleanQuery},codigo_barras.eq.${cleanQuery}+`,
+            )
             .limit(5)
             .then((r) => r.data || [])
             .catch(() => []),
@@ -207,7 +217,10 @@ exports.searchProduct = async (req, res) => {
                 found = true;
               }
             } catch (e) {
-              console.warn(`Error buscando f120_id ${f120Id} en WC:`, e.message);
+              console.warn(
+                `Error buscando f120_id ${f120Id} en WC:`,
+                e.message,
+              );
             }
           }
         }
@@ -317,8 +330,9 @@ exports.searchProduct = async (req, res) => {
 
         // RUTA 3 (fallback): Buscar en meta_data
         if (!unidadMedida) {
-          const metaUM = p.meta_data?.find((m) => m.key === "pa_unidad-de-medida-aproximado")
-            ?.display_value || null;
+          const metaUM =
+            p.meta_data?.find((m) => m.key === "pa_unidad-de-medida-aproximado")
+              ?.display_value || null;
           unidadMedida = metaUM ? metaUM.toUpperCase().trim() : null;
         }
 

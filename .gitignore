@@ -18,3 +18,8 @@ build/
 # Ignore OS specific files
 .DS_Store
 Thumbs.db
+
+# AI/Agent config
+.claude/
+.atl/
+CLAUDE.md
