@@ -15,6 +15,8 @@ import {
   FaStoreAlt,
   FaSpinner,
   FaSync,
+  FaTrashAlt,
+  FaExclamationTriangle,
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
 
@@ -40,6 +42,8 @@ const PendingOrdersView = ({
   onAssignSingleDirect,
   isFetchingPickers,
   onForceSync,
+  onCancelOrder,
+  isCancelling,
 }) => {
   const displayedOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -79,6 +83,8 @@ const PendingOrdersView = ({
   };
 
   const [localSelectedOrder, setLocalSelectedOrder] = useState(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelMotivo, setCancelMotivo] = useState("");
 
   // ✅ Función auxiliar para detectar recogida
   const isPickupOrder = (order) => {
@@ -379,6 +385,16 @@ const PendingOrdersView = ({
                       "Incluir en Lote"
                     )}
                   </button>
+                  <button
+                    className="pa-btn-cancel-order"
+                    onClick={() => {
+                      setCancelMotivo("");
+                      setShowCancelModal(true);
+                    }}
+                    disabled={isCancelling}
+                  >
+                    <FaTrashAlt /> Cancelar Pedido
+                  </button>
                 </div>
                 <div className="pa-footer-right">
                   <button
@@ -428,6 +444,65 @@ const PendingOrdersView = ({
               )}{" "}
               Asignar a Picker
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CANCELACIÓN */}
+      {showCancelModal && localSelectedOrder && (
+        <div
+          className="pedidos-modal-overlay"
+          onClick={() => setShowCancelModal(false)}
+          style={{ zIndex: 1100 }}
+        >
+          <div
+            className="pedidos-modal-content cancel-modal animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cancel-modal-header">
+              <FaExclamationTriangle className="cancel-modal-icon" />
+              <h3>Cancelar Pedido #{localSelectedOrder.id}</h3>
+            </div>
+            <p className="cancel-modal-warning">
+              Esta acción cambiará el estado del pedido en WooCommerce a{" "}
+              <strong>cancelado</strong>. El cliente será notificado por email.
+            </p>
+            <div className="cancel-modal-field">
+              <label>Motivo de cancelación *</label>
+              <textarea
+                value={cancelMotivo}
+                onChange={(e) => setCancelMotivo(e.target.value)}
+                placeholder="Ej: Cliente solicitó cancelación por teléfono, producto agotado, error en pedido..."
+                rows={3}
+                autoFocus
+              />
+            </div>
+            <div className="cancel-modal-actions">
+              <button
+                className="pa-btn-secondary"
+                onClick={() => setShowCancelModal(false)}
+                disabled={isCancelling}
+              >
+                <FaTimes /> Volver
+              </button>
+              <button
+                className="pa-btn-danger"
+                disabled={!cancelMotivo.trim() || isCancelling}
+                onClick={async () => {
+                  await onCancelOrder(localSelectedOrder, cancelMotivo);
+                  setShowCancelModal(false);
+                  setLocalSelectedOrder(null);
+                  setCancelMotivo("");
+                }}
+              >
+                {isCancelling ? (
+                  <FaSpinner className="ec-spin" />
+                ) : (
+                  <FaTrashAlt />
+                )}{" "}
+                Confirmar Cancelación
+              </button>
+            </div>
           </div>
         </div>
       )}

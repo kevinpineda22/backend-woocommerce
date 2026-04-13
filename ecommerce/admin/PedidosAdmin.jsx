@@ -12,6 +12,7 @@ import {
   FaClipboardCheck,
   FaMoneyBillWave,
   FaUserCircle,
+  FaTrashAlt,
 } from "react-icons/fa";
 
 import { supabase } from "../../../supabaseClient";
@@ -32,6 +33,7 @@ import PendingPaymentView from "./PendingPaymentView";
 import HistoryDetailModal from "./HistoryDetailModal";
 import ManifestInvoiceModal from "../shared/ManifestInvoiceModal";
 import ConfirmModal from "../shared/ConfirmModal";
+import CancelledOrdersView from "./CancelledOrdersView";
 import { AnimatePresence, motion } from "framer-motion";
 
 // --- MULTI-SEDE ---
@@ -113,6 +115,9 @@ const PedidosAdmin = () => {
   const [historyOrders, setHistoryOrders] = useState([]);
   const [pendingAuditOrders, setPendingAuditOrders] = useState([]);
   const [paymentPendingOrders, setPaymentPendingOrders] = useState([]);
+  const [cancelledOrders, setCancelledOrders] = useState([]);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [pickers, setPickers] = useState([]);
 
   // Modales de Gestión
@@ -323,6 +328,78 @@ const PedidosAdmin = () => {
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // --- HANDLERS: PEDIDOS CANCELADOS ---
+  const fetchCancelledOrders = async () => {
+    setLoading(true);
+    try {
+      const res = await ecommerceApi.get(
+        `/pedidos-cancelados?${getSedeParam()}`,
+      );
+      setCancelledOrders(res.data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async (order, motivo) => {
+    const empleado = JSON.parse(localStorage.getItem("empleado_info") || "{}");
+    const adminName = empleado.nombre || "Admin";
+    const adminEmail = localStorage.getItem("correo_empleado") || "";
+
+    setIsCancelling(true);
+    try {
+      await ecommerceApi.post(`/cancelar-pedido?${getSedeParam()}`, {
+        order_id: order.id,
+        motivo,
+        admin_name: adminName,
+        admin_email: adminEmail,
+        sede_id: order.sede_id || null,
+      });
+      showToast(`Pedido #${order.id} cancelado correctamente.`, "success");
+      fetchData();
+    } catch (error) {
+      const msg =
+        error.response?.data?.error || error.message || "Error desconocido";
+      showToast(msg, "error");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const handleRestoreOrder = async (record) => {
+    const empleado = JSON.parse(localStorage.getItem("empleado_info") || "{}");
+    const adminName = empleado.nombre || "Admin";
+
+    if (
+      !window.confirm(
+        `¿Restaurar pedido #${record.order_id}? Volverá al panel de pendientes.`,
+      )
+    )
+      return;
+
+    setIsRestoring(true);
+    try {
+      await ecommerceApi.post(`/restaurar-pedido?${getSedeParam()}`, {
+        cancel_record_id: record.id,
+        admin_name: adminName,
+      });
+      showToast(
+        `Pedido #${record.order_id} restaurado correctamente.`,
+        "success",
+      );
+      fetchCancelledOrders();
+      fetchData();
+    } catch (error) {
+      const msg =
+        error.response?.data?.error || error.message || "Error desconocido";
+      showToast(msg, "error");
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -543,6 +620,16 @@ const PedidosAdmin = () => {
           >
             <FaUserTag /> <span>Pickers</span>
           </button>
+          <button
+            className={`pedidos-layout-sidebar-button ${currentView === "cancelled" ? "active" : ""}`}
+            onClick={() => {
+              setCurrentView("cancelled");
+              fetchCancelledOrders();
+              setSidebarOpen(false);
+            }}
+          >
+            <FaTrashAlt /> <span>Pedidos Cancelados</span>
+          </button>
         </nav>
         <div className="pedidos-sidebar-footer">
           «{getQuote(shuffledQuotes, 0).text}»
@@ -552,7 +639,27 @@ const PedidosAdmin = () => {
 
       {/* CONTENIDO PRINCIPAL */}
       <main className="pedidos-layout-content">
-        {currentView === "pickers" ? (
+        {currentView === "cancelled" ? (
+          <>
+            <header className="pedidos-layout-header">
+              <div>
+                <h1>🗑️ Pedidos Cancelados</h1>
+                <div className="pedidos-header-quote">
+                  Registro de pedidos cancelados desde el panel de administración
+                </div>
+              </div>
+            </header>
+            <div className="pedidos-layout-body">
+              <CancelledOrdersView
+                cancelledOrders={cancelledOrders}
+                loading={loading}
+                onRefresh={fetchCancelledOrders}
+                onRestore={handleRestoreOrder}
+                isRestoring={isRestoring}
+              />
+            </div>
+          </>
+        ) : currentView === "pickers" ? (
           <GestionPickers />
         ) : currentView === "audit_pending" ? (
           /* VISTA PENDIENTES AUDITORIA */
@@ -634,6 +741,8 @@ const PedidosAdmin = () => {
                   onAssignSingleDirect={handleAssignSingleOrder}
                   isFetchingPickers={isFetchingPickers}
                   onForceSync={() => fetchData(false, true)}
+                  onCancelOrder={handleCancelOrder}
+                  isCancelling={isCancelling}
                 />
               ) : (
                 <ActiveSessionsView

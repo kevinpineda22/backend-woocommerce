@@ -54,10 +54,15 @@ router.get("/pendientes-auditoria", dashboardCtrl.getPendingAuditSessions);
 router.get("/historial-detalle", dashboardCtrl.getSessionLogsDetail);
 router.post("/auditor/finalizar", dashboardCtrl.completeAuditSession);
 
-// Rutas de Gestión
+// Rutas de Gestión (items en sesión)
 router.post("/admin-remove-item", adminCtrl.removeItemFromSession);
 router.post("/admin-restore-item", adminCtrl.restoreItemToSession);
 router.post("/admin-force-pick", adminCtrl.forcePickItemToSession);
+
+// Rutas de Cancelación de Pedidos
+router.post("/cancelar-pedido", adminCtrl.cancelOrder);
+router.post("/restaurar-pedido", adminCtrl.restoreOrder);
+router.get("/pedidos-cancelados", adminCtrl.getCancelledOrders);
 
 // Ruta temporal para espiar metadatos (mejorada con detección de sede)
 router.get("/espiar-pedido/:id", dashboardCtrl.espiarPedido);

@@ -1,4 +1,8 @@
 const { supabase } = require("../services/supabaseClient");
+const {
+  getWooClient,
+  invalidateResponseCache,
+} = require("../services/wooMultiService");
 
 // Helper: Obtener sede_id de una sesión
 async function getSessionSedeId(sessionId) {
@@ -273,5 +277,186 @@ exports.forcePickItemToSession = async (req, res) => {
       .json({ message: "Producto enviado a canasta correctamente." });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+// =========================================================
+// CANCELAR PEDIDO COMPLETO (cambiar status en WooCommerce + registro en Supabase)
+// =========================================================
+exports.cancelOrder = async (req, res) => {
+  const { order_id, motivo, admin_name, admin_email, sede_id } = req.body;
+
+  try {
+    if (!order_id) return res.status(400).json({ error: "Falta order_id" });
+    if (!motivo || !motivo.trim())
+      return res.status(400).json({ error: "El motivo es obligatorio" });
+    if (!admin_name || !admin_name.trim())
+      return res.status(400).json({ error: "El nombre del admin es obligatorio" });
+
+    // 1. Verificar que el pedido NO esté en una sesión de picking activa
+    const { data: activeAssignments } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("id, id_sesion, wc_picking_sessions!inner(estado)")
+      .eq("id_pedido", order_id)
+      .not(
+        "wc_picking_sessions.estado",
+        "in",
+        '("cancelado","finalizado","auditado")',
+      );
+
+    if (activeAssignments && activeAssignments.length > 0) {
+      return res.status(409).json({
+        error:
+          "Este pedido está en una sesión de picking activa. Finalice o cancele la sesión primero.",
+      });
+    }
+
+    // 2. Verificar que no esté ya cancelado en nuestra tabla
+    const { data: existing } = await supabase
+      .from("wc_pedidos_cancelados")
+      .select("id")
+      .eq("order_id", order_id)
+      .is("restored_at", null)
+      .maybeSingle();
+
+    if (existing) {
+      return res
+        .status(409)
+        .json({ error: "Este pedido ya fue cancelado previamente." });
+    }
+
+    // 3. Obtener datos completos del pedido desde WooCommerce antes de cancelar
+    const effectiveSedeId = sede_id || req.sedeId;
+    const wooClient = await getWooClient(effectiveSedeId);
+    const { data: orderData } = await wooClient.get(`orders/${order_id}`);
+
+    if (!orderData) {
+      return res
+        .status(404)
+        .json({ error: "Pedido no encontrado en WooCommerce." });
+    }
+
+    // 4. Cambiar status en WooCommerce a "cancelled"
+    await wooClient.put(`orders/${order_id}`, { status: "cancelled" });
+
+    // 5. Guardar snapshot completo en Supabase
+    const { error: insertError } = await supabase
+      .from("wc_pedidos_cancelados")
+      .insert([
+        {
+          order_id: order_id,
+          order_data: orderData,
+          motivo: motivo.trim(),
+          admin_name: admin_name.trim(),
+          admin_email: admin_email || null,
+          sede_id: effectiveSedeId || null,
+        },
+      ]);
+
+    if (insertError) throw insertError;
+
+    // 6. Invalidar caché para que el pedido desaparezca inmediatamente
+    invalidateResponseCache();
+
+    console.log(
+      `🗑️ [ADMIN] Pedido #${order_id} cancelado por ${admin_name} — Motivo: ${motivo}`,
+    );
+
+    res.status(200).json({
+      message: `Pedido #${order_id} cancelado correctamente.`,
+      order_id,
+    });
+  } catch (error) {
+    console.error("Error cancelando pedido:", error.message);
+    res.status(500).json({ error: `Error al cancelar pedido: ${error.message}` });
+  }
+};
+
+// =========================================================
+// RESTAURAR PEDIDO CANCELADO (volver a processing en WooCommerce)
+// =========================================================
+exports.restoreOrder = async (req, res) => {
+  const { cancel_record_id, admin_name } = req.body;
+
+  try {
+    if (!cancel_record_id)
+      return res.status(400).json({ error: "Falta cancel_record_id" });
+    if (!admin_name || !admin_name.trim())
+      return res.status(400).json({ error: "El nombre del admin es obligatorio" });
+
+    // 1. Buscar el registro de cancelación
+    const { data: record, error: findError } = await supabase
+      .from("wc_pedidos_cancelados")
+      .select("*")
+      .eq("id", cancel_record_id)
+      .is("restored_at", null)
+      .single();
+
+    if (findError || !record) {
+      return res
+        .status(404)
+        .json({ error: "Registro de cancelación no encontrado o ya fue restaurado." });
+    }
+
+    // 2. Restaurar en WooCommerce
+    const effectiveSedeId = record.sede_id || req.sedeId;
+    const wooClient = await getWooClient(effectiveSedeId);
+    await wooClient.put(`orders/${record.order_id}`, { status: "processing" });
+
+    // 3. Marcar como restaurado en Supabase
+    const { error: updateError } = await supabase
+      .from("wc_pedidos_cancelados")
+      .update({
+        restored_at: new Date().toISOString(),
+        restored_by: admin_name.trim(),
+      })
+      .eq("id", cancel_record_id);
+
+    if (updateError) throw updateError;
+
+    // 4. Invalidar caché
+    invalidateResponseCache();
+
+    console.log(
+      `♻️ [ADMIN] Pedido #${record.order_id} restaurado por ${admin_name}`,
+    );
+
+    res.status(200).json({
+      message: `Pedido #${record.order_id} restaurado correctamente.`,
+      order_id: record.order_id,
+    });
+  } catch (error) {
+    console.error("Error restaurando pedido:", error.message);
+    res
+      .status(500)
+      .json({ error: `Error al restaurar pedido: ${error.message}` });
+  }
+};
+
+// =========================================================
+// LISTAR PEDIDOS CANCELADOS
+// =========================================================
+exports.getCancelledOrders = async (req, res) => {
+  try {
+    let query = supabase
+      .from("wc_pedidos_cancelados")
+      .select("*")
+      .is("restored_at", null)
+      .order("cancelled_at", { ascending: false })
+      .limit(100);
+
+    if (req.sedeId) {
+      query = query.eq("sede_id", req.sedeId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    res.status(200).json(data || []);
+  } catch (error) {
+    console.error("Error listando pedidos cancelados:", error.message);
+    res
+      .status(500)
+      .json({ error: `Error al listar pedidos cancelados: ${error.message}` });
   }
 };
