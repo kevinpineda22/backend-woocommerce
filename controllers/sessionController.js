@@ -129,6 +129,7 @@ exports.createPickingSession = async (req, res) => {
         total: o.total,
         billing: o.billing,
         shipping: o.shipping,
+        shipping_lines: o.shipping_lines || [],
         customer_note: o.customer_note,
         line_items: o.line_items.map((item) => ({
           ...item,

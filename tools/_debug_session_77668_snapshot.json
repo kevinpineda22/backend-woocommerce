@@ -1,0 +1,2983 @@
+[
+  {
+    "id": 77668,
+    "total": "2223350",
+    "status": "processing",
+    "billing": {
+      "city": "Copacabana",
+      "email": "nataliajaramillogomez8@gmail.com",
+      "phone": "318 3816728",
+      "state": "CO-ANT",
+      "company": "manantiales",
+      "country": "CO",
+      "postcode": "",
+      "address_1": "vereda puertachuela ramal 1 unidad manantial",
+      "address_2": "",
+      "last_name": "jaramillo",
+      "first_name": "natalia"
+    },
+    "shipping": {
+      "city": "Copacabana",
+      "phone": "",
+      "state": "CO-ANT",
+      "company": "manantiales",
+      "country": "CO",
+      "postcode": "",
+      "address_1": "vereda puertachuela ramal 1 unidad manantial",
+      "address_2": "",
+      "last_name": "jaramillo",
+      "first_name": "natalia"
+    },
+    "line_items": [
+      {
+        "id": 1103,
+        "sku": "1210UND",
+        "name": "ARROZ ORQUIDEA X 500 GR - Unidad",
+        "image": {
+          "id": 48953,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/1210.jpg"
+        },
+        "price": 2000,
+        "taxes": [],
+        "total": "30000",
+        "quantity": 15,
+        "subtotal": "30000",
+        "meta_data": [
+          {
+            "id": 11210,
+            "key": "pa_presentacion",
+            "value": "unidad",
+            "display_key": "Presentación",
+            "display_value": "Unidad"
+          },
+          {
+            "id": 12018,
+            "key": "_reduced_stock",
+            "value": "15",
+            "display_key": "_reduced_stock",
+            "display_value": "15"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 71867,
+        "parent_name": "ARROZ ORQUIDEA X 500 GR",
+        "subtotal_tax": "0",
+        "variation_id": 73102,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1104,
+        "sku": "58UND",
+        "name": "PANELA PORCIONA EL BUEN SABOR X908G - Unidad",
+        "image": {
+          "id": 58654,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/58.jpg"
+        },
+        "price": 6350,
+        "taxes": [],
+        "total": "19050",
+        "quantity": 3,
+        "subtotal": "19050",
+        "meta_data": [
+          {
+            "id": 11220,
+            "key": "pa_presentacion",
+            "value": "unidad",
+            "display_key": "Presentación",
+            "display_value": "Unidad"
+          },
+          {
+            "id": 12019,
+            "key": "_reduced_stock",
+            "value": "3",
+            "display_key": "_reduced_stock",
+            "display_value": "3"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62156,
+        "parent_name": "PANELA PORCIONA EL BUEN SABOR X908G",
+        "subtotal_tax": "0",
+        "variation_id": 74135,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1105,
+        "sku": "19P2  ",
+        "name": "FRIJOL AGRANEL CARGAMAN BLAN X 500 GR - Dúo",
+        "image": {
+          "id": 56956,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/19.jpg"
+        },
+        "price": 14400,
+        "taxes": [],
+        "total": "57600",
+        "quantity": 4,
+        "subtotal": "57600",
+        "meta_data": [
+          {
+            "id": 11230,
+            "key": "pa_presentacion",
+            "value": "p2",
+            "display_key": "Presentación",
+            "display_value": "Dúo"
+          },
+          {
+            "id": 12020,
+            "key": "_reduced_stock",
+            "value": "4",
+            "display_key": "_reduced_stock",
+            "display_value": "4"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 63855,
+        "parent_name": "FRIJOL AGRANEL CARGAMAN BLAN X 500 GR",
+        "subtotal_tax": "0",
+        "variation_id": 73720,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1106,
+        "sku": "1282",
+        "name": "SAL REFISAL X 1000 GR",
+        "image": {
+          "id": "49289",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/1282.jpg"
+        },
+        "price": 2800,
+        "taxes": [],
+        "total": "2800",
+        "quantity": 1,
+        "subtotal": "2800",
+        "meta_data": [
+          {
+            "id": 12021,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 71531,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1107,
+        "sku": "1491",
+        "name": "MINICROISSANT EL PAISA X 25 UND 400G",
+        "image": {
+          "id": "50064",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/1491.jpg"
+        },
+        "price": 9650,
+        "taxes": [],
+        "total": "19300",
+        "quantity": 2,
+        "subtotal": "19300",
+        "meta_data": [
+          {
+            "id": 12022,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": true,
+        "product_id": 70756,
+        "removed_at": "2026-04-10T19:35:11.413Z",
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "removal_reason": "admin_decision",
+        "global_unique_id": ""
+      },
+      {
+        "id": 1108,
+        "sku": "25588P30",
+        "name": "HUEVO TIPO AA X UND - Cubeta x30",
+        "image": {
+          "id": 57294,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/25588.jpg"
+        },
+        "price": 15950,
+        "taxes": [],
+        "total": "47850",
+        "quantity": 3,
+        "subtotal": "47850",
+        "meta_data": [
+          {
+            "id": 11258,
+            "key": "pa_presentacion",
+            "value": "p30",
+            "display_key": "Presentación",
+            "display_value": "Cubeta x30"
+          },
+          {
+            "id": 12023,
+            "key": "_reduced_stock",
+            "value": "3",
+            "display_key": "_reduced_stock",
+            "display_value": "3"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 63518,
+        "parent_name": "HUEVO TIPO AA X UND",
+        "subtotal_tax": "0",
+        "variation_id": 73504,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1109,
+        "sku": "14850",
+        "name": "CHOCOLATE CORONA BARRA TRAD X 450 G",
+        "image": {
+          "id": "50038",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/14850.jpg"
+        },
+        "price": 16550,
+        "taxes": [],
+        "total": "33100",
+        "quantity": 2,
+        "subtotal": "33100",
+        "meta_data": [
+          {
+            "id": 12024,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 70782,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1110,
+        "sku": "184818",
+        "name": "ACEITE MUA DE SOYA X 2700",
+        "image": {
+          "id": "76366",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/04/184818.webp"
+        },
+        "price": 22600,
+        "taxes": [],
+        "total": "22600",
+        "quantity": 1,
+        "subtotal": "22600",
+        "meta_data": [
+          {
+            "id": 12025,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 66066,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1111,
+        "sku": "33",
+        "name": "AZUCAR EL TRECE X 1000 GR",
+        "image": {
+          "id": "57637",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/33.jpg"
+        },
+        "price": 4950,
+        "taxes": [],
+        "total": "9900",
+        "quantity": 2,
+        "subtotal": "9900",
+        "meta_data": [
+          {
+            "id": 12026,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 63175,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1112,
+        "sku": "6096P6  ",
+        "name": "LECHE BETANIA ENTERA UHT X 900 ML - Six-pack",
+        "image": {
+          "id": 58721,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/6096.jpg"
+        },
+        "price": 20950,
+        "taxes": [],
+        "total": "20950",
+        "quantity": 1,
+        "subtotal": "20950",
+        "meta_data": [
+          {
+            "id": 11295,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12027,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62089,
+        "parent_name": "LECHE BETANIA ENTERA UHT X 900 ML",
+        "subtotal_tax": "0",
+        "variation_id": 74018,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1113,
+        "sku": "17129",
+        "name": "QUESO MEDIO ENTERO COSTEÑITA X 1150",
+        "image": {
+          "id": "51180",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/17129.jpg"
+        },
+        "price": 43250,
+        "taxes": [],
+        "total": "86500",
+        "quantity": 2,
+        "subtotal": "86500",
+        "meta_data": [
+          {
+            "id": 12028,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 69640,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1114,
+        "sku": "186821",
+        "name": "QUESO RED TIPO MOZARELLA X 1000 GR",
+        "image": {
+          "id": "56143",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/186821.jpg"
+        },
+        "price": 29300,
+        "taxes": [],
+        "total": "58600",
+        "quantity": 2,
+        "subtotal": "58600",
+        "meta_data": [
+          {
+            "id": 12029,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 64674,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1115,
+        "sku": "10772UND",
+        "name": "LAVALOZA LOZACREM LIQ LIMON X1.5LT - Unidad",
+        "image": {
+          "id": 76777,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/04/10772.webp"
+        },
+        "price": 16600,
+        "taxes": [],
+        "total": "16600",
+        "quantity": 1,
+        "subtotal": "16600",
+        "meta_data": [
+          {
+            "id": 11323,
+            "key": "pa_presentacion",
+            "value": "unidad",
+            "display_key": "Presentación",
+            "display_value": "Unidad"
+          },
+          {
+            "id": 12030,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 72354,
+        "parent_name": "LAVALOZA LOZACREM LIQ LIMON X1.5LT",
+        "subtotal_tax": "0",
+        "variation_id": 73987,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1116,
+        "sku": "13006",
+        "name": "DESINFEC MUA LAVANDA X 2000 ML",
+        "image": {
+          "id": "76952",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/04/13006.webp"
+        },
+        "price": 6450,
+        "taxes": [],
+        "total": "6450",
+        "quantity": 1,
+        "subtotal": "6450",
+        "meta_data": [
+          {
+            "id": 12031,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 71437,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1117,
+        "sku": "10121",
+        "name": "P.H. MUA MEGA ROLLO X 12 R X 891 GR",
+        "image": {
+          "id": "77533",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/04/10121.webp"
+        },
+        "price": 14900,
+        "taxes": [],
+        "total": "14900",
+        "quantity": 1,
+        "subtotal": "14900",
+        "meta_data": [
+          {
+            "id": 12032,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 72519,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1118,
+        "sku": "16598",
+        "name": "VASOS TUC 7 ONZ X 50 UND",
+        "image": {
+          "id": "50837",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/16598.jpg"
+        },
+        "price": 2400,
+        "taxes": [],
+        "total": "7200",
+        "quantity": 3,
+        "subtotal": "7200",
+        "meta_data": [
+          {
+            "id": 12033,
+            "key": "_reduced_stock",
+            "value": "3",
+            "display_key": "_reduced_stock",
+            "display_value": "3"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 69983,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1119,
+        "sku": "15830",
+        "name": "VASOS GUTVAN 12 ONZ X 50 UND",
+        "image": {
+          "id": "50417",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/15830.jpg"
+        },
+        "price": 5100,
+        "taxes": [],
+        "total": "10200",
+        "quantity": 2,
+        "subtotal": "10200",
+        "meta_data": [
+          {
+            "id": 12034,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": true,
+        "product_id": 70403,
+        "removed_at": "2026-04-10T19:30:06.126Z",
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "removal_reason": "admin_decision",
+        "global_unique_id": ""
+      },
+      {
+        "id": 1120,
+        "sku": "2570",
+        "name": "VASOS GUTVAN 14 ONZ X 26 UND",
+        "image": {
+          "id": "57304",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/2570.jpg"
+        },
+        "price": 3200,
+        "taxes": [],
+        "total": "3200",
+        "quantity": 1,
+        "subtotal": "3200",
+        "meta_data": [
+          {
+            "id": 12035,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 63508,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1121,
+        "sku": "4017",
+        "name": "COPAS DOMINGO 1,5 ONZ X 50 UND",
+        "image": {
+          "id": "57888",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/4017.jpg"
+        },
+        "price": 2350,
+        "taxes": [],
+        "total": "2350",
+        "quantity": 1,
+        "subtotal": "2350",
+        "meta_data": [
+          {
+            "id": 12036,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62923,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1122,
+        "sku": "15838",
+        "name": "CUCHARAS SOPERA X 100 UND",
+        "image": {
+          "id": "50422",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/15838.jpg"
+        },
+        "price": 4800,
+        "taxes": [],
+        "total": "9600",
+        "quantity": 2,
+        "subtotal": "9600",
+        "meta_data": [
+          {
+            "id": 12037,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": true,
+        "product_id": 70398,
+        "removed_at": "2026-04-10T19:30:27.712Z",
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "removal_reason": "admin_decision",
+        "global_unique_id": ""
+      },
+      {
+        "id": 1123,
+        "sku": "185453",
+        "name": "SERVILLETAS MUA PARTIDAS X 300 UND",
+        "image": {
+          "id": "55157",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/185453.jpg"
+        },
+        "price": 4100,
+        "taxes": [],
+        "total": "4100",
+        "quantity": 1,
+        "subtotal": "4100",
+        "meta_data": [
+          {
+            "id": 12038,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 65660,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1124,
+        "sku": "2962",
+        "name": "CHORIZOS FRICAR DE TERNERA X 1000 G",
+        "image": {
+          "id": "57511",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/2962.jpg"
+        },
+        "price": 39050,
+        "taxes": [],
+        "total": "156200",
+        "quantity": 4,
+        "subtotal": "156200",
+        "meta_data": [
+          {
+            "id": 12039,
+            "key": "_reduced_stock",
+            "value": "4",
+            "display_key": "_reduced_stock",
+            "display_value": "4"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 63300,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1125,
+        "sku": "186372",
+        "name": "SALCHICHA MINI PERRO FRICAR X 1200 GR",
+        "image": {
+          "id": "55793",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/186372.jpg"
+        },
+        "price": 28700,
+        "taxes": [],
+        "total": "28700",
+        "quantity": 1,
+        "subtotal": "28700",
+        "meta_data": [
+          {
+            "id": 12040,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 65024,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1126,
+        "sku": "4002",
+        "name": "PLATOS DARNEL HONDOS 30 0NZ X 20 UN",
+        "image": {
+          "id": "57882",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/4002.jpg"
+        },
+        "price": 6750,
+        "taxes": [],
+        "total": "20250",
+        "quantity": 3,
+        "subtotal": "20250",
+        "meta_data": [
+          {
+            "id": 12041,
+            "key": "_reduced_stock",
+            "value": "3",
+            "display_key": "_reduced_stock",
+            "display_value": "3"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62929,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1127,
+        "sku": "181071",
+        "name": "BOLSA BASURA BRIO NEG BIODEG 65X90 X10UN",
+        "image": {
+          "id": "53774",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/181071.jpg"
+        },
+        "price": 6300,
+        "taxes": [],
+        "total": "6300",
+        "quantity": 1,
+        "subtotal": "6300",
+        "meta_data": [
+          {
+            "id": 12042,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 67045,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1128,
+        "sku": "1397",
+        "name": "CALDO RICOSTILLA DESMENU X 10 U X 108 GR",
+        "image": {
+          "id": "49769",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/1397.jpg"
+        },
+        "price": 4800,
+        "taxes": [],
+        "total": "4800",
+        "quantity": 1,
+        "subtotal": "4800",
+        "meta_data": [
+          {
+            "id": 12043,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 71051,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1129,
+        "sku": "844",
+        "name": "SALSA FRUCO DE TOMATE PAGUE800LLEV1000GR",
+        "image": {
+          "id": "59275",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/844.jpg"
+        },
+        "price": 16000,
+        "taxes": [],
+        "total": "16000",
+        "quantity": 1,
+        "subtotal": "16000",
+        "meta_data": [
+          {
+            "id": 12044,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 61535,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1130,
+        "sku": "181195",
+        "name": "SALSA BARY BBQ X1000 GR",
+        "image": {
+          "id": "53819",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/181195.jpg"
+        },
+        "price": 14550,
+        "taxes": [],
+        "total": "14550",
+        "quantity": 1,
+        "subtotal": "14550",
+        "meta_data": [
+          {
+            "id": 12045,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 66999,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1131,
+        "sku": "175875",
+        "name": "DESENGRASANTE WHITE MULTIUSOS X1000",
+        "image": {
+          "id": "51599",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/175875.jpg"
+        },
+        "price": 14250,
+        "taxes": [],
+        "total": "14250",
+        "quantity": 1,
+        "subtotal": "14250",
+        "meta_data": [
+          {
+            "id": 12046,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 69221,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1132,
+        "sku": "176179",
+        "name": "TENEDOR DESECHABLE X 100 UND",
+        "image": {
+          "id": "51737",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/176179.jpg"
+        },
+        "price": 7000,
+        "taxes": [],
+        "total": "14000",
+        "quantity": 2,
+        "subtotal": "14000",
+        "meta_data": [
+          {
+            "id": 12047,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 69083,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1133,
+        "sku": "177956",
+        "name": "DETERGENTE MUA LIQ ROPA COLOR X 4L",
+        "image": {
+          "id": "76138",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/04/177956.webp"
+        },
+        "price": 23050,
+        "taxes": [],
+        "total": "23050",
+        "quantity": 1,
+        "subtotal": "23050",
+        "meta_data": [
+          {
+            "id": 12048,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 68276,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1134,
+        "sku": "12715",
+        "name": "BLANQUEADOR MUA REGULAR X 3800 ML",
+        "image": {
+          "id": "75963",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/04/1775479628283_12715.webp"
+        },
+        "price": 8750,
+        "taxes": [],
+        "total": "17500",
+        "quantity": 2,
+        "subtotal": "17500",
+        "meta_data": [
+          {
+            "id": 12049,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 71584,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1135,
+        "sku": "182648",
+        "name": "PAÑO MICROFIBRA ULTRA SOFT X 3 UND",
+        "image": {
+          "id": "75487",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/03/182648-1.webp"
+        },
+        "price": 8000,
+        "taxes": [],
+        "total": "40000",
+        "quantity": 5,
+        "subtotal": "40000",
+        "meta_data": [
+          {
+            "id": 12050,
+            "key": "_reduced_stock",
+            "value": "5",
+            "display_key": "_reduced_stock",
+            "display_value": "5"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 60898,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1136,
+        "sku": "175132",
+        "name": "ESPARCIBLE RAMA CON SAL X 1000 GR",
+        "image": {
+          "id": "51353",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/175132.jpg"
+        },
+        "price": 22400,
+        "taxes": [],
+        "total": "22400",
+        "quantity": 1,
+        "subtotal": "22400",
+        "meta_data": [
+          {
+            "id": 12051,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 69467,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1137,
+        "sku": "15792P6  ",
+        "name": "MECATO DE TODITO LIMON X 45 GR - Six-pack",
+        "image": {
+          "id": 50391,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/15792.jpg"
+        },
+        "price": 18700,
+        "taxes": [],
+        "total": "37400",
+        "quantity": 2,
+        "subtotal": "37400",
+        "meta_data": [
+          {
+            "id": 11522,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12052,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 70429,
+        "parent_name": "MECATO DE TODITO LIMON X 45 GR",
+        "subtotal_tax": "0",
+        "variation_id": 74088,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1138,
+        "sku": "12353P6  ",
+        "name": "MECATO DETODITO NATURAL X 45 GR - Six-pack",
+        "image": {
+          "id": 49081,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/12353.jpg"
+        },
+        "price": 18700,
+        "taxes": [],
+        "total": "37400",
+        "quantity": 2,
+        "subtotal": "37400",
+        "meta_data": [
+          {
+            "id": 11532,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12053,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 71739,
+        "parent_name": "MECATO DETODITO NATURAL X 45 GR",
+        "subtotal_tax": "0",
+        "variation_id": 74094,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1139,
+        "sku": "15777P6  ",
+        "name": "MECATO DE TODITO MIX X 45 GR - Six-pack",
+        "image": {
+          "id": 50383,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/15777.jpg"
+        },
+        "price": 18700,
+        "taxes": [],
+        "total": "37400",
+        "quantity": 2,
+        "subtotal": "37400",
+        "meta_data": [
+          {
+            "id": 11542,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12054,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 70437,
+        "parent_name": "MECATO DE TODITO MIX X 45 GR",
+        "subtotal_tax": "0",
+        "variation_id": 74090,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1140,
+        "sku": "12350P6  ",
+        "name": "MECATO DETODITO BBQ X 45 GR - Six-pack",
+        "image": {
+          "id": 49080,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/12350.jpg"
+        },
+        "price": 18700,
+        "taxes": [],
+        "total": "37400",
+        "quantity": 2,
+        "subtotal": "37400",
+        "meta_data": [
+          {
+            "id": 11552,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12055,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": true,
+        "product_id": 71740,
+        "removed_at": "2026-04-10T19:35:53.146Z",
+        "parent_name": "MECATO DETODITO BBQ X 45 GR",
+        "subtotal_tax": "0",
+        "variation_id": 74092,
+        "removal_reason": "admin_decision",
+        "global_unique_id": ""
+      },
+      {
+        "id": 1141,
+        "sku": "15779P12 ",
+        "name": "MECATO CHOCLITOS LIMON X 27 GR - Caja x12",
+        "image": {
+          "id": 50384,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/15779.jpg"
+        },
+        "price": 16050,
+        "taxes": [],
+        "total": "16050",
+        "quantity": 1,
+        "subtotal": "16050",
+        "meta_data": [
+          {
+            "id": 11562,
+            "key": "pa_presentacion",
+            "value": "p12",
+            "display_key": "Presentación",
+            "display_value": "Caja x12"
+          },
+          {
+            "id": 12056,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 70436,
+        "parent_name": "MECATO CHOCLITOS LIMON X 27 GR",
+        "subtotal_tax": "0",
+        "variation_id": 74086,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1142,
+        "sku": "184636P6  ",
+        "name": "POPETAS DULCE Y SALADA X 24.3 GR - Six-pack",
+        "image": {
+          "id": 54636,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/184636.jpg"
+        },
+        "price": 13600,
+        "taxes": [],
+        "total": "13600",
+        "quantity": 1,
+        "subtotal": "13600",
+        "meta_data": [
+          {
+            "id": 11572,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12057,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": true,
+        "product_id": 66181,
+        "removed_at": "2026-04-10T19:30:53.902Z",
+        "parent_name": "POPETAS DULCE Y SALADA X 24.3 GR",
+        "subtotal_tax": "0",
+        "variation_id": 74168,
+        "removal_reason": "admin_decision",
+        "global_unique_id": ""
+      },
+      {
+        "id": 1143,
+        "sku": "13519P6  ",
+        "name": "POPETAS MIX QUESO X 39.6 GR - Six-pack",
+        "image": {
+          "id": 49598,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/13519.jpg"
+        },
+        "price": 12800,
+        "taxes": [],
+        "total": "12800",
+        "quantity": 1,
+        "subtotal": "12800",
+        "meta_data": [
+          {
+            "id": 11582,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12058,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": true,
+        "product_id": 71222,
+        "removed_at": "2026-04-10T19:31:04.841Z",
+        "parent_name": "POPETAS MIX QUESO X 39.6 GR",
+        "subtotal_tax": "0",
+        "variation_id": 74170,
+        "removal_reason": "admin_decision",
+        "global_unique_id": ""
+      },
+      {
+        "id": 1144,
+        "sku": "17906P12 ",
+        "name": "MECATO NATUCHIPS VERDE X 28 GR - Caja x12",
+        "image": {
+          "id": 53138,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/17906.jpg"
+        },
+        "price": 22050,
+        "taxes": [],
+        "total": "22050",
+        "quantity": 1,
+        "subtotal": "22050",
+        "meta_data": [
+          {
+            "id": 11592,
+            "key": "pa_presentacion",
+            "value": "p12",
+            "display_key": "Presentación",
+            "display_value": "Caja x12"
+          },
+          {
+            "id": 12059,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 67680,
+        "parent_name": "MECATO NATUCHIPS VERDE X 28 GR",
+        "subtotal_tax": "0",
+        "variation_id": 74104,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1145,
+        "sku": "1455P5",
+        "name": "CHOCORAMO RAMO X 65 GR - Pack x5",
+        "image": {
+          "id": 49909,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/1455.jpg"
+        },
+        "price": 1900,
+        "taxes": [],
+        "total": "1900",
+        "quantity": 1,
+        "subtotal": "1900",
+        "meta_data": [
+          {
+            "id": 11602,
+            "key": "pa_presentacion",
+            "value": "p5",
+            "display_key": "Presentación",
+            "display_value": "Pack x5"
+          },
+          {
+            "id": 12060,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 70911,
+        "parent_name": "CHOCORAMO RAMO X 65 GR",
+        "subtotal_tax": "0",
+        "variation_id": 73382,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1146,
+        "sku": "17516",
+        "name": "CHICLE TRIDENT MENTA X 5U 8.5GR",
+        "image": {
+          "id": "51366",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/17516.jpg"
+        },
+        "price": 1900,
+        "taxes": [],
+        "total": "7600",
+        "quantity": 4,
+        "subtotal": "7600",
+        "meta_data": [
+          {
+            "id": 12061,
+            "key": "_reduced_stock",
+            "value": "4",
+            "display_key": "_reduced_stock",
+            "display_value": "4"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 69454,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1147,
+        "sku": "17515",
+        "name": "CHICLE TRIDENT YERBABUENA X 5U 8,5GR",
+        "image": {
+          "id": "51364",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/17515.jpg"
+        },
+        "price": 1700,
+        "taxes": [],
+        "total": "6800",
+        "quantity": 4,
+        "subtotal": "6800",
+        "meta_data": [
+          {
+            "id": 12062,
+            "key": "_reduced_stock",
+            "value": "4",
+            "display_key": "_reduced_stock",
+            "display_value": "4"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 69456,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1148,
+        "sku": "12695",
+        "name": "CHICLE TRIDENT MORA AZUL X 3 U X 5.1 GR",
+        "image": {
+          "id": "49229",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/12695.jpg"
+        },
+        "price": 1150,
+        "taxes": [],
+        "total": "4600",
+        "quantity": 4,
+        "subtotal": "4600",
+        "meta_data": [
+          {
+            "id": 12063,
+            "key": "_reduced_stock",
+            "value": "4",
+            "display_key": "_reduced_stock",
+            "display_value": "4"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 71591,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1149,
+        "sku": "16845",
+        "name": "SHAMPOO SAVITAL MULTI SOBRE X25ML",
+        "image": {
+          "id": "51010",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/16845.jpg"
+        },
+        "price": 1100,
+        "taxes": [],
+        "total": "6600",
+        "quantity": 6,
+        "subtotal": "6600",
+        "meta_data": [
+          {
+            "id": 12064,
+            "key": "_reduced_stock",
+            "value": "6",
+            "display_key": "_reduced_stock",
+            "display_value": "6"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 69810,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1150,
+        "sku": "180293",
+        "name": "ACONDIC SAVITAL FUSION PROTEINAS X 22ML",
+        "image": {
+          "id": "53544",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/180293.jpg"
+        },
+        "price": 1100,
+        "taxes": [],
+        "total": "6600",
+        "quantity": 6,
+        "subtotal": "6600",
+        "meta_data": [
+          {
+            "id": 12065,
+            "key": "_reduced_stock",
+            "value": "6",
+            "display_key": "_reduced_stock",
+            "display_value": "6"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 67274,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1151,
+        "sku": "1590",
+        "name": "GOLOSIA MAMAINES X 6 UND 270GR",
+        "image": {
+          "id": "50466",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/1590.jpg"
+        },
+        "price": 7850,
+        "taxes": [],
+        "total": "54950",
+        "quantity": 7,
+        "subtotal": "54950",
+        "meta_data": [
+          {
+            "id": 12066,
+            "key": "_reduced_stock",
+            "value": "7",
+            "display_key": "_reduced_stock",
+            "display_value": "7"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 70354,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1152,
+        "sku": "17102",
+        "name": "MASMELO MILLOWS FOGATA X 145 GR",
+        "image": {
+          "id": "51163",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/17102.jpg"
+        },
+        "price": 6100,
+        "taxes": [],
+        "total": "36600",
+        "quantity": 6,
+        "subtotal": "36600",
+        "meta_data": [
+          {
+            "id": 12067,
+            "key": "_reduced_stock",
+            "value": "6",
+            "display_key": "_reduced_stock",
+            "display_value": "6"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 69657,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1153,
+        "sku": "15841",
+        "name": "PINCHOS EL SOL DE BAMBU X 100 UND",
+        "image": {
+          "id": "50425",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/15841.jpg"
+        },
+        "price": 2550,
+        "taxes": [],
+        "total": "2550",
+        "quantity": 1,
+        "subtotal": "2550",
+        "meta_data": [
+          {
+            "id": 12068,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 70395,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1154,
+        "sku": "2373P12",
+        "name": "MECATO CHEESE TRIS X 42 GR - Caja x12",
+        "image": {
+          "id": 57178,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/2373.jpg"
+        },
+        "price": 23900,
+        "taxes": [],
+        "total": "23900",
+        "quantity": 1,
+        "subtotal": "23900",
+        "meta_data": [
+          {
+            "id": 11684,
+            "key": "pa_presentacion",
+            "value": "p12",
+            "display_key": "Presentación",
+            "display_value": "Caja x12"
+          },
+          {
+            "id": 12069,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 63634,
+        "parent_name": "MECATO CHEESE TRIS X 42 GR",
+        "subtotal_tax": "0",
+        "variation_id": 73559,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1155,
+        "sku": "1570",
+        "name": "GANSITO RAMO X 6 UND 222GR",
+        "image": {
+          "id": "50340",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/1570.jpg"
+        },
+        "price": 12650,
+        "taxes": [],
+        "total": "12650",
+        "quantity": 1,
+        "subtotal": "12650",
+        "meta_data": [
+          {
+            "id": 12070,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 70480,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1156,
+        "sku": "15742",
+        "name": "PAPAS MARGARITA LIMON X 12 UND 300G",
+        "image": {
+          "id": "50360",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/15742.jpg"
+        },
+        "price": 23000,
+        "taxes": [],
+        "total": "23000",
+        "quantity": 1,
+        "subtotal": "23000",
+        "meta_data": [
+          {
+            "id": 12071,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 70460,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1157,
+        "sku": "2574P6",
+        "name": "CERVEZA AGUILA X 330 ML - Six-pack",
+        "image": {
+          "id": 57307,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/2574.jpg"
+        },
+        "price": 17000,
+        "taxes": [],
+        "total": "68000",
+        "quantity": 4,
+        "subtotal": "68000",
+        "meta_data": [
+          {
+            "id": 11712,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12072,
+            "key": "_reduced_stock",
+            "value": "4",
+            "display_key": "_reduced_stock",
+            "display_value": "4"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 63505,
+        "parent_name": "CERVEZA AGUILA X 330 ML",
+        "subtotal_tax": "0",
+        "variation_id": 73292,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1158,
+        "sku": "2592P6",
+        "name": "CERVEZA AGUILA LIGHT LATA X 330 ML - Six-pack",
+        "image": {
+          "id": 57311,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/2592.jpg"
+        },
+        "price": 18000,
+        "taxes": [],
+        "total": "72000",
+        "quantity": 4,
+        "subtotal": "72000",
+        "meta_data": [
+          {
+            "id": 11722,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12073,
+            "key": "_reduced_stock",
+            "value": "4",
+            "display_key": "_reduced_stock",
+            "display_value": "4"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 63501,
+        "parent_name": "CERVEZA AGUILA LIGHT LATA X 330 ML",
+        "subtotal_tax": "0",
+        "variation_id": 73287,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1159,
+        "sku": "2582P6",
+        "name": "CERVEZA PILSEN LATA X 330 ML - Six-pack",
+        "image": {
+          "id": 57308,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/2582.jpg"
+        },
+        "price": 17900,
+        "taxes": [],
+        "total": "71600",
+        "quantity": 4,
+        "subtotal": "71600",
+        "meta_data": [
+          {
+            "id": 11732,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12074,
+            "key": "_reduced_stock",
+            "value": "4",
+            "display_key": "_reduced_stock",
+            "display_value": "4"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 63504,
+        "parent_name": "CERVEZA PILSEN LATA X 330 ML",
+        "subtotal_tax": "0",
+        "variation_id": 73348,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1160,
+        "sku": "186518P6",
+        "name": "CERVEZA ANDINA REFAJO LATA X 310 ML - Six-pack",
+        "image": {
+          "id": 55893,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/186518.jpg"
+        },
+        "price": 13700,
+        "taxes": [],
+        "total": "54800",
+        "quantity": 4,
+        "subtotal": "54800",
+        "meta_data": [
+          {
+            "id": 11742,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12075,
+            "key": "_reduced_stock",
+            "value": "4",
+            "display_key": "_reduced_stock",
+            "display_value": "4"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 64924,
+        "parent_name": "CERVEZA ANDINA REFAJO LATA X 310 ML",
+        "subtotal_tax": "0",
+        "variation_id": 73300,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1161,
+        "sku": "2586P6",
+        "name": "CERVEZA CLUB COLOMBIA DORA LAT X330 - Six-pack",
+        "image": {
+          "id": 57309,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/2586.jpg"
+        },
+        "price": 18900,
+        "taxes": [],
+        "total": "75600",
+        "quantity": 4,
+        "subtotal": "75600",
+        "meta_data": [
+          {
+            "id": 11752,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12076,
+            "key": "_reduced_stock",
+            "value": "4",
+            "display_key": "_reduced_stock",
+            "display_value": "4"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 63503,
+        "parent_name": "CERVEZA CLUB COLOMBIA DORA LAT X330",
+        "subtotal_tax": "0",
+        "variation_id": 73314,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1162,
+        "sku": "178711P6",
+        "name": "CERVEZA POKER LATA X 330 ML - Six-pack",
+        "image": {
+          "id": 52947,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/178711.jpg"
+        },
+        "price": 16600,
+        "taxes": [],
+        "total": "16600",
+        "quantity": 1,
+        "subtotal": "16600",
+        "meta_data": [
+          {
+            "id": 11762,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12077,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 67871,
+        "parent_name": "CERVEZA POKER LATA X 330 ML",
+        "subtotal_tax": "0",
+        "variation_id": 73353,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1163,
+        "sku": "183146P6",
+        "name": "CERVEZA HEINEKEN LATA X 310 ML - Six-pack",
+        "image": {
+          "id": 54369,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/183146.jpg"
+        },
+        "price": 20900,
+        "taxes": [],
+        "total": "20900",
+        "quantity": 1,
+        "subtotal": "20900",
+        "meta_data": [
+          {
+            "id": 11772,
+            "key": "pa_presentacion",
+            "value": "p6",
+            "display_key": "Presentación",
+            "display_value": "Six-pack"
+          },
+          {
+            "id": 12078,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": true,
+        "product_id": 66449,
+        "removed_at": "2026-04-10T19:31:54.713Z",
+        "parent_name": "CERVEZA HEINEKEN LATA X 310 ML",
+        "subtotal_tax": "0",
+        "variation_id": 73342,
+        "removal_reason": "admin_decision",
+        "global_unique_id": ""
+      },
+      {
+        "id": 1164,
+        "sku": "8318P12 ",
+        "name": "GASEOSA COCA COLA X 400 ML - Caja x12",
+        "image": {
+          "id": 59239,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/8318.jpg"
+        },
+        "price": 35500,
+        "taxes": [],
+        "total": "35500",
+        "quantity": 1,
+        "subtotal": "35500",
+        "meta_data": [
+          {
+            "id": 11782,
+            "key": "pa_presentacion",
+            "value": "p12",
+            "display_key": "Presentación",
+            "display_value": "Caja x12"
+          },
+          {
+            "id": 12079,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 61571,
+        "parent_name": "GASEOSA COCA COLA X 400 ML",
+        "subtotal_tax": "0",
+        "variation_id": 73756,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1165,
+        "sku": "12962",
+        "name": "GASEOSA QUATRO X 400 ML",
+        "image": {
+          "id": "49356",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/12962.jpg"
+        },
+        "price": 2800,
+        "taxes": [],
+        "total": "30800",
+        "quantity": 11,
+        "subtotal": "30800",
+        "meta_data": [
+          {
+            "id": 12080,
+            "key": "_reduced_stock",
+            "value": "11",
+            "display_key": "_reduced_stock",
+            "display_value": "11"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 71464,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1166,
+        "sku": "12963",
+        "name": "GASEOSA SPRITE X 400 ML",
+        "image": {
+          "id": "49357",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/12963.jpg"
+        },
+        "price": 2800,
+        "taxes": [],
+        "total": "33600",
+        "quantity": 12,
+        "subtotal": "33600",
+        "meta_data": [
+          {
+            "id": 12081,
+            "key": "_reduced_stock",
+            "value": "12",
+            "display_key": "_reduced_stock",
+            "display_value": "12"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": true,
+        "product_id": 71463,
+        "removed_at": "2026-04-10T19:32:14.284Z",
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "removal_reason": "admin_decision",
+        "global_unique_id": ""
+      },
+      {
+        "id": 1167,
+        "sku": "16710",
+        "name": "GASEOSA POSTOBON MANZANA X 400 ML",
+        "image": {
+          "id": "50914",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/16710.jpg"
+        },
+        "price": 2700,
+        "taxes": [],
+        "total": "32400",
+        "quantity": 12,
+        "subtotal": "32400",
+        "meta_data": [
+          {
+            "id": 12082,
+            "key": "_reduced_stock",
+            "value": "12",
+            "display_key": "_reduced_stock",
+            "display_value": "12"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 69906,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1168,
+        "sku": "2498UND",
+        "name": "JUGO HIT X 200 ML PAG 5 LLEVE 6 - Unidad",
+        "image": {
+          "id": 57231,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/2498.jpg"
+        },
+        "price": 6000,
+        "taxes": [],
+        "total": "48000",
+        "quantity": 8,
+        "subtotal": "48000",
+        "meta_data": [
+          {
+            "id": 11819,
+            "key": "pa_presentacion",
+            "value": "unidad",
+            "display_key": "Presentación",
+            "display_value": "Unidad"
+          },
+          {
+            "id": 12083,
+            "key": "_reduced_stock",
+            "value": "8",
+            "display_key": "_reduced_stock",
+            "display_value": "8"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 63581,
+        "parent_name": "JUGO HIT X 200 ML PAG 5 LLEVE 6",
+        "subtotal_tax": "0",
+        "variation_id": 73951,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1169,
+        "sku": "1117",
+        "name": "AGUARDIENTE ANTIOQUEÑO S A X 375 ML",
+        "image": {
+          "id": "48600",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/1117.jpg"
+        },
+        "price": 27650,
+        "taxes": [],
+        "total": "27650",
+        "quantity": 1,
+        "subtotal": "27650",
+        "meta_data": [
+          {
+            "id": 12084,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 72220,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1170,
+        "sku": "11590",
+        "name": "AGUARDIENTE ANTIOQUEÑO 24° X 375 ML",
+        "image": {
+          "id": "48743",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/11590.jpg"
+        },
+        "price": 24650,
+        "taxes": [],
+        "total": "24650",
+        "quantity": 1,
+        "subtotal": "24650",
+        "meta_data": [
+          {
+            "id": 12085,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 72077,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1171,
+        "sku": "11705",
+        "name": "AGUARDIENTE ANTIOQUEÑO 24° X 1050 M",
+        "image": {
+          "id": "48778",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/11705.jpg"
+        },
+        "price": 50400,
+        "taxes": [],
+        "total": "100800",
+        "quantity": 2,
+        "subtotal": "100800",
+        "meta_data": [
+          {
+            "id": 12086,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 72042,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1172,
+        "sku": "8148",
+        "name": "RON VIEJO DE CALDAS TRAD X 750 ML",
+        "image": {
+          "id": "59201",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/8148.jpg"
+        },
+        "price": 56900,
+        "taxes": [],
+        "total": "56900",
+        "quantity": 1,
+        "subtotal": "56900",
+        "meta_data": [
+          {
+            "id": 12087,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 61609,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1173,
+        "sku": "12236",
+        "name": "BEBIDA POOL SODA X 400 ML",
+        "image": {
+          "id": "49010",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/12236.jpg"
+        },
+        "price": 1300,
+        "taxes": [],
+        "total": "15600",
+        "quantity": 12,
+        "subtotal": "15600",
+        "meta_data": [
+          {
+            "id": 12088,
+            "key": "_reduced_stock",
+            "value": "12",
+            "display_key": "_reduced_stock",
+            "display_value": "12"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": true,
+        "product_id": 71810,
+        "removed_at": "2026-04-10T19:32:44.427Z",
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "removal_reason": "admin_decision",
+        "global_unique_id": ""
+      },
+      {
+        "id": 1174,
+        "sku": "13264UND",
+        "name": "BEBIDA GATORADE FRUTOS TROPI X500ML - Unidad",
+        "image": {
+          "id": 49476,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/13264.jpg"
+        },
+        "price": 3600,
+        "taxes": [],
+        "total": "21600",
+        "quantity": 6,
+        "subtotal": "21600",
+        "meta_data": [
+          {
+            "id": 11874,
+            "key": "pa_presentacion",
+            "value": "unidad",
+            "display_key": "Presentación",
+            "display_value": "Unidad"
+          },
+          {
+            "id": 12089,
+            "key": "_reduced_stock",
+            "value": "6",
+            "display_key": "_reduced_stock",
+            "display_value": "6"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": true,
+        "product_id": 71344,
+        "removed_at": "2026-04-10T19:31:28.999Z",
+        "parent_name": "BEBIDA GATORADE FRUTOS TROPI X500ML",
+        "subtotal_tax": "0",
+        "variation_id": 73172,
+        "removal_reason": "admin_decision",
+        "global_unique_id": ""
+      },
+      {
+        "id": 1175,
+        "sku": "186467",
+        "name": "BEBIDA GATORADE BLUE ICE X 500 ML",
+        "image": {
+          "id": "55851",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/186467.jpg"
+        },
+        "price": 3700,
+        "taxes": [],
+        "total": "22200",
+        "quantity": 6,
+        "subtotal": "22200",
+        "meta_data": [
+          {
+            "id": 12090,
+            "key": "_reduced_stock",
+            "value": "6",
+            "display_key": "_reduced_stock",
+            "display_value": "6"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 64966,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1176,
+        "sku": "5107KL",
+        "name": "ZANAHORIA KILO - Kl",
+        "image": {
+          "id": 58406,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/5107.jpg"
+        },
+        "price": 1450,
+        "taxes": [],
+        "total": "1450",
+        "quantity": 1,
+        "subtotal": "1450",
+        "meta_data": [
+          {
+            "id": 11893,
+            "key": "pa_unidad-de-medida-aproximado",
+            "value": "kl",
+            "display_key": "Unidad de medida (Aproximado)",
+            "display_value": "Kl"
+          },
+          {
+            "id": 12091,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62404,
+        "parent_name": "ZANAHORIA KILO",
+        "subtotal_tax": "0",
+        "variation_id": 73037,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1177,
+        "sku": "5098KL",
+        "name": "TOMATE DE ALIÑO EXTRA KILO - Kl",
+        "image": {
+          "id": 58400,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/5098.jpg"
+        },
+        "price": 5100,
+        "taxes": [],
+        "total": "5100",
+        "quantity": 1,
+        "subtotal": "5100",
+        "meta_data": [
+          {
+            "id": 11903,
+            "key": "pa_unidad-de-medida-aproximado",
+            "value": "kl",
+            "display_key": "Unidad de medida (Aproximado)",
+            "display_value": "Kl"
+          },
+          {
+            "id": 12092,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62410,
+        "parent_name": "TOMATE DE ALIÑO EXTRA KILO",
+        "subtotal_tax": "0",
+        "variation_id": 73013,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1178,
+        "sku": "5021KL",
+        "name": "CEBOLLA DE HUEVO KILO - Kl",
+        "image": {
+          "id": 58331,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/5021.jpg"
+        },
+        "price": 3000,
+        "taxes": [],
+        "total": "3000",
+        "quantity": 1,
+        "subtotal": "3000",
+        "meta_data": [
+          {
+            "id": 11913,
+            "key": "pa_unidad-de-medida-aproximado",
+            "value": "kl",
+            "display_key": "Unidad de medida (Aproximado)",
+            "display_value": "Kl"
+          },
+          {
+            "id": 12093,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62479,
+        "parent_name": "CEBOLLA DE HUEVO KILO",
+        "subtotal_tax": "0",
+        "variation_id": 72665,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1179,
+        "sku": "179773KL",
+        "name": "PLATANO VERDE/MADURO EXTRA KILO - Kl",
+        "image": {
+          "id": 53419,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/179773.jpg"
+        },
+        "price": 3600,
+        "taxes": [],
+        "total": "18000",
+        "quantity": 5,
+        "subtotal": "18000",
+        "meta_data": [
+          {
+            "id": 11923,
+            "key": "pa_unidad-de-medida-aproximado",
+            "value": "kl",
+            "display_key": "Unidad de medida (Aproximado)",
+            "display_value": "Kl"
+          },
+          {
+            "id": 12094,
+            "key": "_reduced_stock",
+            "value": "5",
+            "display_key": "_reduced_stock",
+            "display_value": "5"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 67399,
+        "parent_name": "PLATANO VERDE/MADURO EXTRA KILO",
+        "subtotal_tax": "0",
+        "variation_id": 72937,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1180,
+        "sku": "179773LB",
+        "name": "PLATANO VERDE/MADURO EXTRA KILO - Lb",
+        "image": {
+          "id": 53419,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/179773.jpg"
+        },
+        "price": 1800,
+        "taxes": [],
+        "total": "5400",
+        "quantity": 3,
+        "subtotal": "5400",
+        "meta_data": [
+          {
+            "id": 11933,
+            "key": "pa_unidad-de-medida-aproximado",
+            "value": "lb",
+            "display_key": "Unidad de medida (Aproximado)",
+            "display_value": "Lb"
+          },
+          {
+            "id": 12095,
+            "key": "_reduced_stock",
+            "value": "3",
+            "display_key": "_reduced_stock",
+            "display_value": "3"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 67399,
+        "parent_name": "PLATANO VERDE/MADURO EXTRA KILO",
+        "subtotal_tax": "0",
+        "variation_id": 72938,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1181,
+        "sku": "5167LB",
+        "name": "CILANTRO KILO - Lb",
+        "image": {
+          "id": 58431,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/5167.jpg"
+        },
+        "price": 1800,
+        "taxes": [],
+        "total": "1800",
+        "quantity": 1,
+        "subtotal": "1800",
+        "meta_data": [
+          {
+            "id": 11943,
+            "key": "pa_unidad-de-medida-aproximado",
+            "value": "lb",
+            "display_key": "Unidad de medida (Aproximado)",
+            "display_value": "Lb"
+          },
+          {
+            "id": 12096,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62379,
+        "parent_name": "CILANTRO KILO",
+        "subtotal_tax": "0",
+        "variation_id": 72694,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1182,
+        "sku": "181248KL",
+        "name": "CEBOLLA DE RAMA PELADA KILO - Kl",
+        "image": {
+          "id": 53841,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/181248-7-3.jpg"
+        },
+        "price": 6650,
+        "taxes": [],
+        "total": "6650",
+        "quantity": 1,
+        "subtotal": "6650",
+        "meta_data": [
+          {
+            "id": 11953,
+            "key": "pa_unidad-de-medida-aproximado",
+            "value": "kl",
+            "display_key": "Unidad de medida (Aproximado)",
+            "display_value": "Kl"
+          },
+          {
+            "id": 12097,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 66977,
+        "parent_name": "CEBOLLA DE RAMA PELADA KILO",
+        "subtotal_tax": "0",
+        "variation_id": 72671,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1183,
+        "sku": "5138KL",
+        "name": "TOMATE DE ARBOL KILO - Kl",
+        "image": {
+          "id": 58419,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/5138.jpg"
+        },
+        "price": 5050,
+        "taxes": [],
+        "total": "5050",
+        "quantity": 1,
+        "subtotal": "5050",
+        "meta_data": [
+          {
+            "id": 11963,
+            "key": "pa_unidad-de-medida-aproximado",
+            "value": "kl",
+            "display_key": "Unidad de medida (Aproximado)",
+            "display_value": "Kl"
+          },
+          {
+            "id": 12098,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62391,
+        "parent_name": "TOMATE DE ARBOL KILO",
+        "subtotal_tax": "0",
+        "variation_id": 73019,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1184,
+        "sku": "4736KL",
+        "name": "PAPA CAPIRA KILO - Kl",
+        "image": {
+          "id": 58222,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/4736.jpg"
+        },
+        "price": 3950,
+        "taxes": [],
+        "total": "23700",
+        "quantity": 6,
+        "subtotal": "23700",
+        "meta_data": [
+          {
+            "id": 11973,
+            "key": "pa_unidad-de-medida-aproximado",
+            "value": "kl",
+            "display_key": "Unidad de medida (Aproximado)",
+            "display_value": "Kl"
+          },
+          {
+            "id": 12099,
+            "key": "_reduced_stock",
+            "value": "6",
+            "display_key": "_reduced_stock",
+            "display_value": "6"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62588,
+        "parent_name": "PAPA CAPIRA KILO",
+        "subtotal_tax": "0",
+        "variation_id": 72877,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1185,
+        "sku": "5108KL",
+        "name": "PAPA CRIOLLA KILO - Kl",
+        "image": {
+          "id": 58407,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/5108.jpg"
+        },
+        "price": 7200,
+        "taxes": [],
+        "total": "7200",
+        "quantity": 1,
+        "subtotal": "7200",
+        "meta_data": [
+          {
+            "id": 11983,
+            "key": "pa_unidad-de-medida-aproximado",
+            "value": "kl",
+            "display_key": "Unidad de medida (Aproximado)",
+            "display_value": "Kl"
+          },
+          {
+            "id": 12100,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62403,
+        "parent_name": "PAPA CRIOLLA KILO",
+        "subtotal_tax": "0",
+        "variation_id": 72881,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1186,
+        "sku": "181513",
+        "name": "BOLSA MANZANA GALA X 7 UND",
+        "image": {
+          "id": "53944",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/181513.jpg"
+        },
+        "price": 11550,
+        "taxes": [],
+        "total": "23100",
+        "quantity": 2,
+        "subtotal": "23100",
+        "meta_data": [
+          {
+            "id": 12101,
+            "key": "_reduced_stock",
+            "value": "2",
+            "display_key": "_reduced_stock",
+            "display_value": "2"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": true,
+        "product_id": 66874,
+        "removed_at": "2026-04-10T19:33:10.502Z",
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "removal_reason": "admin_decision",
+        "global_unique_id": ""
+      },
+      {
+        "id": 1187,
+        "sku": "5090LB",
+        "name": "PIÑA ORO MIEL KILO - Lb",
+        "image": {
+          "id": 58385,
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/02/5090.jpg"
+        },
+        "price": 1800,
+        "taxes": [],
+        "total": "5400",
+        "quantity": 3,
+        "subtotal": "5400",
+        "meta_data": [
+          {
+            "id": 12002,
+            "key": "pa_unidad-de-medida-aproximado",
+            "value": "lb",
+            "display_key": "Unidad de medida (Aproximado)",
+            "display_value": "Lb"
+          },
+          {
+            "id": 12102,
+            "key": "_reduced_stock",
+            "value": "3",
+            "display_key": "_reduced_stock",
+            "display_value": "3"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 62425,
+        "parent_name": "PIÑA ORO MIEL KILO",
+        "subtotal_tax": "0",
+        "variation_id": 72932,
+        "global_unique_id": ""
+      },
+      {
+        "id": 1188,
+        "sku": "11527",
+        "name": "CAFE MUA INSTANTA GRANULADO X 170 G",
+        "image": {
+          "id": "77580",
+          "src": "https://supermercadomerkahorro.com/wp-content/uploads/2026/04/11527.webp"
+        },
+        "price": 19600,
+        "taxes": [],
+        "total": "19600",
+        "quantity": 1,
+        "subtotal": "19600",
+        "meta_data": [
+          {
+            "id": 12103,
+            "key": "_reduced_stock",
+            "value": "1",
+            "display_key": "_reduced_stock",
+            "display_value": "1"
+          }
+        ],
+        "tax_class": "",
+        "total_tax": "0",
+        "is_removed": false,
+        "product_id": 72106,
+        "parent_name": null,
+        "subtotal_tax": "0",
+        "variation_id": 0,
+        "global_unique_id": ""
+      }
+    ],
+    "date_created": "2026-04-10T11:47:01",
+    "customer_note": ""
+  }
+]

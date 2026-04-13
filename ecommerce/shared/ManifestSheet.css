@@ -427,6 +427,35 @@
   border-bottom: 1px solid #fde68a !important;
 }
 
+/* Fila de método de despacho */
+.manifest-row-shipping {
+  background: #f0fdf4 !important;
+  border-top: 2px solid #86efac;
+}
+
+.manifest-row-shipping td {
+  border-bottom: 1px solid #bbf7d0 !important;
+  font-style: italic;
+}
+
+.item-shipping-label {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.item-shipping-badge {
+  font-size: 0.5rem;
+  color: #15803d;
+  font-weight: 800;
+  display: inline-block;
+  background: #dcfce7;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 5px;
+  border: 1px solid #86efac;
+  vertical-align: middle;
+}
+
 /* =========================================
    RESUMEN DE SUSTITUCIONES
    ========================================= */
@@ -1064,6 +1093,20 @@
     background: #fffbeb !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .manifest-row-shipping {
+    background: #f0fdf4 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .item-shipping-badge {
+    font-size: 0.45rem !important;
+    background: transparent !important;
+    border: 0.5px solid #000 !important;
+    color: #000 !important;
+    padding: 1px 3px !important;
   }
 
   .manifest-substitutions-summary {

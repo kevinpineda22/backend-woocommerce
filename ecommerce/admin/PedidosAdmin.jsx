@@ -464,14 +464,20 @@ const PedidosAdmin = () => {
           <div className="pedidos-nav-label">Operación</div>
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "pending" ? "active" : ""}`}
-            onClick={() => { setCurrentView("pending"); setSidebarOpen(false); }}
+            onClick={() => {
+              setCurrentView("pending");
+              setSidebarOpen(false);
+            }}
           >
             <FaBox /> <span>Por Asignar</span>
             <span className="pedidos-badge-count">{stats.pending}</span>
           </button>
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "process" ? "active" : ""}`}
-            onClick={() => { setCurrentView("process"); setSidebarOpen(false); }}
+            onClick={() => {
+              setCurrentView("process");
+              setSidebarOpen(false);
+            }}
           >
             <FaRunning /> <span>En Proceso</span>
             <span className="pedidos-badge-count-blue">{stats.process}</span>
@@ -520,15 +526,20 @@ const PedidosAdmin = () => {
           </button>
 
           <div className="pedidos-nav-label">Administración</div>
+          {/* TODO: Habilitar cuando Inteligencia tenga datos reales
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "analitica" ? "active" : ""}`}
             onClick={() => { setCurrentView("analitica"); setSidebarOpen(false); }}
           >
             <FaChartLine /> <span>Inteligencia</span>
           </button>
+          */}
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "pickers" ? "active" : ""}`}
-            onClick={() => { setCurrentView("pickers"); setSidebarOpen(false); }}
+            onClick={() => {
+              setCurrentView("pickers");
+              setSidebarOpen(false);
+            }}
           >
             <FaUserTag /> <span>Pickers</span>
           </button>
@@ -543,8 +554,6 @@ const PedidosAdmin = () => {
       <main className="pedidos-layout-content">
         {currentView === "pickers" ? (
           <GestionPickers />
-        ) : currentView === "analitica" ? (
-          <AnaliticaPickers />
         ) : currentView === "audit_pending" ? (
           /* VISTA PENDIENTES AUDITORIA */
           <PendingAuditView

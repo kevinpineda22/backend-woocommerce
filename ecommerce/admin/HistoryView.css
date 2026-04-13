@@ -460,6 +460,11 @@
   color: #991b1b;
 }
 
+.hdm-order-tag--removed {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
 .hdm-order-customer {
   text-align: right;
   font-size: 0.85rem;
@@ -555,6 +560,11 @@
   border-color: #fca5a5;
 }
 
+.hdm-stat-removed {
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+  border-color: #c4b5fd;
+}
+
 .hdm-stat-icon {
   font-size: 1.2rem;
 }
@@ -567,6 +577,9 @@
 }
 .hdm-stat-notfound .hdm-stat-icon {
   color: #dc2626;
+}
+.hdm-stat-removed .hdm-stat-icon {
+  color: #7c3aed;
 }
 
 .hdm-stat-info {
@@ -622,6 +635,11 @@
   background: #fffbfb;
 }
 
+.hdm-product-card--removed {
+  border-color: #c4b5fd;
+  background: #faf8ff;
+}
+
 /* Barra lateral de color */
 .hdm-product-status-bar {
   width: 5px;
@@ -636,6 +654,9 @@
 }
 .hdm-product-status-bar.notfound {
   background: #ef4444;
+}
+.hdm-product-status-bar.removed {
+  background: #7c3aed;
 }
 
 .hdm-product-card-body {
@@ -754,6 +775,15 @@
   background: #fee2e2;
   color: #991b1b;
   border: 1px solid #fca5a5;
+}
+
+.hdm-badge--removed {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #c4b5fd;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* =========================================

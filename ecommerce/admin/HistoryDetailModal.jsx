@@ -5,6 +5,7 @@ import {
   FaExchangeAlt,
   FaBoxOpen,
   FaTimesCircle,
+  FaTrashAlt,
   FaArrowRight,
   FaClock,
   FaUser,
@@ -32,6 +33,18 @@ const formatTime = (dateStr) =>
 const calcDuration = (start, end) =>
   Math.round((new Date(end) - new Date(start)) / 60000);
 
+// Quita prefijos M/N de códigos de SIESA — la caja no los acepta.
+const stripMN = (code) => {
+  if (!code || typeof code !== "string") return code;
+  const trimmed = code.trim().replace(/\+$/, "");
+  const upper = trimmed.toUpperCase();
+  if (upper.startsWith("M") || upper.startsWith("N")) return trimmed.substring(1);
+  return trimmed;
+};
+
+// Limpia SKU removiendo guiones (mismo criterio que ManifestSheet).
+const cleanSku = (sku) => (!sku ? "" : sku.toString().replace(/-/g, ""));
+
 /* ─── Stats Cards ─── */
 const StatsBar = ({ logs }) => {
   const stats = useMemo(() => {
@@ -40,7 +53,8 @@ const StatsBar = ({ logs }) => {
     ).length;
     const substituted = logs.filter((l) => l.accion === "sustituido").length;
     const notFound = logs.filter((l) => l.accion === "no_encontrado").length;
-    return { picked, substituted, notFound };
+    const removedByAdmin = logs.filter((l) => l.accion === "eliminado_admin").length;
+    return { picked, substituted, notFound, removedByAdmin };
   }, [logs]);
 
   return (
@@ -66,6 +80,15 @@ const StatsBar = ({ logs }) => {
           <span className="hdm-stat-label">No Encontrados</span>
         </div>
       </div>
+      {stats.removedByAdmin > 0 && (
+        <div className="hdm-stat-card hdm-stat-removed">
+          <FaTrashAlt className="hdm-stat-icon" />
+          <div className="hdm-stat-info">
+            <span className="hdm-stat-number">{stats.removedByAdmin}</span>
+            <span className="hdm-stat-label">Eliminados</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -111,9 +134,10 @@ const SessionSummary = ({ metadata }) => (
 );
 
 /* ─── Producto con Imagen (mejorado) ─── */
-const ProductCard = ({ log, productsMap }) => {
+const ProductCard = ({ log, productsMap, snapshotItemsByKey }) => {
   const isSub = log.es_sustituto;
   const isNotFound = log.accion === "no_encontrado";
+  const isRemovedByAdmin = log.accion === "eliminado_admin";
   const isSystem = log.accion === "auditoria_finalizada";
 
   if (isSystem) return null;
@@ -126,16 +150,26 @@ const ProductCard = ({ log, productsMap }) => {
   const subProd = isSub ? productsMap?.[log.id_producto_final] || {} : {};
   const subImg = subProd.image;
 
-  // Código display
-  const displayCode = originalProd.barcode || originalProd.sku || "";
+  // Código display — usa la MISMA fuente que el manifiesto de salida.
+  // Para substituciones matcheamos contra id_producto_final (el producto que realmente quedó en la bolsa).
+  const effectiveProdId = isSub ? log.id_producto_final : log.id_producto;
+  const snapKey = `${effectiveProdId}-${log.id_pedido}`;
+  const snapItem = snapshotItemsByKey?.[snapKey];
+
+  const displayCode =
+    stripMN(snapItem?.barcode) ||
+    stripMN(log.codigo_barras_escaneado) ||
+    stripMN(originalProd.barcode) ||
+    cleanSku(originalProd.sku) ||
+    "";
 
   return (
     <div
-      className={`hdm-product-card ${isSub ? "hdm-product-card--sub" : ""} ${isNotFound ? "hdm-product-card--notfound" : ""}`}
+      className={`hdm-product-card ${isSub ? "hdm-product-card--sub" : ""} ${isNotFound ? "hdm-product-card--notfound" : ""} ${isRemovedByAdmin ? "hdm-product-card--removed" : ""}`}
     >
       {/* Status indicator bar */}
       <div
-        className={`hdm-product-status-bar ${isSub ? "sub" : isNotFound ? "notfound" : "normal"}`}
+        className={`hdm-product-status-bar ${isRemovedByAdmin ? "removed" : isSub ? "sub" : isNotFound ? "notfound" : "normal"}`}
       />
 
       <div className="hdm-product-card-body">
@@ -156,7 +190,7 @@ const ProductCard = ({ log, productsMap }) => {
 
           <div className="hdm-product-details">
             <div
-              className={`hdm-product-name ${isNotFound ? "hdm-strikethrough" : ""} ${isSub ? "hdm-strikethrough" : ""}`}
+              className={`hdm-product-name ${isNotFound ? "hdm-strikethrough" : ""} ${isSub ? "hdm-strikethrough" : ""} ${isRemovedByAdmin ? "hdm-strikethrough" : ""}`}
             >
               {log.nombre_producto}
             </div>
@@ -165,7 +199,7 @@ const ProductCard = ({ log, productsMap }) => {
             )}
 
             {/* Badge de estado */}
-            {!isSub && !isNotFound && (
+            {!isSub && !isNotFound && !isRemovedByAdmin && (
               <span className="hdm-badge hdm-badge--success">
                 ✓ Recolectado
               </span>
@@ -173,6 +207,11 @@ const ProductCard = ({ log, productsMap }) => {
             {isNotFound && (
               <span className="hdm-badge hdm-badge--danger">
                 ✕ No Encontrado
+              </span>
+            )}
+            {isRemovedByAdmin && (
+              <span className="hdm-badge hdm-badge--removed">
+                <FaTrashAlt size={10} /> Eliminado por Admin
               </span>
             )}
           </div>
@@ -229,7 +268,7 @@ const ProductCard = ({ log, productsMap }) => {
 };
 
 /* ─── Order Card (mejorado) ─── */
-const OrderCard = ({ orderInfo, logs, productsMap }) => {
+const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
   const order = orderInfo || {};
   const billing = order.billing || {};
   const shipping = order.shipping || {};
@@ -242,6 +281,9 @@ const OrderCard = ({ orderInfo, logs, productsMap }) => {
   const subsCount = orderLogs.filter((l) => l.es_sustituto).length;
   const notFoundCount = orderLogs.filter(
     (l) => l.accion === "no_encontrado",
+  ).length;
+  const removedCount = orderLogs.filter(
+    (l) => l.accion === "eliminado_admin",
   ).length;
 
   const addr = shipping.address_1 || billing.address_1 || "";
@@ -265,6 +307,11 @@ const OrderCard = ({ orderInfo, logs, productsMap }) => {
             {notFoundCount > 0 && (
               <span className="hdm-order-tag hdm-order-tag--danger">
                 {notFoundCount} no encontrados
+              </span>
+            )}
+            {removedCount > 0 && (
+              <span className="hdm-order-tag hdm-order-tag--removed">
+                {removedCount} eliminados
               </span>
             )}
           </div>
@@ -317,7 +364,12 @@ const OrderCard = ({ orderInfo, logs, productsMap }) => {
       {/* Lista de productos como tarjetas */}
       <div className="hdm-products-list">
         {orderLogs.map((log) => (
-          <ProductCard key={log.id} log={log} productsMap={productsMap} />
+          <ProductCard
+            key={log.id}
+            log={log}
+            productsMap={productsMap}
+            snapshotItemsByKey={snapshotItemsByKey}
+          />
         ))}
         {orderLogs.length === 0 && (
           <p className="hdm-no-logs">Sin novedades registradas</p>
@@ -339,6 +391,20 @@ const HistoryDetailModal = ({ historyDetail, onClose, onViewManifest }) => {
     () => (logs || []).filter((l) => l.accion !== "auditoria_finalizada"),
     [logs],
   );
+
+  // Mapa de items del final_snapshot por clave "<prodId>-<orderId>" — nos da el
+  // MISMO código que emitió el manifiesto de salida (EAN-13 real, GS1-29 pesable o fallback sintético).
+  const snapshotItemsByKey = useMemo(() => {
+    const map = {};
+    if (final_snapshot?.orders) {
+      final_snapshot.orders.forEach((order) => {
+        (order.items || []).forEach((item) => {
+          if (item.id) map[item.id] = item;
+        });
+      });
+    }
+    return map;
+  }, [final_snapshot]);
 
   const handleViewCertificate = () => {
     const mData = {
@@ -401,6 +467,7 @@ const HistoryDetailModal = ({ historyDetail, onClose, onViewManifest }) => {
                   orderInfo={oi}
                   logs={actionLogs}
                   productsMap={products_map}
+                  snapshotItemsByKey={snapshotItemsByKey}
                 />
               ))}
             </>

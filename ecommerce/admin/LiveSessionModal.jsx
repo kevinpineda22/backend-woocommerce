@@ -17,6 +17,7 @@ import {
   FaSync,
   FaStoreAlt,
   FaSpinner,
+  FaExchangeAlt,
 } from "react-icons/fa";
 import "./LiveSessionModal.css";
 
@@ -359,7 +360,13 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                                 textDecoration: "line-through",
                                 color: "#ef4444",
                               }
-                            : {}
+                            : hasSub
+                              ? {
+                                  textDecoration: "line-through",
+                                  color: "#92400e",
+                                  opacity: 0.7,
+                                }
+                              : {}
                         }
                       >
                         {item.name}
@@ -417,29 +424,45 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                             ? "General"
                             : `Pasillo ${item.pasillo}`}
                         </span>
-                        {!hasSub ? (
+                        {!hasSub && (
                           <span>
                             <strong>{item.quantity_total}</strong>{" "}
                             {item.unidad_medida || "un."}
                           </span>
-                        ) : (
-                          <div className="lsm-sub-breakdown">
-                            {item.qty_scanned > 0 && (
-                              <div className="lsm-sub-row original">
-                                <FaCheck size={10} /> {item.qty_scanned}{" "}
-                                Originales
-                              </div>
-                            )}
-                            <div className="lsm-sub-row warning">
-                              <FaExclamationTriangle size={10} />{" "}
-                              {item.sustituto.qty ||
-                                item.quantity_total -
-                                  (item.qty_scanned || 0)}{" "}
-                              {item.sustituto.name}
-                            </div>
-                          </div>
                         )}
                       </div>
+                      {hasSub && (
+                        <div className="lsm-substitution-block">
+                          <div className="lsm-sub-arrow-container">
+                            <div className="lsm-sub-arrow-line" />
+                            <div className="lsm-sub-arrow-badge">
+                              <FaExchangeAlt size={10} />
+                              <span>SUSTITUIDO POR</span>
+                            </div>
+                            <div className="lsm-sub-arrow-line" />
+                          </div>
+                          <div className="lsm-sub-product">
+                            <div className="lsm-sub-product-name">
+                              {item.sustituto.name}
+                            </div>
+                            <div className="lsm-sub-product-details">
+                              {item.sustituto.price > 0 && (
+                                <span className="lsm-sub-product-price">
+                                  {formatPrice(item.sustituto.price)}
+                                </span>
+                              )}
+                              <span className="lsm-sub-product-qty">
+                                {item.sustituto.qty || item.quantity_total - (item.qty_scanned || 0)} de {item.quantity_total} sustituidas
+                              </span>
+                            </div>
+                            {item.qty_scanned > 0 && (
+                              <div className="lsm-sub-row original" style={{ marginTop: 4 }}>
+                                <FaCheck size={10} /> {item.qty_scanned} de {item.quantity_total} originales OK
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     {showTrash ? (
                       <button
@@ -546,15 +569,19 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                             {it.status === "recolectado" && !hasSub && (
                               <FaCheck />
                             )}
-                            {hasSub && <FaExclamationTriangle />}
+                            {hasSub && <FaExchangeAlt />}
                           </div>
                           <div style={{ flex: 1 }}>
                             <div
-                              style={{ fontWeight: "600", color: "#334155" }}
+                              style={{
+                                fontWeight: "600",
+                                color: hasSub ? "#92400e" : "#334155",
+                                textDecoration: hasSub ? "line-through" : "none",
+                              }}
                             >
                               {it.name}
                             </div>
-                            {/* ✅ PESO EN EL ADMIN PEDIDOS */}
+                            {/* PESO EN EL ADMIN PEDIDOS */}
                             {it.peso_real > 0 && (
                               <div
                                 style={{
@@ -578,41 +605,33 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                                 Cant: <strong>{it.qty}</strong>
                               </div>
                             ) : (
-                              <div className="lsm-sub-breakdown extended">
-                                <div className="lsm-sub-header">
-                                  Solicitado:{" "}
-                                  <strong>
-                                    {it.qty} {it.unidad_medida || "un."}
-                                  </strong>
+                              <div className="lsm-substitution-block compact">
+                                <div className="lsm-sub-arrow-container compact">
+                                  <div className="lsm-sub-arrow-badge compact">
+                                    <FaExchangeAlt size={9} />
+                                    <span>SUSTITUIDO POR</span>
+                                  </div>
                                 </div>
-                                {it.quantity_total === it.qty ? (
-                                  <div className="lsm-sub-rows-container">
-                                    {it.qty_scanned > 0 && (
-                                      <div className="lsm-sub-row original">
-                                        <FaCheck size={10} />
-                                        <span>
-                                          <strong>{it.qty_scanned}</strong>{" "}
-                                          Originales
-                                        </span>
-                                      </div>
-                                    )}
-                                    <div className="lsm-sub-row warning">
-                                      <FaExclamationTriangle size={10} />
-                                      <span>
-                                        <strong>
-                                          {it.sustituto.qty ||
-                                            it.quantity_total -
-                                              (it.qty_scanned || 0)}
-                                        </strong>{" "}
-                                        x {it.sustituto.name}
+                                <div className="lsm-sub-product compact">
+                                  <div className="lsm-sub-product-name">
+                                    {it.sustituto.name}
+                                  </div>
+                                  <div className="lsm-sub-product-details">
+                                    {it.sustituto.price > 0 && (
+                                      <span className="lsm-sub-product-price">
+                                        {formatPrice(it.sustituto.price)}
                                       </span>
+                                    )}
+                                    <span className="lsm-sub-product-qty">
+                                      {it.sustituto.qty || it.quantity_total - (it.qty_scanned || 0)} de {it.qty} sustituidas
+                                    </span>
+                                  </div>
+                                  {it.qty_scanned > 0 && (
+                                    <div className="lsm-sub-row original" style={{ marginTop: 3, fontSize: "0.75rem" }}>
+                                      <FaCheck size={9} /> {it.qty_scanned} de {it.qty} originales OK
                                     </div>
-                                  </div>
-                                ) : (
-                                  <div className="lsm-shared-warning">
-                                    ⚠️ Sustitución en Lote Compartido
-                                  </div>
-                                )}
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>

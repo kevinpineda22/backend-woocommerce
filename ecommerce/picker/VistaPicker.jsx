@@ -210,6 +210,18 @@ const VistaPicker = () => {
           item_key: itemKey(item),
         });
       }
+      // Borrar logs de sustitución si existen
+      if (item.sustituto) {
+        queueAction({
+          id_sesion: sessionData.session_id,
+          id_producto_original: effectiveId(item),
+          accion: "reset_sustituto",
+          cantidad_afectada: 0,
+          pasillo: item.pasillo,
+          id_pedido: itemOrderId(item),
+          item_key: itemKey(item),
+        });
+      }
       if (scanned > 0) {
         queueAction({
           id_sesion: sessionData.session_id,

@@ -125,6 +125,10 @@ const ManifestSheet = ({
 
   const qrValue = items
     .flatMap((item) => {
+      // Ítem virtual de método de despacho: solo la barra, sin prefijo qty*
+      if (item.is_shipping_method) {
+        return [item.barcode];
+      }
       const qty = item.qty || item.count || 1;
       const unidad_medida = item.unidad_medida || "";
       const tieneVariaciones = item.tiene_variaciones || false;
@@ -203,8 +207,9 @@ const ManifestSheet = ({
     .filter(Boolean)
     .join("\r\n");
 
-  // Calcular total de items
-  const totalQty = items.reduce(
+  // Calcular total de items (excluir ítems virtuales de despacho)
+  const productItems = items.filter((i) => !i.is_shipping_method);
+  const totalQty = productItems.reduce(
     (sum, item) => sum + (item.qty || item.count || 1),
     0,
   );
@@ -319,7 +324,7 @@ const ManifestSheet = ({
           <div className="qr-info">
             <h4>CERTIFICADO DE SALIDA</h4>
             <p>
-              {items.length - omittedItems.length} de {items.length} productos
+              {productItems.length - omittedItems.length} de {productItems.length} productos
               incluidos en el QR
             </p>
             {omittedItems.length > 0 && (
@@ -366,6 +371,23 @@ const ManifestSheet = ({
               {items.map((item, idx) => {
                 const qty = item.qty || item.count || 1;
                 const isSub = item.type === "sustituido" || item.is_sub;
+
+                // Fila especial para método de despacho
+                if (item.is_shipping_method) {
+                  return (
+                    <tr key={idx} className="manifest-row-shipping">
+                      <td className="cell-num"></td>
+                      <td className="cell-qty">—</td>
+                      <td className="cell-item">
+                        <span className="item-name item-shipping-label">
+                          {item.name}
+                        </span>
+                        <span className="item-shipping-badge">DESPACHO</span>
+                      </td>
+                      <td className="cell-ref">{item.barcode}</td>
+                    </tr>
+                  );
+                }
 
                 const displayCode = getDisplayCode(item);
 
@@ -427,7 +449,7 @@ const ManifestSheet = ({
           {/* Footer con total */}
           <div className="manifest-footer">
             <div className="manifest-footer-total">
-              <span>Total:</span> {items.length} productos / {totalQty} unidades
+              <span>Total:</span> {productItems.length} productos / {totalQty} unidades
             </div>
           </div>
 

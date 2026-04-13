@@ -630,12 +630,17 @@ const VistaAuditor = () => {
   // ✅ GENERAMOS EL SNAPSHOT FINAL PARA LA DB
   const generateOutputData = () => {
     if (!auditData) return null;
-    return auditData.groupedItems.map((group) => ({
-      id: group.id,
-      customer: group.customer,
-      billing: group.billing,
-      shipping: group.shipping,
-      items: group.items.map((i) => {
+    return auditData.groupedItems.map((group) => {
+      // Detectar método de envío: recogida (305) o domicilio (304)
+      const isPickup = (group.shipping_lines || []).some(
+        (ship) => ship.method_id === "local_pickup",
+      );
+      const shippingBarcode = isPickup ? "305" : "304";
+      const shippingLabel = isPickup
+        ? "Recogida en tienda"
+        : "Domicilio e-commerce envío";
+
+      const productItems = group.items.map((i) => {
         const scannedSet = auditData.scannedBarcodes[i.id];
         let exactScannedBarcode = null;
 
@@ -684,8 +689,28 @@ const VistaAuditor = () => {
           unidad_medida: i.unidad_medida || "",
           tiene_variaciones: i.tiene_variaciones || false,
         };
-      }),
-    }));
+      });
+
+      // Inyectar ítem virtual de método de despacho al final
+      productItems.push({
+        id: `shipping-${group.id}`,
+        sku: shippingBarcode,
+        name: shippingLabel,
+        qty: 1,
+        price: 0,
+        barcode: shippingBarcode,
+        is_shipping_method: true,
+      });
+
+      return {
+        id: group.id,
+        customer: group.customer,
+        billing: group.billing,
+        shipping: group.shipping,
+        shipping_lines: group.shipping_lines || [],
+        items: productItems,
+      };
+    });
   };
 
   // ✅ RESTAURAR HISTORIAL

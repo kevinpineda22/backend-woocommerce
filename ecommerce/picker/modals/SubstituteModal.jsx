@@ -278,19 +278,29 @@ const SubstituteModal = ({
       try {
         // Extraer f120_id y unidad_medida del SKU (ej: "1039P2" → f120_id=1039, um=P2)
         const skuMatch = expectedSku.match(/^(\d+)([A-Z]+\d*)$/);
-        const f120Id = skuMatch ? parseInt(skuMatch[1]) : null;
+        // Si el SKU tiene sufijo de unidad (ej: "9896UND"), extraer f120_id del match
+        // Si el SKU es puramente numérico (ej: "9896"), usarlo directamente como f120_id
+        const f120Id = skuMatch
+          ? parseInt(skuMatch[1])
+          : (parseInt(expectedSku) || null);
         // Usar unidad_medida del SKU si está disponible, sino usar la del producto
         const umEsperada =
           (skuMatch && skuMatch[2]) || pendingSub.unidad_medida || "UND";
 
         if (f120Id) {
-          // Usar el mismo endpoint de validación que auditor
+          // Validar contra SIESA
           const res = await ecommerceApi.post(`/validar-codigo-auditor`, {
             codigo: cleanCode,
             f120_id_esperado: f120Id,
             unidad_medida_esperada: umEsperada,
           });
           isValid = res.data?.valid ?? false;
+
+          // En sustituciones, si el f120_id coincide pero la presentación difiere,
+          // aceptar igualmente — el picker ya eligió este producto conscientemente
+          if (!isValid && res.data?.f120_id_coincide) {
+            isValid = true;
+          }
 
           if (!isValid) {
             setSubError(
