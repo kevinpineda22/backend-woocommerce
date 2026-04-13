@@ -465,7 +465,7 @@ const PedidosAdmin = () => {
         `/historial-detalle?session_id=${session.id}&${getSedeParam()}`,
       );
 
-      const { final_snapshot, metadata, products_map } = res.data;
+      const { final_snapshot, metadata, products_map, orders_info } = res.data;
       if (!final_snapshot) {
         showToast(
           "Esta sesión no tiene certificado de salida (no ha sido auditada o es antigua).",
@@ -477,23 +477,36 @@ const PedidosAdmin = () => {
       // ✅ Mergear códigos de barras del products_map con los items del snapshot
       // Prioridad: barcode_sku_um (SKU+UM validado en SIESA) > datos_salida > barcode general > fallback
       const enrichedSnapshot = { ...final_snapshot };
+      // Construir mapa de orders_info para enriquecer con meta_data (cédula, etc.)
+      const ordersInfoMap = {};
+      if (orders_info) {
+        orders_info.forEach((oi) => {
+          ordersInfoMap[oi.id] = oi;
+        });
+      }
       if (products_map && enrichedSnapshot.orders) {
-        enrichedSnapshot.orders = enrichedSnapshot.orders.map((order) => ({
-          ...order,
-          items: order.items.map((item) => {
-            const pm = products_map[item.id] || {};
-            return {
-              ...item,
-              barcode:
-                pm.barcode_sku_um ||
-                item.barcode ||
-                pm.barcode ||
-                item.sku ||
-                item.id,
-              unidad_medida: pm.unidad_medida || item.unidad_medida || "",
-            };
-          }),
-        }));
+        enrichedSnapshot.orders = enrichedSnapshot.orders.map((order) => {
+          const orderInfo = ordersInfoMap[order.id] || {};
+          return {
+            ...order,
+            meta_data: order.meta_data || orderInfo.meta_data || [],
+            billing: order.billing || orderInfo.billing,
+            shipping: order.shipping || orderInfo.shipping,
+            items: order.items.map((item) => {
+              const pm = products_map[item.id] || {};
+              return {
+                ...item,
+                barcode:
+                  pm.barcode_sku_um ||
+                  item.barcode ||
+                  pm.barcode ||
+                  item.sku ||
+                  item.id,
+                unidad_medida: pm.unidad_medida || item.unidad_medida || "",
+              };
+            }),
+          };
+        });
       }
 
       setManifestData({

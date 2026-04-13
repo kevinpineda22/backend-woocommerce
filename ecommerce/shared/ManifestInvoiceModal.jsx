@@ -84,7 +84,9 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
           (() => {
             const items = currentOrder.items || [];
             const orderId =
-              currentOrder.order_id || currentOrder.id || manifestData.session_id;
+              currentOrder.order_id ||
+              currentOrder.id ||
+              manifestData.session_id;
 
             // Normalizar items para ManifestSheet
             const normalizedItems = items.map((item) => ({
@@ -110,6 +112,7 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
                   customer: currentOrder.customer,
                   billing: currentOrder.billing,
                   shipping: currentOrder.shipping,
+                  meta_data: currentOrder.meta_data,
                   items: normalizedItems,
                 }}
                 timestamp={manifestData.timestamp}

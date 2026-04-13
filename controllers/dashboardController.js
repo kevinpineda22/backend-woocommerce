@@ -820,6 +820,7 @@ exports.getSessionLogsDetail = async (req, res) => {
           billing: o.billing,
           shipping: o.shipping,
           shipping_lines: o.shipping_lines || [],
+          meta_data: o.meta_data || [],
           total_items:
             o.line_items?.reduce((acc, i) => acc + i.quantity, 0) || 0,
           date_created: o.date_created,

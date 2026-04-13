@@ -419,7 +419,7 @@ const VistaAuditor = () => {
           const prodId = log.es_sustituto
             ? log.id_producto_final || log.id_producto
             : log.id_producto;
-          
+
           // 🚀 CLAVE MAESTRA COMPUESTA: ID Producto + ID Pedido
           // Esto evita que la yuca del pedido A se sume a la del pedido B
           const key = `${prodId}-${log.id_pedido}`;
@@ -708,6 +708,7 @@ const VistaAuditor = () => {
         billing: group.billing,
         shipping: group.shipping,
         shipping_lines: group.shipping_lines || [],
+        meta_data: group.meta_data || [],
         items: productItems,
       };
     });
