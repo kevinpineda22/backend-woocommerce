@@ -578,6 +578,17 @@ exports.completeSession = async (req, res) => {
       .eq("id", id_sesion)
       .single();
 
+    // Resolver nombre del picker para auditoría
+    let pickerName = null;
+    {
+      const { data: pickerRow } = await supabase
+        .from("wc_pickers")
+        .select("nombre_completo")
+        .eq("id", id_picker)
+        .single();
+      pickerName = pickerRow?.nombre_completo || null;
+    }
+
     await supabase
       .from("wc_picking_sessions")
       .update({ estado: "pendiente_auditoria", fecha_fin: now })
@@ -598,11 +609,14 @@ exports.completeSession = async (req, res) => {
       .eq("id_sesion", id_sesion);
 
     logAuditEvent({
-      actor: { type: "picker", id: id_picker, name: null },
+      actor: { type: "picker", id: id_picker, name: pickerName },
       action: "session.completed",
       entity: { type: "session", id: id_sesion },
       sedeId: sessData?.sede_id || req.sedeId || null,
-      metadata: { orders: sessData?.ids_pedidos || [] },
+      metadata: {
+        orders: sessData?.ids_pedidos || [],
+        picker_name: pickerName,
+      },
     });
 
     res
@@ -636,9 +650,20 @@ exports.cancelAssignment = async (req, res) => {
 
     const { data: sessSede } = await supabase
       .from("wc_picking_sessions")
-      .select("sede_id")
+      .select("sede_id, ids_pedidos")
       .eq("id", idSesion)
       .single();
+
+    // Resolver nombre del picker para auditoría
+    let cancelPickerName = null;
+    {
+      const { data: pickerRow } = await supabase
+        .from("wc_pickers")
+        .select("nombre_completo")
+        .eq("id", id_picker)
+        .single();
+      cancelPickerName = pickerRow?.nombre_completo || null;
+    }
 
     await supabase
       .from("wc_picking_sessions")
@@ -654,11 +679,14 @@ exports.cancelAssignment = async (req, res) => {
       .eq("id", id_picker);
 
     logAuditEvent({
-      actor: { type: "picker", id: id_picker, name: null },
+      actor: { type: "picker", id: id_picker, name: cancelPickerName },
       action: "session.cancelled",
       entity: { type: "session", id: idSesion },
       sedeId: sessSede?.sede_id || req.sedeId || null,
-      metadata: {},
+      metadata: {
+        orders: sessSede?.ids_pedidos || [],
+        picker_name: cancelPickerName,
+      },
     });
 
     res.status(200).json({ message: "Sesión cancelada." });

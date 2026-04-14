@@ -539,6 +539,17 @@ exports.markSessionAsPaid = async (req, res) => {
 
     if (error) throw error;
 
+    // Resolver nombre del picker para trazabilidad
+    let paymentPickerName = null;
+    {
+      const { data: sessForPicker } = await supabase
+        .from("wc_picking_sessions")
+        .select("id_picker, wc_pickers(nombre_completo)")
+        .eq("id", session_id)
+        .single();
+      paymentPickerName = sessForPicker?.wc_pickers?.nombre_completo || null;
+    }
+
     logAuditEvent({
       actor: { type: "admin", id: admin_email || null, name: actorName },
       action: "payment.marked",
@@ -547,6 +558,7 @@ exports.markSessionAsPaid = async (req, res) => {
       metadata: {
         payment_method,
         orders: updated?.ids_pedidos || [],
+        picker_name: paymentPickerName,
       },
     });
 
@@ -817,6 +829,17 @@ exports.completeAuditSession = async (req, res) => {
 
     const allSynced = syncResults.every((r) => r.success);
 
+    // Resolver nombre del picker para el registro de auditoría
+    let auditPickerName = null;
+    if (session?.id_picker) {
+      const { data: pickerRow } = await supabase
+        .from("wc_pickers")
+        .select("nombre_completo")
+        .eq("id", session.id_picker)
+        .single();
+      auditPickerName = pickerRow?.nombre_completo || null;
+    }
+
     logAuditEvent({
       actor: {
         type: "auditor",
@@ -829,6 +852,7 @@ exports.completeAuditSession = async (req, res) => {
       metadata: {
         orders: session?.ids_pedidos || [],
         picker_id: session?.id_picker || null,
+        picker_name: auditPickerName,
         all_synced: allSynced,
       },
     });

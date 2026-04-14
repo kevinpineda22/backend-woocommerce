@@ -61,23 +61,33 @@ const buildSentence = (evt) => {
   const actor = evt.actor_name || evt.actor_id || "Alguien";
   const meta = evt.metadata || {};
 
+  // Helper: formatea lista de pedidos como "#77973, #77966"
+  const fmtOrders = (orders) => {
+    if (!orders || orders.length === 0) return "";
+    return orders.map((o) => `#${o}`).join(", ");
+  };
+
+  const ordersList = fmtOrders(meta.orders);
+  const ordersText = ordersList ? ` — Pedido(s): ${ordersList}` : "";
+  const pickerText = meta.picker_name ? ` (picker: ${meta.picker_name})` : "";
+
   switch (evt.action) {
     case "session.created":
-      return `${actor} asignó ${(meta.orders || []).length} pedido(s) al picker ${meta.picker_name || meta.picker_id || "?"}.`;
+      return `${actor} asignó pedido(s) ${ordersList || "?"} al picker ${meta.picker_name || meta.picker_id || "?"}.`;
     case "session.completed":
-      return `${actor} finalizó el picking de ${(meta.orders || []).length} pedido(s).`;
+      return `${actor} finalizó el picking de pedido(s) ${ordersList || "?"}.`;
     case "session.cancelled":
-      return `${actor} canceló su sesión de picking.`;
+      return `${actor} canceló su sesión de picking.${ordersText}`;
     case "session.audited":
-      return `${actor} aprobó la auditoría de ${(meta.orders || []).length} pedido(s).`;
+      return `${actor} aprobó la auditoría de pedido(s) ${ordersList || "?"}.${pickerText}`;
     case "payment.marked":
-      return `${actor} registró pago (${meta.payment_method || "?"}) para ${(meta.orders || []).length} pedido(s).`;
+      return `${actor} registró pago (${meta.payment_method || "?"}) para pedido(s) ${ordersList || "?"}.${pickerText}`;
     case "item.picked":
-      return `${actor} recolectó ${meta.cantidad || 1}x "${meta.nombre_producto || meta.id_producto}".`;
+      return `${actor} recolectó ${meta.cantidad || 1}x "${meta.nombre_producto || meta.id_producto}"${meta.id_pedido ? ` del pedido #${meta.id_pedido}` : ""}.`;
     case "item.substituted":
-      return `${actor} sustituyó "${meta.nombre_producto || meta.id_producto}" por "${meta.sustituto?.name || "?"}".`;
+      return `${actor} sustituyó "${meta.nombre_producto || meta.id_producto}" por "${meta.sustituto?.name || "?"}"${meta.id_pedido ? ` en pedido #${meta.id_pedido}` : ""}.`;
     case "item.not_found":
-      return `${actor} marcó "${meta.nombre_producto || meta.id_producto}" como no encontrado${meta.motivo ? ` — ${meta.motivo}` : ""}.`;
+      return `${actor} marcó "${meta.nombre_producto || meta.id_producto}" como no encontrado${meta.motivo ? ` — ${meta.motivo}` : ""}${meta.id_pedido ? ` (pedido #${meta.id_pedido})` : ""}.`;
     case "item.removed":
       return `${actor} anuló "${meta.nombre_producto || meta.id_producto}" de la sesión.`;
     case "item.restored":
