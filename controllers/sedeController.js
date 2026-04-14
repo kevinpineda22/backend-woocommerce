@@ -7,6 +7,7 @@
 
 const { supabase } = require("../services/supabaseClient");
 const WooCommerce = require("../services/wooService");
+const { logAuditEvent } = require("../services/auditService");
 
 // Multi-sede WooCommerce (WordPress Multisite)
 const { getOrderFromAnySede } = require("../services/wooMultiService");
@@ -68,6 +69,19 @@ exports.createSede = async (req, res) => {
     if (error) throw error;
 
     invalidateSedeCache();
+
+    logAuditEvent({
+      actor: {
+        type: "admin",
+        id: req.body.admin_email || null,
+        name: req.body.admin_name || "Admin",
+      },
+      action: "sede.created",
+      entity: { type: "sede", id: data.id },
+      sedeId: data.id,
+      metadata: { nombre: data.nombre, slug: data.slug },
+    });
+
     res.status(201).json({ message: "Sede creada exitosamente", sede: data });
   } catch (error) {
     if (error.code === "23505") {
@@ -101,6 +115,19 @@ exports.updateSede = async (req, res) => {
     if (error) throw error;
 
     invalidateSedeCache();
+
+    logAuditEvent({
+      actor: {
+        type: "admin",
+        id: req.body.admin_email || null,
+        name: req.body.admin_name || "Admin",
+      },
+      action: "sede.updated",
+      entity: { type: "sede", id: data.id },
+      sedeId: data.id,
+      metadata: { changes: Object.keys(updateData) },
+    });
+
     res.status(200).json({ message: "Sede actualizada", sede: data });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -122,6 +149,19 @@ exports.deactivateSede = async (req, res) => {
     if (error) throw error;
 
     invalidateSedeCache();
+
+    logAuditEvent({
+      actor: {
+        type: "admin",
+        id: req.body?.admin_email || null,
+        name: req.body?.admin_name || "Admin",
+      },
+      action: "sede.deactivated",
+      entity: { type: "sede", id },
+      sedeId: id,
+      metadata: {},
+    });
+
     res.status(200).json({ message: "Sede desactivada" });
   } catch (error) {
     res.status(500).json({ error: error.message });

@@ -13,6 +13,7 @@ import {
   FaMoneyBillWave,
   FaUserCircle,
   FaTrashAlt,
+  FaClipboardList,
 } from "react-icons/fa";
 
 import { supabase } from "../../../supabaseClient";
@@ -34,6 +35,7 @@ import HistoryDetailModal from "./HistoryDetailModal";
 import ManifestInvoiceModal from "../shared/ManifestInvoiceModal";
 import ConfirmModal from "../shared/ConfirmModal";
 import CancelledOrdersView from "./CancelledOrdersView";
+import AuditLogView from "./AuditLogView";
 import { AnimatePresence, motion } from "framer-motion";
 
 // --- MULTI-SEDE ---
@@ -148,6 +150,7 @@ const PedidosAdmin = () => {
   const [confirmConfig, setConfirmConfig] = useState({
     isOpen: false,
     session: null,
+    paymentMethod: "efectivo", // 'efectivo' | 'credito'
   });
 
   const showToast = useCallback((msg, type = "success") => {
@@ -271,10 +274,15 @@ const PedidosAdmin = () => {
 
   const handleConfirmAssignment = async (picker) => {
     setIsAssigning(true);
+    const empleado = JSON.parse(localStorage.getItem("empleado_info") || "{}");
+    const adminName = empleado.nombre || "Admin";
+    const adminEmail = localStorage.getItem("correo_empleado") || "";
     try {
       await ecommerceApi.post(`/crear-sesion?${getSedeParam()}`, {
         id_picker: picker.id,
         ids_pedidos: Array.from(selectedIds),
+        admin_name: adminName,
+        admin_email: adminEmail,
       });
       showToast(`✅ Misión asignada a ${picker.nombre_completo}`, "success");
       setShowAssignModal(false);
@@ -403,24 +411,40 @@ const PedidosAdmin = () => {
     }
   };
 
-  // --- MARCAR COMO PAGADO (MODAL CONFIRMACIÓN) ---
+  // --- MARCAR COMO PAGADO / CRÉDITO (MODAL CONFIRMACIÓN) ---
   const handleMarkAsPaidRequested = (session) => {
-    setConfirmConfig({ isOpen: true, session });
+    setConfirmConfig({ isOpen: true, session, paymentMethod: "efectivo" });
+  };
+
+  const handleMarkAsCreditRequested = (session) => {
+    setConfirmConfig({ isOpen: true, session, paymentMethod: "credito" });
   };
 
   const handleMarkAsPaidConfirm = async () => {
     if (!confirmConfig.session) return;
+    const empleado = JSON.parse(localStorage.getItem("empleado_info") || "{}");
+    const adminName = empleado.nombre || "Admin";
+    const adminEmail = localStorage.getItem("correo_empleado") || "";
+    const method = confirmConfig.paymentMethod || "efectivo";
     try {
       await ecommerceApi.post(`/marcar-pagado?${getSedeParam()}`, {
         session_id: confirmConfig.session.id,
+        payment_method: method,
+        admin_name: adminName,
+        admin_email: adminEmail,
       });
-      showToast("✅ Pago registrado con éxito.", "success");
+      showToast(
+        method === "credito"
+          ? "🏦 Venta a crédito registrada."
+          : "✅ Pago en efectivo registrado.",
+        "success",
+      );
       fetchPaymentPending();
-      fetchHistory(); // Actualizar historial
+      fetchHistory();
     } catch (error) {
       showToast("Error al registrar pago: " + error.message, "error");
     } finally {
-      setConfirmConfig({ isOpen: false, session: null });
+      setConfirmConfig({ isOpen: false, session: null, paymentMethod: "efectivo" });
     }
   };
 
@@ -649,6 +673,15 @@ const PedidosAdmin = () => {
           >
             <FaTrashAlt /> <span>Pedidos Cancelados</span>
           </button>
+          <button
+            className={`pedidos-layout-sidebar-button ${currentView === "audit_log" ? "active" : ""}`}
+            onClick={() => {
+              setCurrentView("audit_log");
+              setSidebarOpen(false);
+            }}
+          >
+            <FaClipboardList /> <span>Auditoría</span>
+          </button>
         </nav>
         <div className="pedidos-sidebar-footer">
           «{getQuote(shuffledQuotes, 0).text}»
@@ -658,7 +691,9 @@ const PedidosAdmin = () => {
 
       {/* CONTENIDO PRINCIPAL */}
       <main className="pedidos-layout-content">
-        {currentView === "cancelled" ? (
+        {currentView === "audit_log" ? (
+          <AuditLogView />
+        ) : currentView === "cancelled" ? (
           <>
             <header className="pedidos-layout-header">
               <div>
@@ -699,6 +734,7 @@ const PedidosAdmin = () => {
             onViewDetail={handleViewHistoryDetail}
             onViewManifest={handleViewManifestDirect}
             onMarkAsPaid={handleMarkAsPaidRequested}
+            onMarkAsCredit={handleMarkAsCreditRequested}
           />
         ) : currentView === "history" ? (
           /* VISTA DE HISTORIAL */
@@ -812,16 +848,32 @@ const PedidosAdmin = () => {
       {/* COMPONENTE DE CONFIRMACION */}
       <ConfirmModal
         isOpen={confirmConfig.isOpen}
-        title="💵 Confirmar Recepción de Pago"
+        title={
+          confirmConfig.paymentMethod === "credito"
+            ? "🏦 Confirmar Venta a Crédito"
+            : "💵 Confirmar Recepción de Pago"
+        }
         message={
           confirmConfig.session
-            ? `¿Confirmas físicamente haber recibido el dinero del picker ${confirmConfig.session.picker}? Una vez procesado, este registro pasará al Historial de Sesiones Finalizadas y no habrá vuelta atrás.`
+            ? confirmConfig.paymentMethod === "credito"
+              ? `¿Confirmas registrar esta venta como CRÉDITO para el picker ${confirmConfig.session.picker}? Quedará marcado en el historial como pago pendiente por crédito.`
+              : `¿Confirmas físicamente haber recibido el dinero del picker ${confirmConfig.session.picker}? Una vez procesado, este registro pasará al Historial de Sesiones Finalizadas y no habrá vuelta atrás.`
             : ""
         }
-        confirmText="Confirmar Pago"
+        confirmText={
+          confirmConfig.paymentMethod === "credito"
+            ? "Confirmar Crédito"
+            : "Confirmar Pago"
+        }
         cancelText="Volver"
         onConfirm={handleMarkAsPaidConfirm}
-        onCancel={() => setConfirmConfig({ isOpen: false, session: null })}
+        onCancel={() =>
+          setConfirmConfig({
+            isOpen: false,
+            session: null,
+            paymentMethod: "efectivo",
+          })
+        }
       />
 
       {/* TOAST ESTILO GLOBAL */}

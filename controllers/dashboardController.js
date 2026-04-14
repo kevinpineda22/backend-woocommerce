@@ -2,6 +2,7 @@ const WooCommerce = require("../services/wooService");
 const { supabase } = require("../services/supabaseClient");
 const { agruparItemsParaPicking } = require("./pickingUtils");
 const { syncOrderToWoo } = require("../services/syncWooService");
+const { logAuditEvent } = require("../services/auditService");
 const {
   getSedeFromWooOrder,
   extractSedeFromOrder,
@@ -485,18 +486,52 @@ exports.getPendingPaymentSessions = async (req, res) => {
 };
 
 exports.markSessionAsPaid = async (req, res) => {
-  const { session_id } = req.body;
+  const {
+    session_id,
+    payment_method = "efectivo",
+    admin_name,
+    admin_email,
+  } = req.body;
   try {
     if (!session_id) return res.status(400).json({ error: "Falta session_id" });
+    if (!["efectivo", "credito"].includes(payment_method)) {
+      return res.status(400).json({
+        error: "payment_method inválido. Debe ser 'efectivo' o 'credito'.",
+      });
+    }
 
-    const { error } = await supabase
+    const now = new Date().toISOString();
+    const actorName = (admin_name || "").trim() || "Admin";
+
+    const { data: updated, error } = await supabase
       .from("wc_picking_sessions")
-      .update({ estado: "finalizado" })
-      .eq("id", session_id);
+      .update({
+        estado: "finalizado",
+        metodo_pago: payment_method,
+        fecha_pago: now,
+        pagado_por: actorName,
+      })
+      .eq("id", session_id)
+      .select("id, ids_pedidos, sede_id")
+      .single();
 
     if (error) throw error;
 
-    res.status(200).json({ message: "Sesión marcada como pagada/finalizada." });
+    logAuditEvent({
+      actor: { type: "admin", id: admin_email || null, name: actorName },
+      action: "payment.marked",
+      entity: { type: "session", id: session_id },
+      sedeId: updated?.sede_id || req.sedeId || null,
+      metadata: {
+        payment_method,
+        orders: updated?.ids_pedidos || [],
+      },
+    });
+
+    res.status(200).json({
+      message: "Sesión marcada como pagada/finalizada.",
+      payment_method,
+    });
   } catch (error) {
     console.error("Error markSessionAsPaid:", error.message);
     res
@@ -510,7 +545,7 @@ exports.getHistorySessions = async (req, res) => {
     let histQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, sede_id, metodo_pago, fecha_pago, pagado_por, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
       )
       .in("estado", ["finalizado"])
       .order("fecha_fin", { ascending: false })
@@ -561,6 +596,9 @@ exports.getHistorySessions = async (req, res) => {
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
         estado: sess.estado,
+        metodo_pago: sess.metodo_pago || null,
+        fecha_pago: sess.fecha_pago || null,
+        pagado_por: sess.pagado_por || null,
       };
     });
     res.status(200).json(historyData);
@@ -648,7 +686,7 @@ exports.getPendingAuditSessions = async (req, res) => {
 // 5. FINALIZAR AUDITORÍA (APROBAR SALIDA)
 // =========================================================
 exports.completeAuditSession = async (req, res) => {
-  const { session_id, datos_salida } = req.body;
+  const { session_id, datos_salida, auditor_name, auditor_email } = req.body;
 
   try {
     if (!session_id) return res.status(400).json({ error: "Falta session_id" });
@@ -657,7 +695,7 @@ exports.completeAuditSession = async (req, res) => {
 
     const { data: session, error: getSessError } = await supabase
       .from("wc_picking_sessions")
-      .select("id_picker, ids_pedidos, resumen_metricas")
+      .select("id_picker, ids_pedidos, resumen_metricas, sede_id")
       .eq("id", session_id)
       .single();
 
@@ -730,6 +768,23 @@ exports.completeAuditSession = async (req, res) => {
     }
 
     const allSynced = syncResults.every((r) => r.success);
+
+    logAuditEvent({
+      actor: {
+        type: "auditor",
+        id: auditor_email || null,
+        name: (auditor_name || "").trim() || "Auditor",
+      },
+      action: "session.audited",
+      entity: { type: "session", id: session_id },
+      sedeId: session?.sede_id || req.sedeId || null,
+      metadata: {
+        orders: session?.ids_pedidos || [],
+        picker_id: session?.id_picker || null,
+        all_synced: allSynced,
+      },
+    });
+
     res.status(200).json({
       message: allSynced
         ? "Salida aprobada. Pedidos sincronizados con WooCommerce."

@@ -165,24 +165,24 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
     if (!confirmConfig.item || !confirmConfig.type) return;
     const { type, item } = confirmConfig;
     setIsProcessing(true);
+    const empleado = JSON.parse(localStorage.getItem("empleado_info") || "{}");
+    const adminName = empleado.nombre || "Admin";
+    const adminEmail = localStorage.getItem("correo_empleado") || "";
+    const commonBody = {
+      id_sesion: sessionInfo.session_id,
+      id_producto: item.variation_id || item.product_id,
+      admin_name: adminName,
+      admin_email: adminEmail,
+    };
     try {
       if (type === "delete") {
-        await ecommerceApi.post("/admin-remove-item", {
-          id_sesion: sessionInfo.session_id,
-          id_producto: item.variation_id || item.product_id,
-        });
+        await ecommerceApi.post("/admin-remove-item", commonBody);
         showToast(`Anulado: ${item.name}`, "success");
       } else if (type === "restore") {
-        await ecommerceApi.post("/admin-restore-item", {
-          id_sesion: sessionInfo.session_id,
-          id_producto: item.variation_id || item.product_id,
-        });
+        await ecommerceApi.post("/admin-restore-item", commonBody);
         showToast(`Restaurado: ${item.name}`, "info");
       } else if (type === "pick") {
-        await ecommerceApi.post("/admin-force-pick", {
-          id_sesion: sessionInfo.session_id,
-          id_producto: item.variation_id || item.product_id,
-        });
+        await ecommerceApi.post("/admin-force-pick", commonBody);
         showToast(`Recolectado a la fuerza: ${item.name}`, "success");
       }
       await refreshRouteData();

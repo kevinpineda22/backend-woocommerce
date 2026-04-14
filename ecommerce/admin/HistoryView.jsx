@@ -8,12 +8,24 @@ const ESTADO_CONFIG = {
   auditado: { className: "hv-badge--pendiente", label: "🚧 Pendiente de Pago" },
 };
 
+const METODO_PAGO_CONFIG = {
+  efectivo: { className: "hv-badge-metodo hv-badge-metodo--cash", label: "💵 Efectivo" },
+  credito:  { className: "hv-badge-metodo hv-badge-metodo--credit", label: "🏦 Crédito" },
+};
+
 const getEstadoBadge = (estado) => {
   const config = ESTADO_CONFIG[estado] || {
     className: "hv-badge--default",
     label: estado,
   };
   return <span className={`hv-badge ${config.className}`}>{config.label}</span>;
+};
+
+const getMetodoPagoBadge = (metodo) => {
+  if (!metodo) return null;
+  const cfg = METODO_PAGO_CONFIG[metodo];
+  if (!cfg) return null;
+  return <span className={cfg.className}>{cfg.label}</span>;
 };
 
 /* ─── Componente ─── */
@@ -26,6 +38,7 @@ const HistoryView = ({
   emptyText = "📭 No hay registros en el historial",
   isPaymentView = false,
   onMarkAsPaid,
+  onMarkAsCredit,
 }) => {
   if (loading) {
     return (
@@ -65,7 +78,7 @@ const HistoryView = ({
                 <div className="hv-cell-fecha-label">{sess.fecha}</div>
                 <small>{sess.hora_fin}</small>
               </td>
-              
+
               {isPaymentView ? (
                 <td>
                   <div className="hv-cell-stack">
@@ -100,20 +113,34 @@ const HistoryView = ({
                   ))}
                 </div>
               </td>
-              <td className="hv-cell-estado">{getEstadoBadge(sess.estado)}</td>
+              <td className="hv-cell-estado">
+                <div className="hv-cell-stack hv-cell-stack--center">
+                  {getEstadoBadge(sess.estado)}
+                  {!isPaymentView && getMetodoPagoBadge(sess.metodo_pago)}
+                </div>
+              </td>
               <td>
                 <span className="hv-badge-duracion">{sess.duracion}</span>
               </td>
               <td>
                 <div className="hv-cell-acciones">
                   {isPaymentView && (
-                    <button
-                      className="hv-btn-paid"
-                      title="Marcar como Pagado"
-                      onClick={() => onMarkAsPaid(sess)}
-                    >
-                      💰 Pagado
-                    </button>
+                    <>
+                      <button
+                        className="hv-btn-paid"
+                        title="Marcar como Pagado (Efectivo)"
+                        onClick={() => onMarkAsPaid(sess)}
+                      >
+                        💰 Pagado
+                      </button>
+                      <button
+                        className="hv-btn-credit"
+                        title="Marcar como Crédito"
+                        onClick={() => onMarkAsCredit(sess)}
+                      >
+                        🏦 Crédito
+                      </button>
+                    </>
                   )}
                   <button
                     className="hv-btn-icon hv-btn-icon--warning"

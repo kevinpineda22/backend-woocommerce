@@ -8,7 +8,8 @@ const PendingPaymentView = ({
   onRefresh,
   onViewDetail,
   onViewManifest,
-  onMarkAsPaid, // Nueva prop para marcar como pagado
+  onMarkAsPaid,
+  onMarkAsCredit,
 }) => {
   return (
     <>
@@ -26,8 +27,9 @@ const PendingPaymentView = ({
           onViewManifest={onViewManifest}
           loadingText="Cargando pendientes de pago..."
           emptyText="💰 No hay pedidos pendientes de pago"
-          isPaymentView={true} // Flag para activar botón de pago en HistoryView
+          isPaymentView={true}
           onMarkAsPaid={onMarkAsPaid}
+          onMarkAsCredit={onMarkAsCredit}
         />
       </div>
     </>

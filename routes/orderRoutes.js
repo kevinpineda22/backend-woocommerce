@@ -8,6 +8,7 @@ const productCtrl = require("../controllers/productController");
 const dashboardCtrl = require("../controllers/dashboardController");
 const adminCtrl = require("../controllers/adminController");
 const sedeCtrl = require("../controllers/sedeController");
+const auditCtrl = require("../controllers/auditLogController");
 
 // Middleware Multi-Sede (se aplica a TODAS las rutas de este router)
 const { sedeMiddleware } = require("../middleware/sedeMiddleware");
@@ -63,6 +64,10 @@ router.post("/admin-force-pick", adminCtrl.forcePickItemToSession);
 router.post("/cancelar-pedido", adminCtrl.cancelOrder);
 router.post("/restaurar-pedido", adminCtrl.restoreOrder);
 router.get("/pedidos-cancelados", adminCtrl.getCancelledOrders);
+
+// Audit Log (timeline global del sistema)
+router.get("/audit-log", auditCtrl.listAuditEvents);
+router.get("/audit-log/actions", auditCtrl.getAuditActions);
 
 // Ruta temporal para espiar metadatos (mejorada con detección de sede)
 router.get("/espiar-pedido/:id", dashboardCtrl.espiarPedido);

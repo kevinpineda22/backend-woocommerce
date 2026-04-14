@@ -1,4 +1,15 @@
 const { supabase } = require("../services/supabaseClient");
+const { logAuditEvent } = require("../services/auditService");
+
+// Mapeo de acción de picking → acción de audit log
+const PICKING_ACTION_MAP = {
+  recolectado: "item.picked",
+  sustituido: "item.substituted",
+  no_encontrado: "item.not_found",
+  reset: "item.reset",
+  revert_short_pick: "item.revert_short_pick",
+  reset_sustituto: "item.reset_sustituto",
+};
 
 exports.registerAction = async (req, res) => {
   const {
@@ -60,16 +71,36 @@ exports.registerAction = async (req, res) => {
 
     const allAssignmentIds = assignments.map((a) => a.id);
 
-    // Multi-Sede: Obtener sede_id de la sesión para propagarla al log
+    // Multi-Sede: Obtener sede_id y picker de la sesión
     let sedeId = req.sedeId || null;
-    if (!sedeId) {
+    let pickerIdForAudit = null;
+    {
       const { data: sessionData } = await supabase
         .from("wc_picking_sessions")
-        .select("sede_id")
+        .select("sede_id, id_picker")
         .eq("id", id_sesion)
         .single();
-      if (sessionData) sedeId = sessionData.sede_id;
+      if (sessionData) {
+        if (!sedeId) sedeId = sessionData.sede_id;
+        pickerIdForAudit = sessionData.id_picker;
+      }
     }
+
+    const auditItem = (auditAction, extraMeta = {}) => {
+      logAuditEvent({
+        actor: { type: "picker", id: pickerIdForAudit, name: null },
+        action: auditAction,
+        entity: { type: "session", id: id_sesion },
+        sedeId,
+        metadata: {
+          id_producto: id_producto_original,
+          nombre_producto: nombre_producto_original,
+          cantidad: qty,
+          id_pedido: id_pedido || null,
+          ...extraMeta,
+        },
+      });
+    };
 
     // =================================================================
     // CASO REVERT SHORT PICK: BORRAR SÓLO LOGS DE "no_encontrado"
@@ -85,6 +116,8 @@ exports.registerAction = async (req, res) => {
         .eq("accion", "no_encontrado");
 
       if (delError) throw delError;
+
+      auditItem(PICKING_ACTION_MAP.revert_short_pick);
 
       return res.status(200).json({
         success: true,
@@ -126,6 +159,8 @@ exports.registerAction = async (req, res) => {
         if (delError) throw delError;
       }
 
+      auditItem(PICKING_ACTION_MAP.reset);
+
       return res
         .status(200)
         .json({ success: true, message: "Item devuelto a pendientes" });
@@ -156,6 +191,8 @@ exports.registerAction = async (req, res) => {
           .in("id", ids);
         if (delError) throw delError;
       }
+
+      auditItem(PICKING_ACTION_MAP.reset_sustituto);
 
       return res
         .status(200)
@@ -246,6 +283,19 @@ exports.registerAction = async (req, res) => {
       .insert(logsToInsert);
 
     if (insertError) throw insertError;
+
+    const auditAction = PICKING_ACTION_MAP[accion] || `item.${accion}`;
+    const extraMeta = {};
+    if (accion === "sustituido" && datos_sustituto) {
+      extraMeta.sustituto = {
+        id: datos_sustituto.id,
+        name: datos_sustituto.name,
+        price: datos_sustituto.price,
+      };
+    }
+    if (accion === "no_encontrado" && motivo) extraMeta.motivo = motivo;
+    if (peso_real) extraMeta.peso_real = peso_real;
+    auditItem(auditAction, extraMeta);
 
     res.status(200).json({ success: true, message: "Acción registrada" });
   } catch (error) {

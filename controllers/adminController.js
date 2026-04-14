@@ -3,6 +3,7 @@ const {
   getWooClient,
   invalidateResponseCache,
 } = require("../services/wooMultiService");
+const { logAuditEvent } = require("../services/auditService");
 
 // Helper: Obtener sede_id de una sesión
 async function getSessionSedeId(sessionId) {
@@ -45,7 +46,7 @@ async function getBarcodeFromSiesa(sku) {
 }
 
 exports.removeItemFromSession = async (req, res) => {
-  const { id_sesion, id_producto } = req.body;
+  const { id_sesion, id_producto, admin_name, admin_email } = req.body;
 
   try {
     const now = new Date().toISOString();
@@ -109,6 +110,21 @@ exports.removeItemFromSession = async (req, res) => {
 
     await supabase.from("wc_log_picking").insert([logEntry]);
 
+    logAuditEvent({
+      actor: {
+        type: "admin",
+        id: admin_email || null,
+        name: (admin_name || "").trim() || "Admin",
+      },
+      action: "item.removed",
+      entity: { type: "session", id: id_sesion },
+      sedeId,
+      metadata: {
+        id_producto,
+        nombre_producto: nombreProducto,
+      },
+    });
+
     res.status(200).json({ message: "Producto anulado correctamente." });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -117,7 +133,7 @@ exports.removeItemFromSession = async (req, res) => {
 
 // ✅ NUEVA FUNCIÓN: RESTAURAR ITEM
 exports.restoreItemToSession = async (req, res) => {
-  const { id_sesion, id_producto } = req.body;
+  const { id_sesion, id_producto, admin_name, admin_email } = req.body;
 
   try {
     const now = new Date().toISOString();
@@ -172,6 +188,18 @@ exports.restoreItemToSession = async (req, res) => {
 
     await supabase.from("wc_log_picking").insert([logEntry]);
 
+    logAuditEvent({
+      actor: {
+        type: "admin",
+        id: admin_email || null,
+        name: (admin_name || "").trim() || "Admin",
+      },
+      action: "item.restored",
+      entity: { type: "session", id: id_sesion },
+      sedeId: sedeIdRestore,
+      metadata: { id_producto },
+    });
+
     res.status(200).json({ message: "Producto restaurado correctamente." });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -179,7 +207,7 @@ exports.restoreItemToSession = async (req, res) => {
 };
 // ✅ NUEVA FUNCIÓN: PASAR A CANASTA (FORZADO POR ADMIN)
 exports.forcePickItemToSession = async (req, res) => {
-  const { id_sesion, id_producto } = req.body;
+  const { id_sesion, id_producto, admin_name, admin_email } = req.body;
 
   try {
     const now = new Date().toISOString();
@@ -268,6 +296,18 @@ exports.forcePickItemToSession = async (req, res) => {
         .insert(logsToInsert);
       if (insertError) throw insertError;
     }
+
+    logAuditEvent({
+      actor: {
+        type: "admin",
+        id: admin_email || null,
+        name: (admin_name || "").trim() || "Admin",
+      },
+      action: "item.force_picked",
+      entity: { type: "session", id: id_sesion },
+      sedeId: sedeIdForce,
+      metadata: { id_producto, cantidad: logsToInsert.length },
+    });
 
     res
       .status(200)
@@ -361,6 +401,18 @@ exports.cancelOrder = async (req, res) => {
       `🗑️ [ADMIN] Pedido #${order_id} cancelado por ${admin_name} — Motivo: ${motivo}`,
     );
 
+    logAuditEvent({
+      actor: {
+        type: "admin",
+        id: admin_email || null,
+        name: admin_name.trim(),
+      },
+      action: "order.cancelled",
+      entity: { type: "order", id: order_id },
+      sedeId: effectiveSedeId || null,
+      metadata: { motivo: motivo.trim() },
+    });
+
     res.status(200).json({
       message: `Pedido #${order_id} cancelado correctamente.`,
       order_id,
@@ -425,6 +477,14 @@ exports.restoreOrder = async (req, res) => {
     console.log(
       `♻️ [ADMIN] Pedido #${record.order_id} restaurado por ${admin_name}`,
     );
+
+    logAuditEvent({
+      actor: { type: "admin", id: null, name: admin_name.trim() },
+      action: "order.restored",
+      entity: { type: "order", id: record.order_id },
+      sedeId: effectiveSedeId || null,
+      metadata: { cancel_record_id: record.id },
+    });
 
     res.status(200).json({
       message: `Pedido #${record.order_id} restaurado correctamente.`,

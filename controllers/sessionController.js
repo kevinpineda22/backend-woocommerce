@@ -7,6 +7,7 @@ const {
   getSedeFromWooOrder,
   getSedeById,
 } = require("../services/sedeConfig");
+const { logAuditEvent } = require("../services/auditService");
 
 // Multi-sede WooCommerce (WordPress Multisite)
 const { getWooClient } = require("../services/wooMultiService");
@@ -75,7 +76,7 @@ async function getBarcodesFromSiesa(productIds) {
 }
 
 exports.createPickingSession = async (req, res) => {
-  const { id_picker, ids_pedidos } = req.body;
+  const { id_picker, ids_pedidos, admin_name, admin_email } = req.body;
   try {
     // 1. Obtener Nombre y Sede del Picker
     const { data: pickerData } = await supabase
@@ -182,6 +183,22 @@ exports.createPickingSession = async (req, res) => {
       .from("wc_asignaciones_pedidos")
       .insert(asignaciones);
     if (assignError) throw assignError;
+
+    logAuditEvent({
+      actor: {
+        type: "admin",
+        id: admin_email || null,
+        name: (admin_name || "").trim() || "Admin",
+      },
+      action: "session.created",
+      entity: { type: "session", id: session.id },
+      sedeId,
+      metadata: {
+        picker_id: id_picker,
+        picker_name: nombrePicker,
+        orders: ids_pedidos,
+      },
+    });
 
     res.status(200).json({
       message: "Sesión creada",
@@ -555,6 +572,12 @@ exports.completeSession = async (req, res) => {
   const { id_sesion, id_picker } = req.body;
   try {
     const now = new Date().toISOString();
+    const { data: sessData } = await supabase
+      .from("wc_picking_sessions")
+      .select("sede_id, ids_pedidos")
+      .eq("id", id_sesion)
+      .single();
+
     await supabase
       .from("wc_picking_sessions")
       .update({ estado: "pendiente_auditoria", fecha_fin: now })
@@ -573,6 +596,15 @@ exports.completeSession = async (req, res) => {
       .from("wc_asignaciones_pedidos")
       .update({ estado_asignacion: "completado", fecha_fin: now })
       .eq("id_sesion", id_sesion);
+
+    logAuditEvent({
+      actor: { type: "picker", id: id_picker, name: null },
+      action: "session.completed",
+      entity: { type: "session", id: id_sesion },
+      sedeId: sessData?.sede_id || req.sedeId || null,
+      metadata: { orders: sessData?.ids_pedidos || [] },
+    });
+
     res
       .status(200)
       .json({ message: "Sesión finalizada. Esperando auditoría." });
@@ -602,6 +634,12 @@ exports.cancelAssignment = async (req, res) => {
     const idSesion = pickerData.id_sesion_actual;
     const now = new Date().toISOString();
 
+    const { data: sessSede } = await supabase
+      .from("wc_picking_sessions")
+      .select("sede_id")
+      .eq("id", idSesion)
+      .single();
+
     await supabase
       .from("wc_picking_sessions")
       .update({ estado: "cancelado", fecha_fin: now })
@@ -614,6 +652,14 @@ exports.cancelAssignment = async (req, res) => {
       .from("wc_pickers")
       .update({ estado_picker: "disponible", id_sesion_actual: null })
       .eq("id", id_picker);
+
+    logAuditEvent({
+      actor: { type: "picker", id: id_picker, name: null },
+      action: "session.cancelled",
+      entity: { type: "session", id: idSesion },
+      sedeId: sessSede?.sede_id || req.sedeId || null,
+      metadata: {},
+    });
 
     res.status(200).json({ message: "Sesión cancelada." });
   } catch (error) {
