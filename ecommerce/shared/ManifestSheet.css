@@ -140,6 +140,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.manifest-note-row {
+  border-top: 1px dashed #e2e8f0;
+  padding-top: 4px;
+}
+.manifest-field-note {
+  white-space: normal !important;
+  color: #b45309 !important;
+  font-weight: 600 !important;
+}
 
 /* =========================================
    SECCIÓN QR CODE
@@ -935,7 +944,7 @@
     gap: 4px 12px !important;
     flex: 1 !important;
   }
-  
+
   .manifest-customer-row {
     margin: 0 !important;
     gap: 12px !important;
@@ -966,18 +975,18 @@
     max-width: 65px !important;
     max-height: 65px !important;
   }
-  
+
   .manifest-qr-section:not(.manifest-qr-only) .qr-info h4 {
     font-size: 0.65rem !important;
     margin: 0 !important;
   }
-  
+
   .manifest-qr-section:not(.manifest-qr-only) .qr-info p {
     font-size: 0.55rem !important;
     margin: 0 !important;
     max-width: 120px;
   }
-  
+
   .manifest-qr-section:not(.manifest-qr-only) .qr-info div {
     display: none !important; /* Ocultar alerta roja */
   }
@@ -1063,7 +1072,7 @@
   .item-name {
     font-size: 0.65rem !important;
   }
-  
+
   .cell-ref {
     font-size: 0.6rem !important;
     color: #555 !important;
@@ -1081,7 +1090,7 @@
     background: transparent !important;
     color: #666 !important;
   }
-  
+
   .manifest-row-original-replaced .original-qty-badge,
   .manifest-row-original-replaced .original-replaced-label {
     background: transparent !important;

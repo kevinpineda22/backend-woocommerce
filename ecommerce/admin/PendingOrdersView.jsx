@@ -11,6 +11,10 @@ import {
   FaUserCheck,
   FaBoxOpen,
   FaPhone,
+  FaEnvelope,
+  FaStickyNote,
+  FaTruck,
+  FaCity,
   FaWalking,
   FaStoreAlt,
   FaSpinner,
@@ -136,7 +140,9 @@ const PendingOrdersView = ({
       {/* FILTROS — flat, sin wrappers innecesarios */}
       <div className="pedidos-admin-filters-container">
         <div className="pedidos-admin-filter-group">
-          <label><FaSearch /> Buscar</label>
+          <label>
+            <FaSearch /> Buscar
+          </label>
           <input
             type="text"
             className="pedidos-admin-filter-input"
@@ -146,7 +152,9 @@ const PendingOrdersView = ({
           />
         </div>
         <div className="pedidos-admin-filter-group">
-          <label><FaCalendarAlt /> Fecha</label>
+          <label>
+            <FaCalendarAlt /> Fecha
+          </label>
           <input
             type="date"
             className="pedidos-admin-filter-input"
@@ -155,7 +163,9 @@ const PendingOrdersView = ({
           />
         </div>
         <div className="pedidos-admin-filter-group">
-          <label><FaMapMarkerAlt /> Zona</label>
+          <label>
+            <FaMapMarkerAlt /> Zona
+          </label>
           <input
             type="text"
             className="pedidos-admin-filter-input"
@@ -170,11 +180,16 @@ const PendingOrdersView = ({
             onClick={onForceSync}
             disabled={loading}
           >
-            {loading ? <FaSpinner className="ec-spin" /> : <FaSync />} Sincronizar
+            {loading ? <FaSpinner className="ec-spin" /> : <FaSync />}{" "}
+            Sincronizar
           </button>
           <button
             className="pedidos-btn-clear"
-            onClick={() => { setSearchTerm(""); setFilterDate(""); setFilterZone(""); }}
+            onClick={() => {
+              setSearchTerm("");
+              setFilterDate("");
+              setFilterZone("");
+            }}
           >
             Limpiar
           </button>
@@ -182,7 +197,8 @@ const PendingOrdersView = ({
       </div>
 
       <div className="pedidos-filter-results">
-        Mostrando <strong>{displayedOrders.length}</strong> de <strong>{orders.length}</strong> pedidos
+        Mostrando <strong>{displayedOrders.length}</strong> de{" "}
+        <strong>{orders.length}</strong> pedidos
       </div>
 
       {loading && orders.length === 0 ? (
@@ -210,7 +226,10 @@ const PendingOrdersView = ({
                 <div className="pa-date-separator">
                   <FaCalendarAlt size={13} />
                   <span className="pa-date-label">{label}</span>
-                  <span className="pa-date-count">{dateOrders.length} pedido{dateOrders.length !== 1 ? "s" : ""}</span>
+                  <span className="pa-date-count">
+                    {dateOrders.length} pedido
+                    {dateOrders.length !== 1 ? "s" : ""}
+                  </span>
                   <div className="pa-date-line" />
                 </div>
                 <div className="pedidos-admin-orders-grid">
@@ -247,15 +266,24 @@ const PendingOrdersView = ({
                           </div>
                           <span className="pa-ticket-date">
                             <FaClock size={11} />
-                            {new Date(order.date_created).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                            {new Date(order.date_created).toLocaleTimeString(
+                              [],
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )}
                           </span>
                         </div>
                         <h4 className="pa-ticket-customer">
                           {order.billing?.first_name} {order.billing?.last_name}
                         </h4>
+                        {order.billing?.phone && (
+                          <div className="pa-ticket-contact">
+                            <FaPhone size={10} color="#64748b" />
+                            <span>{order.billing.phone}</span>
+                          </div>
+                        )}
                         <div className="pa-ticket-meta">
                           <span className="pa-meta-item">
                             <FaBox /> {order.line_items?.length} items
@@ -276,6 +304,14 @@ const PendingOrdersView = ({
                             </>
                           )}
                         </div>
+                        {order.customer_note && (
+                          <div className="pa-ticket-note">
+                            <FaStickyNote size={10} />{" "}
+                            {order.customer_note.length > 60
+                              ? order.customer_note.substring(0, 60) + "..."
+                              : order.customer_note}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -337,12 +373,27 @@ const PendingOrdersView = ({
                     {localSelectedOrder.billing?.first_name}{" "}
                     {localSelectedOrder.billing?.last_name}
                   </p>
-                  <p className="pa-info-sub-text">
-                    {localSelectedOrder.billing?.email}
-                  </p>
-                  <div className="pa-phone-row">
-                    <FaPhone size={12} /> {localSelectedOrder.billing?.phone}
-                  </div>
+                  {localSelectedOrder.billing?.company && (
+                    <p className="pa-info-sub-text">
+                      <FaCity size={10} /> {localSelectedOrder.billing.company}
+                    </p>
+                  )}
+                  {localSelectedOrder.billing?.phone && (
+                    <div className="pa-phone-row">
+                      <FaPhone size={12} />
+                      <a href={`tel:${localSelectedOrder.billing.phone}`}>
+                        {localSelectedOrder.billing.phone}
+                      </a>
+                    </div>
+                  )}
+                  {localSelectedOrder.billing?.email && (
+                    <div className="pa-phone-row">
+                      <FaEnvelope size={12} />
+                      <a href={`mailto:${localSelectedOrder.billing.email}`}>
+                        {localSelectedOrder.billing.email}
+                      </a>
+                    </div>
+                  )}
                 </div>
                 <div className="pa-detail-card">
                   <h4 className="pa-section-title">
@@ -356,15 +407,41 @@ const PendingOrdersView = ({
                     <>
                       <p className="pa-info-main-text">
                         {localSelectedOrder.billing?.address_1}
+                        {localSelectedOrder.billing?.address_2
+                          ? `, ${localSelectedOrder.billing.address_2}`
+                          : ""}
                       </p>
                       <p className="pa-info-sub-text">
                         {localSelectedOrder.billing?.city}
+                        {localSelectedOrder.billing?.state
+                          ? `, ${localSelectedOrder.billing.state}`
+                          : ""}
                       </p>
                     </>
                   )}
+                  {localSelectedOrder.shipping?.address_1 &&
+                    localSelectedOrder.shipping.address_1 !==
+                      localSelectedOrder.billing?.address_1 && (
+                      <div className="pa-shipping-row">
+                        <FaTruck size={11} />
+                        <div>
+                          <small style={{ color: "#64748b" }}>
+                            Envío diferente:
+                          </small>
+                          <p
+                            className="pa-info-main-text"
+                            style={{ margin: 0 }}
+                          >
+                            {localSelectedOrder.shipping.address_1},{" "}
+                            {localSelectedOrder.shipping.city}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   {localSelectedOrder.customer_note && (
                     <div className="pa-note-box">
-                      <strong>Nota:</strong> {localSelectedOrder.customer_note}
+                      <FaStickyNote size={11} /> <strong>Nota:</strong>{" "}
+                      {localSelectedOrder.customer_note}
                     </div>
                   )}
                 </div>

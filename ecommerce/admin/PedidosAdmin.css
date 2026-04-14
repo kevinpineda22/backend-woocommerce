@@ -589,7 +589,11 @@
 .pa-date-line {
   flex: 1;
   height: 2px;
-  background: linear-gradient(to right, var(--pa-admin-accent-blue, #0071e3), transparent);
+  background: linear-gradient(
+    to right,
+    var(--pa-admin-accent-blue, #0071e3),
+    transparent
+  );
   border-radius: 1px;
 }
 
@@ -727,6 +731,45 @@
 .pa-ticket-address-pickup {
   color: #a21caf;
   font-weight: 700;
+}
+
+/* Contact row in ticket card */
+.pa-ticket-contact {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+/* Customer note in ticket card */
+.pa-ticket-note {
+  font-size: 0.72rem;
+  color: #b45309;
+  background: #fffbeb;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border-left: 2px solid #f59e0b;
+  margin-top: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  line-height: 1.3;
+}
+
+/* Shipping row in modal */
+.pa-shipping-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: #f0f9ff;
+  border-radius: 6px;
+  border-left: 2px solid #0ea5e9;
+  font-size: 0.82rem;
+  color: #0369a1;
 }
 
 /* Product note box in modals */

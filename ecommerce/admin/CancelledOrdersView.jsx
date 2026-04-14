@@ -4,7 +4,9 @@ import {
   FaUndoAlt,
   FaUser,
   FaPhone,
+  FaEnvelope,
   FaMapMarkerAlt,
+  FaTruck,
   FaBox,
   FaCalendarAlt,
   FaStickyNote,
@@ -74,6 +76,7 @@ const CancelledOrdersView = ({
           {cancelledOrders.map((record) => {
             const order = record.order_data || {};
             const billing = order.billing || {};
+            const shipping = order.shipping || {};
             const lineItems = order.line_items || [];
             const isExpanded = expandedId === record.id;
 
@@ -104,13 +107,16 @@ const CancelledOrdersView = ({
                     </span>
                     <span className="cancelled-order-date">
                       <FaCalendarAlt size={10} />{" "}
-                      {new Date(record.cancelled_at).toLocaleDateString("es-CO", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {new Date(record.cancelled_at).toLocaleDateString(
+                        "es-CO",
+                        {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        },
+                      )}
                     </span>
                   </div>
                 </div>
@@ -128,7 +134,9 @@ const CancelledOrdersView = ({
                   </div>
                   <div className="cancelled-admin-block">
                     <FaUser size={11} />
-                    <span>Cancelado por: <strong>{record.admin_name}</strong></span>
+                    <span>
+                      Cancelado por: <strong>{record.admin_name}</strong>
+                    </span>
                   </div>
                 </div>
 
@@ -148,12 +156,25 @@ const CancelledOrdersView = ({
                             <FaPhone size={10} /> {billing.phone}
                           </span>
                         )}
+                        {billing.email && (
+                          <span>
+                            <FaEnvelope size={10} /> {billing.email}
+                          </span>
+                        )}
                         {billing.address_1 && (
                           <span>
                             <FaMapMarkerAlt size={10} /> {billing.address_1},{" "}
                             {billing.city}
+                            {billing.state ? `, ${billing.state}` : ""}
                           </span>
                         )}
+                        {shipping.address_1 &&
+                          shipping.address_1 !== billing.address_1 && (
+                            <span>
+                              <FaTruck size={10} /> Envío: {shipping.address_1},{" "}
+                              {shipping.city}
+                            </span>
+                          )}
                       </div>
                     </div>
 
@@ -172,7 +193,9 @@ const CancelledOrdersView = ({
                               {item.name}
                             </span>
                             <span className="cancelled-product-price">
-                              {formatPrice(item.total || item.price * item.quantity)}
+                              {formatPrice(
+                                item.total || item.price * item.quantity,
+                              )}
                             </span>
                           </div>
                         ))}
@@ -182,7 +205,9 @@ const CancelledOrdersView = ({
                     {/* Nota del cliente */}
                     {order.customer_note && (
                       <div className="cancelled-detail-section">
-                        <h5><FaStickyNote size={11} /> Nota del cliente</h5>
+                        <h5>
+                          <FaStickyNote size={11} /> Nota del cliente
+                        </h5>
                         <p className="cancelled-customer-note">
                           {order.customer_note}
                         </p>

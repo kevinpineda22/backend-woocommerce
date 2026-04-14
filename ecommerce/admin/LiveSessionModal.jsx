@@ -18,6 +18,14 @@ import {
   FaStoreAlt,
   FaSpinner,
   FaExchangeAlt,
+  FaPhone,
+  FaEnvelope,
+  FaMapMarkerAlt,
+  FaStickyNote,
+  FaTruck,
+  FaIdCard,
+  FaCity,
+  FaCopy,
 } from "react-icons/fa";
 import "./LiveSessionModal.css";
 
@@ -452,12 +460,19 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                                 </span>
                               )}
                               <span className="lsm-sub-product-qty">
-                                {item.sustituto.qty || item.quantity_total - (item.qty_scanned || 0)} de {item.quantity_total} sustituidas
+                                {item.sustituto.qty ||
+                                  item.quantity_total -
+                                    (item.qty_scanned || 0)}{" "}
+                                de {item.quantity_total} sustituidas
                               </span>
                             </div>
                             {item.qty_scanned > 0 && (
-                              <div className="lsm-sub-row original" style={{ marginTop: 4 }}>
-                                <FaCheck size={10} /> {item.qty_scanned} de {item.quantity_total} originales OK
+                              <div
+                                className="lsm-sub-row original"
+                                style={{ marginTop: 4 }}
+                              >
+                                <FaCheck size={10} /> {item.qty_scanned} de{" "}
+                                {item.quantity_total} originales OK
                               </div>
                             )}
                           </div>
@@ -558,6 +573,91 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                       {data.stats.done}/{data.stats.total}
                     </span>
                   </div>
+
+                  {/* DATOS DEL CLIENTE */}
+                  <div className="lsm-customer-info">
+                    {data.phone && (
+                      <div className="lsm-ci-row">
+                        <FaPhone size={11} />
+                        <a href={`tel:${data.phone}`}>{data.phone}</a>
+                        <button
+                          className="lsm-ci-copy"
+                          onClick={() => {
+                            navigator.clipboard.writeText(data.phone);
+                          }}
+                          title="Copiar"
+                        >
+                          <FaCopy size={10} />
+                        </button>
+                      </div>
+                    )}
+                    {data.email && (
+                      <div className="lsm-ci-row">
+                        <FaEnvelope size={11} />
+                        <a href={`mailto:${data.email}`}>{data.email}</a>
+                        <button
+                          className="lsm-ci-copy"
+                          onClick={() => {
+                            navigator.clipboard.writeText(data.email);
+                          }}
+                          title="Copiar"
+                        >
+                          <FaCopy size={10} />
+                        </button>
+                      </div>
+                    )}
+                    {data.billing?.company && (
+                      <div className="lsm-ci-row">
+                        <FaCity size={11} />
+                        <span>{data.billing.company}</span>
+                      </div>
+                    )}
+                    {data.billing?.address_1 && (
+                      <div className="lsm-ci-row">
+                        <FaMapMarkerAlt size={11} />
+                        <span>
+                          {data.billing.address_1}
+                          {data.billing.address_2
+                            ? `, ${data.billing.address_2}`
+                            : ""}
+                          {data.billing.city ? ` — ${data.billing.city}` : ""}
+                          {data.billing.state ? `, ${data.billing.state}` : ""}
+                        </span>
+                      </div>
+                    )}
+                    {data.shipping?.address_1 &&
+                      data.shipping.address_1 !== data.billing?.address_1 && (
+                        <div className="lsm-ci-row">
+                          <FaTruck size={11} />
+                          <span>
+                            {data.shipping.first_name
+                              ? `${data.shipping.first_name} ${data.shipping.last_name || ""} — `
+                              : ""}
+                            {data.shipping.address_1}
+                            {data.shipping.address_2
+                              ? `, ${data.shipping.address_2}`
+                              : ""}
+                            {data.shipping.city
+                              ? ` — ${data.shipping.city}`
+                              : ""}
+                          </span>
+                        </div>
+                      )}
+                    {data.customer_note && (
+                      <div className="lsm-ci-row lsm-ci-note">
+                        <FaStickyNote size={11} />
+                        <span>{data.customer_note}</span>
+                      </div>
+                    )}
+                    {data.total && (
+                      <div className="lsm-ci-row">
+                        <strong style={{ marginLeft: 2 }}>Total:</strong>
+                        <span style={{ fontWeight: 700 }}>
+                          {formatPrice(data.total)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                   <div className="lsm-sub-list">
                     {data.items.map((it, k) => {
                       const hasSub = !!it.sustituto;
@@ -576,7 +676,9 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                               style={{
                                 fontWeight: "600",
                                 color: hasSub ? "#92400e" : "#334155",
-                                textDecoration: hasSub ? "line-through" : "none",
+                                textDecoration: hasSub
+                                  ? "line-through"
+                                  : "none",
                               }}
                             >
                               {it.name}
@@ -623,12 +725,22 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                                       </span>
                                     )}
                                     <span className="lsm-sub-product-qty">
-                                      {it.sustituto.qty || it.quantity_total - (it.qty_scanned || 0)} de {it.qty} sustituidas
+                                      {it.sustituto.qty ||
+                                        it.quantity_total -
+                                          (it.qty_scanned || 0)}{" "}
+                                      de {it.qty} sustituidas
                                     </span>
                                   </div>
                                   {it.qty_scanned > 0 && (
-                                    <div className="lsm-sub-row original" style={{ marginTop: 3, fontSize: "0.75rem" }}>
-                                      <FaCheck size={9} /> {it.qty_scanned} de {it.qty} originales OK
+                                    <div
+                                      className="lsm-sub-row original"
+                                      style={{
+                                        marginTop: 3,
+                                        fontSize: "0.75rem",
+                                      }}
+                                    >
+                                      <FaCheck size={9} /> {it.qty_scanned} de{" "}
+                                      {it.qty} originales OK
                                     </div>
                                   )}
                                 </div>

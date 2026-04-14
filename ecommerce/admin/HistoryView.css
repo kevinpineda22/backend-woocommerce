@@ -244,6 +244,20 @@
   font-size: 0.8rem;
   font-style: italic;
 }
+.hv-contact-stack {
+  gap: 2px !important;
+}
+.hv-contact-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
 .hv-sede-tag {
   display: inline-flex;
   align-items: center;

@@ -418,11 +418,63 @@
 /* Header del pedido (Nombre cliente, progreso) */
 .lsm-og-header {
   padding: 15px 20px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
   background: #fff;
+}
+
+/* Datos del cliente dentro de cada pedido */
+.lsm-customer-info {
+  padding: 0 20px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fafbfc;
+}
+
+.lsm-ci-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: #475569;
+}
+
+.lsm-ci-row a {
+  color: #3b82f6;
+  text-decoration: none;
+}
+.lsm-ci-row a:hover {
+  text-decoration: underline;
+}
+
+.lsm-ci-copy {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.lsm-ci-copy:hover {
+  color: #3b82f6;
+  background: #eff6ff;
+}
+
+.lsm-ci-note {
+  width: 100%;
+  background: #fffbeb;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border-left: 3px solid #f59e0b;
+  color: #92400e;
+  font-style: italic;
 }
 
 /* Lista interna de productos */

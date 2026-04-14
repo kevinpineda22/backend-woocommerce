@@ -358,11 +358,31 @@ const ManifestSheet = ({
                 <span className="manifest-field-value">{fullAddress}</span>
               </div>
             )}
+            {shipping.address_1 && shipping.address_1 !== billing.address_1 && (
+              <div className="manifest-customer-field">
+                <span className="manifest-field-label">Envío:</span>
+                <span className="manifest-field-value">
+                  {[shipping.address_1, shipping.city, shipping.state]
+                    .filter(Boolean)
+                    .join(", ")}
+                </span>
+              </div>
+            )}
             <div className="manifest-customer-field">
               <span className="manifest-field-label">Picker:</span>
               <span className="manifest-field-value">{pickerName}</span>
             </div>
           </div>
+          {order.customer_note && (
+            <div className="manifest-customer-row manifest-note-row">
+              <div className="manifest-customer-field" style={{ flex: 1 }}>
+                <span className="manifest-field-label">📝 Nota:</span>
+                <span className="manifest-field-value manifest-field-note">
+                  {order.customer_note}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* QR Code Section */}

@@ -320,6 +320,15 @@ exports.getActiveSessionsDashboard = async (req, res) => {
           current_location: currentLocation,
           orders_count: sess.ids_pedidos.length,
           order_ids: sess.ids_pedidos,
+          clientes: orders.map(
+            (o) =>
+              (
+                (o.billing?.first_name || "") +
+                " " +
+                (o.billing?.last_name || "")
+              ).trim() || "Cliente",
+          ),
+          telefonos: orders.map((o) => o.billing?.phone || "").filter(Boolean),
         };
       }),
     );
@@ -464,12 +473,25 @@ exports.getPendingPaymentSessions = async (req, res) => {
           )
         : [];
 
+      const telefonos = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos
+            .map((o) => o.billing?.phone || "")
+            .filter(Boolean)
+        : [];
+      const emails = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos
+            .map((o) => o.billing?.email || "")
+            .filter(Boolean)
+        : [];
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
         sede_nombre: sess.wc_sedes?.nombre || null,
         pedidos: sess.ids_pedidos,
         clientes: clientes,
+        telefonos,
+        emails,
         fecha: end.toLocaleDateString("es-CO", optionsDate),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
@@ -586,12 +608,25 @@ exports.getHistorySessions = async (req, res) => {
           )
         : [];
 
+      const telefonos = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos
+            .map((o) => o.billing?.phone || "")
+            .filter(Boolean)
+        : [];
+      const emails = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos
+            .map((o) => o.billing?.email || "")
+            .filter(Boolean)
+        : [];
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
         sede_nombre: sess.wc_sedes?.nombre || null,
         pedidos: sess.ids_pedidos,
         clientes: clientes,
+        telefonos,
+        emails,
         fecha: end.toLocaleDateString("es-CO", optionsDate),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
@@ -661,12 +696,25 @@ exports.getPendingAuditSessions = async (req, res) => {
           )
         : [];
 
+      const telefonos = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos
+            .map((o) => o.billing?.phone || "")
+            .filter(Boolean)
+        : [];
+      const emails = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos
+            .map((o) => o.billing?.email || "")
+            .filter(Boolean)
+        : [];
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
         sede_nombre: sess.wc_sedes?.nombre || null,
         pedidos: sess.ids_pedidos,
         clientes: clientes,
+        telefonos,
+        emails,
         fecha: end ? end.toLocaleDateString("es-CO", optionsDate) : "--",
         hora_fin: end ? end.toLocaleTimeString("es-CO", optionsTime) : "--",
         duracion: `${durationMin} min`,

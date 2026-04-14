@@ -9,6 +9,7 @@ import {
   FaStoreAlt,
   FaSpinner,
   FaExclamationTriangle,
+  FaPhone,
 } from "react-icons/fa";
 import { supabase } from "../../../supabaseClient";
 import { useSedeContext } from "../shared/SedeContext";
@@ -50,7 +51,10 @@ const DualTimer = ({ startTime, pickingStartTime }) => {
 
   return (
     <div className="pa-dual-timer">
-      <div className={`pa-timer ${isLong ? "danger" : ""}`} title="Tiempo en sesión">
+      <div
+        className={`pa-timer ${isLong ? "danger" : ""}`}
+        title="Tiempo en sesión"
+      >
         <FaClock /> {sessionElapsed || "--:--:--"}
       </div>
       <div
@@ -243,12 +247,26 @@ const ActiveSessionsView = ({ onViewDetail, loadingDetailId }) => {
             </div>
             <div className="pa-bs-list">
               {session.order_ids &&
-                session.order_ids.map((id) => (
+                session.order_ids.map((id, i) => (
                   <span key={id} className="pa-bs-chip">
                     #{id}
+                    {session.clientes?.[i] && (
+                      <span className="pa-bs-chip-customer">
+                        {session.clientes[i].split(" ")[0]}
+                      </span>
+                    )}
                   </span>
                 ))}
             </div>
+            {session.telefonos && session.telefonos.length > 0 && (
+              <div className="pa-bs-contacts">
+                {session.telefonos.map((t, i) => (
+                  <span key={i} className="pa-bs-phone">
+                    <FaPhone size={9} /> {t}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="pa-stats-grid">
@@ -268,9 +286,11 @@ const ActiveSessionsView = ({ onViewDetail, loadingDetailId }) => {
             </div>
           </div>
 
-          {(session.not_found_items > 0) && (
+          {session.not_found_items > 0 && (
             <div className="pa-not-found-badge">
-              <FaExclamationTriangle /> {session.not_found_items} producto{session.not_found_items !== 1 ? "s" : ""} cancelado{session.not_found_items !== 1 ? "s" : ""} por admin
+              <FaExclamationTriangle /> {session.not_found_items} producto
+              {session.not_found_items !== 1 ? "s" : ""} cancelado
+              {session.not_found_items !== 1 ? "s" : ""} por admin
             </div>
           )}
 

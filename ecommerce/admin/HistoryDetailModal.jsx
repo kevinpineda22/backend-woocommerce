@@ -13,6 +13,7 @@ import {
   FaPhone,
   FaEnvelope,
   FaStickyNote,
+  FaCity,
 } from "react-icons/fa";
 import "./HistoryView.css";
 
@@ -38,7 +39,8 @@ const stripMN = (code) => {
   if (!code || typeof code !== "string") return code;
   const trimmed = code.trim().replace(/\+$/, "");
   const upper = trimmed.toUpperCase();
-  if (upper.startsWith("M") || upper.startsWith("N")) return trimmed.substring(1);
+  if (upper.startsWith("M") || upper.startsWith("N"))
+    return trimmed.substring(1);
   return trimmed;
 };
 
@@ -53,7 +55,9 @@ const StatsBar = ({ logs }) => {
     ).length;
     const substituted = logs.filter((l) => l.accion === "sustituido").length;
     const notFound = logs.filter((l) => l.accion === "no_encontrado").length;
-    const removedByAdmin = logs.filter((l) => l.accion === "eliminado_admin").length;
+    const removedByAdmin = logs.filter(
+      (l) => l.accion === "eliminado_admin",
+    ).length;
     return { picked, substituted, notFound, removedByAdmin };
   }, [logs]);
 
@@ -321,6 +325,11 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
             <div className="hdm-order-customer-name">
               <FaUser size={11} /> {billing.first_name} {billing.last_name}
             </div>
+            {billing.company && (
+              <div className="hdm-order-customer-contact">
+                <FaCity size={10} /> {billing.company}
+              </div>
+            )}
             {billing.phone && (
               <div className="hdm-order-customer-contact">
                 <FaPhone size={10} /> {billing.phone}
@@ -345,6 +354,14 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
                 <span title="Dirección de Envío">
                   ENVÍO: {shipping.address_1}, {shipping.city}
                 </span>
+              </div>
+            )}
+            {order.total && (
+              <div
+                className="hdm-order-customer-contact"
+                style={{ fontWeight: 700 }}
+              >
+                Total: {formatPrice(order.total)}
               </div>
             )}
           </div>

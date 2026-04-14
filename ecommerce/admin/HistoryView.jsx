@@ -1,5 +1,11 @@
 import React from "react";
-import { FaFileAlt, FaQrcode, FaStoreAlt } from "react-icons/fa";
+import {
+  FaFileAlt,
+  FaQrcode,
+  FaStoreAlt,
+  FaPhone,
+  FaEnvelope,
+} from "react-icons/fa";
 import "./HistoryView.css";
 
 /* ─── Helpers ─── */
@@ -9,8 +15,14 @@ const ESTADO_CONFIG = {
 };
 
 const METODO_PAGO_CONFIG = {
-  efectivo: { className: "hv-badge-metodo hv-badge-metodo--cash", label: "💵 Efectivo" },
-  credito:  { className: "hv-badge-metodo hv-badge-metodo--credit", label: "🏦 Crédito" },
+  efectivo: {
+    className: "hv-badge-metodo hv-badge-metodo--cash",
+    label: "💵 Efectivo",
+  },
+  credito: {
+    className: "hv-badge-metodo hv-badge-metodo--credit",
+    label: "🏦 Crédito",
+  },
 };
 
 const getEstadoBadge = (estado) => {
@@ -64,6 +76,7 @@ const HistoryView = ({
           <tr>
             <th>Fecha</th>
             {isPaymentView ? <th>Cliente(s)</th> : <th>Picker</th>}
+            {isPaymentView && <th>Contacto</th>}
             <th>Sede</th>
             <th>Pedidos</th>
             <th>Estado</th>
@@ -84,7 +97,9 @@ const HistoryView = ({
                   <div className="hv-cell-stack">
                     {sess.clientes && sess.clientes.length > 0 ? (
                       sess.clientes.map((c, i) => (
-                        <span key={i} className="hv-client-name">{c}</span>
+                        <span key={i} className="hv-client-name">
+                          {c}
+                        </span>
                       ))
                     ) : (
                       <span className="hv-text-muted">Sin datos</span>
@@ -93,6 +108,27 @@ const HistoryView = ({
                 </td>
               ) : (
                 <td>{sess.picker}</td>
+              )}
+
+              {isPaymentView && (
+                <td>
+                  <div className="hv-cell-stack hv-contact-stack">
+                    {sess.telefonos &&
+                      sess.telefonos.length > 0 &&
+                      sess.telefonos.map((t, i) => (
+                        <span key={`p${i}`} className="hv-contact-item">
+                          <FaPhone size={9} /> {t}
+                        </span>
+                      ))}
+                    {sess.emails &&
+                      sess.emails.length > 0 &&
+                      sess.emails.map((e, i) => (
+                        <span key={`e${i}`} className="hv-contact-item">
+                          <FaEnvelope size={9} /> {e}
+                        </span>
+                      ))}
+                  </div>
+                </td>
               )}
 
               <td>
@@ -108,7 +144,12 @@ const HistoryView = ({
                 <div className="hv-cell-stack">
                   {sess.pedidos.map((p, i) => (
                     <span key={p} className="hv-order-id">
-                      #{p} {isPaymentView ? "" : (sess.clientes?.[i] ? `(${sess.clientes[i].split(" ")[0]})` : "")}
+                      #{p}{" "}
+                      {isPaymentView
+                        ? ""
+                        : sess.clientes?.[i]
+                          ? `(${sess.clientes[i].split(" ")[0]})`
+                          : ""}
                     </span>
                   ))}
                 </div>

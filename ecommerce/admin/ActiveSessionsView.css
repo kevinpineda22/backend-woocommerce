@@ -237,6 +237,31 @@
   padding: 2px 8px;
   border-radius: 6px;
   font-family: "SF Mono", "Menlo", monospace;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pa-bs-chip-customer {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 400;
+  color: #64748b;
+  font-size: 0.7rem;
+}
+.pa-bs-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.pa-bs-phone {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 /* ─── Stats ─── */
