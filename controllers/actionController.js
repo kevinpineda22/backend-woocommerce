@@ -209,7 +209,8 @@ exports.registerAction = async (req, res) => {
       const isAlreadyGS1 =
         finalScannedBarcode &&
         finalScannedBarcode.startsWith("2") &&
-        (finalScannedBarcode.length === 13 || finalScannedBarcode.length === 14);
+        (finalScannedBarcode.length === 13 ||
+          finalScannedBarcode.length === 14);
 
       if (!isAlreadyGS1) {
         try {
@@ -242,9 +243,11 @@ exports.registerAction = async (req, res) => {
               finalScannedBarcode = `${sinCheck}${checkDigit}`;
             }
           } else {
-            // 🚀 FALLBACK: Si no hay base 29, mantenemos lo que venga del front 
+            // 🚀 FALLBACK: Si no hay base 29, mantenemos lo que venga del front
             // para no bloquear al picker.
-            console.warn(`⚠️ No se encontró base GS1 para item ${f120_id_siesa}. Usando SKU.`);
+            console.warn(
+              `⚠️ No se encontró base GS1 para item ${f120_id_siesa}. Usando SKU.`,
+            );
           }
         } catch (err) {
           console.error("Error generando GS1 en backend:", err.message);
@@ -252,6 +255,71 @@ exports.registerAction = async (req, res) => {
       }
     }
 
+    // =================================================================
+    // 🛡️ GUARD 1: DEBOUNCE — Rechazar acción duplicada en ventana de 3 segundos
+    // Previene: double-tap del picker, replay de cola offline
+    // =================================================================
+    if (accion === "recolectado" || accion === "sustituido") {
+      const threeSecondsAgo = new Date(Date.now() - 3000).toISOString();
+      const { data: recentDups } = await supabase
+        .from("wc_log_picking")
+        .select("id")
+        .eq("id_asignacion", targetAssignment.id)
+        .eq("id_producto_original", id_producto_original)
+        .eq("accion", accion)
+        .gte("fecha_registro", threeSecondsAgo)
+        .limit(1);
+
+      if (recentDups && recentDups.length > 0) {
+        console.warn(
+          `⚠️ DEBOUNCE: Acción duplicada bloqueada — ${accion} producto ${id_producto_original} asignación ${targetAssignment.id}`,
+        );
+        return res
+          .status(200)
+          .json({ success: true, message: "Acción duplicada ignorada" });
+      }
+    }
+
+    // =================================================================
+    // 🛡️ GUARD 2: QUANTITY CAP — No permitir más logs que la qty del pedido
+    // Previene: cualquier forma de over-picking (doble-tap, bug, manipulación)
+    // =================================================================
+    if (accion === "recolectado" || accion === "sustituido") {
+      const snapshot = targetAssignment.reporte_snapshot;
+      if (snapshot?.line_items) {
+        const matchingItems = snapshot.line_items.filter(
+          (i) =>
+            String(i.product_id) === String(id_producto_original) ||
+            String(i.variation_id) === String(id_producto_original),
+        );
+        const expectedQty = matchingItems.reduce(
+          (sum, i) => sum + (i.quantity || 0),
+          0,
+        );
+
+        if (expectedQty > 0) {
+          const { count: existingCount } = await supabase
+            .from("wc_log_picking")
+            .select("id", { count: "exact", head: true })
+            .eq("id_asignacion", targetAssignment.id)
+            .eq("id_producto_original", id_producto_original)
+            .in("accion", ["recolectado", "sustituido"]);
+
+          if ((existingCount || 0) + qty > expectedQty) {
+            console.warn(
+              `⚠️ QUANTITY CAP: Over-pick bloqueado — existentes=${existingCount} + nuevos=${qty} > esperados=${expectedQty} producto ${id_producto_original}`,
+            );
+            return res
+              .status(200)
+              .json({ success: true, message: "Cantidad máxima alcanzada" });
+          }
+        }
+      }
+    }
+
+    // =================================================================
+    // CASO NORMAL (INSERTAR ACCIÓN)
+    // =================================================================
     const logData = {
       id_asignacion: targetAssignment.id,
       id_pedido: targetAssignment.id_pedido,

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { ecommerceApi } from "../../shared/ecommerceApi";
-import { supabase } from "../../../../supabaseClient"; 
+import { supabase } from "../../../../supabaseClient";
 
 export const useOfflineQueue = (resetSesionLocal) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -21,7 +21,33 @@ export const useOfflineQueue = (resetSesionLocal) => {
 
   // 2. Función para encolar acciones localmente
   const queueAction = (payload) => {
-    const queue = JSON.parse(localStorage.getItem("offline_actions_queue") || "[]");
+    const queue = JSON.parse(
+      localStorage.getItem("offline_actions_queue") || "[]",
+    );
+
+    // 🛡️ Dedup: rechazar acción idéntica (mismo item_key + acción) en ventana de 2 segundos
+    if (
+      payload.item_key &&
+      (payload.accion === "recolectado" || payload.accion === "sustituido") &&
+      queue.length > 0
+    ) {
+      const last = queue[queue.length - 1];
+      if (
+        last.item_key === payload.item_key &&
+        last.accion === payload.accion &&
+        last._queued_at &&
+        Date.now() - last._queued_at < 2000
+      ) {
+        console.warn(
+          "⚠️ DEDUP QUEUE: Acción duplicada bloqueada:",
+          payload.accion,
+          payload.item_key,
+        );
+        return;
+      }
+    }
+
+    payload._queued_at = Date.now();
     queue.push(payload);
     localStorage.setItem("offline_actions_queue", JSON.stringify(queue));
     setPendingSync(queue.length);
@@ -35,7 +61,7 @@ export const useOfflineQueue = (resetSesionLocal) => {
       try {
         let queueStr = localStorage.getItem("offline_actions_queue");
         let queue = queueStr ? JSON.parse(queueStr) : [];
-        
+
         if (queue.length === 0) {
           if (pendingSync > 0) setPendingSync(0);
           return;
@@ -44,13 +70,10 @@ export const useOfflineQueue = (resetSesionLocal) => {
         while (queue.length > 0) {
           const item = queue[0];
           setPendingSync(queue.length);
-          
+
           try {
             console.log("📤 Subiendo acción:", item.accion);
-            await ecommerceApi.post(
-              "/registrar-accion",
-              item
-            );
+            await ecommerceApi.post("/registrar-accion", item);
 
             // 📢 Avisar al Dashboard (Broadcast Global)
             try {
@@ -64,7 +87,7 @@ export const useOfflineQueue = (resetSesionLocal) => {
                   timestamp: Date.now(),
                 },
               });
-              
+
               // 📢 Avisar a los espectadores de la sesión (Broadcast Privado)
               await supabase.channel(`session-${item.id_sesion}`).send({
                 type: "broadcast",
@@ -76,11 +99,18 @@ export const useOfflineQueue = (resetSesionLocal) => {
             }
 
             // Éxito: Sacar de la cola
-            const currentQueueStr = localStorage.getItem("offline_actions_queue");
-            const currentQueue = currentQueueStr ? JSON.parse(currentQueueStr) : [];
+            const currentQueueStr = localStorage.getItem(
+              "offline_actions_queue",
+            );
+            const currentQueue = currentQueueStr
+              ? JSON.parse(currentQueueStr)
+              : [];
             if (currentQueue.length > 0) {
               currentQueue.shift();
-              localStorage.setItem("offline_actions_queue", JSON.stringify(currentQueue));
+              localStorage.setItem(
+                "offline_actions_queue",
+                JSON.stringify(currentQueue),
+              );
               queue = currentQueue;
               setPendingSync(currentQueue.length);
             } else {
@@ -92,7 +122,7 @@ export const useOfflineQueue = (resetSesionLocal) => {
             // Detector de Sesión Zombie
             if (err.response?.data?.error?.includes("Sesión inválida")) {
               console.error("💀 SESIÓN LOCAL MUERTA: Limpiando todo.");
-              if(resetSesionLocal) resetSesionLocal();
+              if (resetSesionLocal) resetSesionLocal();
               localStorage.removeItem("offline_actions_queue");
               window.location.reload();
               return;
@@ -101,11 +131,18 @@ export const useOfflineQueue = (resetSesionLocal) => {
             // Eliminar acción corrupta
             if (err.response && err.response.status >= 400) {
               console.warn("⚠️ Acción corrupta. Eliminando de cola.");
-              const currentQueueStr = localStorage.getItem("offline_actions_queue");
-              const currentQueue = currentQueueStr ? JSON.parse(currentQueueStr) : [];
+              const currentQueueStr = localStorage.getItem(
+                "offline_actions_queue",
+              );
+              const currentQueue = currentQueueStr
+                ? JSON.parse(currentQueueStr)
+                : [];
               if (currentQueue.length > 0) {
                 currentQueue.shift();
-                localStorage.setItem("offline_actions_queue", JSON.stringify(currentQueue));
+                localStorage.setItem(
+                  "offline_actions_queue",
+                  JSON.stringify(currentQueue),
+                );
                 queue = currentQueue;
                 setPendingSync(currentQueue.length);
               }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useRef } from "react";
 import { ecommerceApi } from "../shared/ecommerceApi";
 import QRCode from "react-qr-code";
 import { AnimatePresence, motion } from "framer-motion";
@@ -104,6 +104,9 @@ const VistaPicker = () => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 3500);
   }, []);
+
+  // 🛡️ Lock anti-doble-tap: previene que el picker dispare 2 acciones sobre el mismo ítem
+  const pickingLockRef = useRef(new Set());
 
   // --- LÓGICA DE INTERACCIÓN (Botones y Acciones) ---
 
@@ -365,6 +368,12 @@ const VistaPicker = () => {
     if (!currentItem) return;
     const itemRef = currentItem;
 
+    // 🛡️ Anti-doble-tap: si este ítem ya está en proceso, ignorar
+    const lockKey = itemKey(itemRef);
+    if (pickingLockRef.current.has(lockKey)) return;
+    pickingLockRef.current.add(lockKey);
+    setTimeout(() => pickingLockRef.current.delete(lockKey), 2000);
+
     let qtyToProcess = 1;
     let pesoToLog = peso;
 
@@ -426,6 +435,12 @@ const VistaPicker = () => {
   };
 
   const confirmSubstitution = (newItem, qty, finalBarcode = null) => {
+    // 🛡️ Anti-doble-tap
+    const lockKey = itemKey(currentItem);
+    if (pickingLockRef.current.has(lockKey)) return;
+    pickingLockRef.current.add(lockKey);
+    setTimeout(() => pickingLockRef.current.delete(lockKey), 2000);
+
     queueAction({
       id_sesion: sessionData.session_id,
       id_producto_original: effectiveId(currentItem),

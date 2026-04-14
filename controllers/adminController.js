@@ -291,10 +291,46 @@ exports.forcePickItemToSession = async (req, res) => {
 
     // Insertar a la base de datos
     if (logsToInsert.length > 0) {
-      const { error: insertError } = await supabase
+      // 🛡️ GUARD: Re-verificar cantidad justo antes de insertar (anti-race-condition)
+      // Si entre el cálculo de missingQty y este punto otro request insertó logs,
+      // recalculamos para no exceder la cantidad del pedido.
+      const { data: freshLogs } = await supabase
         .from("wc_log_picking")
-        .insert(logsToInsert);
-      if (insertError) throw insertError;
+        .select("id_pedido, accion")
+        .eq("id_producto_original", id_producto)
+        .in(
+          "id_asignacion",
+          assignments.map((a) => a.id),
+        )
+        .in("accion", ["recolectado", "sustituido", "no_encontrado"]);
+
+      const freshPickedByOrder = {};
+      (freshLogs || []).forEach((l) => {
+        freshPickedByOrder[l.id_pedido] =
+          (freshPickedByOrder[l.id_pedido] || 0) + 1;
+      });
+
+      // Filtrar logs que ya no son necesarios
+      const safeLogsToInsert = logsToInsert.filter((log) => {
+        const assign = assignments.find((a) => a.id === log.id_asignacion);
+        if (!assign) return false;
+        const items = assign.reporte_snapshot?.line_items || [];
+        const foundItem = items.find(
+          (i) => i.product_id === id_producto || i.variation_id === id_producto,
+        );
+        if (!foundItem) return false;
+        const currentPicked = freshPickedByOrder[log.id_pedido] || 0;
+        if (currentPicked >= foundItem.quantity) return false;
+        freshPickedByOrder[log.id_pedido] = currentPicked + 1;
+        return true;
+      });
+
+      if (safeLogsToInsert.length > 0) {
+        const { error: insertError } = await supabase
+          .from("wc_log_picking")
+          .insert(safeLogsToInsert);
+        if (insertError) throw insertError;
+      }
     }
 
     logAuditEvent({
@@ -448,11 +484,9 @@ exports.restoreOrder = async (req, res) => {
       .single();
 
     if (findError || !record) {
-      return res
-        .status(404)
-        .json({
-          error: "Registro de cancelación no encontrado o ya fue restaurado.",
-        });
+      return res.status(404).json({
+        error: "Registro de cancelación no encontrado o ya fue restaurado.",
+      });
     }
 
     // 2. Restaurar en WooCommerce

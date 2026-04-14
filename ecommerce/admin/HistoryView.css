@@ -31,7 +31,8 @@
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-radius: 20px;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid rgba(255, 255, 255, 0.45);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
   margin-top: 16px;
@@ -40,6 +41,7 @@
 /* --- Tabla --- */
 .hv-table {
   width: 100%;
+  min-width: 780px;
   border-collapse: collapse;
   text-align: left;
 }
@@ -279,10 +281,6 @@
 
 /* --- Responsive Table --- */
 @media (max-width: 768px) {
-  .history-table-container {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
   .hv-table {
     min-width: 640px;
   }
