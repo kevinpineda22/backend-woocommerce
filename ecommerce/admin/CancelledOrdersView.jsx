@@ -14,9 +14,13 @@ import {
   FaSync,
   FaBoxOpen,
   FaIdCard,
+  FaCreditCard,
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
-import { extractDocumento } from "../shared/extractDocumento";
+import {
+  extractDocumento,
+  extractMetodoPago,
+} from "../shared/extractDocumento";
 
 const formatPrice = (amount) =>
   new Intl.NumberFormat("es-CO", {
@@ -171,6 +175,12 @@ const CancelledOrdersView = ({
                             </span>
                           ) : null;
                         })()}
+                        {order.payment_method_title && (
+                          <span>
+                            <FaCreditCard size={10} />{" "}
+                            {order.payment_method_title}
+                          </span>
+                        )}
                         {billing.address_1 && (
                           <span>
                             <FaMapMarkerAlt size={10} /> {billing.address_1},{" "}

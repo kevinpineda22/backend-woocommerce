@@ -11,6 +11,7 @@ import {
   FaChevronRight,
   FaClock,
   FaIdCard,
+  FaCreditCard,
 } from "react-icons/fa";
 import "./HistoryView.css";
 
@@ -171,6 +172,11 @@ const HistoryView = ({
                         {sess.documentos?.[i] && (
                           <span className="hv-contact-link hv-doc-badge">
                             <FaIdCard size={9} /> {sess.documentos[i]}
+                          </span>
+                        )}
+                        {sess.metodos_pago?.[i] && (
+                          <span className="hv-contact-link">
+                            <FaCreditCard size={9} /> {sess.metodos_pago[i]}
                           </span>
                         )}
                       </div>

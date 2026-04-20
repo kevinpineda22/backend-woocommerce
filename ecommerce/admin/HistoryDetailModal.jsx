@@ -17,9 +17,13 @@ import {
   FaMapMarkerAlt,
   FaMoneyBillWave,
   FaIdCard,
+  FaCreditCard,
 } from "react-icons/fa";
 import "./HistoryView.css";
-import { extractDocumento } from "../shared/extractDocumento";
+import {
+  extractDocumento,
+  extractMetodoPago,
+} from "../shared/extractDocumento";
 
 /* ─── Helpers ─── */
 const formatPrice = (amount) =>
@@ -367,6 +371,15 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
                 <div className="hdm-customer-field">
                   <FaIdCard size={12} />
                   <span>{doc}</span>
+                </div>
+              ) : null;
+            })()}
+            {(() => {
+              const metodo = extractMetodoPago(order);
+              return metodo ? (
+                <div className="hdm-customer-field">
+                  <FaCreditCard size={12} />
+                  <span>{metodo}</span>
                 </div>
               ) : null;
             })()}

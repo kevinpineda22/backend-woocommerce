@@ -129,6 +129,8 @@ exports.createPickingSession = async (req, res) => {
         shipping: o.shipping,
         shipping_lines: o.shipping_lines || [],
         customer_note: o.customer_note,
+        payment_method: o.payment_method || "",
+        payment_method_title: o.payment_method_title || "",
         meta_data: o.meta_data || [],
         line_items: o.line_items.map((item) => ({
           ...item,
@@ -558,6 +560,7 @@ exports.getSessionActive = async (req, res) => {
         shipping: o.shipping,
         total: o.total,
         customer_note: o.customer_note || null,
+        payment_method_title: o.payment_method_title || "",
         meta_data: o.meta_data || [],
       })),
       items: itemsConRuta,

@@ -2,7 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { ecommerceApi } from "../shared/ecommerceApi";
 import EscanerBarras from "../../DesarrolloSurtido_API/EscanerBarras";
 import ManifestInvoiceModal from "../shared/ManifestInvoiceModal";
-import { extractDocumento } from "../shared/extractDocumento";
+import {
+  extractDocumento,
+  extractMetodoPago,
+} from "../shared/extractDocumento";
 import { useSedeContext } from "../shared/SedeContext";
 import { supabase } from "../../../supabaseClient";
 import {
@@ -1124,6 +1127,7 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
                       : null;
                     const customerNote = orderData.customer_note || null;
                     const documento = extractDocumento(orderData);
+                    const metodoPago = extractMetodoPago(orderData);
 
                     return (
                       <div
@@ -1168,6 +1172,11 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
                                 {documento && (
                                   <div className="aud-order-detail-line">
                                     <span>🪪 Documento: {documento}</span>
+                                  </div>
+                                )}
+                                {metodoPago && (
+                                  <div className="aud-order-detail-line">
+                                    <span>💳 Pago: {metodoPago}</span>
                                   </div>
                                 )}
                                 {email && (

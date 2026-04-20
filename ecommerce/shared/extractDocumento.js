@@ -8,6 +8,13 @@ const DOC_META_KEYS = [
   "documento",
 ];
 
+const COD_MODE_LABELS = {
+  cash: "Efectivo",
+  qr: "QR",
+  datafono: "Datáfono",
+  credito: "Crédito",
+};
+
 export function extractDocumento(orderOrMeta) {
   const meta = Array.isArray(orderOrMeta)
     ? orderOrMeta
@@ -15,4 +22,24 @@ export function extractDocumento(orderOrMeta) {
   if (!meta || !Array.isArray(meta)) return "";
   const found = meta.find((m) => DOC_META_KEYS.includes(m.key));
   return found?.value || "";
+}
+
+/**
+ * Extrae el método de pago real desde _billing_cod_payment_mode.
+ * Fallback a payment_method_title si no existe el meta.
+ */
+export function extractMetodoPago(orderOrMeta) {
+  const meta = Array.isArray(orderOrMeta)
+    ? orderOrMeta
+    : orderOrMeta?.meta_data;
+  if (meta && Array.isArray(meta)) {
+    const codMode = meta.find((m) => m.key === "_billing_cod_payment_mode");
+    if (codMode?.value) {
+      return COD_MODE_LABELS[codMode.value] || codMode.value;
+    }
+  }
+  if (!Array.isArray(orderOrMeta) && orderOrMeta?.payment_method_title) {
+    return orderOrMeta.payment_method_title;
+  }
+  return "";
 }

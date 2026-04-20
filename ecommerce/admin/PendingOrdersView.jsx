@@ -22,9 +22,13 @@ import {
   FaTrashAlt,
   FaExclamationTriangle,
   FaIdCard,
+  FaCreditCard,
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
-import { extractDocumento } from "../shared/extractDocumento";
+import {
+  extractDocumento,
+  extractMetodoPago,
+} from "../shared/extractDocumento";
 
 const formatPrice = (amount) =>
   new Intl.NumberFormat("es-CO", {
@@ -286,12 +290,27 @@ const PendingOrdersView = ({
                             <span>{order.billing.phone}</span>
                           </div>
                         )}
+                        {order.billing?.email && (
+                          <div className="pa-ticket-contact">
+                            <FaEnvelope size={10} color="#64748b" />
+                            <span>{order.billing.email}</span>
+                          </div>
+                        )}
                         {(() => {
                           const doc = extractDocumento(order);
                           return doc ? (
                             <div className="pa-ticket-contact">
                               <FaIdCard size={10} color="#64748b" />
                               <span>{doc}</span>
+                            </div>
+                          ) : null;
+                        })()}
+                        {(() => {
+                          const metodo = extractMetodoPago(order);
+                          return metodo ? (
+                            <div className="pa-ticket-contact">
+                              <FaCreditCard size={10} color="#64748b" />
+                              <span>{metodo}</span>
                             </div>
                           ) : null;
                         })()}
@@ -405,6 +424,24 @@ const PendingOrdersView = ({
                       </a>
                     </div>
                   )}
+                  {(() => {
+                    const doc = extractDocumento(localSelectedOrder);
+                    return doc ? (
+                      <div className="pa-phone-row">
+                        <FaIdCard size={12} />
+                        <span>{doc}</span>
+                      </div>
+                    ) : null;
+                  })()}
+                  {(() => {
+                    const metodo = extractMetodoPago(localSelectedOrder);
+                    return metodo ? (
+                      <div className="pa-phone-row">
+                        <FaCreditCard size={12} />
+                        <span>{metodo}</span>
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="pa-detail-card">
                   <h4 className="pa-section-title">

@@ -38,6 +38,24 @@ function extractDocumento(orderSnapshot) {
   return found?.value || "";
 }
 
+const COD_MODE_LABELS = {
+  cash: "Efectivo",
+  qr: "QR",
+  datafono: "Datáfono",
+  credito: "Crédito",
+};
+
+function extractMetodoPago(orderSnapshot) {
+  const meta = orderSnapshot?.meta_data;
+  if (meta && Array.isArray(meta)) {
+    const codMode = meta.find((m) => m.key === "_billing_cod_payment_mode");
+    if (codMode?.value) {
+      return COD_MODE_LABELS[codMode.value] || codMode.value;
+    }
+  }
+  return orderSnapshot?.payment_method_title || "";
+}
+
 // =========================================================
 // HELPER: Obtener códigos de barras desde SIESA
 // =========================================================
@@ -350,6 +368,7 @@ exports.getActiveSessionsDashboard = async (req, res) => {
           ),
           telefonos: orders.map((o) => o.billing?.phone || "").filter(Boolean),
           documentos: orders.map((o) => extractDocumento(o)),
+          metodos_pago: orders.map((o) => extractMetodoPago(o)),
           totales: orders.map((o) => o.total || null),
         };
       }),
@@ -514,6 +533,10 @@ exports.getPendingPaymentSessions = async (req, res) => {
         ? sess.snapshot_pedidos.map((o) => extractDocumento(o))
         : [];
 
+      const metodos_pago = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) => extractMetodoPago(o))
+        : [];
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
@@ -524,6 +547,7 @@ exports.getPendingPaymentSessions = async (req, res) => {
         emails,
         totales,
         documentos,
+        metodos_pago,
         fecha: end.toLocaleDateString("es-CO", optionsDate),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
@@ -672,6 +696,10 @@ exports.getHistorySessions = async (req, res) => {
         ? sess.snapshot_pedidos.map((o) => extractDocumento(o))
         : [];
 
+      const metodos_pago = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) => extractMetodoPago(o))
+        : [];
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
@@ -682,6 +710,7 @@ exports.getHistorySessions = async (req, res) => {
         emails,
         totales,
         documentos,
+        metodos_pago,
         fecha: end.toLocaleDateString("es-CO", optionsDate),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
@@ -770,6 +799,10 @@ exports.getPendingAuditSessions = async (req, res) => {
         ? sess.snapshot_pedidos.map((o) => extractDocumento(o))
         : [];
 
+      const metodos_pago = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) => extractMetodoPago(o))
+        : [];
+
       const fechas_pedidos = sess.snapshot_pedidos
         ? sess.snapshot_pedidos.map((o) => {
             if (!o.date_created) return null;
@@ -791,6 +824,7 @@ exports.getPendingAuditSessions = async (req, res) => {
         emails,
         totales,
         documentos,
+        metodos_pago,
         fechas_pedidos,
         fecha: end ? end.toLocaleDateString("es-CO", optionsDate) : "--",
         hora_inicio: start.toLocaleTimeString("es-CO", optionsTime),

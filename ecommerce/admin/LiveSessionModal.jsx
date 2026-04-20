@@ -26,9 +26,13 @@ import {
   FaIdCard,
   FaCity,
   FaCopy,
+  FaCreditCard,
 } from "react-icons/fa";
 import "./LiveSessionModal.css";
-import { extractDocumento } from "../shared/extractDocumento";
+import {
+  extractDocumento,
+  extractMetodoPago,
+} from "../shared/extractDocumento";
 
 const ORDER_COLORS = ["#3b82f6", "#f97316", "#8b5cf6", "#10b981", "#ec4899"];
 
@@ -625,6 +629,15 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                         <div className="lsm-ci-row">
                           <FaIdCard size={11} />
                           <span>{doc}</span>
+                        </div>
+                      ) : null;
+                    })()}
+                    {(() => {
+                      const metodo = extractMetodoPago(data);
+                      return metodo ? (
+                        <div className="lsm-ci-row">
+                          <FaCreditCard size={11} />
+                          <span>{metodo}</span>
                         </div>
                       ) : null;
                     })()}
