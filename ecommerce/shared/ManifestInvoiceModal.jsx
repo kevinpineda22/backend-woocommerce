@@ -102,6 +102,8 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
               is_sub: item.type === "sustituido" || item.is_sub,
               unidad_medida: item.unidad_medida || "",
               tiene_variaciones: item.tiene_variaciones || false,
+              price: item.price || 0,
+              total: item.total || null,
             }));
 
             return (
@@ -113,6 +115,7 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
                   billing: currentOrder.billing,
                   shipping: currentOrder.shipping,
                   meta_data: currentOrder.meta_data,
+                  total: currentOrder.total,
                   items: normalizedItems,
                 }}
                 timestamp={manifestData.timestamp}

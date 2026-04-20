@@ -28,6 +28,7 @@ import {
   FaCopy,
 } from "react-icons/fa";
 import "./LiveSessionModal.css";
+import { extractDocumento } from "../shared/extractDocumento";
 
 const ORDER_COLORS = ["#3b82f6", "#f97316", "#8b5cf6", "#10b981", "#ec4899"];
 
@@ -554,7 +555,13 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                 <div key={id} className="lsm-order-group">
                   <div className="lsm-og-header">
                     <div>
-                      <strong style={{ fontSize: "1.1rem", color: "#1e293b" }}>
+                      <strong
+                        style={{
+                          fontSize: "1.1rem",
+                          color: "#1e293b",
+                          textTransform: "uppercase",
+                        }}
+                      >
                         {data.customer}
                       </strong>
                       <div style={{ fontSize: "0.8rem", color: "#64748b" }}>
@@ -612,6 +619,15 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                         <span>{data.billing.company}</span>
                       </div>
                     )}
+                    {(() => {
+                      const doc = extractDocumento(data);
+                      return doc ? (
+                        <div className="lsm-ci-row">
+                          <FaIdCard size={11} />
+                          <span>{doc}</span>
+                        </div>
+                      ) : null;
+                    })()}
                     {data.billing?.address_1 && (
                       <div className="lsm-ci-row">
                         <FaMapMarkerAlt size={11} />

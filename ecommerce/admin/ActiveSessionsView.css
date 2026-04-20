@@ -246,6 +246,7 @@
   font-weight: 400;
   color: #64748b;
   font-size: 0.7rem;
+  text-transform: uppercase;
 }
 .pa-bs-contacts {
   display: flex;
@@ -262,6 +263,27 @@
   background: rgba(255, 255, 255, 0.5);
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+.pa-bs-totals {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 1px solid #6ee7b7;
+  border-radius: 8px;
+  color: #047857;
+}
+
+.pa-bs-totals svg {
+  flex-shrink: 0;
+}
+
+.pa-bs-total-value {
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 /* ─── Stats ─── */

@@ -13,8 +13,10 @@ import {
   FaSpinner,
   FaSync,
   FaBoxOpen,
+  FaIdCard,
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
+import { extractDocumento } from "../shared/extractDocumento";
 
 const formatPrice = (amount) =>
   new Intl.NumberFormat("es-CO", {
@@ -161,6 +163,14 @@ const CancelledOrdersView = ({
                             <FaEnvelope size={10} /> {billing.email}
                           </span>
                         )}
+                        {(() => {
+                          const doc = extractDocumento(order);
+                          return doc ? (
+                            <span>
+                              <FaIdCard size={10} /> {doc}
+                            </span>
+                          ) : null;
+                        })()}
                         {billing.address_1 && (
                           <span>
                             <FaMapMarkerAlt size={10} /> {billing.address_1},{" "}

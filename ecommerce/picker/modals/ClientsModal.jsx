@@ -1,6 +1,7 @@
 import React from "react";
-import { FaTimes, FaPhone, FaWhatsapp } from "react-icons/fa";
+import { FaTimes, FaPhone, FaWhatsapp, FaIdCard } from "react-icons/fa";
 import { WHATSAPP_COUNTRY_CODE } from "../utils/pickerConstants";
+import { extractDocumento } from "../../shared/extractDocumento";
 import "../Modals.css";
 
 const ClientsModal = ({ isOpen, orders, onClose }) => {
@@ -20,6 +21,14 @@ const ClientsModal = ({ isOpen, orders, onClose }) => {
               <div className="clients-order-info">
                 <div className="clients-order-name">{order.customer}</div>
                 <div className="clients-order-id">Pedido #{order.id}</div>
+                {(() => {
+                  const doc = extractDocumento(order);
+                  return doc ? (
+                    <div className="clients-order-id">
+                      <FaIdCard size={10} /> {doc}
+                    </div>
+                  ) : null;
+                })()}
               </div>
               <div className="clients-order-actions">
                 {order.phone && (

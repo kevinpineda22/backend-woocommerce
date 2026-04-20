@@ -10,10 +10,19 @@ import {
   FaSpinner,
   FaExclamationTriangle,
   FaPhone,
+  FaMoneyBillWave,
+  FaIdCard,
 } from "react-icons/fa";
 import { supabase } from "../../../supabaseClient";
 import { useSedeContext } from "../shared/SedeContext";
 import { ecommerceApi } from "../shared/ecommerceApi";
+
+const formatPrice = (amount) =>
+  new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(amount);
 import "./ActiveSessionsView.css";
 
 // Calcula el tiempo transcurrido desde una fecha
@@ -265,6 +274,30 @@ const ActiveSessionsView = ({ onViewDetail, loadingDetailId }) => {
                     <FaPhone size={9} /> {t}
                   </span>
                 ))}
+              </div>
+            )}
+            {session.documentos && session.documentos.some(Boolean) && (
+              <div className="pa-bs-contacts">
+                {session.documentos.map((d, i) =>
+                  d ? (
+                    <span key={i} className="pa-bs-phone">
+                      <FaIdCard size={9} /> {d}
+                    </span>
+                  ) : null,
+                )}
+              </div>
+            )}
+            {session.totales && session.totales.length > 0 && (
+              <div className="pa-bs-totals">
+                <FaMoneyBillWave size={10} />
+                <span className="pa-bs-total-value">
+                  {formatPrice(
+                    session.totales.reduce(
+                      (sum, t) => sum + (parseFloat(t) || 0),
+                      0,
+                    ),
+                  )}
+                </span>
               </div>
             )}
           </div>

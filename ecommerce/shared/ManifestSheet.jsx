@@ -51,6 +51,50 @@ const ManifestSheet = ({
 
   const [showFullDetails, setShowFullDetails] = React.useState(false);
 
+  // Sistema de ventana de escaneo con contador regresivo
+  // El QR arranca oculto; el cajero lo activa cuando el escáner está en mano
+  const SCAN_WINDOW_SECONDS = 5;
+  const qrStorageKey = `qr_used_${orderId}`;
+  const [qrVisible, setQrVisible] = React.useState(false);
+  const [countdown, setCountdown] = React.useState(null);
+  const [everUsed, setEverUsed] = React.useState(() => {
+    try {
+      return localStorage.getItem(qrStorageKey) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const countdownRef = React.useRef(null);
+
+  const startScanWindow = () => {
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    setQrVisible(true);
+    setCountdown(SCAN_WINDOW_SECONDS);
+    let remaining = SCAN_WINDOW_SECONDS;
+    countdownRef.current = setInterval(() => {
+      remaining -= 1;
+      setCountdown(remaining);
+      if (remaining <= 0) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+        setQrVisible(false);
+        setCountdown(null);
+        setEverUsed(true);
+        try {
+          localStorage.setItem(qrStorageKey, "1");
+        } catch {
+          /* safari private mode */
+        }
+      }
+    }, 1000);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
+
   // Helper: Limpiar SKU removiendo guiones
   const cleanSku = (sku) => {
     if (!sku) return "";
@@ -252,6 +296,13 @@ const ManifestSheet = ({
     .filter(Boolean)
     .join("\r\n");
 
+  const orderTotal = order.total;
+
+  // Estadísticas del QR generado
+  const qrLineCount = qrValue.split("\r\n").filter(Boolean).length;
+  const qrIsComplex = qrValue.length > 1000; // Umbral: ~70 productos avg
+  const qrExceedsCapacity = qrValue.length > 1270; // Límite aprox. de QR v40 nivel Q
+
   // Calcular total de items (excluir ítems virtuales de despacho)
   const productItems = items.filter((i) => !i.is_shipping_method);
   const totalQty = productItems.reduce(
@@ -389,40 +440,199 @@ const ManifestSheet = ({
         <div
           className={`manifest-qr-section ${!showFullDetails ? "manifest-qr-only" : ""}`}
         >
-          <div className="qr-wrapper">
-            <QRCode value={qrValue} size={showFullDetails ? 100 : 480} />
-          </div>
-          <div className="qr-info">
-            <h4>CERTIFICADO DE SALIDA</h4>
-            <p>
-              {productItems.length - omittedItems.length} de{" "}
-              {productItems.length} productos incluidos en el QR
-            </p>
-            {omittedItems.length > 0 && (
-              <div
-                style={{
-                  marginTop: "8px",
-                  padding: "6px 10px",
-                  background: "#fef2f2",
-                  border: "1px solid #fca5a5",
-                  borderRadius: "4px",
-                  color: "#b91c1c",
-                  fontSize: "0.75rem",
-                  textAlign: "left",
-                }}
-              >
-                <strong>Advertencia:</strong> {omittedItems.length} producto(s)
-                omitidos del QR:
-                <ul style={{ margin: "3px 0 0 16px", paddingLeft: 0 }}>
-                  {omittedItems.map((item, idx) => (
-                    <li key={idx}>
-                      {item.name} {item.qty && `(x${item.qty})`}
-                    </li>
-                  ))}
-                </ul>
+          {showFullDetails ? (
+            /* ---- Modo manifiesto completo: QR siempre visible (para impresión) ---- */
+            <>
+              <div className="qr-wrapper">
+                <QRCode value={qrValue || " "} size={180} level="Q" />
               </div>
-            )}
-          </div>
+              <div className="qr-info">
+                <h4>CERTIFICADO DE SALIDA</h4>
+                <div className="qr-scan-once-warning">
+                  ⚠️ ESCANEAR UNA SOLA VEZ
+                </div>
+                <p>
+                  {productItems.length - omittedItems.length} de{" "}
+                  {productItems.length} productos —{" "}
+                  <strong>{qrLineCount} entradas en el QR</strong>
+                </p>
+                {qrExceedsCapacity && (
+                  <div
+                    style={{
+                      marginTop: "6px",
+                      padding: "6px 10px",
+                      background: "#fff7ed",
+                      border: "1px solid #f97316",
+                      borderRadius: "4px",
+                      color: "#c2410c",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                    }}
+                  >
+                    ⚠️ QR muy denso ({qrValue.length} bytes). Imprimir a máxima
+                    calidad.
+                  </div>
+                )}
+                {omittedItems.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: "8px",
+                      padding: "6px 10px",
+                      background: "#fef2f2",
+                      border: "1px solid #fca5a5",
+                      borderRadius: "4px",
+                      color: "#b91c1c",
+                      fontSize: "0.75rem",
+                      textAlign: "left",
+                    }}
+                  >
+                    <strong>Advertencia:</strong> {omittedItems.length}{" "}
+                    producto(s) omitidos del QR.
+                  </div>
+                )}
+              </div>
+            </>
+          ) : qrVisible ? (
+            /* ---- Modo solo QR + timer activo: ventana de escaneo ---- */
+            <>
+              <div className="qr-countdown-timer">
+                <svg viewBox="0 0 50 50" className="qr-countdown-svg">
+                  <circle
+                    cx="25"
+                    cy="25"
+                    r="22"
+                    className="qr-countdown-track"
+                  />
+                  <circle
+                    cx="25"
+                    cy="25"
+                    r="22"
+                    className="qr-countdown-progress"
+                    style={{
+                      strokeDashoffset: `${138.23 * (1 - countdown / SCAN_WINDOW_SECONDS)}`,
+                    }}
+                  />
+                </svg>
+                <span className="qr-countdown-num">{countdown}</span>
+              </div>
+              <div className="qr-wrapper">
+                <QRCode value={qrValue || " "} size={480} level="Q" />
+              </div>
+              <div className="qr-info">
+                <div className="qr-scan-once-warning">
+                  ⚠️ ESCANEAR UNA SOLA VEZ
+                </div>
+                <p>
+                  {productItems.length - omittedItems.length} de{" "}
+                  {productItems.length} productos —{" "}
+                  <strong>{qrLineCount} entradas en el QR</strong>
+                </p>
+                {qrExceedsCapacity && (
+                  <div
+                    style={{
+                      marginTop: "6px",
+                      padding: "6px 10px",
+                      background: "#fff7ed",
+                      border: "1px solid #f97316",
+                      borderRadius: "4px",
+                      color: "#c2410c",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                    }}
+                  >
+                    ⚠️ QR muy denso ({qrValue.length} bytes). Imprimir a máxima
+                    calidad.
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            /* ---- Modo solo QR + timer inactivo: botón para activar ventana ---- */
+            <div className="qr-reveal-container">
+              <h4 className="qr-reveal-title">CERTIFICADO DE SALIDA</h4>
+              {everUsed && (
+                <div className="qr-ever-used-badge">
+                  ✅ QR procesado — se ocultó automáticamente
+                </div>
+              )}
+              <p className="qr-reveal-info">
+                {productItems.length - omittedItems.length} productos —{" "}
+                {qrLineCount} entradas en el QR
+              </p>
+              <div className="qr-scan-instructions">
+                <div className="qr-scan-step">
+                  <span className="qr-step-num">1</span>
+                  <span>Apunte el escáner al código QR</span>
+                </div>
+                <div className="qr-scan-step">
+                  <span className="qr-step-num">2</span>
+                  <span>
+                    Espere el <strong>PITIDO</strong> de confirmación
+                  </span>
+                </div>
+                <div className="qr-scan-step qr-scan-step--critical">
+                  <span className="qr-step-num qr-step-num--critical">3</span>
+                  <span>
+                    Al sonar el pitido →{" "}
+                    <strong>ALEJE el QR de inmediato</strong>
+                  </span>
+                </div>
+              </div>
+              {qrIsComplex && (
+                <div
+                  style={{
+                    padding: "6px 12px",
+                    background: "#fefce8",
+                    border: "1px solid #fbbf24",
+                    borderRadius: "4px",
+                    color: "#92400e",
+                    fontSize: "0.85rem",
+                    width: "100%",
+                    maxWidth: "460px",
+                  }}
+                >
+                  Pedido grande — verificar que el escáner leyó {qrLineCount}{" "}
+                  entradas en SIESA.
+                </div>
+              )}
+              {omittedItems.length > 0 && (
+                <div
+                  style={{
+                    padding: "6px 12px",
+                    background: "#fef2f2",
+                    border: "1px solid #fca5a5",
+                    borderRadius: "4px",
+                    color: "#b91c1c",
+                    fontSize: "0.85rem",
+                    textAlign: "left",
+                    width: "100%",
+                    maxWidth: "460px",
+                  }}
+                >
+                  <strong>Advertencia:</strong> {omittedItems.length}{" "}
+                  producto(s) omitidos del QR:
+                  <ul style={{ margin: "3px 0 0 16px", paddingLeft: 0 }}>
+                    {omittedItems.map((item, idx) => (
+                      <li key={idx}>
+                        {item.name} {item.qty && `(x${item.qty})`}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <button
+                className="qr-reveal-btn no-print"
+                onClick={startScanWindow}
+              >
+                {everUsed
+                  ? "🔁 Volver a mostrar QR (5 seg)"
+                  : "👁️ Mostrar QR para escanear (5 seg)"}
+              </button>
+              <p className="qr-reveal-hint">
+                Se ocultará automáticamente en 5 segundos
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -435,6 +645,7 @@ const ManifestSheet = ({
                 <th className="col-num">#</th>
                 <th className="col-qty">Cant.</th>
                 <th className="col-item">Producto</th>
+                <th className="col-price">Precio</th>
                 <th className="col-ref">Código</th>
               </tr>
             </thead>
@@ -455,6 +666,7 @@ const ManifestSheet = ({
                         </span>
                         <span className="item-shipping-badge">DESPACHO</span>
                       </td>
+                      <td className="cell-price">—</td>
                       <td className="cell-ref">{item.barcode}</td>
                     </tr>
                   );
@@ -471,7 +683,7 @@ const ManifestSheet = ({
                         <td className="cell-qty">
                           <span className="original-qty-badge">-{qty}</span>
                         </td>
-                        <td className="cell-item" colSpan={2}>
+                        <td className="cell-item" colSpan={3}>
                           <div className="original-replaced-info">
                             <span className="original-name-strikethrough">
                               {item.original_name}
@@ -509,6 +721,31 @@ const ManifestSheet = ({
                           </span>
                         )}
                       </td>
+                      <td className="cell-price">
+                        {item.price ? (
+                          <div className="manifest-item-price">
+                            <span className="manifest-unit-price">
+                              {new Intl.NumberFormat("es-CO", {
+                                style: "currency",
+                                currency: "COP",
+                                maximumFractionDigits: 0,
+                              }).format(item.price)}
+                            </span>
+                            {qty > 1 && (
+                              <span className="manifest-line-total">
+                                ={" "}
+                                {new Intl.NumberFormat("es-CO", {
+                                  style: "currency",
+                                  currency: "COP",
+                                  maximumFractionDigits: 0,
+                                }).format(item.price * qty)}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="manifest-no-price">—</span>
+                        )}
+                      </td>
                       <td className="cell-ref">{displayCode}</td>
                     </tr>
                   </React.Fragment>
@@ -523,6 +760,16 @@ const ManifestSheet = ({
               <span>Total:</span> {productItems.length} productos / {totalQty}{" "}
               unidades
             </div>
+            {orderTotal && (
+              <div className="manifest-footer-order-total">
+                <span>Valor del Pedido:</span>{" "}
+                {new Intl.NumberFormat("es-CO", {
+                  style: "currency",
+                  currency: "COP",
+                  maximumFractionDigits: 0,
+                }).format(orderTotal)}
+              </div>
+            )}
           </div>
 
           {/* Resumen de sustituciones */}

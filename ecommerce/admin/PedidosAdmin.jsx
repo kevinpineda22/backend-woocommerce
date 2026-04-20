@@ -412,8 +412,15 @@ const PedidosAdmin = () => {
   };
 
   // --- MARCAR COMO PAGADO / CRÉDITO (MODAL CONFIRMACIÓN) ---
-  const handleMarkAsPaidRequested = (session) => {
-    setConfirmConfig({ isOpen: true, session, paymentMethod: "efectivo" });
+  const METODO_LABELS = {
+    efectivo: "Efectivo",
+    qr: "QR",
+    datafono: "Datáfono",
+    credito: "Crédito",
+  };
+
+  const handleMarkAsPaidRequested = (session, method = "efectivo") => {
+    setConfirmConfig({ isOpen: true, session, paymentMethod: method });
   };
 
   const handleMarkAsCreditRequested = (session) => {
@@ -426,6 +433,7 @@ const PedidosAdmin = () => {
     const adminName = empleado.nombre || "Admin";
     const adminEmail = localStorage.getItem("correo_empleado") || "";
     const method = confirmConfig.paymentMethod || "efectivo";
+    const label = METODO_LABELS[method] || method;
     try {
       await ecommerceApi.post(`/marcar-pagado?${getSedeParam()}`, {
         session_id: confirmConfig.session.id,
@@ -436,7 +444,7 @@ const PedidosAdmin = () => {
       showToast(
         method === "credito"
           ? "🏦 Venta a crédito registrada."
-          : "✅ Pago en efectivo registrado.",
+          : `✅ Pago por ${label} registrado.`,
         "success",
       );
       fetchPaymentPending();
@@ -444,7 +452,11 @@ const PedidosAdmin = () => {
     } catch (error) {
       showToast("Error al registrar pago: " + error.message, "error");
     } finally {
-      setConfirmConfig({ isOpen: false, session: null, paymentMethod: "efectivo" });
+      setConfirmConfig({
+        isOpen: false,
+        session: null,
+        paymentMethod: "efectivo",
+      });
     }
   };
 
@@ -516,6 +528,7 @@ const PedidosAdmin = () => {
             meta_data: order.meta_data || orderInfo.meta_data || [],
             billing: order.billing || orderInfo.billing,
             shipping: order.shipping || orderInfo.shipping,
+            total: order.total || orderInfo.total || null,
             items: order.items.map((item) => {
               const pm = products_map[item.id] || {};
               return {
@@ -851,19 +864,19 @@ const PedidosAdmin = () => {
         title={
           confirmConfig.paymentMethod === "credito"
             ? "🏦 Confirmar Venta a Crédito"
-            : "💵 Confirmar Recepción de Pago"
+            : `💵 Confirmar Pago por ${METODO_LABELS[confirmConfig.paymentMethod] || "Efectivo"}`
         }
         message={
           confirmConfig.session
             ? confirmConfig.paymentMethod === "credito"
               ? `¿Confirmas registrar esta venta como CRÉDITO para el picker ${confirmConfig.session.picker}? Quedará marcado en el historial como pago pendiente por crédito.`
-              : `¿Confirmas físicamente haber recibido el dinero del picker ${confirmConfig.session.picker}? Una vez procesado, este registro pasará al Historial de Sesiones Finalizadas y no habrá vuelta atrás.`
+              : `¿Confirmas haber recibido el pago por ${METODO_LABELS[confirmConfig.paymentMethod] || "Efectivo"} del picker ${confirmConfig.session.picker}? Una vez procesado, este registro pasará al Historial de Sesiones Finalizadas y no habrá vuelta atrás.`
             : ""
         }
         confirmText={
           confirmConfig.paymentMethod === "credito"
             ? "Confirmar Crédito"
-            : "Confirmar Pago"
+            : `Confirmar ${METODO_LABELS[confirmConfig.paymentMethod] || "Pago"}`
         }
         cancelText="Volver"
         onConfirm={handleMarkAsPaidConfirm}

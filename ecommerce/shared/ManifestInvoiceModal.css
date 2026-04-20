@@ -29,7 +29,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 40px 20px 140px 20px; /* Espacio para que el scroll termine por encima de los botones de abajo */
+  padding: 30px 20px 60px 20px;
 }
 
 @keyframes fadeInOverlay {
@@ -41,30 +41,22 @@
    BOTONES DE ACCIÓN (NO IMPRIMIBLES) - FLOATING BOTTOM BAR
    ========================================= */
 .invoice-actions {
-  position: absolute;
-  bottom: 25px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: sticky;
+  top: 0;
+  width: 100%;
   display: flex;
   flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: 15px;
   z-index: 10000;
-  padding: 12px 20px;
-  background: rgba(15, 23, 42, 0.85); /* Premium dark glass */
+  padding: 10px 20px;
+  background: rgba(15, 23, 42, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 50px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.invoice-actions:hover {
-  background: rgba(15, 23, 42, 0.95);
-  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  transform: translateX(-50%) translateY(-2px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
 }
 
 .invoice-btn-close,

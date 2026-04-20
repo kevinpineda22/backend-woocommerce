@@ -139,6 +139,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-transform: uppercase;
 }
 .manifest-note-row {
   border-top: 1px dashed #e2e8f0;
@@ -295,6 +296,11 @@
   width: 110px;
 }
 
+.manifest-table th.col-price {
+  text-align: right;
+  width: 90px;
+}
+
 .manifest-table tbody tr {
   border-bottom: 1px solid #f1f5f9;
 }
@@ -370,6 +376,37 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Celda de precio */
+.cell-price {
+  text-align: right;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.manifest-item-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+}
+
+.manifest-unit-price {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.manifest-line-total {
+  font-size: 0.6rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.manifest-no-price {
+  font-size: 0.68rem;
+  color: #94a3b8;
 }
 
 /* =========================================
@@ -561,6 +598,24 @@
   margin-right: 4px;
 }
 
+.manifest-footer-order-total {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #047857;
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 6px;
+  text-align: right;
+}
+
+.manifest-footer-order-total span {
+  color: #065f46;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
 /* =========================================
    MODOS DE DENSIDAD
    ========================================= */
@@ -662,6 +717,386 @@
 .manifest-sheet.ultra-compact .qr-wrapper svg {
   max-width: 65px;
   max-height: 65px;
+}
+
+/* =========================================
+   BOTÓN "YA ESCANEADO — OCULTAR QR"
+   ========================================= */
+.qr-mark-used-btn {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 16px;
+  background: #15803d;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
+}
+
+.qr-mark-used-btn:hover {
+  background: #166534;
+  transform: translateY(-1px);
+}
+
+.qr-mark-used-btn:active {
+  transform: translateY(0);
+}
+
+/* Modo QR-only: el botón aparece debajo del bloque de info */
+.manifest-qr-section.manifest-qr-only .qr-mark-used-btn {
+  font-size: 1.1rem;
+  padding: 14px 24px;
+  max-width: 380px;
+  margin: 16px auto 0;
+  border-radius: 8px;
+}
+
+/* =========================================
+   OVERLAY: QR YA PROCESADO
+   ========================================= */
+.qr-used-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 20px;
+  background: #f0fdf4;
+  border: 2px solid #16a34a;
+  border-radius: 6px;
+  text-align: center;
+  width: 100%;
+}
+
+/* Versión grande (modo solo QR) */
+.qr-used-overlay--full {
+  padding: 48px 32px;
+  border-radius: 10px;
+  gap: 14px;
+  min-height: 40vh;
+  justify-content: center;
+}
+
+.qr-used-check {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.qr-used-overlay--full .qr-used-check {
+  font-size: 5rem;
+}
+
+.qr-used-title {
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: #15803d;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.qr-used-overlay--full .qr-used-title {
+  font-size: 1.8rem;
+}
+
+.qr-used-sub {
+  font-size: 0.75rem;
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.qr-used-overlay--full .qr-used-sub {
+  font-size: 1.1rem;
+}
+
+.qr-used-reopen-btn {
+  margin-top: 10px;
+  padding: 8px 20px;
+  background: transparent;
+  border: 1.5px solid #16a34a;
+  border-radius: 6px;
+  color: #15803d;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.qr-used-reopen-btn:hover {
+  background: #dcfce7;
+}
+
+.qr-used-overlay--full .qr-used-reopen-btn {
+  font-size: 1rem;
+  padding: 12px 28px;
+  margin-top: 16px;
+}
+
+/* En impresión: ocultar elementos interactivos del sistema de ventana de escaneo */
+@media print {
+  .qr-used-overlay {
+    display: none !important;
+  }
+  .qr-reveal-container {
+    display: none !important;
+  }
+  .qr-countdown-timer {
+    display: none !important;
+  }
+}
+
+/* =========================================
+   ADVERTENCIA ANTI-DUPLICADO (ESCANEAR 1 VEZ)
+   ========================================= */
+.qr-scan-once-warning {
+  display: inline-block;
+  background: #dc2626;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 5px 12px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+/* En modo QR-only: la advertencia es más grande */
+.manifest-qr-section.manifest-qr-only .qr-scan-once-warning {
+  font-size: 1.15rem;
+  padding: 8px 20px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+/* =========================================
+   INSTRUCCIONES DE ESCANEO PASO A PASO
+   ========================================= */
+.qr-scan-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.qr-scan-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #1e3a5f;
+}
+
+.qr-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  background: #3b82f6;
+  color: white;
+  border-radius: 50%;
+  font-size: 0.65rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.qr-scan-step--critical {
+  background: #dcfce7;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-weight: 700;
+  color: #166534;
+}
+
+.qr-step-num--critical {
+  background: #16a34a;
+}
+
+.qr-scan-step--stop {
+  background: #fef2f2;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-weight: 700;
+  color: #991b1b;
+}
+
+.qr-step-icon {
+  width: 20px;
+  min-width: 20px;
+  text-align: center;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+/* QR-only mode: instrucciones más grandes */
+.manifest-qr-section.manifest-qr-only .qr-scan-instructions {
+  gap: 8px;
+  padding: 14px 18px;
+  margin: 10px 0;
+  max-width: 460px;
+  width: 100%;
+}
+
+.manifest-qr-section.manifest-qr-only .qr-scan-step {
+  font-size: 1rem;
+  gap: 12px;
+}
+
+.manifest-qr-section.manifest-qr-only .qr-step-num {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  font-size: 0.8rem;
+}
+
+.manifest-qr-section.manifest-qr-only .qr-scan-step--critical {
+  padding: 6px 10px;
+}
+
+.manifest-qr-section.manifest-qr-only .qr-scan-step--stop {
+  padding: 6px 10px;
+}
+
+/* =========================================
+   CONTADOR REGRESIVO (SVG Ring)
+   ========================================= */
+.qr-countdown-timer {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  flex-shrink: 0;
+}
+
+.qr-countdown-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.qr-countdown-track {
+  fill: none;
+  stroke: #e2e8f0;
+  stroke-width: 4;
+}
+
+.qr-countdown-progress {
+  fill: none;
+  stroke: #f97316;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 138.23;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.9s linear;
+}
+
+.qr-countdown-num {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #f97316;
+  line-height: 1;
+}
+
+/* QR-only mode: ring más grande */
+.manifest-qr-section.manifest-qr-only .qr-countdown-timer {
+  width: 130px;
+  height: 130px;
+}
+
+.manifest-qr-section.manifest-qr-only .qr-countdown-num {
+  font-size: 3rem;
+}
+
+/* =========================================
+   REVEAL CONTAINER (QR oculto, esperando activación)
+   ========================================= */
+.qr-reveal-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 40px 24px;
+  text-align: center;
+  width: 100%;
+  min-height: 60vh;
+  justify-content: center;
+}
+
+.qr-reveal-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.qr-ever-used-badge {
+  display: inline-block;
+  background: #f0fdf4;
+  border: 1.5px solid #16a34a;
+  color: #15803d;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 6px 18px;
+  border-radius: 20px;
+}
+
+.qr-reveal-info {
+  margin: 0;
+  color: #64748b;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.qr-reveal-btn {
+  display: block;
+  padding: 16px 36px;
+  background: #1e293b;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
+  margin-top: 4px;
+}
+
+.qr-reveal-btn:hover {
+  background: #0f172a;
+  transform: translateY(-2px);
+}
+
+.qr-reveal-btn:active {
+  transform: translateY(0);
+}
+
+.qr-reveal-hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  font-style: italic;
 }
 
 /* =========================================
@@ -783,6 +1218,14 @@
   .manifest-table th.col-ref,
   .manifest-table td.cell-ref {
     display: none;
+  }
+
+  .manifest-unit-price {
+    font-size: 0.6rem;
+  }
+
+  .manifest-line-total {
+    font-size: 0.55rem;
   }
 
   .cell-qty {
@@ -967,13 +1410,13 @@
     padding: 0 !important;
     border: none !important;
     background: transparent !important;
-    max-width: 65px !important;
-    max-height: 65px !important;
+    max-width: 80px !important;
+    max-height: 80px !important;
   }
 
   .manifest-qr-section:not(.manifest-qr-only) .qr-wrapper svg {
-    max-width: 65px !important;
-    max-height: 65px !important;
+    max-width: 80px !important;
+    max-height: 80px !important;
   }
 
   .manifest-qr-section:not(.manifest-qr-only) .qr-info h4 {
@@ -987,8 +1430,80 @@
     max-width: 120px;
   }
 
+  /* Instrucciones de escaneo — visibles en QR-only, ocultas en modo compacto */
+  .qr-scan-instructions {
+    display: none !important; /* ocultar en modo full-details para ahorrar espacio */
+  }
+
+  .manifest-qr-section.manifest-qr-only .qr-scan-instructions {
+    display: flex !important;
+    background: #eff6ff !important;
+    border-color: #93c5fd !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    gap: 4px !important;
+    padding: 8px 12px !important;
+    margin: 6px 0 !important;
+    max-width: 100% !important;
+  }
+
+  .manifest-qr-section.manifest-qr-only .qr-scan-step {
+    font-size: 0.75rem !important;
+    gap: 8px !important;
+  }
+
+  .manifest-qr-section.manifest-qr-only .qr-step-num {
+    width: 18px !important;
+    height: 18px !important;
+    min-width: 18px !important;
+    font-size: 0.6rem !important;
+    background: #3b82f6 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-qr-section.manifest-qr-only .qr-step-num--critical {
+    background: #16a34a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-qr-section.manifest-qr-only .qr-scan-step--critical {
+    background: #dcfce7 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: 3px 6px !important;
+  }
+
+  .manifest-qr-section.manifest-qr-only .qr-scan-step--stop {
+    background: #fef2f2 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: 3px 6px !important;
+  }
+
+  /* Advertencia anti-duplicado en impresión */
+  .qr-scan-once-warning {
+    font-size: 0.65rem !important;
+    padding: 3px 8px !important;
+    margin-bottom: 4px !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .manifest-qr-section.manifest-qr-only .qr-scan-once-warning {
+    font-size: 1rem !important;
+    padding: 6px 16px !important;
+    margin-bottom: 8px !important;
+  }
+
   .manifest-qr-section:not(.manifest-qr-only) .qr-info div {
-    display: none !important; /* Ocultar alerta roja */
+    display: none !important; /* Ocultar alertas naranjas/amarillas en modo compacto */
+  }
+
+  /* Mantener visible la advertencia roja de escaneo único */
+  .manifest-qr-section:not(.manifest-qr-only) .qr-info .qr-scan-once-warning {
+    display: inline-block !important;
   }
 
   /* QR - modo solo QR: ocupar toda la hoja */

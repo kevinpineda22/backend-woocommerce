@@ -786,6 +786,7 @@
   font-size: 1.15rem;
   font-weight: 800;
   color: #0f172a;
+  text-transform: uppercase;
 }
 
 .aud-order-id-badge {

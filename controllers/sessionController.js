@@ -129,6 +129,7 @@ exports.createPickingSession = async (req, res) => {
         shipping: o.shipping,
         shipping_lines: o.shipping_lines || [],
         customer_note: o.customer_note,
+        meta_data: o.meta_data || [],
         line_items: o.line_items.map((item) => ({
           ...item,
           is_removed: false,
@@ -557,6 +558,7 @@ exports.getSessionActive = async (req, res) => {
         shipping: o.shipping,
         total: o.total,
         customer_note: o.customer_note || null,
+        meta_data: o.meta_data || [],
       })),
       items: itemsConRuta,
     });

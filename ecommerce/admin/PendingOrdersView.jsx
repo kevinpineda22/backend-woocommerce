@@ -21,8 +21,10 @@ import {
   FaSync,
   FaTrashAlt,
   FaExclamationTriangle,
+  FaIdCard,
 } from "react-icons/fa";
 import "./PedidosAdmin.css";
+import { extractDocumento } from "../shared/extractDocumento";
 
 const formatPrice = (amount) =>
   new Intl.NumberFormat("es-CO", {
@@ -284,6 +286,15 @@ const PendingOrdersView = ({
                             <span>{order.billing.phone}</span>
                           </div>
                         )}
+                        {(() => {
+                          const doc = extractDocumento(order);
+                          return doc ? (
+                            <div className="pa-ticket-contact">
+                              <FaIdCard size={10} color="#64748b" />
+                              <span>{doc}</span>
+                            </div>
+                          ) : null;
+                        })()}
                         <div className="pa-ticket-meta">
                           <span className="pa-meta-item">
                             <FaBox /> {order.line_items?.length} items

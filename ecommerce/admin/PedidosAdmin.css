@@ -697,6 +697,7 @@
   line-height: 1.3;
   font-weight: 600;
   letter-spacing: -0.02em;
+  text-transform: uppercase;
 }
 .pa-ticket-meta {
   display: flex;
@@ -944,6 +945,7 @@
   font-size: 1rem;
   color: #1e293b;
   margin: 0 0 4px 0;
+  text-transform: uppercase;
 }
 .pa-info-sub-text {
   color: #64748b;
@@ -1456,6 +1458,7 @@
 .cancelled-order-customer {
   color: #64748b;
   font-size: 0.82rem;
+  text-transform: uppercase;
 }
 
 .cancelled-order-header-right {

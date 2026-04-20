@@ -19,6 +19,26 @@ const {
 } = require("../services/wooMultiService");
 
 // =========================================================
+// HELPER: Extraer documento de identidad del cliente
+// =========================================================
+const DOC_META_KEYS = [
+  "_billing_document",
+  "_billing_dni",
+  "_billing_cedula",
+  "_billing_nit",
+  "billing_document",
+  "cedula",
+  "documento",
+];
+
+function extractDocumento(orderSnapshot) {
+  const meta = orderSnapshot?.meta_data;
+  if (!meta || !Array.isArray(meta)) return "";
+  const found = meta.find((m) => DOC_META_KEYS.includes(m.key));
+  return found?.value || "";
+}
+
+// =========================================================
 // HELPER: Obtener códigos de barras desde SIESA
 // =========================================================
 // ✅ NUEVA FUNCIÓN: Obtiene códigos de barras discriminados ESTRICTAMENTE por unidad_medida
@@ -329,6 +349,8 @@ exports.getActiveSessionsDashboard = async (req, res) => {
               ).trim() || "Cliente",
           ),
           telefonos: orders.map((o) => o.billing?.phone || "").filter(Boolean),
+          documentos: orders.map((o) => extractDocumento(o)),
+          totales: orders.map((o) => o.total || null),
         };
       }),
     );
@@ -484,6 +506,14 @@ exports.getPendingPaymentSessions = async (req, res) => {
             .filter(Boolean)
         : [];
 
+      const totales = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) => o.total || null)
+        : [];
+
+      const documentos = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) => extractDocumento(o))
+        : [];
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
@@ -492,6 +522,8 @@ exports.getPendingPaymentSessions = async (req, res) => {
         clientes: clientes,
         telefonos,
         emails,
+        totales,
+        documentos,
         fecha: end.toLocaleDateString("es-CO", optionsDate),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
@@ -516,9 +548,10 @@ exports.markSessionAsPaid = async (req, res) => {
   } = req.body;
   try {
     if (!session_id) return res.status(400).json({ error: "Falta session_id" });
-    if (!["efectivo", "credito"].includes(payment_method)) {
+    if (!["efectivo", "credito", "qr", "datafono"].includes(payment_method)) {
       return res.status(400).json({
-        error: "payment_method inválido. Debe ser 'efectivo' o 'credito'.",
+        error:
+          "payment_method inválido. Debe ser 'efectivo', 'credito', 'qr' o 'datafono'.",
       });
     }
 
@@ -631,6 +664,14 @@ exports.getHistorySessions = async (req, res) => {
             .filter(Boolean)
         : [];
 
+      const totales = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) => o.total || null)
+        : [];
+
+      const documentos = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) => extractDocumento(o))
+        : [];
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
@@ -639,6 +680,8 @@ exports.getHistorySessions = async (req, res) => {
         clientes: clientes,
         telefonos,
         emails,
+        totales,
+        documentos,
         fecha: end.toLocaleDateString("es-CO", optionsDate),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
@@ -719,6 +762,25 @@ exports.getPendingAuditSessions = async (req, res) => {
             .filter(Boolean)
         : [];
 
+      const totales = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) => o.total || null)
+        : [];
+
+      const documentos = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) => extractDocumento(o))
+        : [];
+
+      const fechas_pedidos = sess.snapshot_pedidos
+        ? sess.snapshot_pedidos.map((o) => {
+            if (!o.date_created) return null;
+            const d = new Date(o.date_created);
+            return {
+              fecha: d.toLocaleDateString("es-CO", optionsDate),
+              hora: d.toLocaleTimeString("es-CO", optionsTime),
+            };
+          })
+        : [];
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
@@ -727,7 +789,11 @@ exports.getPendingAuditSessions = async (req, res) => {
         clientes: clientes,
         telefonos,
         emails,
+        totales,
+        documentos,
+        fechas_pedidos,
         fecha: end ? end.toLocaleDateString("es-CO", optionsDate) : "--",
+        hora_inicio: start.toLocaleTimeString("es-CO", optionsTime),
         hora_fin: end ? end.toLocaleTimeString("es-CO", optionsTime) : "--",
         duracion: `${durationMin} min`,
         estado: sess.estado,
@@ -948,6 +1014,7 @@ exports.getSessionLogsDetail = async (req, res) => {
           shipping: o.shipping,
           shipping_lines: o.shipping_lines || [],
           meta_data: o.meta_data || [],
+          total: o.total || null,
           total_items:
             o.line_items?.reduce((acc, i) => acc + i.quantity, 0) || 0,
           date_created: o.date_created,

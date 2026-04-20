@@ -1,10 +1,16 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import {
   FaFileAlt,
   FaQrcode,
   FaStoreAlt,
   FaPhone,
   FaEnvelope,
+  FaSpinner,
+  FaClipboardCheck,
+  FaChevronLeft,
+  FaChevronRight,
+  FaClock,
+  FaIdCard,
 } from "react-icons/fa";
 import "./HistoryView.css";
 
@@ -18,6 +24,14 @@ const METODO_PAGO_CONFIG = {
   efectivo: {
     className: "hv-badge-metodo hv-badge-metodo--cash",
     label: "💵 Efectivo",
+  },
+  qr: {
+    className: "hv-badge-metodo hv-badge-metodo--qr",
+    label: "📱 QR",
+  },
+  datafono: {
+    className: "hv-badge-metodo hv-badge-metodo--datafono",
+    label: "💳 Datáfono",
   },
   credito: {
     className: "hv-badge-metodo hv-badge-metodo--credit",
@@ -41,6 +55,13 @@ const getMetodoPagoBadge = (metodo) => {
 };
 
 /* ─── Componente ─── */
+const formatPrice = (amount) =>
+  new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(amount);
+
 const HistoryView = ({
   historyOrders,
   loading,
@@ -49,9 +70,46 @@ const HistoryView = ({
   loadingText = "Cargando historial...",
   emptyText = "📭 No hay registros en el historial",
   isPaymentView = false,
+  isAuditView = false,
   onMarkAsPaid,
   onMarkAsCredit,
+  onAudit,
+  pageSize = 10,
 }) => {
+  const [loadingDetailId, setLoadingDetailId] = useState(null);
+  const [loadingManifestId, setLoadingManifestId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(historyOrders.length / pageSize));
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return historyOrders.slice(start, start + pageSize);
+  }, [historyOrders, currentPage, pageSize]);
+
+  // Reset page when data changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [historyOrders]);
+
+  const handleViewDetail = async (sess) => {
+    if (loadingDetailId) return;
+    setLoadingDetailId(sess.id);
+    try {
+      await onViewDetail(sess);
+    } finally {
+      setLoadingDetailId(null);
+    }
+  };
+
+  const handleViewManifest = async (sess) => {
+    if (loadingManifestId) return;
+    setLoadingManifestId(sess.id);
+    try {
+      await onViewManifest(sess);
+    } finally {
+      setLoadingManifestId(null);
+    }
+  };
   if (loading) {
     return (
       <div className="history-loading-state">
@@ -74,63 +132,120 @@ const HistoryView = ({
       <table className="hv-table">
         <thead>
           <tr>
-            <th>Fecha</th>
-            {isPaymentView ? <th>Cliente(s)</th> : <th>Picker</th>}
-            {isPaymentView && <th>Contacto</th>}
+            <th>Cliente</th>
+            <th>Pedidos / Total</th>
+            {isAuditView ? <th>Trazabilidad</th> : <th>Fecha</th>}
+            {!isPaymentView && <th>Picker</th>}
             <th>Sede</th>
-            <th>Pedidos</th>
             <th>Estado</th>
             <th>Duración</th>
             <th>Acción</th>
           </tr>
         </thead>
         <tbody>
-          {historyOrders.map((sess) => (
+          {paginatedOrders.map((sess) => (
             <tr key={sess.id}>
+              {/* ── CLIENTE + CONTACTO (siempre visible, primera columna) ── */}
               <td>
-                <div className="hv-cell-fecha-label">{sess.fecha}</div>
-                <small>{sess.hora_fin}</small>
+                <div className="hv-client-block">
+                  {sess.clientes && sess.clientes.length > 0 ? (
+                    sess.clientes.map((c, i) => (
+                      <div key={i} className="hv-client-row">
+                        <span className="hv-client-name">{c}</span>
+                        {sess.telefonos?.[i] && (
+                          <a
+                            href={`tel:${sess.telefonos[i]}`}
+                            className="hv-contact-link"
+                          >
+                            <FaPhone size={9} /> {sess.telefonos[i]}
+                          </a>
+                        )}
+                        {sess.emails?.[i] && (
+                          <a
+                            href={`mailto:${sess.emails[i]}`}
+                            className="hv-contact-link"
+                          >
+                            <FaEnvelope size={9} /> {sess.emails[i]}
+                          </a>
+                        )}
+                        {sess.documentos?.[i] && (
+                          <span className="hv-contact-link hv-doc-badge">
+                            <FaIdCard size={9} /> {sess.documentos[i]}
+                          </span>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <span className="hv-text-muted">Sin datos</span>
+                  )}
+                </div>
               </td>
 
-              {isPaymentView ? (
-                <td>
-                  <div className="hv-cell-stack">
-                    {sess.clientes && sess.clientes.length > 0 ? (
-                      sess.clientes.map((c, i) => (
-                        <span key={i} className="hv-client-name">
-                          {c}
+              {/* ── PEDIDOS + TOTAL (fusionados) ── */}
+              <td>
+                <div className="hv-orders-block">
+                  {sess.pedidos.map((p, i) => (
+                    <div key={p} className="hv-order-row">
+                      <span className="hv-order-id">#{p}</span>
+                      {sess.totales?.[i] ? (
+                        <span className="hv-order-total">
+                          {formatPrice(sess.totales[i])}
                         </span>
-                      ))
-                    ) : (
-                      <span className="hv-text-muted">Sin datos</span>
-                    )}
-                  </div>
-                </td>
-              ) : (
-                <td>{sess.picker}</td>
-              )}
+                      ) : null}
+                    </div>
+                  ))}
+                  {sess.totales && sess.totales.length > 1 && (
+                    <div className="hv-order-total-sum">
+                      Σ{" "}
+                      {formatPrice(
+                        sess.totales.reduce(
+                          (sum, t) => sum + (parseFloat(t) || 0),
+                          0,
+                        ),
+                      )}
+                    </div>
+                  )}
+                </div>
+              </td>
 
-              {isPaymentView && (
-                <td>
-                  <div className="hv-cell-stack hv-contact-stack">
-                    {sess.telefonos &&
-                      sess.telefonos.length > 0 &&
-                      sess.telefonos.map((t, i) => (
-                        <span key={`p${i}`} className="hv-contact-item">
-                          <FaPhone size={9} /> {t}
+              {/* ── FECHA / TRAZABILIDAD ── */}
+              <td>
+                {isAuditView ? (
+                  <div className="hv-trace-block">
+                    {sess.clientes?.map((c, i) => (
+                      <div key={i} className="hv-trace-row">
+                        <span className="hv-trace-client">
+                          {c} — #{sess.pedidos?.[i]}
                         </span>
-                      ))}
-                    {sess.emails &&
-                      sess.emails.length > 0 &&
-                      sess.emails.map((e, i) => (
-                        <span key={`e${i}`} className="hv-contact-item">
-                          <FaEnvelope size={9} /> {e}
-                        </span>
-                      ))}
+                        {sess.fechas_pedidos?.[i] && (
+                          <span className="hv-trace-step hv-trace-step--order">
+                            <FaClock size={9} /> Pedido:{" "}
+                            {sess.fechas_pedidos[i].hora}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    <div className="hv-trace-session">
+                      <span className="hv-trace-step hv-trace-step--assign">
+                        📋 Asignado: {sess.hora_inicio || "--"}
+                      </span>
+                      <span className="hv-trace-step hv-trace-step--done">
+                        ✅ Finalizado: {sess.hora_fin || "--"}
+                      </span>
+                    </div>
                   </div>
-                </td>
-              )}
+                ) : (
+                  <>
+                    <div className="hv-cell-fecha-label">{sess.fecha}</div>
+                    <small>{sess.hora_fin}</small>
+                  </>
+                )}
+              </td>
 
+              {/* ── PICKER (no en payment view) ── */}
+              {!isPaymentView && <td>{sess.picker}</td>}
+
+              {/* ── SEDE ── */}
               <td>
                 {sess.sede_nombre ? (
                   <span className="hv-sede-tag">
@@ -140,62 +255,87 @@ const HistoryView = ({
                   <span className="hv-text-muted">—</span>
                 )}
               </td>
-              <td>
-                <div className="hv-cell-stack">
-                  {sess.pedidos.map((p, i) => (
-                    <span key={p} className="hv-order-id">
-                      #{p}{" "}
-                      {isPaymentView
-                        ? ""
-                        : sess.clientes?.[i]
-                          ? `(${sess.clientes[i].split(" ")[0]})`
-                          : ""}
-                    </span>
-                  ))}
-                </div>
-              </td>
+
+              {/* ── ESTADO ── */}
               <td className="hv-cell-estado">
                 <div className="hv-cell-stack hv-cell-stack--center">
                   {getEstadoBadge(sess.estado)}
                   {!isPaymentView && getMetodoPagoBadge(sess.metodo_pago)}
                 </div>
               </td>
+
+              {/* ── DURACIÓN ── */}
               <td>
                 <span className="hv-badge-duracion">{sess.duracion}</span>
               </td>
+
+              {/* ── ACCIONES ── */}
               <td>
                 <div className="hv-cell-acciones">
                   {isPaymentView && (
-                    <>
+                    <div className="hv-payment-methods">
                       <button
-                        className="hv-btn-paid"
-                        title="Marcar como Pagado (Efectivo)"
-                        onClick={() => onMarkAsPaid(sess)}
+                        className="hv-btn-pay hv-btn-pay--cash"
+                        title="Pagó en Efectivo"
+                        onClick={() => onMarkAsPaid(sess, "efectivo")}
                       >
-                        💰 Pagado
+                        💵 Efectivo
                       </button>
                       <button
-                        className="hv-btn-credit"
+                        className="hv-btn-pay hv-btn-pay--qr"
+                        title="Pagó con QR"
+                        onClick={() => onMarkAsPaid(sess, "qr")}
+                      >
+                        📱 QR
+                      </button>
+                      <button
+                        className="hv-btn-pay hv-btn-pay--datafono"
+                        title="Pagó con Datáfono"
+                        onClick={() => onMarkAsPaid(sess, "datafono")}
+                      >
+                        💳 Datáfono
+                      </button>
+                      <button
+                        className="hv-btn-pay hv-btn-pay--credit"
                         title="Marcar como Crédito"
                         onClick={() => onMarkAsCredit(sess)}
                       >
                         🏦 Crédito
                       </button>
-                    </>
+                    </div>
+                  )}
+                  {isAuditView && onAudit && (
+                    <button
+                      className="hv-btn-icon hv-btn-icon--audit"
+                      title="Auditar Sesión"
+                      onClick={() => onAudit(sess)}
+                    >
+                      <FaClipboardCheck />
+                    </button>
                   )}
                   <button
                     className="hv-btn-icon hv-btn-icon--warning"
                     title="Ver Logs"
-                    onClick={() => onViewDetail(sess)}
+                    onClick={() => handleViewDetail(sess)}
+                    disabled={loadingDetailId === sess.id}
                   >
-                    <FaFileAlt />
+                    {loadingDetailId === sess.id ? (
+                      <FaSpinner className="ec-spin" />
+                    ) : (
+                      <FaFileAlt />
+                    )}
                   </button>
                   <button
                     className="hv-btn-icon hv-btn-icon--success"
                     title="Ver Certificado"
-                    onClick={() => onViewManifest(sess)}
+                    onClick={() => handleViewManifest(sess)}
+                    disabled={loadingManifestId === sess.id}
                   >
-                    <FaQrcode />
+                    {loadingManifestId === sess.id ? (
+                      <FaSpinner className="ec-spin" />
+                    ) : (
+                      <FaQrcode />
+                    )}
                   </button>
                 </div>
               </td>
@@ -203,6 +343,30 @@ const HistoryView = ({
           ))}
         </tbody>
       </table>
+
+      {/* ── PAGINACIÓN ── */}
+      {totalPages > 1 && (
+        <div className="hv-pagination">
+          <button
+            className="hv-page-btn"
+            disabled={currentPage === 1}
+            onClick={() => setCurrentPage((p) => p - 1)}
+          >
+            <FaChevronLeft size={12} />
+          </button>
+          <span className="hv-page-info">
+            {currentPage} / {totalPages}
+            <small> ({historyOrders.length} registros)</small>
+          </span>
+          <button
+            className="hv-page-btn"
+            disabled={currentPage === totalPages}
+            onClick={() => setCurrentPage((p) => p + 1)}
+          >
+            <FaChevronRight size={12} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

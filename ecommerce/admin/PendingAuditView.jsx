@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { FaSync } from "react-icons/fa";
 import HistoryView from "./HistoryView";
+import VistaAuditor from "../auditor/VistaAuditor";
 
 const PendingAuditView = ({
   pendingOrders,
@@ -9,6 +10,22 @@ const PendingAuditView = ({
   onViewDetail,
   onViewManifest,
 }) => {
+  const [auditSessionId, setAuditSessionId] = useState(null);
+
+  if (auditSessionId) {
+    return (
+      <div className="pending-audit-overlay">
+        <VistaAuditor
+          initialSessionId={auditSessionId}
+          onClose={() => {
+            setAuditSessionId(null);
+            onRefresh();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <>
       <header className="pedidos-layout-header">
@@ -23,6 +40,8 @@ const PendingAuditView = ({
           loading={loading}
           onViewDetail={onViewDetail}
           onViewManifest={onViewManifest}
+          isAuditView={true}
+          onAudit={(sess) => setAuditSessionId(sess.id)}
           loadingText="Cargando pendientes de auditoria..."
           emptyText="📭 No hay pendientes de auditoria"
         />

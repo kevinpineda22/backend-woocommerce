@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { ecommerceApi } from "../shared/ecommerceApi";
 import EscanerBarras from "../../DesarrolloSurtido_API/EscanerBarras";
 import ManifestInvoiceModal from "../shared/ManifestInvoiceModal";
+import { extractDocumento } from "../shared/extractDocumento";
 import { useSedeContext } from "../shared/SedeContext";
 import { supabase } from "../../../supabaseClient";
 import {
@@ -31,11 +32,12 @@ import {
 import { Link } from "react-router-dom";
 import "./VistaAuditor.css";
 
-const VistaAuditor = () => {
+const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
   const { sedeName } = useSedeContext();
-  const [sessionId, setSessionId] = useState("");
+  const [sessionId, setSessionId] = useState(initialSessionId || "");
   const [auditData, setAuditData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const isEmbedded = !!onClose;
 
   const [scannerMode, setScannerMode] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
@@ -95,12 +97,16 @@ const VistaAuditor = () => {
   };
 
   useEffect(() => {
+    if (initialSessionId) {
+      fetchAuditData(initialSessionId);
+      return;
+    }
     const storedSession = localStorage.getItem("auditor_session_id");
     if (storedSession) {
       setSessionId(storedSession);
       fetchAuditData(storedSession);
     }
-  }, []);
+  }, [initialSessionId]);
 
   useEffect(() => {
     if (auditData?.meta?.session_id) {
@@ -709,6 +715,7 @@ const VistaAuditor = () => {
         shipping: group.shipping,
         shipping_lines: group.shipping_lines || [],
         meta_data: group.meta_data || [],
+        total: group.total || null,
         items: productItems,
       };
     });
@@ -810,13 +817,23 @@ const VistaAuditor = () => {
     <div className="auditor-layout">
       <header className="auditor-header">
         <div className="aud-header-left">
-          <Link
-            to="/acceso"
-            className="aud-back-button"
-            title="Volver al panel"
-          >
-            <FaArrowLeft />
-          </Link>
+          {isEmbedded ? (
+            <button
+              className="aud-back-button"
+              title="Volver a la lista"
+              onClick={onClose}
+            >
+              <FaArrowLeft />
+            </button>
+          ) : (
+            <Link
+              to="/acceso"
+              className="aud-back-button"
+              title="Volver al panel"
+            >
+              <FaArrowLeft />
+            </Link>
+          )}
         </div>
         <h1>
           <FaClipboardCheck /> Auditoría
@@ -1106,6 +1123,7 @@ const VistaAuditor = () => {
                         )
                       : null;
                     const customerNote = orderData.customer_note || null;
+                    const documento = extractDocumento(orderData);
 
                     return (
                       <div
@@ -1145,6 +1163,11 @@ const VistaAuditor = () => {
                                 {phone && (
                                   <div className="aud-order-detail-line">
                                     <span>📞 {phone}</span>
+                                  </div>
+                                )}
+                                {documento && (
+                                  <div className="aud-order-detail-line">
+                                    <span>🪪 Documento: {documento}</span>
                                   </div>
                                 )}
                                 {email && (

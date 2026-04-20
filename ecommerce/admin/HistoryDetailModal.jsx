@@ -14,8 +14,12 @@ import {
   FaEnvelope,
   FaStickyNote,
   FaCity,
+  FaMapMarkerAlt,
+  FaMoneyBillWave,
+  FaIdCard,
 } from "react-icons/fa";
 import "./HistoryView.css";
+import { extractDocumento } from "../shared/extractDocumento";
 
 /* ─── Helpers ─── */
 const formatPrice = (amount) =>
@@ -320,53 +324,70 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
             )}
           </div>
         </div>
-        {billing.first_name && (
-          <div className="hdm-order-customer">
-            <div className="hdm-order-customer-name">
-              <FaUser size={11} /> {billing.first_name} {billing.last_name}
-            </div>
-            {billing.company && (
-              <div className="hdm-order-customer-contact">
-                <FaCity size={10} /> {billing.company}
-              </div>
-            )}
-            {billing.phone && (
-              <div className="hdm-order-customer-contact">
-                <FaPhone size={10} /> {billing.phone}
-              </div>
-            )}
-            {billing.email && (
-              <div className="hdm-order-customer-contact">
-                <FaEnvelope size={10} /> {billing.email}
-              </div>
-            )}
-            {(addr || city) && (
-              <div className="hdm-order-customer-contact">
-                <FaTruck size={10} />{" "}
-                <span title="Dirección de Facturación">
-                  {[addr, city].filter(Boolean).join(", ")}
-                </span>
-              </div>
-            )}
-            {shipping.address_1 && shipping.address_1 !== billing.address_1 && (
-              <div className="hdm-order-customer-contact hdm-text-shipping">
-                <FaTruck size={10} />{" "}
-                <span title="Dirección de Envío">
-                  ENVÍO: {shipping.address_1}, {shipping.city}
-                </span>
-              </div>
-            )}
-            {order.total && (
-              <div
-                className="hdm-order-customer-contact"
-                style={{ fontWeight: 700 }}
-              >
-                Total: {formatPrice(order.total)}
-              </div>
-            )}
+        {order.total && (
+          <div className="hdm-order-total-badge">
+            <FaMoneyBillWave size={14} />
+            <span>{formatPrice(order.total)}</span>
           </div>
         )}
       </div>
+
+      {/* Bloque de información del cliente — PROMINENTE */}
+      {billing.first_name && (
+        <div className="hdm-customer-block">
+          <div className="hdm-customer-block-row hdm-customer-block-main">
+            <div className="hdm-customer-name-big">
+              <FaUser size={14} />
+              <span>
+                {billing.first_name} {billing.last_name}
+              </span>
+            </div>
+            {billing.company && (
+              <div className="hdm-customer-company">
+                <FaCity size={12} /> {billing.company}
+              </div>
+            )}
+          </div>
+          <div className="hdm-customer-block-grid">
+            {billing.phone && (
+              <div className="hdm-customer-field">
+                <FaPhone size={12} />
+                <a href={`tel:${billing.phone}`}>{billing.phone}</a>
+              </div>
+            )}
+            {billing.email && (
+              <div className="hdm-customer-field">
+                <FaEnvelope size={12} />
+                <a href={`mailto:${billing.email}`}>{billing.email}</a>
+              </div>
+            )}
+            {(() => {
+              const doc = extractDocumento(order);
+              return doc ? (
+                <div className="hdm-customer-field">
+                  <FaIdCard size={12} />
+                  <span>{doc}</span>
+                </div>
+              ) : null;
+            })()}
+          </div>
+          {(addr || city) && (
+            <div className="hdm-customer-address">
+              <FaMapMarkerAlt size={13} />
+              <span>{[addr, city].filter(Boolean).join(", ")}</span>
+            </div>
+          )}
+          {shipping.address_1 && shipping.address_1 !== billing.address_1 && (
+            <div className="hdm-customer-address hdm-customer-address--shipping">
+              <FaTruck size={13} />
+              <span>
+                ENVÍO: {shipping.address_1}
+                {shipping.city ? `, ${shipping.city}` : ""}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Notas del cliente si existen */}
       {order.customer_note && (

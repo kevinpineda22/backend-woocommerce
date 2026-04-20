@@ -226,6 +226,60 @@
   border: 1px solid rgba(0, 113, 227, 0.3);
 }
 
+.hv-badge-metodo--qr {
+  background: rgba(175, 82, 222, 0.1);
+  color: #8944ab;
+  border: 1px solid rgba(175, 82, 222, 0.3);
+}
+
+.hv-badge-metodo--datafono {
+  background: rgba(255, 159, 10, 0.1);
+  color: #c77c02;
+  border: 1px solid rgba(255, 159, 10, 0.3);
+}
+
+/* --- Botones de Pago --- */
+.hv-payment-methods {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.hv-btn-pay {
+  padding: 4px 8px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s;
+  white-space: nowrap;
+}
+
+.hv-btn-pay:hover {
+  filter: brightness(0.9);
+}
+
+.hv-btn-pay--cash {
+  background: rgba(48, 209, 88, 0.15);
+  color: #1a7a2e;
+}
+
+.hv-btn-pay--qr {
+  background: rgba(175, 82, 222, 0.15);
+  color: #7a3d9a;
+}
+
+.hv-btn-pay--datafono {
+  background: rgba(255, 159, 10, 0.15);
+  color: #b06e00;
+}
+
+.hv-btn-pay--credit {
+  background: rgba(0, 113, 227, 0.15);
+  color: #0059b3;
+}
+
 .hv-cell-stack--center {
   align-items: center;
 }
@@ -240,6 +294,7 @@
   font-weight: 600;
   color: #1e293b;
   font-size: 0.85rem;
+  text-transform: uppercase;
 }
 .hv-text-muted {
   color: #94a3b8;
@@ -1070,4 +1125,354 @@
     font-size: 0.85rem;
     padding: 10px 0;
   }
+
+  .hdm-customer-block-grid {
+    flex-direction: column;
+  }
+
+  .hdm-customer-block {
+    margin: 0 12px 10px;
+    padding: 12px;
+  }
+}
+
+/* =========================================
+   ORDER TOTAL - HistoryView Table
+   ========================================= */
+.hv-order-total {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #059669;
+  white-space: nowrap;
+}
+
+.hv-order-total-sum {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #047857;
+  padding-top: 4px;
+  border-top: 1px solid #d1fae5;
+  margin-top: 2px;
+}
+
+/* Loading state for action buttons */
+.hv-btn-icon:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* =========================================
+   CUSTOMER BLOCK - HistoryDetailModal
+   (Prominent client info)
+   ========================================= */
+.hdm-customer-block {
+  margin: 0 16px 12px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #eff6ff, #f0f9ff);
+  border: 1.5px solid #93c5fd;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hdm-customer-block-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hdm-customer-name-big {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  text-transform: uppercase;
+}
+
+.hdm-customer-name-big svg {
+  color: #3b82f6;
+}
+
+.hdm-customer-company {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  color: #475569;
+  font-weight: 500;
+}
+
+.hdm-customer-block-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.hdm-customer-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  color: #334155;
+}
+
+.hdm-customer-field svg {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.hdm-customer-field a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.hdm-customer-field a:hover {
+  text-decoration: underline;
+}
+
+.hdm-customer-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #1e293b;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+}
+
+.hdm-customer-address svg {
+  color: #ef4444;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.hdm-customer-address--shipping {
+  background: rgba(59, 130, 246, 0.06);
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.hdm-customer-address--shipping svg {
+  color: #3b82f6;
+}
+
+/* Order Total Badge in order card header */
+.hdm-order-total-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 1.5px solid #6ee7b7;
+  border-radius: 980px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #047857;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.hdm-order-total-badge svg {
+  color: #059669;
+}
+
+/* =========================================
+   CLIENT-FIRST LAYOUT - HistoryView Table
+   ========================================= */
+.hv-client-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hv-client-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hv-client-row .hv-client-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #1e293b;
+  text-transform: uppercase;
+}
+
+.hv-contact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.hv-contact-link:hover {
+  text-decoration: underline;
+}
+
+/* Orders + Total merged column */
+.hv-orders-block {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hv-order-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Audit button */
+.hv-btn-icon--audit {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.15s;
+}
+
+.hv-btn-icon--audit:hover {
+  background: #6d28d9;
+}
+
+/* =========================================
+   PAGINATION - HistoryView
+   ========================================= */
+.hv-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 0 4px;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 8px;
+}
+
+.hv-page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.hv-page-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.hv-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hv-page-info {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.hv-page-info small {
+  font-weight: 400;
+  color: #94a3b8;
+  margin-left: 4px;
+}
+
+/* =========================================
+   TRACEABILITY BLOCK - Audit View
+   ========================================= */
+.hv-trace-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.75rem;
+}
+
+.hv-trace-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.hv-trace-row:last-child {
+  border-bottom: none;
+}
+
+.hv-trace-client {
+  font-weight: 600;
+  color: #1d1d1f;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+
+.hv-trace-session {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.hv-trace-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.hv-trace-step--order {
+  background: rgba(0, 122, 255, 0.08);
+  color: #0059b3;
+}
+
+.hv-trace-step--assign {
+  background: rgba(255, 159, 10, 0.1);
+  color: #c77c02;
+}
+
+.hv-trace-step--done {
+  background: rgba(48, 209, 88, 0.1);
+  color: #248a3d;
+}
+
+/* =========================================
+   AUDIT OVERLAY - PendingAuditView
+   ========================================= */
+.pending-audit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: #f8fafc;
+  overflow-y: auto;
 }
