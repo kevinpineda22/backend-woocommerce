@@ -1020,19 +1020,30 @@ exports.getSessionLogsDetail = async (req, res) => {
               (m) => m.key === "pa_unidad-de-medida-aproximado",
             );
             const unitMeasure = unitMeta ? unitMeta.display_value : null;
+            // catalog_price: precio de catálogo por unidad/kg (sin ajuste de peso)
+            // effective_price: total cobrado / cantidad pedida (lo que realmente se factura)
+            // Para productos pesables: total = catalog_price × peso_real_kg
+            // Para productos normales: effective_price = catalog_price (sin diferencia)
+            const catalogPrice = parseFloat(item.price) || 0;
+            const effectivePrice =
+              item.quantity > 0
+                ? parseFloat(item.total) / item.quantity
+                : catalogPrice;
             productDetailsMap[item.product_id] = {
-              name: item.name, // 🔧 Añadir nombre del producto
+              name: item.name,
               image: imgUrl,
               sku: item.sku,
-              price: item.price, // 🔧 Incluir precio también
+              price: effectivePrice,
+              catalog_price: catalogPrice,
               unidad_medida: unitMeasure,
             };
             if (item.variation_id)
               productDetailsMap[item.variation_id] = {
-                name: item.name, // 🔧 Añadir nombre del producto
+                name: item.name,
                 image: imgUrl,
                 sku: item.sku,
-                price: item.price,
+                price: effectivePrice,
+                catalog_price: catalogPrice,
                 unidad_medida: unitMeasure,
               };
           });

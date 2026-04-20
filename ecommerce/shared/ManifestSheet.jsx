@@ -2,6 +2,7 @@ import React from "react";
 import QRCode from "react-qr-code";
 import { getAssetUrl } from "../../../config/storage";
 import { calcularDigitoVerificador } from "../picker/modals/utils/gs1Utils";
+import { extractMetodoPago } from "./extractDocumento";
 import "./ManifestSheet.css";
 
 /**
@@ -37,11 +38,16 @@ const ManifestSheet = ({
   const docMeta = metaData.find((m) => docKeys.includes(m.key));
   const customerDocument = docMeta?.value || "";
 
-  // Dirección de envío (usa shipping, fallback a billing)
-  const addr = shipping.address_1 || billing.address_1 || "";
-  const city = shipping.city || billing.city || "";
-  const state = shipping.state || billing.state || "";
-  const fullAddress = [addr, city, state].filter(Boolean).join(", ");
+  // Dirección de facturación (billing) y envío (shipping)
+  const billingAddress = [billing.address_1, billing.city, billing.state]
+    .filter(Boolean)
+    .join(", ");
+  const shippingAddress = [shipping.address_1, shipping.city, shipping.state]
+    .filter(Boolean)
+    .join(", ");
+
+  // Método de pago (usa _billing_cod_payment_mode → Efectivo/QR/Datáfono/Crédito)
+  const metodoPago = extractMetodoPago(order);
 
   // Nombre del cliente
   const customerName =
@@ -383,6 +389,12 @@ const ManifestSheet = ({
               <span className="manifest-field-label">Cliente:</span>
               <span className="manifest-field-value">{customerName}</span>
             </div>
+            {billing.company && (
+              <div className="manifest-customer-field">
+                <span className="manifest-field-label">Empresa:</span>
+                <span className="manifest-field-value">{billing.company}</span>
+              </div>
+            )}
             {customerDocument && (
               <div className="manifest-customer-field">
                 <span className="manifest-field-label">Documento:</span>
@@ -401,22 +413,24 @@ const ManifestSheet = ({
                 <span className="manifest-field-value">{billing.email}</span>
               </div>
             )}
-          </div>
-          <div className="manifest-customer-row">
-            {fullAddress && (
+            {metodoPago && (
               <div className="manifest-customer-field">
-                <span className="manifest-field-label">Dirección:</span>
-                <span className="manifest-field-value">{fullAddress}</span>
+                <span className="manifest-field-label">Pago:</span>
+                <span className="manifest-field-value">{metodoPago}</span>
               </div>
             )}
-            {shipping.address_1 && shipping.address_1 !== billing.address_1 && (
+          </div>
+          <div className="manifest-customer-row">
+            {billingAddress && (
               <div className="manifest-customer-field">
-                <span className="manifest-field-label">Envío:</span>
-                <span className="manifest-field-value">
-                  {[shipping.address_1, shipping.city, shipping.state]
-                    .filter(Boolean)
-                    .join(", ")}
-                </span>
+                <span className="manifest-field-label">Dir. Facturación:</span>
+                <span className="manifest-field-value">{billingAddress}</span>
+              </div>
+            )}
+            {shippingAddress && shippingAddress !== billingAddress && (
+              <div className="manifest-customer-field">
+                <span className="manifest-field-label">Dir. Envío:</span>
+                <span className="manifest-field-value">{shippingAddress}</span>
               </div>
             )}
             <div className="manifest-customer-field">
@@ -722,29 +736,58 @@ const ManifestSheet = ({
                         )}
                       </td>
                       <td className="cell-price">
-                        {item.price ? (
-                          <div className="manifest-item-price">
-                            <span className="manifest-unit-price">
-                              {new Intl.NumberFormat("es-CO", {
-                                style: "currency",
-                                currency: "COP",
-                                maximumFractionDigits: 0,
-                              }).format(item.price)}
-                            </span>
-                            {qty > 1 && (
-                              <span className="manifest-line-total">
-                                ={" "}
-                                {new Intl.NumberFormat("es-CO", {
-                                  style: "currency",
-                                  currency: "COP",
-                                  maximumFractionDigits: 0,
-                                }).format(item.price * qty)}
+                        {(() => {
+                          const fmt = (v) =>
+                            new Intl.NumberFormat("es-CO", {
+                              style: "currency",
+                              currency: "COP",
+                              maximumFractionDigits: 0,
+                            }).format(v);
+
+                          const isWeighable = isWeighableProduct(
+                            item.unidad_medida,
+                          );
+                          const pesoKg = parseFloat(item.peso_total) || 0;
+                          const hasRealWeight = isWeighable && pesoKg > 0;
+                          const lineTotal = item.price * qty;
+
+                          if (!item.price)
+                            return <span className="manifest-no-price">—</span>;
+
+                          // Producto pesable CON peso real registrado:
+                          // Muestra: precio catálogo/kg × peso_real kg = total cobrado
+                          if (hasRealWeight && item.catalog_price) {
+                            const catalogTotal = item.catalog_price * pesoKg;
+                            return (
+                              <div className="manifest-item-price manifest-item-price--weighable">
+                                <span className="manifest-catalog-rate">
+                                  {fmt(item.catalog_price)}
+                                  <span className="manifest-per-unit">/kg</span>
+                                </span>
+                                <span className="manifest-weight-detail">
+                                  × {pesoKg.toFixed(3)} kg facturado
+                                </span>
+                                <span className="manifest-line-total manifest-line-total--bold">
+                                  = {fmt(Math.round(catalogTotal))}
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          // Producto normal: precio × cantidad = total
+                          return (
+                            <div className="manifest-item-price">
+                              <span className="manifest-unit-price">
+                                {fmt(item.price)}
                               </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="manifest-no-price">—</span>
-                        )}
+                              {qty > 1 && (
+                                <span className="manifest-line-total">
+                                  = {fmt(Math.round(lineTotal))}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="cell-ref">{displayCode}</td>
                     </tr>

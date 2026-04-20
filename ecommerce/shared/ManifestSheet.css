@@ -392,6 +392,31 @@
   gap: 0;
 }
 
+/* Precio de productos pesables: muestra tarifa/kg, peso y total */
+.manifest-item-price--weighable {
+  gap: 1px;
+}
+
+.manifest-catalog-rate {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.manifest-per-unit {
+  font-size: 0.58rem;
+  font-weight: 500;
+  color: #64748b;
+  margin-left: 1px;
+}
+
+.manifest-weight-detail {
+  font-size: 0.58rem;
+  color: #0369a1;
+  font-weight: 500;
+  font-style: italic;
+}
+
 .manifest-unit-price {
   font-size: 0.68rem;
   font-weight: 600;
@@ -402,6 +427,15 @@
   font-size: 0.6rem;
   color: #64748b;
   font-weight: 500;
+}
+
+.manifest-line-total--bold {
+  font-size: 0.65rem;
+  color: #1e293b;
+  font-weight: 700;
+  border-top: 1px solid #cbd5e1;
+  padding-top: 1px;
+  margin-top: 1px;
 }
 
 .manifest-no-price {

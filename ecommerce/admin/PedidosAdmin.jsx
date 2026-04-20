@@ -521,6 +521,11 @@ const PedidosAdmin = () => {
         });
       }
       if (products_map && enrichedSnapshot.orders) {
+        // Construir mapa SKU → precio para enriquecer items del snapshot
+        const skuPriceMap = {};
+        Object.values(products_map).forEach((p) => {
+          if (p.sku && p.price != null) skuPriceMap[p.sku] = p.price;
+        });
         enrichedSnapshot.orders = enrichedSnapshot.orders.map((order) => {
           const orderInfo = ordersInfoMap[order.id] || {};
           return {
@@ -540,6 +545,14 @@ const PedidosAdmin = () => {
                   item.sku ||
                   item.id,
                 unidad_medida: pm.unidad_medida || item.unidad_medida || "",
+                price: item.price || pm.price || skuPriceMap[item.sku] || 0,
+                catalog_price:
+                  item.catalog_price ||
+                  pm.catalog_price ||
+                  item.price ||
+                  pm.price ||
+                  skuPriceMap[item.sku] ||
+                  0,
               };
             }),
           };

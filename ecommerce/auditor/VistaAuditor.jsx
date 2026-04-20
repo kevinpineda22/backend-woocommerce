@@ -448,7 +448,7 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
           if (!itemsMap[key]) {
             const prodDetail = products_map ? products_map[prodId] : null;
             itemsMap[key] = {
-              id: key, // Ahora la ID es la clave compuesta
+              id: key,
               real_prod_id: String(prodId),
               name: log.es_sustituto
                 ? log.nombre_sustituto
@@ -457,7 +457,12 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
               count: 0,
               peso_total: 0,
               is_sub: log.es_sustituto,
-              price: log.precio_nuevo || 0,
+              price: prodDetail?.price || log.precio_nuevo || 0,
+              catalog_price:
+                prodDetail?.catalog_price ||
+                prodDetail?.price ||
+                log.precio_nuevo ||
+                0,
               order_id: log.id_pedido,
               image: prodDetail?.image || null,
               sku: prodDetail?.sku || null,
@@ -688,6 +693,7 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
           qty: i.count,
           peso_total: i.peso_total || 0,
           price: i.price,
+          catalog_price: i.catalog_price || i.price || 0,
           is_sub: i.is_sub,
           barcode: (() => {
             let bc = exactScannedBarcode || i.barcode || "";
