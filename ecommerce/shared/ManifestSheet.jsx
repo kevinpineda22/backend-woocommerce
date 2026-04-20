@@ -132,11 +132,37 @@ const ManifestSheet = ({
 
   // Helper: Detectar si un producto es fruver o carnes (usan peso, no cantidad)
   // Se basa en unidad de medida pesable, NUNCA en el nombre del producto.
-  const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
+  // 500GR/500G = producto al kilo vendido en porciones de 500g (sigue siendo variable-weight)
+  const WEIGHABLE_UNITS = [
+    "kl",
+    "kg",
+    "kilo",
+    "lb",
+    "libra",
+    "500gr",
+    "500g",
+    "500grs",
+  ];
 
   const isWeighableProduct = (unidadMedida) => {
     if (!unidadMedida) return false;
     return WEIGHABLE_UNITS.includes(unidadMedida.toLowerCase());
+  };
+
+  // Factor kg por unidad pedida según la unidad de medida
+  const kgPerUnit = (unidadMedida) => {
+    const u = (unidadMedida || "").toLowerCase();
+    if (u === "lb" || u === "libra") return 0.4536;
+    if (u === "500gr" || u === "500g" || u === "500grs") return 0.5;
+    return 1.0; // kl / kg / kilo → 1 kg por unidad
+  };
+
+  // Sufijo de unidad a mostrar en la columna Cant. del manifiesto
+  const cantUnitSuffix = (unidadMedida) => {
+    const u = (unidadMedida || "").toLowerCase();
+    if (u === "lb" || u === "libra") return "LB";
+    if (u === "500gr" || u === "500g" || u === "500grs") return "500g";
+    return "KL"; // kl / kg / kilo
   };
 
   // Helper: obtener código válido para mostrar en la tabla
@@ -158,8 +184,7 @@ const ManifestSheet = ({
         let pesoKg = parseFloat(item.peso_total) || 0;
         if (!pesoKg || pesoKg <= 0 || isNaN(pesoKg)) {
           const numericQty = parseFloat(qty) || 0;
-          pesoKg =
-            um === "LB" || um === "LIBRA" ? numericQty * 0.4536 : numericQty;
+          pesoKg = numericQty * kgPerUnit(item.unidad_medida);
         }
         if (!isNaN(pesoKg) && pesoKg > 0) {
           const pesoGramos = Math.round(pesoKg * 1000);
@@ -204,6 +229,22 @@ const ManifestSheet = ({
   // 1. Fruver/Carnes: SOLO código (sin multiplicador)
   // 2. Productos CON variaciones: 1*sku repetido qty veces (salto de línea entre cada uno)
   // 3. Productos SIN variaciones: qty*sku (una sola línea)
+  // Calcular totales dinámicamente (antes del QR para disponibilidad en todo el componente)
+  const productItems = items.filter((i) => !i.is_shipping_method);
+  const totalQty = productItems.reduce(
+    (sum, item) => sum + (item.qty || item.count || 1),
+    0,
+  );
+  const calculatedItemsTotal = productItems.reduce((sum, item) => {
+    const qty = item.qty || item.count || 1;
+    return sum + (parseFloat(item.price) || 0) * qty;
+  }, 0);
+  const shippingTotal = (order.shipping_lines || []).reduce(
+    (sum, s) => sum + (parseFloat(s.total) || 0),
+    0,
+  );
+  const orderTotal = calculatedItemsTotal + shippingTotal || null;
+
   const omittedItems = [];
 
   const qrValue = items
@@ -266,8 +307,7 @@ const ManifestSheet = ({
           let pesoKg = parseFloat(item.peso_total) || 0;
           if (!pesoKg || pesoKg <= 0 || isNaN(pesoKg)) {
             const numericQty = parseFloat(qty) || 0;
-            pesoKg =
-              um === "LB" || um === "LIBRA" ? numericQty * 0.4536 : numericQty;
+            pesoKg = numericQty * kgPerUnit(unidad_medida);
           }
 
           if (isNaN(pesoKg) || pesoKg <= 0) {
@@ -302,19 +342,10 @@ const ManifestSheet = ({
     .filter(Boolean)
     .join("\r\n");
 
-  const orderTotal = order.total;
-
   // Estadísticas del QR generado
   const qrLineCount = qrValue.split("\r\n").filter(Boolean).length;
   const qrIsComplex = qrValue.length > 1000; // Umbral: ~70 productos avg
   const qrExceedsCapacity = qrValue.length > 1270; // Límite aprox. de QR v40 nivel Q
-
-  // Calcular total de items (excluir ítems virtuales de despacho)
-  const productItems = items.filter((i) => !i.is_shipping_method);
-  const totalQty = productItems.reduce(
-    (sum, item) => sum + (item.qty || item.count || 1),
-    0,
-  );
 
   return (
     <div
@@ -670,6 +701,7 @@ const ManifestSheet = ({
 
                 // Fila especial para método de despacho
                 if (item.is_shipping_method) {
+                  const shipPrice = parseFloat(item.price) || 0;
                   return (
                     <tr key={idx} className="manifest-row-shipping">
                       <td className="cell-num"></td>
@@ -680,7 +712,15 @@ const ManifestSheet = ({
                         </span>
                         <span className="item-shipping-badge">DESPACHO</span>
                       </td>
-                      <td className="cell-price">—</td>
+                      <td className="cell-price">
+                        {shipPrice > 0
+                          ? new Intl.NumberFormat("es-CO", {
+                              style: "currency",
+                              currency: "COP",
+                              maximumFractionDigits: 0,
+                            }).format(shipPrice)
+                          : "—"}
+                      </td>
                       <td className="cell-ref">{item.barcode}</td>
                     </tr>
                   );
@@ -723,7 +763,7 @@ const ManifestSheet = ({
                               color: "#64748b",
                             }}
                           >
-                            {(item.unidad_medida || "KG").toUpperCase()}
+                            {cantUnitSuffix(item.unidad_medida)}
                           </span>
                         )}
                       </td>
@@ -744,45 +784,33 @@ const ManifestSheet = ({
                               maximumFractionDigits: 0,
                             }).format(v);
 
-                          const isWeighable = isWeighableProduct(
-                            item.unidad_medida,
-                          );
                           const pesoKg = parseFloat(item.peso_total) || 0;
-                          const hasRealWeight = isWeighable && pesoKg > 0;
+                          const hasRealWeight =
+                            isWeighableProduct(item.unidad_medida) &&
+                            pesoKg > 0;
                           const lineTotal = item.price * qty;
 
                           if (!item.price)
                             return <span className="manifest-no-price">—</span>;
 
-                          // Producto pesable CON peso real registrado:
-                          // Muestra: precio catálogo/kg × peso_real kg = total cobrado
-                          if (hasRealWeight && item.catalog_price) {
-                            const catalogTotal = item.catalog_price * pesoKg;
-                            return (
-                              <div className="manifest-item-price manifest-item-price--weighable">
-                                <span className="manifest-catalog-rate">
-                                  {fmt(item.catalog_price)}
-                                  <span className="manifest-per-unit">/kg</span>
-                                </span>
-                                <span className="manifest-weight-detail">
-                                  × {pesoKg.toFixed(3)} kg facturado
-                                </span>
-                                <span className="manifest-line-total manifest-line-total--bold">
-                                  = {fmt(Math.round(catalogTotal))}
-                                </span>
-                              </div>
-                            );
-                          }
-
-                          // Producto normal: precio × cantidad = total
+                          // Todos los productos: precio unitario × qty = total cobrado
+                          // Para pesables: se agrega el peso facturado como detalle informativo
+                          // (WooCommerce ya refleja item.price = total/qty después del ajuste de peso)
                           return (
-                            <div className="manifest-item-price">
+                            <div
+                              className={`manifest-item-price${hasRealWeight ? " manifest-item-price--weighable" : ""}`}
+                            >
                               <span className="manifest-unit-price">
                                 {fmt(item.price)}
                               </span>
                               {qty > 1 && (
-                                <span className="manifest-line-total">
+                                <span className="manifest-line-total manifest-line-total--bold">
                                   = {fmt(Math.round(lineTotal))}
+                                </span>
+                              )}
+                              {hasRealWeight && (
+                                <span className="manifest-weight-detail">
+                                  {pesoKg.toFixed(3)} kg pesado
                                 </span>
                               )}
                             </div>
@@ -803,14 +831,36 @@ const ManifestSheet = ({
               <span>Total:</span> {productItems.length} productos / {totalQty}{" "}
               unidades
             </div>
-            {orderTotal && (
+            {orderTotal > 0 && (
               <div className="manifest-footer-order-total">
-                <span>Valor del Pedido:</span>{" "}
-                {new Intl.NumberFormat("es-CO", {
-                  style: "currency",
-                  currency: "COP",
-                  maximumFractionDigits: 0,
-                }).format(orderTotal)}
+                {shippingTotal > 0 && (
+                  <div className="manifest-footer-subtotals">
+                    <span>
+                      Subtotal artículos:{" "}
+                      {new Intl.NumberFormat("es-CO", {
+                        style: "currency",
+                        currency: "COP",
+                        maximumFractionDigits: 0,
+                      }).format(calculatedItemsTotal)}
+                    </span>
+                    <span>
+                      Envío:{" "}
+                      {new Intl.NumberFormat("es-CO", {
+                        style: "currency",
+                        currency: "COP",
+                        maximumFractionDigits: 0,
+                      }).format(shippingTotal)}
+                    </span>
+                  </div>
+                )}
+                <span className="manifest-footer-grand-total">
+                  Total del Pedido:{" "}
+                  {new Intl.NumberFormat("es-CO", {
+                    style: "currency",
+                    currency: "COP",
+                    maximumFractionDigits: 0,
+                  }).format(orderTotal)}
+                </span>
               </div>
             )}
           </div>

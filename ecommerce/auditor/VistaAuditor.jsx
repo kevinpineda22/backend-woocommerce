@@ -69,10 +69,20 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
   // ─── DETECCIÓN DE TIPO DE PRODUCTO (por unidad de medida del pedido WooCommerce) ───
   // 🔧 Solo productos pesados por PESO real (KL, KG, LB)
   // P2, P3, P4 son variaciones, NO son pesables, aparecen como "confiables"
-  const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
+  // 500GR/500G = producto al kilo vendido en porciones de 500g (sigue pesando en balanza)
+  const WEIGHABLE_UNITS = [
+    "kl",
+    "kg",
+    "kilo",
+    "lb",
+    "libra",
+    "500gr",
+    "500g",
+    "500grs",
+  ];
 
   // ✅ Determina si un producto es pesable: únicamente por la unidad_medida del pedido WooCommerce.
-  // Si el cliente pidió KL o LB, es pesable. Si pidió unidades o no tiene, no lo es.
+  // Si el cliente pidió KL, LB o 500gr, es pesable. Si pidió unidades o no tiene, no lo es.
   const isFruverOrMeatItem = (item) => {
     // 1. Unidad de medida pesable del pedido
     if (
@@ -144,6 +154,7 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
       if (u === "UN" || u === "UNIDAD") return "UND";
       if (u === "KG" || u === "KILO") return "KL";
       if (u === "LIBRA") return "LB";
+      if (u === "500G" || u === "500GRS") return "500GR";
       return u;
     };
 
@@ -707,12 +718,16 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
       });
 
       // Inyectar ítem virtual de método de despacho al final
+      const shippingPrice = (group.shipping_lines || []).reduce(
+        (sum, s) => sum + (parseFloat(s.total) || 0),
+        0,
+      );
       productItems.push({
         id: `shipping-${group.id}`,
         sku: shippingBarcode,
         name: shippingLabel,
         qty: 1,
-        price: 0,
+        price: shippingPrice,
         barcode: shippingBarcode,
         is_shipping_method: true,
       });

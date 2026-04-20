@@ -469,12 +469,53 @@ exports.getPickers = async (req, res) => {
 // =========================================================
 // 4. HISTORIAL DE SESIONES
 // =========================================================
+
+/**
+ * Calcula los totales de cada pedido desde datos_salida (post-picking, precios reales).
+ * Fallback a snapshot_pedidos.total si datos_salida no está disponible.
+ *
+ * @param {Object|null} datosSalida  — campo datos_salida de la sesión
+ * @param {Array}       snapshotPedidos — campo snapshot_pedidos
+ * @param {number[]}    idsPedidos    — ids_pedidos para mantener el orden
+ * @returns {(number|null)[]}         — array de totales en el mismo orden que ids_pedidos
+ */
+function calcTotalesFromDatosSalida(datosSalida, snapshotPedidos, idsPedidos) {
+  // Si hay datos_salida con orders, calcular dinámicamente
+  if (datosSalida?.orders?.length) {
+    return (idsPedidos || []).map((pid) => {
+      const order = datosSalida.orders.find(
+        (o) => String(o.id) === String(pid),
+      );
+      if (!order) return null;
+
+      const productItems = (order.items || []).filter(
+        (i) => !i.is_shipping_method,
+      );
+      const itemsTotal = productItems.reduce((sum, item) => {
+        const qty = item.qty || item.count || 1;
+        return sum + (parseFloat(item.price) || 0) * qty;
+      }, 0);
+      const shippingTotal = (order.shipping_lines || []).reduce(
+        (sum, s) => sum + (parseFloat(s.total) || 0),
+        0,
+      );
+      const total = itemsTotal + shippingTotal;
+      return total > 0 ? total : null;
+    });
+  }
+  // Fallback: usar snapshot_pedidos.total (puede estar desactualizado, pero es lo único disponible)
+  if (snapshotPedidos?.length) {
+    return snapshotPedidos.map((o) => parseFloat(o.total) || null);
+  }
+  return (idsPedidos || []).map(() => null);
+}
+
 exports.getPendingPaymentSessions = async (req, res) => {
   try {
     let payQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, datos_salida, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
       )
       .eq("estado", "auditado")
       .order("fecha_fin", { ascending: false });
@@ -525,9 +566,11 @@ exports.getPendingPaymentSessions = async (req, res) => {
             .filter(Boolean)
         : [];
 
-      const totales = sess.snapshot_pedidos
-        ? sess.snapshot_pedidos.map((o) => o.total || null)
-        : [];
+      const totales = calcTotalesFromDatosSalida(
+        sess.datos_salida,
+        sess.snapshot_pedidos,
+        sess.ids_pedidos,
+      );
 
       const documentos = sess.snapshot_pedidos
         ? sess.snapshot_pedidos.map((o) => extractDocumento(o))
@@ -636,7 +679,7 @@ exports.getHistorySessions = async (req, res) => {
     let histQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, sede_id, metodo_pago, fecha_pago, pagado_por, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, datos_salida, sede_id, metodo_pago, fecha_pago, pagado_por, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
       )
       .in("estado", ["finalizado"])
       .order("fecha_fin", { ascending: false })
@@ -688,9 +731,11 @@ exports.getHistorySessions = async (req, res) => {
             .filter(Boolean)
         : [];
 
-      const totales = sess.snapshot_pedidos
-        ? sess.snapshot_pedidos.map((o) => o.total || null)
-        : [];
+      const totales = calcTotalesFromDatosSalida(
+        sess.datos_salida,
+        sess.snapshot_pedidos,
+        sess.ids_pedidos,
+      );
 
       const documentos = sess.snapshot_pedidos
         ? sess.snapshot_pedidos.map((o) => extractDocumento(o))
@@ -737,7 +782,7 @@ exports.getPendingAuditSessions = async (req, res) => {
     let auditQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, datos_salida, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
       )
       .eq("estado", "pendiente_auditoria")
       .order("fecha_fin", { ascending: false })
@@ -791,9 +836,11 @@ exports.getPendingAuditSessions = async (req, res) => {
             .filter(Boolean)
         : [];
 
-      const totales = sess.snapshot_pedidos
-        ? sess.snapshot_pedidos.map((o) => o.total || null)
-        : [];
+      const totales = calcTotalesFromDatosSalida(
+        sess.datos_salida,
+        sess.snapshot_pedidos,
+        sess.ids_pedidos,
+      );
 
       const documentos = sess.snapshot_pedidos
         ? sess.snapshot_pedidos.map((o) => extractDocumento(o))

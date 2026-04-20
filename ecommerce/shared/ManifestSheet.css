@@ -633,15 +633,36 @@
 }
 
 .manifest-footer-order-total {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #047857;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   margin-top: 4px;
-  padding: 4px 8px;
+  padding: 6px 10px;
   background: #ecfdf5;
   border: 1px solid #a7f3d0;
   border-radius: 6px;
   text-align: right;
+}
+
+.manifest-footer-subtotals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  font-size: 0.75rem;
+  color: #047857;
+  font-weight: 500;
+  border-bottom: 1px solid #a7f3d0;
+  padding-bottom: 3px;
+  margin-bottom: 2px;
+  width: 100%;
+}
+
+.manifest-footer-grand-total {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #065f46;
 }
 
 .manifest-footer-order-total span {

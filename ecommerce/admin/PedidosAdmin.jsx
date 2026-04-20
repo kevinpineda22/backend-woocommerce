@@ -521,10 +521,17 @@ const PedidosAdmin = () => {
         });
       }
       if (products_map && enrichedSnapshot.orders) {
-        // Construir mapa SKU → precio para enriquecer items del snapshot
+        // Construir mapas SKU → precio para enriquecer items del snapshot
+        // (el item.id en snapshots viejos es clave compuesta "prodId-orderId",
+        //  no matchea products_map directamente — el fallback por SKU es necesario)
         const skuPriceMap = {};
+        const skuCatalogPriceMap = {};
         Object.values(products_map).forEach((p) => {
-          if (p.sku && p.price != null) skuPriceMap[p.sku] = p.price;
+          if (p.sku) {
+            if (p.price != null) skuPriceMap[p.sku] = p.price;
+            if (p.catalog_price != null)
+              skuCatalogPriceMap[p.sku] = p.catalog_price;
+          }
         });
         enrichedSnapshot.orders = enrichedSnapshot.orders.map((order) => {
           const orderInfo = ordersInfoMap[order.id] || {};
@@ -549,6 +556,7 @@ const PedidosAdmin = () => {
                 catalog_price:
                   item.catalog_price ||
                   pm.catalog_price ||
+                  skuCatalogPriceMap[item.sku] ||
                   item.price ||
                   pm.price ||
                   skuPriceMap[item.sku] ||

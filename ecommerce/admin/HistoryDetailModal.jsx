@@ -298,6 +298,18 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
     (l) => l.accion === "eliminado_admin",
   ).length;
 
+  // Calcular total dinámicamente (order.total en snapshot puede estar desactualizado)
+  const productItems = (order.items || []).filter((i) => !i.is_shipping_method);
+  const calcItemsTotal = productItems.reduce((sum, item) => {
+    const qty = item.qty || item.count || 1;
+    return sum + (parseFloat(item.price) || 0) * qty;
+  }, 0);
+  const calcShipping = (order.shipping_lines || []).reduce(
+    (sum, s) => sum + (parseFloat(s.total) || 0),
+    0,
+  );
+  const calcTotal = calcItemsTotal + calcShipping || null;
+
   const addr = shipping.address_1 || billing.address_1 || "";
   const city = shipping.city || billing.city || "";
 
@@ -328,10 +340,10 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
             )}
           </div>
         </div>
-        {order.total && (
+        {calcTotal > 0 && (
           <div className="hdm-order-total-badge">
             <FaMoneyBillWave size={14} />
-            <span>{formatPrice(order.total)}</span>
+            <span>{formatPrice(calcTotal)}</span>
           </div>
         )}
       </div>
