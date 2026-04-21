@@ -3,6 +3,7 @@ import QRCode from "react-qr-code";
 import { getAssetUrl } from "../../../config/storage";
 import { calcularDigitoVerificador } from "../picker/modals/utils/gs1Utils";
 import { extractMetodoPago } from "./extractDocumento";
+import { isWeighableUnit, kgPerUnit, cantUnitSuffix } from "./weighableUnits";
 import "./ManifestSheet.css";
 
 /**
@@ -132,38 +133,8 @@ const ManifestSheet = ({
 
   // Helper: Detectar si un producto es fruver o carnes (usan peso, no cantidad)
   // Se basa en unidad de medida pesable, NUNCA en el nombre del producto.
-  // 500GR/500G = producto al kilo vendido en porciones de 500g (sigue siendo variable-weight)
-  const WEIGHABLE_UNITS = [
-    "kl",
-    "kg",
-    "kilo",
-    "lb",
-    "libra",
-    "500gr",
-    "500g",
-    "500grs",
-  ];
-
-  const isWeighableProduct = (unidadMedida) => {
-    if (!unidadMedida) return false;
-    return WEIGHABLE_UNITS.includes(unidadMedida.toLowerCase());
-  };
-
-  // Factor kg por unidad pedida según la unidad de medida
-  const kgPerUnit = (unidadMedida) => {
-    const u = (unidadMedida || "").toLowerCase();
-    if (u === "lb" || u === "libra") return 0.4536;
-    if (u === "500gr" || u === "500g" || u === "500grs") return 0.5;
-    return 1.0; // kl / kg / kilo → 1 kg por unidad
-  };
-
-  // Sufijo de unidad a mostrar en la columna Cant. del manifiesto
-  const cantUnitSuffix = (unidadMedida) => {
-    const u = (unidadMedida || "").toLowerCase();
-    if (u === "lb" || u === "libra") return "LB";
-    if (u === "500gr" || u === "500g" || u === "500grs") return "500g";
-    return "KL"; // kl / kg / kilo
-  };
+  // La lista de unidades vive en shared/weighableUnits.js (única fuente de verdad).
+  const isWeighableProduct = isWeighableUnit;
 
   // Helper: obtener código válido para mostrar en la tabla
   const getDisplayCode = (item) => {
@@ -235,15 +206,25 @@ const ManifestSheet = ({
     (sum, item) => sum + (item.qty || item.count || 1),
     0,
   );
+  // Subtotal de artículos: preferir line_total (lo efectivamente cobrado por Woo,
+  // ya incluye promos y ajustes de peso) y caer a price*qty solo si no viene.
   const calculatedItemsTotal = productItems.reduce((sum, item) => {
     const qty = item.qty || item.count || 1;
-    return sum + (parseFloat(item.price) || 0) * qty;
+    const unitFinal =
+      parseFloat(item.line_total) || parseFloat(item.price) || 0;
+    return sum + unitFinal * qty;
   }, 0);
   const shippingTotal = (order.shipping_lines || []).reduce(
     (sum, s) => sum + (parseFloat(s.total) || 0),
     0,
   );
-  const orderTotal = calculatedItemsTotal + shippingTotal || null;
+  // Total del pedido: si Woo nos dio order.total, ESE es el real (incluye cupones,
+  // fees, impuestos, ajustes). Solo usamos el calculado como fallback.
+  const wooOrderTotal = parseFloat(order.total) || 0;
+  const orderTotal =
+    wooOrderTotal > 0
+      ? wooOrderTotal
+      : calculatedItemsTotal + shippingTotal || null;
 
   const omittedItems = [];
 
@@ -788,24 +769,45 @@ const ManifestSheet = ({
                           const hasRealWeight =
                             isWeighableProduct(item.unidad_medida) &&
                             pesoKg > 0;
-                          const lineTotal = item.price * qty;
 
-                          if (!item.price)
+                          // unit values provistos por VistaAuditor y dashboardController
+                          const unitSubtotal = parseFloat(item.subtotal) || 0;
+                          const unitFinal =
+                            parseFloat(item.line_total) ||
+                            parseFloat(item.price) ||
+                            0;
+
+                          const lineFinal = unitFinal * qty;
+
+                          // Detectar promoción: subtotal_unitario > total_unitario (con margen de 1 peso)
+                          const hasPromo =
+                            unitSubtotal > 0 &&
+                            unitFinal > 0 &&
+                            unitSubtotal - unitFinal > 1;
+
+                          if (!unitFinal)
                             return <span className="manifest-no-price">—</span>;
 
-                          // Todos los productos: precio unitario × qty = total cobrado
-                          // Para pesables: se agrega el peso facturado como detalle informativo
-                          // (WooCommerce ya refleja item.price = total/qty después del ajuste de peso)
                           return (
                             <div
-                              className={`manifest-item-price${hasRealWeight ? " manifest-item-price--weighable" : ""}`}
+                              className={`manifest-item-price${hasRealWeight ? " manifest-item-price--weighable" : ""}${hasPromo ? " manifest-item-price--promo" : ""}`}
                             >
+                              {hasPromo && (
+                                <span className="manifest-base-price">
+                                  {fmt(Math.round(unitSubtotal))}
+                                </span>
+                              )}
                               <span className="manifest-unit-price">
-                                {fmt(item.price)}
+                                {fmt(Math.round(unitFinal))}
                               </span>
                               {qty > 1 && (
                                 <span className="manifest-line-total manifest-line-total--bold">
-                                  = {fmt(Math.round(lineTotal))}
+                                  = {fmt(Math.round(lineFinal))}
+                                </span>
+                              )}
+                              {hasPromo && (
+                                <span className="manifest-promo-badge">
+                                  PROMO
                                 </span>
                               )}
                               {hasRealWeight && (

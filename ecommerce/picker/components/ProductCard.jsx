@@ -219,10 +219,15 @@ export const ProductCard = ({
           <div className="ec-weight-registered">
             <FaWeightHanging size={14} />
             PESO REGISTRADO: {parseFloat(item.peso_real).toFixed(3)} KG
-            {item.unidad_medida?.toUpperCase() === "LB" ||
-            item.unidad_medida?.toUpperCase() === "LIBRA"
-              ? ` (${(parseFloat(item.peso_real) * 2).toFixed(2)} LB)`
-              : ""}
+            {(() => {
+              const u = item.unidad_medida?.toLowerCase();
+              const kg = parseFloat(item.peso_real);
+              if (u === "lb" || u === "libra")
+                return ` (${(kg * 2).toFixed(2)} LB)`;
+              if (u === "500gr" || u === "500g" || u === "500grs")
+                return ` (${(kg * 2).toFixed(2)} porciones de 500g)`;
+              return "";
+            })()}
           </div>
         )}
 

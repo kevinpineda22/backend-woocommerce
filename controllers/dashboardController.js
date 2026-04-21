@@ -3,6 +3,7 @@ const { supabase } = require("../services/supabaseClient");
 const { agruparItemsParaPicking } = require("./pickingUtils");
 const { syncOrderToWoo } = require("../services/syncWooService");
 const { logAuditEvent } = require("../services/auditService");
+const { isWeighableUnit } = require("../utils/weighableUnits");
 const {
   getSedeFromWooOrder,
   extractSedeFromOrder,
@@ -1072,16 +1073,21 @@ exports.getSessionLogsDetail = async (req, res) => {
             // Para productos pesables: total = catalog_price × peso_real_kg
             // Para productos normales: effective_price = catalog_price (sin diferencia)
             const catalogPrice = parseFloat(item.price) || 0;
+            const lineSubtotal = parseFloat(item.subtotal) || 0;
+            const lineTotal = parseFloat(item.total) || 0;
             const effectivePrice =
-              item.quantity > 0
-                ? parseFloat(item.total) / item.quantity
-                : catalogPrice;
+              item.quantity > 0 ? lineTotal / item.quantity : catalogPrice;
+            const effectiveSubtotal =
+              item.quantity > 0 ? lineSubtotal / item.quantity : catalogPrice;
+
             productDetailsMap[item.product_id] = {
               name: item.name,
               image: imgUrl,
               sku: item.sku,
               price: effectivePrice,
               catalog_price: catalogPrice,
+              subtotal: effectiveSubtotal,
+              line_total: effectivePrice,
               unidad_medida: unitMeasure,
             };
             if (item.variation_id)
@@ -1091,6 +1097,8 @@ exports.getSessionLogsDetail = async (req, res) => {
                 sku: item.sku,
                 price: effectivePrice,
                 catalog_price: catalogPrice,
+                subtotal: effectiveSubtotal,
+                line_total: effectivePrice,
                 unidad_medida: unitMeasure,
               };
           });
@@ -1464,10 +1472,8 @@ exports.getSessionLogsDetail = async (req, res) => {
     // que decidirá qué mostrar en "Por verificar" vs "Productos confiables"
 
     // Identificar productos PESABLES (fruver/carnes) para marcar en el frontend
-    const WEIGHT_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
     Object.entries(productDetailsMap).forEach(([id, detail]) => {
-      const um = (detail.unidad_medida || "").toLowerCase();
-      if (WEIGHT_UNITS.includes(um)) {
+      if (isWeighableUnit(detail.unidad_medida)) {
         detail._isWeighable = true; // Marcar para que frontend lo detecte
       }
     });

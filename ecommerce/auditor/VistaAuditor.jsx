@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ecommerceApi } from "../shared/ecommerceApi";
+import { isWeighableUnit } from "../shared/weighableUnits";
 import EscanerBarras from "../../DesarrolloSurtido_API/EscanerBarras";
 import ManifestInvoiceModal from "../shared/ManifestInvoiceModal";
 import {
@@ -67,29 +68,10 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
   };
 
   // ─── DETECCIÓN DE TIPO DE PRODUCTO (por unidad de medida del pedido WooCommerce) ───
-  // 🔧 Solo productos pesados por PESO real (KL, KG, LB)
-  // P2, P3, P4 son variaciones, NO son pesables, aparecen como "confiables"
-  // 500GR/500G = producto al kilo vendido en porciones de 500g (sigue pesando en balanza)
-  const WEIGHABLE_UNITS = [
-    "kl",
-    "kg",
-    "kilo",
-    "lb",
-    "libra",
-    "500gr",
-    "500g",
-    "500grs",
-  ];
-
-  // ✅ Determina si un producto es pesable: únicamente por la unidad_medida del pedido WooCommerce.
-  // Si el cliente pidió KL, LB o 500gr, es pesable. Si pidió unidades o no tiene, no lo es.
+  // Lista de unidades pesables centralizada en shared/weighableUnits.js
   const isFruverOrMeatItem = (item) => {
     // 1. Unidad de medida pesable del pedido
-    if (
-      item.unidad_medida &&
-      WEIGHABLE_UNITS.includes(item.unidad_medida.toLowerCase())
-    )
-      return true;
+    if (isWeighableUnit(item.unidad_medida)) return true;
 
     // 2. Código GS1 de peso variable (empieza con "2", 13-14 dígitos)
     const scannedBarcodes = item._scannedBarcodes;
@@ -474,6 +456,8 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
                 prodDetail?.price ||
                 log.precio_nuevo ||
                 0,
+              subtotal: prodDetail?.subtotal || 0,
+              line_total: prodDetail?.line_total || 0,
               order_id: log.id_pedido,
               image: prodDetail?.image || null,
               sku: prodDetail?.sku || null,
@@ -705,6 +689,8 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
           peso_total: i.peso_total || 0,
           price: i.price,
           catalog_price: i.catalog_price || i.price || 0,
+          subtotal: i.subtotal || 0,
+          line_total: i.line_total || 0,
           is_sub: i.is_sub,
           barcode: (() => {
             let bc = exactScannedBarcode || i.barcode || "";

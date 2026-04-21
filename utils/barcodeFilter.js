@@ -3,6 +3,8 @@
  * Extraída de los controllers para ser testeable de forma aislada.
  */
 
+const { isWeighableUnit } = require("./weighableUnits");
+
 /**
  * Valida si un código de barras de SIESA es aceptable.
  * Permite: dígitos puros (EAN), dígitos+UM (SKU+UM como 185325P25), dígitos con +
@@ -139,9 +141,7 @@ function isSkuUmFormat(code) {
 function resolveManifestBarcode(item) {
   const barcode = (item.barcode || "").toString().trim().replace(/\+$/, "");
   const sku = item.sku || "";
-  const um = (item.unidad_medida || "").toLowerCase();
-  const WEIGHABLE = ["kl", "kg", "kilo", "lb", "libra"];
-  const isWeighable = um && WEIGHABLE.includes(um);
+  const isWeighable = isWeighableUnit(item.unidad_medida);
 
   // Prioridad 1: GS1 "29" ya construido
   if (/^\d{13,14}$/.test(barcode) && barcode.startsWith("29")) {

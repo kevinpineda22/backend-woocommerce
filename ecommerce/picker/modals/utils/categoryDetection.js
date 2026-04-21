@@ -2,12 +2,14 @@
  * Detección de categorías de producto (carnicería, fruver).
  *
  * Reglas:
- *   1. unidad_medida decide si es pesable (kg, lb, kilo, libra, kl)
+ *   1. unidad_medida decide si es pesable → ver `shared/weighableUnits.js`
  *   2. Categorías solo distinguen carne vs fruver
  *   3. Pesable + categoría de carne → carnicería
  *   4. Pesable + NO categoría de carne → fruver
  *   5. NO pesable → flujo normal
  */
+
+import { isWeighableUnit } from "../../../shared/weighableUnits";
 
 const MEAT_KEYWORDS = [
   "carne", "carnes", "pollo", "pollos", "pescado", "pescados",
@@ -18,17 +20,7 @@ const MEAT_KEYWORDS = [
   "camaron", "camarones",
 ];
 
-const WEIGHABLE_UNITS = ["kl", "kg", "kilo", "lb", "libra"];
-
-/**
- * Determina si un producto es pesable por su unidad de medida.
- * @param {object} item
- * @returns {boolean}
- */
-const isWeighable = (item) => {
-  if (!item?.unidad_medida) return false;
-  return WEIGHABLE_UNITS.includes(item.unidad_medida.toLowerCase());
-};
+const isWeighable = (item) => isWeighableUnit(item?.unidad_medida);
 
 /**
  * Extrae las palabras de las categorías de un item.

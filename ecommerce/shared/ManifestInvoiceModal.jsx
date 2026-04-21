@@ -100,9 +100,13 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
               count: item.count,
               type: item.type,
               is_sub: item.type === "sustituido" || item.is_sub,
+              is_shipping_method: item.is_shipping_method || false,
               unidad_medida: item.unidad_medida || "",
               tiene_variaciones: item.tiene_variaciones || false,
               price: item.price || 0,
+              catalog_price: item.catalog_price || 0,
+              subtotal: item.subtotal || 0,
+              line_total: item.line_total || 0,
               total: item.total || null,
             }));
 

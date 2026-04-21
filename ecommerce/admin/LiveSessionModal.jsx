@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { ecommerceApi } from "../shared/ecommerceApi";
+import { isWeighableUnit } from "../shared/weighableUnits";
 import { supabase } from "../../../supabaseClient";
 import ConfirmModal from "../shared/ConfirmModal";
 import { AnimatePresence, motion } from "framer-motion";
@@ -148,17 +149,7 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
   );
   const displayItems = showTrash ? removedItems : activeItems;
 
-  const isWeighable = (item) => {
-    // Igual que el picker: solo la unidad de medida del pedido WooCommerce determina
-    // si es pesable. Si el cliente pidió KL/KG/LB → pesable. Si pidió UND o no tiene → no pesable.
-    // Productos como embutidos (salchichón, chorizo) vendidos por unidad NO son pesables.
-    return (
-      item.unidad_medida &&
-      ["kl", "kg", "kilo", "lb", "libra"].includes(
-        item.unidad_medida.toLowerCase(),
-      )
-    );
-  };
+  const isWeighable = (item) => isWeighableUnit(item?.unidad_medida);
 
   // ⚡ CANAL DE RADIO: Avisar al Picker instantáneamente
   const notifyPickerInstantly = async () => {
