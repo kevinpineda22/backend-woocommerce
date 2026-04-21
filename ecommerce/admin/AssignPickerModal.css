@@ -55,6 +55,7 @@
   gap: 12px;
   flex: 1;
   background: #f8fafc;
+  max-height: 480px;
 }
 
 /* ─── Picker Card ─── */

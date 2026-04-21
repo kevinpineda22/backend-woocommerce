@@ -249,7 +249,16 @@ export const ProductCard = ({
                 </div>
                 <div className="ec-req-info-col">
                   <span className="ec-req-qty" style={{ color: style.color }}>
-                    {ped.cantidad} {item.unidad_medida || "un."}
+                    {ped.cantidad}{" "}
+                    {(() => {
+                      const u = (item.unidad_medida || "").trim().toLowerCase();
+                      if (!u) return "un.";
+                      if (u === "500gr" || u === "500g" || u === "500grs")
+                        return "porciones de 500g";
+                      if (u === "lb" || u === "libra") return "LB";
+                      if (u === "kl" || u === "kg" || u === "kilo") return "KG";
+                      return item.unidad_medida;
+                    })()}
                   </span>
                   <span className="ec-req-name" style={{ color: style.color }}>
                     {ped.nombre_cliente.split(" ")[0]}

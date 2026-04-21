@@ -4,12 +4,6 @@
  * Cada sede tiene su propio layout de pasillos y orden de ruta.
  * Las categorías de WooCommerce son las mismas para todas las sedes,
  * lo que cambia es en QUÉ PASILLO está cada categoría y el ORDEN DE RECORRIDO.
- *
- * Para agregar una nueva sede:
- *   1. Crear una entrada en SEDES_CONFIG con el slug de la sede
- *   2. Definir ORDEN_RUTA (serpentina del picker)
- *   3. Definir DEFINICION_PASILLOS (categorías → pasillo)
- *   4. Listo. El sistema lo detecta automáticamente.
  */
 
 // ============================================================
@@ -17,23 +11,27 @@
 // ============================================================
 
 const CATEGORIAS = {
-  // ── Sin cambios (usadas tal cual en ambas sedes) ──────────
-  bebe_adulto_cereales: [
+  bebe_higiene: [
     "bebe",
     "bebes",
     "pañal",
     "pañales",
     "pañitos humedos",
+    "pañitos",
     "cuidado del bebe",
     "higiene para bebes",
     "adulto",
     "incontinencia",
     "pañal adulto",
+  ],
+  cereales_leche_polvo: [
     "cereal",
     "cereales",
     "granola",
     "leche en polvo",
     "bebidas en polvo",
+    "milo",
+    "chocolisto",
   ],
   cafe_aromaticas: [
     "cafe",
@@ -69,6 +67,7 @@ const CATEGORIAS = {
     "salud",
     "medicamentos",
     "salud y medicamentos",
+    "japonés",
   ],
   aseo_hogar: [
     "aseo del hogar",
@@ -105,8 +104,10 @@ const CATEGORIAS = {
     "detergente en polvo",
     "suavizante",
     "suavizantes",
+    "suavitel",
     "blanqueador",
     "blanqueadores",
+    "limpido",
     "desmanchadores",
     "jabon barra",
     "jabones",
@@ -129,18 +130,10 @@ const CATEGORIAS = {
     "sopa",
     "sopas",
   ],
-  reposteria_leche: [
-    "gelatina",
-    "flan",
-    "pudin",
-    "reposteria",
-    "parva",
-    "reposteria y parva",
-    "leche larga vida",
-    "leche",
-    "refrescos en polvo",
-    "arequipe",
-  ],
+  reposteria_base: ["gelatina", "flan", "pudin", "reposteria"],
+  parva_arequipe: ["parva", "reposteria y parva", "arequipe"],
+  leche_larga_vida: ["leche larga vida", "leche"],
+  gelatinas_refrescos: ["gelatina", "refrescos en polvo", "frutiño", "frutiños"],
   galletas_avenas: [
     "galleta",
     "galletas",
@@ -175,10 +168,6 @@ const CATEGORIAS = {
     "carbon",
     "implementos del hogar",
   ],
-
-  // ── Atómicas (split de las antiguas combinadas) ───────────
-
-  // ex refrigerados_carnes_licores → 7 sub-grupos
   licores_cigarrillos: [
     "cerveza",
     "cervezas",
@@ -203,7 +192,7 @@ const CATEGORIAS = {
     "mexicano",
   ],
   mani_bocadillo: ["mani", "nueces", "frutos secos", "bocadillo"],
-  lacteos_refrigerados: [
+  lacteos_refrigerados_base: [
     "refrigerado",
     "queso",
     "quesos",
@@ -219,6 +208,7 @@ const CATEGORIAS = {
     "postres",
     "postres y gelatinas",
   ],
+  neveras_especial: ["neveras"],
   carnes_frias_congelados: [
     "jamon",
     "embutido",
@@ -250,8 +240,6 @@ const CATEGORIAS = {
     "vitaminas",
     "suplementos y vitaminas",
   ],
-
-  // ex gaseosas_mecato_fruver → 2 sub-grupos
   fruver: [
     "fruver",
     "fruta",
@@ -266,8 +254,6 @@ const CATEGORIAS = {
     "papa",
   ],
   gaseosas_mecato: ["gaseosa", "gaseosas", "mecato"],
-
-  // ex arroz_azucar_granos → 2 sub-grupos
   salsas_condimentos: [
     "salsa",
     "salsas",
@@ -293,8 +279,6 @@ const CATEGORIAS = {
     "granos",
     "sal",
   ],
-
-  // ex huevos_atunes_pastas → 2 sub-grupos
   huevos: ["huevo", "huevos"],
   atunes_enlatados_pastas: [
     "atun",
@@ -307,8 +291,6 @@ const CATEGORIAS = {
     "pastas",
     "spaghetti",
   ],
-
-  // ex bebidas_pasabocas → 2 sub-grupos
   bebidas: [
     "jugo",
     "jugos",
@@ -323,10 +305,7 @@ const CATEGORIAS = {
     "energizante",
     "energizantes",
   ],
-  pasabocas_desechables: [
-    "snack",
-    "snacks",
-    "pasabocas",
+  desechables: [
     "servilletas",
     "desechable",
     "desechables",
@@ -336,6 +315,11 @@ const CATEGORIAS = {
     "loncheras",
     "papel cocina",
   ],
+  pasabocas_snacks: [
+    "snack",
+    "snacks",
+    "pasabocas",
+  ],
 };
 
 // ============================================================
@@ -343,243 +327,95 @@ const CATEGORIAS = {
 // ============================================================
 
 const SEDES_CONFIG = {
-  /**
-   * COPACABANA PLAZA
-   * Layout: 14 pasillos (P1-P14)
-   * Recorrido serpentina: P2 → P1 → P3 → P4 → P6 → P5 → P7 → P8 → P10 → P9 → P11 → P12 → P13 → P14
-   */
   "copacabana-plaza": {
-    orden_ruta: {
-      2: 1,
-      1: 2,
-      3: 3,
-      4: 4,
-      6: 5,
-      5: 6,
-      7: 7,
-      8: 8,
-      10: 9,
-      9: 10,
-      11: 11,
-      12: 12,
-      13: 13,
-      14: 14,
-      Otros: 99,
-    },
+    orden_ruta: { 2: 1, 1: 2, 3: 3, 4: 4, 6: 5, 5: 6, 7: 7, 8: 8, 10: 9, 9: 10, 11: 11, 12: 12, 13: 13, 14: 14, Otros: 99 },
     pasillos: [
-      {
-        pasillo: "7",
-        nombre: "Bebé, Adulto y Cereales",
-        categorias: CATEGORIAS.bebe_adulto_cereales,
-      },
-      {
-        pasillo: "6",
-        nombre: "Pan de Sal y Café",
-        categorias: CATEGORIAS.cafe_aromaticas,
-      },
-      {
-        pasillo: "8",
-        nombre: "Cuidado Personal y Belleza",
-        categorias: CATEGORIAS.cuidado_personal,
-      },
+      { pasillo: "7", nombre: "Bebé, Adulto y Cereales", categorias: [...CATEGORIAS.bebe_higiene, ...CATEGORIAS.cereales_leche_polvo] },
+      { pasillo: "6", nombre: "Pan de Sal y Café", categorias: CATEGORIAS.cafe_aromaticas },
+      { pasillo: "8", nombre: "Cuidado Personal y Belleza", categorias: CATEGORIAS.cuidado_personal },
       { pasillo: "9", nombre: "Aseo Hogar", categorias: CATEGORIAS.aseo_hogar },
-      {
-        pasillo: "10",
-        nombre: "Aseo Ropa e Insecticidas",
-        categorias: CATEGORIAS.aseo_ropa,
-      },
+      { pasillo: "10", nombre: "Aseo Ropa e Insecticidas", categorias: CATEGORIAS.aseo_ropa },
       {
         pasillo: "13",
         nombre: "Refrigerados, Carnes, Golosinas y Licores",
         categorias: [
-          ...CATEGORIAS.licores_cigarrillos,
-          ...CATEGORIAS.dulceria_golosinas,
-          ...CATEGORIAS.mani_bocadillo,
-          ...CATEGORIAS.lacteos_refrigerados,
-          ...CATEGORIAS.carnes_frias_congelados,
-          ...CATEGORIAS.carnes_rojas,
-          ...CATEGORIAS.pollo_pescado,
-          ...CATEGORIAS.saludable_suplementos,
+          ...CATEGORIAS.licores_cigarrillos, ...CATEGORIAS.dulceria_golosinas, ...CATEGORIAS.mani_bocadillo,
+          ...CATEGORIAS.lacteos_refrigerados_base, ...CATEGORIAS.neveras_especial, ...CATEGORIAS.carnes_frias_congelados,
+          ...CATEGORIAS.carnes_rojas, ...CATEGORIAS.pollo_pescado, ...CATEGORIAS.saludable_suplementos,
         ],
       },
-      {
-        pasillo: "14",
-        nombre: "Gaseosas, Mecato y Fruver",
-        categorias: [...CATEGORIAS.gaseosas_mecato, ...CATEGORIAS.fruver],
-      },
-      {
-        pasillo: "12",
-        nombre: "Bebidas, Pasabocas y Desechables",
-        categorias: [
-          ...CATEGORIAS.bebidas,
-          ...CATEGORIAS.pasabocas_desechables,
-        ],
-      },
-      {
-        pasillo: "2",
-        nombre: "Huevos, Atunes, Enlatados y Pastas",
-        categorias: [
-          ...CATEGORIAS.huevos,
-          ...CATEGORIAS.atunes_enlatados_pastas,
-        ],
-      },
-      {
-        pasillo: "1",
-        nombre: "Arroz, Azúcar, Granos y Salsas",
-        categorias: [
-          ...CATEGORIAS.arroz_granos,
-          ...CATEGORIAS.salsas_condimentos,
-        ],
-      },
-      {
-        pasillo: "3",
-        nombre: "Harinas, Margarinas, Sopas y Aceites",
-        categorias: CATEGORIAS.harinas_aceites,
-      },
-      {
-        pasillo: "4",
-        nombre: "Repostería, Gelatina y Leche Larga Vida",
-        categorias: CATEGORIAS.reposteria_leche,
-      },
-      {
-        pasillo: "5",
-        nombre: "Pan Dulce, Galletas, Avenas y Leche en Polvo",
-        categorias: CATEGORIAS.galletas_avenas,
-      },
-      {
-        pasillo: "11",
-        nombre: "Mascotas, Esponjas e Implementos",
-        categorias: CATEGORIAS.mascotas_implementos,
-      },
+      { pasillo: "14", nombre: "Gaseosas, Mecato y Fruver", categorias: [...CATEGORIAS.gaseosas_mecato, ...CATEGORIAS.fruver] },
+      { pasillo: "12", nombre: "Bebidas, Pasabocas y Desechables", categorias: [...CATEGORIAS.bebidas, ...CATEGORIAS.desechables, ...CATEGORIAS.pasabocas_snacks] },
+      { pasillo: "2", nombre: "Huevos, Atunes, Enlatados y Pastas", categorias: [...CATEGORIAS.huevos, ...CATEGORIAS.atunes_enlatados_pastas] },
+      { pasillo: "1", nombre: "Arroz, Azúcar, Granos y Salsas", categorias: [...CATEGORIAS.arroz_granos, ...CATEGORIAS.salsas_condimentos] },
+      { pasillo: "3", nombre: "Harinas, Margarinas, Sopas y Aceites", categorias: CATEGORIAS.harinas_aceites },
+      { pasillo: "4", nombre: "Repostería, Gelatina y Leche Larga Vida", categorias: [...CATEGORIAS.reposteria_base, ...CATEGORIAS.parva_arequipe, ...CATEGORIAS.leche_larga_vida, ...CATEGORIAS.gelatinas_refrescos] },
+      { pasillo: "5", nombre: "Pan Dulce, Galletas, Avenas y Leche en Polvo", categorias: CATEGORIAS.galletas_avenas },
+      { pasillo: "11", nombre: "Mascotas, Esponjas e Implementos", categorias: CATEGORIAS.mascotas_implementos },
     ],
   },
-
-  /**
-   * GIRARDOTA
-   * Layout: 11 pasillos (P1-P11)
-   * Recorrido lineal: P1 → P2 → P3 → P4 → P5 → P6 → P7 → P8 → P9 → P10 → P11
-   */
   girardota: {
-    orden_ruta: {
-      1: 1,
-      2: 2,
-      3: 3,
-      4: 4,
-      5: 5,
-      6: 6,
-      7: 7,
-      8: 8,
-      9: 9,
-      10: 10,
-      11: 11,
-      Otros: 99,
-    },
+    orden_ruta: { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, Otros: 99 },
     pasillos: [
-      {
-        pasillo: "1",
-        nombre: "Aseo Hogar y Velas",
-        categorias: CATEGORIAS.aseo_hogar,
-      },
-      {
-        pasillo: "2",
-        nombre: "Aseo Ropa, Cuidado Personal y Bebé",
-        categorias: [
-          ...CATEGORIAS.aseo_ropa,
-          ...CATEGORIAS.cuidado_personal,
-          ...CATEGORIAS.bebe_adulto_cereales,
-        ],
-      },
-      {
-        pasillo: "3",
-        nombre: "Café, Aromáticas y Parva",
-        categorias: CATEGORIAS.cafe_aromaticas,
-      },
-      {
-        pasillo: "4",
-        nombre: "Leche, Galletas, Granola y Avenas",
-        categorias: [
-          ...CATEGORIAS.reposteria_leche,
-          ...CATEGORIAS.galletas_avenas,
-        ],
-      },
-      {
-        pasillo: "5",
-        nombre: "Licores y Dulcería",
-        categorias: [
-          ...CATEGORIAS.licores_cigarrillos,
-          ...CATEGORIAS.dulceria_golosinas,
-        ],
-      },
-      {
-        pasillo: "6",
-        nombre: "Mecato, Gaseosas y Refrescos",
-        categorias: [
-          ...CATEGORIAS.gaseosas_mecato,
-          ...CATEGORIAS.pasabocas_desechables,
-        ],
-      },
-      {
-        pasillo: "7",
-        nombre: "Salsas, Atún, Enlatados, Pastas y Condimentos",
-        categorias: [
-          ...CATEGORIAS.salsas_condimentos,
-          ...CATEGORIAS.atunes_enlatados_pastas,
-          ...CATEGORIAS.mani_bocadillo,
-        ],
-      },
-      {
-        pasillo: "8",
-        nombre: "Arroz, Aceites, Huevos, Granos, Panela y Harinas",
-        categorias: [
-          ...CATEGORIAS.arroz_granos,
-          ...CATEGORIAS.harinas_aceites,
-          ...CATEGORIAS.huevos,
-        ],
-      },
+      { pasillo: "1", nombre: "Aseo Hogar y Velas", categorias: CATEGORIAS.aseo_hogar },
+      { pasillo: "2", nombre: "Aseo Ropa, Cuidado Personal y Bebé", categorias: [...CATEGORIAS.aseo_ropa, ...CATEGORIAS.cuidado_personal, ...CATEGORIAS.bebe_higiene, ...CATEGORIAS.cereales_leche_polvo] },
+      { pasillo: "3", nombre: "Café, Aromáticas y Parva", categorias: CATEGORIAS.cafe_aromaticas },
+      { pasillo: "4", nombre: "Leche, Galletas, Granola y Avenas", categorias: [...CATEGORIAS.leche_larga_vida, ...CATEGORIAS.reposteria_base, ...CATEGORIAS.parva_arequipe, ...CATEGORIAS.gelatinas_refrescos, ...CATEGORIAS.galletas_avenas] },
+      { pasillo: "5", nombre: "Licores y Dulcería", categorias: [...CATEGORIAS.licores_cigarrillos, ...CATEGORIAS.dulceria_golosinas] },
+      { pasillo: "6", nombre: "Mecato, Gaseosas y Refrescos", categorias: [...CATEGORIAS.gaseosas_mecato, ...CATEGORIAS.desechables, ...CATEGORIAS.pasabocas_snacks] },
+      { pasillo: "7", nombre: "Salsas, Atún, Enlatados, Pastas y Condimentos", categorias: [...CATEGORIAS.salsas_condimentos, ...CATEGORIAS.atunes_enlatados_pastas, ...CATEGORIAS.mani_bocadillo] },
+      { pasillo: "8", nombre: "Arroz, Aceites, Huevos, Granos, Panela y Harinas", categorias: [...CATEGORIAS.arroz_granos, ...CATEGORIAS.harinas_aceites, ...CATEGORIAS.huevos] },
       {
         pasillo: "9",
         nombre: "Mascotas, Bebidas, Lácteos y Refrigerados",
         categorias: [
-          ...CATEGORIAS.mascotas_implementos,
-          ...CATEGORIAS.bebidas,
-          ...CATEGORIAS.lacteos_refrigerados,
-          ...CATEGORIAS.carnes_frias_congelados,
-          ...CATEGORIAS.pollo_pescado,
+          ...CATEGORIAS.mascotas_implementos, ...CATEGORIAS.bebidas, ...CATEGORIAS.lacteos_refrigerados_base,
+          ...CATEGORIAS.neveras_especial, ...CATEGORIAS.carnes_frias_congelados, ...CATEGORIAS.pollo_pescado,
           ...CATEGORIAS.saludable_suplementos,
         ],
       },
-      {
-        pasillo: "10",
-        nombre: "Frutas y Verduras",
-        categorias: CATEGORIAS.fruver,
-      },
-      {
-        pasillo: "11",
-        nombre: "Carnes",
-        categorias: CATEGORIAS.carnes_rojas,
-      },
+      { pasillo: "10", nombre: "Frutas y Verduras", categorias: CATEGORIAS.fruver },
+      { pasillo: "11", nombre: "Carnes", categorias: CATEGORIAS.carnes_rojas },
+    ],
+  },
+  barbosa: {
+    orden_ruta: { 1: 1, 2: 2, 3: 3, 5: 4, 6: 5, 7: 6, 8: 7, Otros: 99 },
+    pasillos: [
+      { pasillo: "1", nombre: "Granos, Salsas, Aceites, Pastas y Enlatados", categorias: [...CATEGORIAS.arroz_granos, ...CATEGORIAS.salsas_condimentos, ...CATEGORIAS.harinas_aceites, ...CATEGORIAS.atunes_enlatados_pastas] },
+      { pasillo: "2", nombre: "Fruver", categorias: CATEGORIAS.fruver },
+      { pasillo: "3", nombre: "Carnes", categorias: [...CATEGORIAS.carnes_rojas, ...CATEGORIAS.pollo_pescado] },
+      { pasillo: "5", nombre: "Mekato, Dulcería, Cereales y Pan de Sal", categorias: [...CATEGORIAS.gaseosas_mecato, ...CATEGORIAS.dulceria_golosinas, ...CATEGORIAS.parva_arequipe, ...CATEGORIAS.leche_larga_vida, ...CATEGORIAS.cereales_leche_polvo, ...CATEGORIAS.galletas_avenas, ...CATEGORIAS.cafe_aromaticas] },
+      { pasillo: "6", nombre: "Refrigerados, Bebidas y Desechables", categorias: [...CATEGORIAS.carnes_frias_congelados, ...CATEGORIAS.lacteos_refrigerados_base, ...CATEGORIAS.bebidas, ...CATEGORIAS.desechables, ...CATEGORIAS.pasabocas_snacks, ...CATEGORIAS.mascotas_implementos] },
+      { pasillo: "7", nombre: "Aseo y Mascotas", categorias: [...CATEGORIAS.aseo_hogar, ...CATEGORIAS.aseo_ropa, ...CATEGORIAS.mascotas_implementos, ...CATEGORIAS.cuidado_personal] },
+      { pasillo: "8", nombre: "Licores y Gaseosas", categorias: [...CATEGORIAS.licores_cigarrillos, ...CATEGORIAS.bebidas] },
+    ],
+  },
+  villahermosa: {
+    orden_ruta: { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, Otros: 99 },
+    pasillos: [
+      { pasillo: "1", nombre: "Granos, Aceites, Harinas y Huevos", categorias: [...CATEGORIAS.arroz_granos, ...CATEGORIAS.harinas_aceites, ...CATEGORIAS.reposteria_base, ...CATEGORIAS.huevos] },
+      { pasillo: "2", nombre: "Salsas, Enlatados, Pastas y Atún", categorias: [...CATEGORIAS.salsas_condimentos, ...CATEGORIAS.atunes_enlatados_pastas] },
+      { pasillo: "3", nombre: "Cereales y Leche", categorias: [...CATEGORIAS.cereales_leche_polvo, ...CATEGORIAS.leche_larga_vida, ...CATEGORIAS.galletas_avenas] },
+      { pasillo: "4", nombre: "Café, Aromáticas, Parva y Galletas", categorias: [...CATEGORIAS.cafe_aromaticas, ...CATEGORIAS.parva_arequipe, ...CATEGORIAS.galletas_avenas] },
+      { pasillo: "5", nombre: "Aseo y Cuidado del Bebé", categorias: [...CATEGORIAS.aseo_hogar, ...CATEGORIAS.aseo_ropa, ...CATEGORIAS.bebe_higiene] },
+      { pasillo: "6", nombre: "Cuidado Personal", categorias: [...CATEGORIAS.cuidado_personal, ...CATEGORIAS.saludable_suplementos] },
+      { pasillo: "7", nombre: "Carnicería y Carnes Frías", categorias: [...CATEGORIAS.carnes_frias_congelados, ...CATEGORIAS.carnes_rojas, ...CATEGORIAS.pollo_pescado] },
+      { pasillo: "8", nombre: "Lácteos, Congelados y Desechables", categorias: [...CATEGORIAS.lacteos_refrigerados_base, ...CATEGORIAS.carnes_frias_congelados, ...CATEGORIAS.desechables] },
+      { pasillo: "9", nombre: "Mekato, Golosinas y Pasabocas", categorias: [...CATEGORIAS.gelatinas_refrescos, ...CATEGORIAS.bebidas, ...CATEGORIAS.gaseosas_mecato, ...CATEGORIAS.pasabocas_snacks, ...CATEGORIAS.dulceria_golosinas] },
+      { pasillo: "10", nombre: "Mascotas y Aseo Hogar", categorias: [...CATEGORIAS.mascotas_implementos, ...CATEGORIAS.aseo_hogar] },
+      { pasillo: "11", nombre: "Fruver, Licores y Neveras", categorias: [...CATEGORIAS.fruver, ...CATEGORIAS.licores_cigarrillos, ...CATEGORIAS.neveras_especial] },
     ],
   },
 };
 
-// Sede por defecto si no se encuentra la sede solicitada
 const SEDE_DEFAULT = "copacabana-plaza";
 
-// ============================================================
-// MOTOR DE MATCHING (igual para todas las sedes)
-// ============================================================
-
-const removeAccents = (str) =>
-  str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const removeAccents = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 const matchesKey = (text, key) => {
   const normalizedText = removeAccents(text).toLowerCase();
   const normalizedKey = removeAccents(key).toLowerCase();
-
-  if (normalizedKey.includes(" ")) {
-    return normalizedText.includes(normalizedKey);
-  }
-
+  if (normalizedKey.includes(" ")) return normalizedText.includes(normalizedKey);
   try {
     const regex = new RegExp(`\\b${normalizedKey}(s|es)?\\b`, "i");
     return regex.test(normalizedText);
@@ -588,27 +424,19 @@ const matchesKey = (text, key) => {
   }
 };
 
-/**
- * Genera las reglas de pasillos para una sede específica.
- */
 const buildReglas = (sedeSlug) => {
   const config = SEDES_CONFIG[sedeSlug] || SEDES_CONFIG[SEDE_DEFAULT];
   return config.pasillos.map((def) => ({
     keys: def.categorias,
     pasillo: def.pasillo,
     nombre: def.nombre,
-    prioridad:
-      config.orden_ruta[def.pasillo] || config.orden_ruta["Otros"] || 99,
+    prioridad: config.orden_ruta[def.pasillo] || config.orden_ruta["Otros"] || 99,
   }));
 };
 
-/**
- * Busca la regla con la coincidencia MÁS ESPECÍFICA (key más larga).
- */
 const findBestMatch = (text, reglas) => {
   let bestMatch = null;
   let bestKeyLength = 0;
-
   for (const regla of reglas) {
     for (const key of regla.keys) {
       if (matchesKey(text, key) && key.length > bestKeyLength) {
@@ -617,107 +445,54 @@ const findBestMatch = (text, reglas) => {
       }
     }
   }
-
   return bestMatch;
 };
 
-/**
- * Busca TODAS las reglas que matchean en el texto.
- * Retorna un Map<regla, mejorKeyLength> para detectar ambigüedades
- * (ej: categoría "Pastas y Harinas" matchea pasillo 2 Y pasillo 3).
- */
 const findAllMatches = (text, reglas) => {
   const matches = new Map();
-
   for (const regla of reglas) {
     for (const key of regla.keys) {
       if (matchesKey(text, key)) {
         const current = matches.get(regla) || 0;
-        if (key.length > current) {
-          matches.set(regla, key.length);
-        }
+        if (key.length > current) matches.set(regla, key.length);
       }
     }
   }
-
   return matches;
 };
 
-/**
- * Determina el pasillo y prioridad de un producto basado en sus categorías.
- *
- * @param {Array} categoriasWC - Categorías de WooCommerce [{name: "..."}]
- * @param {String} nombreProducto - Nombre del producto (fallback)
- * @param {String} sedeSlug - Slug de la sede (ej: "copacabana-plaza", "girardota")
- */
-const obtenerInfoPasillo = (
-  categoriasWC,
-  nombreProducto = "",
-  sedeSlug = "",
-) => {
+const obtenerInfoPasillo = (categoriasWC, nombreProducto = "", sedeSlug = "") => {
   const config = SEDES_CONFIG[sedeSlug] || SEDES_CONFIG[SEDE_DEFAULT];
   const reglas = buildReglas(sedeSlug);
   const ordenRuta = config.orden_ruta;
-
-  // 1. Estrategia Principal: Búsqueda por NOMBRE DE CATEGORÍA
   if (categoriasWC && categoriasWC.length > 0) {
     let categoriasValidas = categoriasWC.filter((c) => {
       if (!c.name) return false;
       const nombreNormalizado = removeAccents(c.name).toLowerCase().trim();
       if (nombreNormalizado.includes("despensa")) return false;
-      if (nombreNormalizado.includes("lacteos, huevos y refrigerados"))
-        return false;
+      if (nombreNormalizado.includes("lacteos, huevos y refrigerados")) return false;
       return true;
     });
-
-    const tieneDataDeJerarquia = categoriasValidas.some((c) =>
-      c.hasOwnProperty("parent"),
-    );
-
+    const tieneDataDeJerarquia = categoriasValidas.some((c) => c.hasOwnProperty("parent"));
     if (tieneDataDeJerarquia && categoriasValidas.length > 1) {
-      const subcategoriasOficiales = categoriasValidas.filter(
-        (c) => c.parent > 0,
-      );
-      if (subcategoriasOficiales.length > 0) {
-        categoriasValidas = subcategoriasOficiales;
-      }
+      const subcategoriasOficiales = categoriasValidas.filter((c) => c.parent > 0);
+      if (subcategoriasOficiales.length > 0) categoriasValidas = subcategoriasOficiales;
     } else if (categoriasValidas.length > 1) {
-      const subcategorias = categoriasValidas.filter((c) => {
-        const n = removeAccents(c.name).toLowerCase();
-        return !n.includes(",");
-      });
-      if (subcategorias.length > 0) {
-        categoriasValidas = subcategorias;
-      }
+      const subcategorias = categoriasValidas.filter((c) => !removeAccents(c.name).toLowerCase().includes(","));
+      if (subcategorias.length > 0) categoriasValidas = subcategorias;
     }
-
-    const nombresCategorias = categoriasValidas
-      .map((c) => c.name || "")
-      .join(" ");
-
-    // Detectar si la categoría matchea múltiples pasillos (ambigüedad)
+    const nombresCategorias = categoriasValidas.map((c) => c.name || "").join(" ");
     const allMatches = findAllMatches(nombresCategorias, reglas);
-
     if (allMatches.size === 1) {
-      // Match único — sin ambigüedad
       const [match] = allMatches.keys();
       return { pasillo: match.pasillo, prioridad: match.prioridad };
     }
-
     if (allMatches.size > 1) {
-      // Ambiguo (ej: categoría "Pastas y Harinas" matchea P2 y P3)
-      // Desempatar con el nombre del producto
       if (nombreProducto) {
         const candidatos = [...allMatches.keys()];
         const productMatch = findBestMatch(nombreProducto, candidatos);
-        if (productMatch) {
-          return {
-            pasillo: productMatch.pasillo,
-            prioridad: productMatch.prioridad,
-          };
-        }
+        if (productMatch) return { pasillo: productMatch.pasillo, prioridad: productMatch.prioridad };
       }
-      // Sin nombre o nombre no desempata → usar la key más larga de categoría
       let bestMatch = null;
       let bestLen = 0;
       for (const [regla, len] of allMatches) {
@@ -729,20 +504,9 @@ const obtenerInfoPasillo = (
       return { pasillo: bestMatch.pasillo, prioridad: bestMatch.prioridad };
     }
   }
-
-  // 2. Estrategia Fallback: Búsqueda por NOMBRE DEL PRODUCTO
   const match = findBestMatch(nombreProducto || "", reglas);
-  if (match) {
-    return { pasillo: match.pasillo, prioridad: match.prioridad };
-  }
-
-  // 3. Default
+  if (match) return { pasillo: match.pasillo, prioridad: match.prioridad };
   return { pasillo: "Otros", prioridad: ordenRuta["Otros"] || 99 };
 };
 
-module.exports = {
-  obtenerInfoPasillo,
-  SEDES_CONFIG,
-  SEDE_DEFAULT,
-  CATEGORIAS,
-};
+module.exports = { obtenerInfoPasillo, SEDES_CONFIG, SEDE_DEFAULT, CATEGORIAS };

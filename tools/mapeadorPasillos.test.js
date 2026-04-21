@@ -35,37 +35,37 @@ describe("Configuración", () => {
 
   it("CATEGORIAS debería tener todas las secciones atómicas", () => {
     const secciones = [
-      // Sin cambios
-      "bebe_adulto_cereales",
+      "bebe_higiene",
+      "cereales_leche_polvo",
       "cafe_aromaticas",
       "cuidado_personal",
       "aseo_hogar",
       "aseo_ropa",
       "harinas_aceites",
-      "reposteria_leche",
+      "reposteria_base",
+      "parva_arequipe",
+      "leche_larga_vida",
+      "gelatinas_refrescos",
       "galletas_avenas",
       "mascotas_implementos",
-      // ex refrigerados_carnes_licores
       "licores_cigarrillos",
       "dulceria_golosinas",
       "mani_bocadillo",
-      "lacteos_refrigerados",
+      "lacteos_refrigerados_base",
+      "neveras_especial",
       "carnes_frias_congelados",
       "carnes_rojas",
       "pollo_pescado",
       "saludable_suplementos",
-      // ex gaseosas_mecato_fruver
       "fruver",
       "gaseosas_mecato",
-      // ex arroz_azucar_granos
       "salsas_condimentos",
       "arroz_granos",
-      // ex huevos_atunes_pastas
       "huevos",
       "atunes_enlatados_pastas",
-      // ex bebidas_pasabocas
       "bebidas",
-      "pasabocas_desechables",
+      "desechables",
+      "pasabocas_snacks",
     ];
     secciones.forEach((s) => expect(CATEGORIAS[s]).toBeDefined());
   });
@@ -590,6 +590,133 @@ describe("obtenerInfoPasillo — Girardota", () => {
       expect(
         obtenerInfoPasillo(cat("Licores"), "", "copacabana-plaza").pasillo,
       ).toBe("13");
+    });
+  });
+});
+
+// =============================================
+// Tests para BARBOSA
+// =============================================
+
+describe("obtenerInfoPasillo — Barbosa", () => {
+  const sede = "barbosa";
+
+  describe("categorías → pasillo correcto", () => {
+    it("Arroz (Granos) → P1", () => {
+      expect(obtenerInfoPasillo(cat("Arroz"), "", sede).pasillo).toBe("1");
+    });
+
+    it("Salsas → P1", () => {
+      expect(obtenerInfoPasillo(cat("Salsas"), "", sede).pasillo).toBe("1");
+    });
+
+    it("Fruver → P2", () => {
+      expect(obtenerInfoPasillo(cat("Fruver"), "", sede).pasillo).toBe("2");
+    });
+
+    it("Carnicería → P3", () => {
+      expect(obtenerInfoPasillo(cat("Carniceria"), "", sede).pasillo).toBe("3");
+    });
+
+    it("Mekato → P5", () => {
+      expect(obtenerInfoPasillo(cat("Mecato"), "", sede).pasillo).toBe("5");
+    });
+
+    it("Galletas → P5", () => {
+      expect(obtenerInfoPasillo(cat("Galletas"), "", sede).pasillo).toBe("5");
+    });
+
+    it("Cereal (Milo) → P5", () => {
+      expect(obtenerInfoPasillo(cat("Milo"), "", sede).pasillo).toBe("5");
+    });
+
+    it("Lácteos → P6", () => {
+      expect(obtenerInfoPasillo(cat("Lacteos"), "", sede).pasillo).toBe("6");
+    });
+
+    it("Congelados → P6", () => {
+      expect(obtenerInfoPasillo(cat("Congelados"), "", sede).pasillo).toBe("6");
+    });
+
+    it("Desechables → P6", () => {
+      expect(obtenerInfoPasillo(cat("Desechables"), "", sede).pasillo).toBe("6");
+    });
+
+    it("Aseo → P7", () => {
+      expect(obtenerInfoPasillo(cat("Aseo del Hogar"), "", sede).pasillo).toBe("7");
+    });
+
+    it("Suavitel → P7", () => {
+      expect(obtenerInfoPasillo(cat("Suavitel"), "", sede).pasillo).toBe("7");
+    });
+
+    it("Licores → P8", () => {
+      expect(obtenerInfoPasillo(cat("Licores"), "", sede).pasillo).toBe("8");
+    });
+  });
+});
+
+// =============================================
+// Tests para VILLAHERMOSA
+// =============================================
+
+describe("obtenerInfoPasillo — Villahermosa", () => {
+  const sede = "villahermosa";
+
+  describe("categorías → pasillo correcto", () => {
+    it("Arroz → P1", () => {
+      expect(obtenerInfoPasillo(cat("Arroz"), "", sede).pasillo).toBe("1");
+    });
+
+    it("Huevos → P1", () => {
+      expect(obtenerInfoPasillo(cat("Huevos"), "", sede).pasillo).toBe("1");
+    });
+
+    it("Atún → P2", () => {
+      expect(obtenerInfoPasillo(cat("Atun"), "", sede).pasillo).toBe("2");
+    });
+
+    it("Milo/Chocolisto → P3", () => {
+      expect(obtenerInfoPasillo(cat("Milo"), "", sede).pasillo).toBe("3");
+      expect(obtenerInfoPasillo(cat("Chocolisto"), "", sede).pasillo).toBe("3");
+    });
+
+    it("Café/Parva → P4", () => {
+      expect(obtenerInfoPasillo(cat("Cafe"), "", sede).pasillo).toBe("4");
+      expect(obtenerInfoPasillo(cat("Parva"), "", sede).pasillo).toBe("4");
+    });
+
+    it("Pañales/Limpido → P5", () => {
+      expect(obtenerInfoPasillo(cat("Pañales"), "", sede).pasillo).toBe("5");
+      expect(obtenerInfoPasillo(cat("Limpido"), "", sede).pasillo).toBe("5");
+    });
+
+    it("Japonés (Cuidado Personal) → P6", () => {
+      expect(obtenerInfoPasillo(cat("Japonés"), "", sede).pasillo).toBe("6");
+    });
+
+    it("Carnicería → P7", () => {
+      expect(obtenerInfoPasillo(cat("Carniceria"), "", sede).pasillo).toBe("7");
+    });
+
+    it("Lácteos/Desechables → P8", () => {
+      expect(obtenerInfoPasillo(cat("Lacteos"), "", sede).pasillo).toBe("8");
+      expect(obtenerInfoPasillo(cat("Desechables"), "", sede).pasillo).toBe("8");
+    });
+
+    it("Frutiños/Snacks → P9", () => {
+      expect(obtenerInfoPasillo(cat("Frutiños"), "", sede).pasillo).toBe("9");
+      expect(obtenerInfoPasillo(cat("Snacks"), "", sede).pasillo).toBe("9");
+    });
+
+    it("Mascotas → P10", () => {
+      expect(obtenerInfoPasillo(cat("Mascotas"), "", sede).pasillo).toBe("10");
+    });
+
+    it("Fruver/Licores/Neveras → P11", () => {
+      expect(obtenerInfoPasillo(cat("Fruver"), "", sede).pasillo).toBe("11");
+      expect(obtenerInfoPasillo(cat("Licores"), "", sede).pasillo).toBe("11");
+      expect(obtenerInfoPasillo(cat("Neveras"), "", sede).pasillo).toBe("11");
     });
   });
 });

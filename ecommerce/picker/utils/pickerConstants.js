@@ -71,6 +71,7 @@ export const getPresentationLabel = (unidad_medida) => {
   if (!uom || uom === "UND" || uom === "UN") return "UN";
   if (uom === "KL" || uom === "KG") return "KILO";
   if (uom === "LB") return "LIBRA";
+  if (uom === "500GR" || uom === "500G" || uom === "500GRS") return "500GR";
   const mp = parseMultipack(uom);
   if (mp.isMultipack) return mp.label;
   return uom;

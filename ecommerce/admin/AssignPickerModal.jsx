@@ -11,7 +11,13 @@ import {
 import "./PedidosAdmin.css";
 import "./AssignPickerModal.css";
 
-const AssignPickerModal = ({ isOpen, pickers, onClose, onConfirm, isAssigning }) => {
+const AssignPickerModal = ({
+  isOpen,
+  pickers,
+  onClose,
+  onConfirm,
+  isAssigning,
+}) => {
   if (!isOpen) return null;
 
   // 1. Lógica de Ordenamiento: Disponibles primero, luego por nombre
@@ -51,7 +57,15 @@ const AssignPickerModal = ({ isOpen, pickers, onClose, onConfirm, isAssigning })
         </div>
 
         {/* BODY */}
-        <div className="pa-modal-body-custom">
+        <div
+          className="pa-modal-body-custom"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+            overflow: "hidden",
+          }}
+        >
           {/* Barra de búsqueda decorativa (puedes hacerla funcional si tienes muchos pickers) */}
           <div className="apm-search-bar">
             <FaSearch color="#94a3b8" />
@@ -60,7 +74,10 @@ const AssignPickerModal = ({ isOpen, pickers, onClose, onConfirm, isAssigning })
             </span>
           </div>
 
-          <div className="apm-list-container">
+          <div
+            className="apm-list-container"
+            style={{ flex: 1, overflowY: "auto" }}
+          >
             {sortedPickers.map((picker) => {
               const isBusy = picker.estado_picker !== "disponible";
 
@@ -100,7 +117,9 @@ const AssignPickerModal = ({ isOpen, pickers, onClose, onConfirm, isAssigning })
                     {isBusy ? (
                       <span className="apm-badge busy">OCUPADO</span>
                     ) : isAssigning ? (
-                      <span className="apm-badge loading"><FaSpinner className="ec-spin" /> ASIGNANDO</span>
+                      <span className="apm-badge loading">
+                        <FaSpinner className="ec-spin" /> ASIGNANDO
+                      </span>
                     ) : (
                       <span className="apm-badge available">ASIGNAR</span>
                     )}

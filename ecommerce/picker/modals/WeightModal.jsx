@@ -16,6 +16,7 @@ import {
   formatCOP,
 } from "./utils/gs1Utils";
 import { normalizeSku } from "../utils/pickerConstants";
+import { kgPerUnit, cantUnitSuffix } from "../../shared/weighableUnits";
 import "../Modals.css";
 
 // --- MODAL DE PESO INTELIGENTE (CARNES VS FRUVER CON PRECIO EN VIVO) ---
@@ -336,11 +337,19 @@ const WeightModal = ({ isOpen, item, onClose, onConfirm, onRequestScan }) => {
           <div className="wm-request-badge">
             Solicitado:{" "}
             <strong>
-              {item.quantity_total} {item.unidad_medida || "Kg"}
-              {(item.unidad_medida || "").toUpperCase() === "LB" ||
-              (item.unidad_medida || "").toUpperCase() === "LIBRA"
-                ? ` (≈ ${Math.round(parseFloat(item.quantity_total) * 500)}g)`
-                : ` (≈ ${Math.round(parseFloat(item.quantity_total) * 1000)}g)`}
+              {(() => {
+                const u = (item.unidad_medida || "").trim().toLowerCase();
+                const is500g = u === "500gr" || u === "500g" || u === "500grs";
+                const qty = parseFloat(item.quantity_total) || 0;
+                const weightGrams = Math.round(
+                  qty * kgPerUnit(item.unidad_medida) * 1000,
+                );
+
+                if (is500g) {
+                  return `${weightGrams}g`;
+                }
+                return `${item.quantity_total} ${cantUnitSuffix(item.unidad_medida) || "Kg"} (≈ ${weightGrams}g)`;
+              })()}
             </strong>
           </div>
           {isFruver && loadingBaseEan && (
