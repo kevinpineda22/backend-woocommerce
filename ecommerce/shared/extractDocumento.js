@@ -10,6 +10,7 @@ const DOC_META_KEYS = [
 
 const COD_MODE_LABELS = {
   cash: "Efectivo",
+  efectivo: "Efectivo",
   qr: "QR",
   datafono: "Datáfono",
   credito: "Crédito",

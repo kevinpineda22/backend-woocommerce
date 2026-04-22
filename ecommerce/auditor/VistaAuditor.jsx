@@ -689,8 +689,8 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
           peso_total: i.peso_total || 0,
           price: i.price,
           catalog_price: i.catalog_price || i.price || 0,
-          subtotal: i.subtotal || 0,
-          line_total: i.line_total || 0,
+          subtotal: i.subtotal || i.price || 0,
+          line_total: i.line_total || i.price || 0,
           is_sub: i.is_sub,
           barcode: (() => {
             let bc = exactScannedBarcode || i.barcode || "";

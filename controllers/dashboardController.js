@@ -41,6 +41,7 @@ function extractDocumento(orderSnapshot) {
 
 const COD_MODE_LABELS = {
   cash: "Efectivo",
+  efectivo: "Efectivo",
   qr: "QR",
   datafono: "Datáfono",
   credito: "Crédito",
@@ -480,8 +481,13 @@ exports.getPickers = async (req, res) => {
  * @param {number[]}    idsPedidos    — ids_pedidos para mantener el orden
  * @returns {(number|null)[]}         — array de totales en el mismo orden que ids_pedidos
  */
-function calcTotalesFromDatosSalida(datosSalida, snapshotPedidos, idsPedidos) {
-  // Si hay datos_salida con orders, calcular dinámicamente
+function calcTotalesFromDatosSalida(
+  datosSalida,
+  snapshotPedidos,
+  idsPedidos,
+  session_id = null,
+) {
+  // 1. Si hay datos_salida con orders (el flujo ideal), calcular desde ahí
   if (datosSalida?.orders?.length) {
     return (idsPedidos || []).map((pid) => {
       const order = datosSalida.orders.find(
@@ -489,12 +495,21 @@ function calcTotalesFromDatosSalida(datosSalida, snapshotPedidos, idsPedidos) {
       );
       if (!order) return null;
 
+      // Preferir el order.total de WooCommerce si existe (igual que en ManifestSheet)
+      const wooOrderTotal = parseFloat(order.total) || 0;
+      if (wooOrderTotal > 0) {
+        return wooOrderTotal;
+      }
+
       const productItems = (order.items || []).filter(
         (i) => !i.is_shipping_method,
       );
       const itemsTotal = productItems.reduce((sum, item) => {
         const qty = item.qty || item.count || 1;
-        return sum + (parseFloat(item.price) || 0) * qty;
+        // Rescatar precio si es 0 (blindaje extra)
+        const price =
+          parseFloat(item.price) || parseFloat(item.catalog_price) || 0;
+        return sum + price * qty;
       }, 0);
       const shippingTotal = (order.shipping_lines || []).reduce(
         (sum, s) => sum + (parseFloat(s.total) || 0),
@@ -504,10 +519,12 @@ function calcTotalesFromDatosSalida(datosSalida, snapshotPedidos, idsPedidos) {
       return total > 0 ? total : null;
     });
   }
-  // Fallback: usar snapshot_pedidos.total (puede estar desactualizado, pero es lo único disponible)
+
+  // 2. Fallback: Si no hay datos_salida pero tenemos el snapshot, usar el total de WooCommerce
   if (snapshotPedidos?.length) {
     return snapshotPedidos.map((o) => parseFloat(o.total) || null);
   }
+
   return (idsPedidos || []).map(() => null);
 }
 
@@ -917,7 +934,35 @@ exports.completeAuditSession = async (req, res) => {
       estado: "auditado", // ✅ Estado final luego de auditoria
       resumen_metricas: updatedMetrics,
     };
-    if (datos_salida) updatePayload.datos_salida = datos_salida;
+
+    if (datos_salida) {
+      // 🚀 LIMPIEZA DE PRECIOS 0: Si algún ítem llega con precio 0 pero tiene valor real, lo rescatamos
+      if (datos_salida.orders && Array.isArray(datos_salida.orders)) {
+        datos_salida.orders.forEach((order) => {
+          if (order.items && Array.isArray(order.items)) {
+            order.items.forEach((item) => {
+              // Si no es un ítem de despacho y tiene precio/catálogo pero line_total es 0
+              if (!item.is_shipping_method) {
+                const itemPrice = parseFloat(item.price) || 0;
+                const itemCatalog = parseFloat(item.catalog_price) || 0;
+                const effectivePrice = itemPrice || itemCatalog;
+
+                if (
+                  (!item.line_total || parseFloat(item.line_total) === 0) &&
+                  effectivePrice > 0
+                ) {
+                  item.price = effectivePrice;
+                  item.catalog_price = itemCatalog || effectivePrice;
+                  item.subtotal = effectivePrice;
+                  item.line_total = effectivePrice;
+                }
+              }
+            });
+          }
+        });
+      }
+      updatePayload.datos_salida = datos_salida;
+    }
 
     const { error: sessError } = await supabase
       .from("wc_picking_sessions")
@@ -1185,7 +1230,20 @@ exports.getSessionLogsDetail = async (req, res) => {
           );
           if (subProds) {
             subProds.forEach((p) => {
-              productDetailsMap[p.id] = { image: p.images[0]?.src, sku: p.sku };
+              const catalogPrice = parseFloat(p.price) || 0;
+              productDetailsMap[p.id] = {
+                name: p.name,
+                image: p.images[0]?.src,
+                sku: p.sku,
+                price: catalogPrice,
+                catalog_price: catalogPrice,
+                subtotal: catalogPrice,
+                line_total: catalogPrice,
+                unidad_medida:
+                  (p.attributes || []).find((a) =>
+                    a.name.toLowerCase().includes("unidad"),
+                  )?.options[0] || "UND",
+              };
             });
           }
         }
