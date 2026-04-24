@@ -495,28 +495,31 @@ function calcTotalesFromDatosSalida(
       );
       if (!order) return null;
 
-      // Preferir el order.total de WooCommerce si existe (igual que en ManifestSheet)
-      const wooOrderTotal = parseFloat(order.total) || 0;
-      if (wooOrderTotal > 0) {
-        return wooOrderTotal;
-      }
-
       const productItems = (order.items || []).filter(
         (i) => !i.is_shipping_method,
       );
       const itemsTotal = productItems.reduce((sum, item) => {
         const qty = item.qty || item.count || 1;
-        // Rescatar precio si es 0 (blindaje extra)
         const price =
-          parseFloat(item.price) || parseFloat(item.catalog_price) || 0;
+          parseFloat(item.line_total) || parseFloat(item.price) || parseFloat(item.catalog_price) || 0;
         return sum + price * qty;
       }, 0);
       const shippingTotal = (order.shipping_lines || []).reduce(
         (sum, s) => sum + (parseFloat(s.total) || 0),
         0,
       );
-      const total = itemsTotal + shippingTotal;
-      return total > 0 ? total : null;
+      const calculatedTotal = itemsTotal + shippingTotal;
+
+      // ✅ Preferir el calculado si hay diferencia con el total de WooCommerce
+      const wooOrderTotal = parseFloat(order.total) || 0;
+      if (
+        Math.abs(calculatedTotal - wooOrderTotal) > 1 &&
+        calculatedTotal > 0
+      ) {
+        return calculatedTotal;
+      }
+
+      return wooOrderTotal > 0 ? wooOrderTotal : calculatedTotal || null;
     });
   }
 

@@ -218,13 +218,18 @@ const ManifestSheet = ({
     (sum, s) => sum + (parseFloat(s.total) || 0),
     0,
   );
-  // Total del pedido: si Woo nos dio order.total, ESE es el real (incluye cupones,
-  // fees, impuestos, ajustes). Solo usamos el calculado como fallback.
+  // Total del pedido: En el Manifiesto de Salida, la "verdad física" son los items
+  // que efectivamente se entregan. Priorizamos el cálculo dinámico sobre el total
+  // estático de WooCommerce, ya que este último puede estar desactualizado si 
+  // se eliminaron productos durante el picking y aún no se ha sincronizado.
   const wooOrderTotal = parseFloat(order.total) || 0;
-  const orderTotal =
-    wooOrderTotal > 0
-      ? wooOrderTotal
-      : calculatedItemsTotal + shippingTotal || null;
+  const calculatedTotal = calculatedItemsTotal + shippingTotal;
+  
+  // Si hay una diferencia (ej: por picking), usamos el calculado. 
+  // Solo usamos wooOrderTotal si el calculado da 0 o si son idénticos.
+  const orderTotal = (Math.abs(calculatedTotal - wooOrderTotal) > 1 && calculatedTotal > 0)
+    ? calculatedTotal 
+    : (wooOrderTotal || calculatedTotal || null);
 
   const omittedItems = [];
 

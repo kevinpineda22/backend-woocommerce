@@ -708,6 +708,16 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
         (sum, s) => sum + (parseFloat(s.total) || 0),
         0,
       );
+
+      // ✅ RECALCULAR TOTAL REAL (Suma de items + envío)
+      // No podemos confiar en group.total porque es el total original de WooCommerce
+      // antes de que el picker eliminara o sustituyera productos.
+      const calculatedTotal =
+        productItems.reduce((sum, item) => {
+          const itemPrice = parseFloat(item.line_total) || 0;
+          return sum + itemPrice * item.qty;
+        }, 0) + shippingPrice;
+
       productItems.push({
         id: `shipping-${group.id}`,
         sku: shippingBarcode,
@@ -725,7 +735,7 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
         shipping: group.shipping,
         shipping_lines: group.shipping_lines || [],
         meta_data: group.meta_data || [],
-        total: group.total || null,
+        total: calculatedTotal,
         items: productItems,
       };
     });
