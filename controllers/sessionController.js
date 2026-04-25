@@ -76,15 +76,31 @@ async function getBarcodesFromSiesa(productIds) {
 }
 
 exports.createPickingSession = async (req, res) => {
-  const { id_picker, ids_pedidos, admin_name, admin_email } = req.body;
+  const { id_picker, picker_email, ids_pedidos, admin_name, admin_email } = req.body;
   try {
-    // 1. Obtener Nombre y Sede del Picker
-    const { data: pickerData } = await supabase
+    // 1. Obtener Nombre y Sede del Picker (Priorizar búsqueda por Email para evitar desajustes de ID)
+    let pickerQuery = supabase
       .from("wc_pickers")
-      .select("nombre_completo, sede_id")
-      .eq("id", id_picker)
-      .single();
-    const nombrePicker = pickerData ? pickerData.nombre_completo : "Picker";
+      .select("id, nombre_completo, sede_id, email");
+
+    if (picker_email) {
+      pickerQuery = pickerQuery.eq("email", picker_email);
+    } else if (id_picker && id_picker.includes("@")) {
+      // Fallback si mandan el email en el campo id_picker
+      pickerQuery = pickerQuery.eq("email", id_picker);
+    } else {
+      pickerQuery = pickerQuery.eq("id", id_picker);
+    }
+
+    const { data: pickerData, error: pickerError } = await pickerQuery.single();
+
+    if (pickerError || !pickerData) {
+      throw new Error("No se encontró el picker operativo con el identificador proporcionado.");
+    }
+
+    const nombrePicker = pickerData.nombre_completo || "Picker";
+    const targetPickerId = pickerData.id; // El ID real en la tabla wc_pickers
+    const targetPickerEmail = pickerData.email;
 
     // Multi-Sede: La sede de la sesión viene del picker, o del request
     let sedeId = req.sedeId || pickerData?.sede_id || null;
@@ -157,11 +173,11 @@ exports.createPickingSession = async (req, res) => {
 
     if (sessError) throw sessError;
 
-    // 4. Actualizar Picker
+    // 4. Actualizar Picker (Usar el ID real resuelto)
     const { error: pickerUpdateError } = await supabase
       .from("wc_pickers")
       .update({ estado_picker: "picking", id_sesion_actual: session.id })
-      .eq("id", id_picker);
+      .eq("id", targetPickerId);
 
     if (pickerUpdateError) {
       console.error("Error actualizando picker:", pickerUpdateError);
@@ -170,10 +186,10 @@ exports.createPickingSession = async (req, res) => {
       );
     }
 
-    // 5. Crear Asignaciones (con sede_id)
+    // 5. Crear Asignaciones (con sede_id y usando el ID real resuelto)
     const asignaciones = ids_pedidos.map((idPedido) => ({
       id_pedido: idPedido,
-      id_picker: id_picker,
+      id_picker: targetPickerId,
       id_sesion: session.id,
       nombre_picker: nombrePicker,
       reporte_snapshot: snapshotPedidos.find((s) => s.id === idPedido),
@@ -197,7 +213,8 @@ exports.createPickingSession = async (req, res) => {
       entity: { type: "session", id: session.id },
       sedeId,
       metadata: {
-        picker_id: id_picker,
+        picker_id: targetPickerId,
+        picker_email: targetPickerEmail,
         picker_name: nombrePicker,
         orders: ids_pedidos,
       },
@@ -207,6 +224,7 @@ exports.createPickingSession = async (req, res) => {
       message: "Sesión creada",
       session_id: session.id,
       sede_id: sedeId,
+      picker_id: targetPickerId
     });
   } catch (error) {
     console.error("Error createSession:", error.message || error);
@@ -216,20 +234,30 @@ exports.createPickingSession = async (req, res) => {
   }
 };
 
-// ✅ LÓGICA CORREGIDA: SPLIT LINE (1 ORIGINAL + 1 SUSTITUTO)
+// ✅ LÓGICA CORREGIDA: Resolución flexible de Picker (Email/ID)
 exports.getSessionActive = async (req, res) => {
   const { id_picker, include_removed } = req.query;
 
   try {
-    const { data: picker } = await supabase
+    // 1. Resolver Picker Operativo
+    let pickerQuery = supabase
       .from("wc_pickers")
-      .select("id_sesion_actual")
-      .eq("id", id_picker)
-      .single();
-    if (!picker || !picker.id_sesion_actual)
+      .select("id, id_sesion_actual");
+
+    if (id_picker && id_picker.includes("@")) {
+      pickerQuery = pickerQuery.eq("email", id_picker);
+    } else {
+      pickerQuery = pickerQuery.eq("id", id_picker);
+    }
+
+    const { data: picker, error: pError } = await pickerQuery.single();
+
+    if (pError || !picker || !picker.id_sesion_actual)
       return res.status(404).json({ message: "No tienes una sesión activa." });
 
     const sessionId = picker.id_sesion_actual;
+    const targetPickerId = picker.id;
+
     const { data: session } = await supabase
       .from("wc_picking_sessions")
       .select("*")
@@ -241,7 +269,7 @@ exports.getSessionActive = async (req, res) => {
       await supabase
         .from("wc_pickers")
         .update({ id_sesion_actual: null, estado_picker: "disponible" })
-        .eq("id", id_picker);
+        .eq("id", targetPickerId);
 
       return res
         .status(404)
@@ -577,36 +605,28 @@ exports.completeSession = async (req, res) => {
   const { id_sesion, id_picker } = req.body;
   try {
     const now = new Date().toISOString();
+
+    // Resolver Picker Operativo
+    let pickerQuery = supabase.from("wc_pickers").select("id, nombre_completo");
+    if (id_picker && id_picker.includes("@")) {
+      pickerQuery = pickerQuery.eq("email", id_picker);
+    } else {
+      pickerQuery = pickerQuery.eq("id", id_picker);
+    }
+    const { data: pickerRow } = await pickerQuery.single();
+    const targetPickerId = pickerRow?.id || id_picker;
+    const pickerName = pickerRow?.nombre_completo || "Picker";
+
     const { data: sessData } = await supabase
       .from("wc_picking_sessions")
       .select("sede_id, ids_pedidos")
       .eq("id", id_sesion)
       .single();
 
-    // Resolver nombre del picker para auditoría
-    let pickerName = null;
-    {
-      const { data: pickerRow } = await supabase
-        .from("wc_pickers")
-        .select("nombre_completo")
-        .eq("id", id_picker)
-        .single();
-      pickerName = pickerRow?.nombre_completo || null;
-    }
-
     await supabase
       .from("wc_picking_sessions")
       .update({ estado: "pendiente_auditoria", fecha_fin: now })
       .eq("id", id_sesion);
-
-    // [INSTRUCCION 2026-02-13] Se comenta para que el picker NO se libere aquí.
-    // El picker seguirá en session_actual hasta que el Auditor lo libere en Dashboard.
-    /*
-    await supabase
-      .from("wc_pickers")
-      .update({ estado_picker: "disponible", id_sesion_actual: null })
-      .eq("id", id_picker); 
-    */
 
     await supabase
       .from("wc_asignaciones_pedidos")
@@ -614,7 +634,7 @@ exports.completeSession = async (req, res) => {
       .eq("id_sesion", id_sesion);
 
     logAuditEvent({
-      actor: { type: "picker", id: id_picker, name: pickerName },
+      actor: { type: "picker", id: targetPickerId, name: pickerName },
       action: "session.completed",
       entity: { type: "session", id: id_sesion },
       sedeId: sessData?.sede_id || req.sedeId || null,
@@ -638,19 +658,28 @@ exports.completeSession = async (req, res) => {
 exports.cancelAssignment = async (req, res) => {
   const { id_picker } = req.body;
   try {
-    const { data: pickerData } = await supabase
-      .from("wc_pickers")
-      .select("id_sesion_actual")
-      .eq("id", id_picker)
-      .single();
+    // Resolver Picker Operativo
+    let pickerQuery = supabase.from("wc_pickers").select("id, nombre_completo, id_sesion_actual");
+    if (id_picker && id_picker.includes("@")) {
+      pickerQuery = pickerQuery.eq("email", id_picker);
+    } else {
+      pickerQuery = pickerQuery.eq("id", id_picker);
+    }
+    const { data: pickerData } = await pickerQuery.single();
+
     if (!pickerData || !pickerData.id_sesion_actual) {
-      await supabase
-        .from("wc_pickers")
-        .update({ estado_picker: "disponible", id_sesion_actual: null })
-        .eq("id", id_picker);
+      if (pickerData) {
+        await supabase
+          .from("wc_pickers")
+          .update({ estado_picker: "disponible", id_sesion_actual: null })
+          .eq("id", pickerData.id);
+      }
       return res.status(200).json({ message: "Picker liberado." });
     }
+
     const idSesion = pickerData.id_sesion_actual;
+    const targetPickerId = pickerData.id;
+    const cancelPickerName = pickerData.nombre_completo || "Picker";
     const now = new Date().toISOString();
 
     const { data: sessSede } = await supabase
@@ -658,17 +687,6 @@ exports.cancelAssignment = async (req, res) => {
       .select("sede_id, ids_pedidos")
       .eq("id", idSesion)
       .single();
-
-    // Resolver nombre del picker para auditoría
-    let cancelPickerName = null;
-    {
-      const { data: pickerRow } = await supabase
-        .from("wc_pickers")
-        .select("nombre_completo")
-        .eq("id", id_picker)
-        .single();
-      cancelPickerName = pickerRow?.nombre_completo || null;
-    }
 
     await supabase
       .from("wc_picking_sessions")
@@ -681,10 +699,10 @@ exports.cancelAssignment = async (req, res) => {
     await supabase
       .from("wc_pickers")
       .update({ estado_picker: "disponible", id_sesion_actual: null })
-      .eq("id", id_picker);
+      .eq("id", targetPickerId);
 
     logAuditEvent({
-      actor: { type: "picker", id: id_picker, name: cancelPickerName },
+      actor: { type: "picker", id: targetPickerId, name: cancelPickerName },
       action: "session.cancelled",
       entity: { type: "session", id: idSesion },
       sedeId: sessSede?.sede_id || req.sedeId || null,
