@@ -455,7 +455,7 @@ exports.getPickers = async (req, res) => {
     .from("wc_pickers")
     .select("*, wc_sedes(nombre, slug)")
     .order("nombre_completo", { ascending: true });
-  if (email) query = query.eq("email", email);
+  if (email) query = query.eq("email", email.toLowerCase().trim());
   // Filtro Multi-Sede
   if (req.sedeId) {
     query = query.eq("sede_id", req.sedeId);

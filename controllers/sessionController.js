@@ -84,10 +84,10 @@ exports.createPickingSession = async (req, res) => {
       .select("id, nombre_completo, sede_id, email");
 
     if (picker_email) {
-      pickerQuery = pickerQuery.eq("email", picker_email);
+      pickerQuery = pickerQuery.eq("email", picker_email.toLowerCase().trim());
     } else if (id_picker && id_picker.includes("@")) {
       // Fallback si mandan el email en el campo id_picker
-      pickerQuery = pickerQuery.eq("email", id_picker);
+      pickerQuery = pickerQuery.eq("email", id_picker.toLowerCase().trim());
     } else {
       pickerQuery = pickerQuery.eq("id", id_picker);
     }
@@ -245,7 +245,7 @@ exports.getSessionActive = async (req, res) => {
       .select("id, id_sesion_actual");
 
     if (id_picker && id_picker.includes("@")) {
-      pickerQuery = pickerQuery.eq("email", id_picker);
+      pickerQuery = pickerQuery.eq("email", id_picker.toLowerCase().trim());
     } else {
       pickerQuery = pickerQuery.eq("id", id_picker);
     }
@@ -609,7 +609,7 @@ exports.completeSession = async (req, res) => {
     // Resolver Picker Operativo
     let pickerQuery = supabase.from("wc_pickers").select("id, nombre_completo");
     if (id_picker && id_picker.includes("@")) {
-      pickerQuery = pickerQuery.eq("email", id_picker);
+      pickerQuery = pickerQuery.eq("email", id_picker.toLowerCase().trim());
     } else {
       pickerQuery = pickerQuery.eq("id", id_picker);
     }
@@ -661,7 +661,7 @@ exports.cancelAssignment = async (req, res) => {
     // Resolver Picker Operativo
     let pickerQuery = supabase.from("wc_pickers").select("id, nombre_completo, id_sesion_actual");
     if (id_picker && id_picker.includes("@")) {
-      pickerQuery = pickerQuery.eq("email", id_picker);
+      pickerQuery = pickerQuery.eq("email", id_picker.toLowerCase().trim());
     } else {
       pickerQuery = pickerQuery.eq("id", id_picker);
     }
