@@ -713,10 +713,14 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
       // No podemos confiar en group.total porque es el total original de WooCommerce
       // antes de que el picker eliminara o sustituyera productos.
       const calculatedTotal =
-        productItems.reduce((sum, item) => {
-          const itemPrice = parseFloat(item.line_total) || 0;
-          return sum + itemPrice * item.qty;
-        }, 0) + shippingPrice;
+        productItems
+          .filter((i) => !i.is_removed)
+          .reduce((sum, item) => {
+            // Extraemos el subtotal de origen y normalizamos según unidades
+            const unitPrice =
+              parseFloat(item.price) || parseFloat(item.line_total) || 0;
+            return sum + unitPrice * item.qty;
+          }, 0) + shippingPrice;
 
       productItems.push({
         id: `shipping-${group.id}`,

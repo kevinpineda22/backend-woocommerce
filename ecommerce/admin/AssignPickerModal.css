@@ -55,11 +55,11 @@
   gap: 12px;
   flex: 1;
   background: #f8fafc;
-  max-height: 480px;
 }
 
 /* ─── Picker Card ─── */
 .apm-picker-card {
+  flex-shrink: 0;
   background: white;
   border: 1px solid var(--apm-border);
   border-radius: 12px;
@@ -95,6 +95,7 @@
 /* ─── Avatar ─── */
 .apm-avatar-wrapper {
   position: relative;
+  flex-shrink: 0;
 }
 
 .apm-avatar {
@@ -168,6 +169,12 @@
 }
 
 /* ─── Badge de Estado ─── */
+.apm-action {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
 .apm-badge {
   font-size: 0.7rem;
   font-weight: 800;

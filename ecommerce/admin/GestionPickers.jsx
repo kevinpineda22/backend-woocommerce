@@ -81,10 +81,11 @@ export const GestionPickers = () => {
       // 3. Fusionar datos y calcular carga real
       const mergedList = await Promise.all(
         profilesData.map(async (profile) => {
-          let operativo = wcData.find((w) => w.email === profile.correo);
+          const profileEmail = (profile.correo || "").toLowerCase().trim();
+          let operativo = wcData.find((w) => (w.email || "").toLowerCase().trim() === profileEmail);
 
           // AUTO-FIX: Si existe en profiles pero no en wc_pickers, intentar crearlo
-          if (!operativo && profile.correo) {
+          if (!operativo && profileEmail) {
             try {
               const { data: newOp, error: insertErr } = await supabase
                 .from("wc_pickers")

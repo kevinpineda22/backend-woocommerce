@@ -201,7 +201,9 @@ const ManifestSheet = ({
   // 2. Productos CON variaciones: 1*sku repetido qty veces (salto de línea entre cada uno)
   // 3. Productos SIN variaciones: qty*sku (una sola línea)
   // Calcular totales dinámicamente (antes del QR para disponibilidad en todo el componente)
-  const productItems = items.filter((i) => !i.is_shipping_method);
+  const productItems = items.filter(
+    (i) => !i.is_shipping_method && !i.is_removed,
+  );
   const totalQty = productItems.reduce(
     (sum, item) => sum + (item.qty || item.count || 1),
     0,
@@ -218,18 +220,13 @@ const ManifestSheet = ({
     (sum, s) => sum + (parseFloat(s.total) || 0),
     0,
   );
-  // Total del pedido: En el Manifiesto de Salida, la "verdad física" son los items
-  // que efectivamente se entregan. Priorizamos el cálculo dinámico sobre el total
-  // estático de WooCommerce, ya que este último puede estar desactualizado si 
-  // se eliminaron productos durante el picking y aún no se ha sincronizado.
+  // Total del pedido: si Woo nos dio order.total, ESE es el real (incluye cupones,
+  // fees, impuestos, ajustes). Solo usamos el calculado como fallback.
   const wooOrderTotal = parseFloat(order.total) || 0;
-  const calculatedTotal = calculatedItemsTotal + shippingTotal;
-  
-  // Si hay una diferencia (ej: por picking), usamos el calculado. 
-  // Solo usamos wooOrderTotal si el calculado da 0 o si son idénticos.
-  const orderTotal = (Math.abs(calculatedTotal - wooOrderTotal) > 1 && calculatedTotal > 0)
-    ? calculatedTotal 
-    : (wooOrderTotal || calculatedTotal || null);
+  const orderTotal =
+    wooOrderTotal > 0
+      ? wooOrderTotal
+      : calculatedItemsTotal + shippingTotal || null;
 
   const omittedItems = [];
 
@@ -401,17 +398,11 @@ const ManifestSheet = ({
       >
         {/* Customer & Shipping Info */}
         <div className="manifest-customer">
-          <div className="manifest-customer-row">
+          <div className="manifest-customer-grid">
             <div className="manifest-customer-field">
               <span className="manifest-field-label">Cliente:</span>
               <span className="manifest-field-value">{customerName}</span>
             </div>
-            {billing.company && (
-              <div className="manifest-customer-field">
-                <span className="manifest-field-label">Empresa:</span>
-                <span className="manifest-field-value">{billing.company}</span>
-              </div>
-            )}
             {customerDocument && (
               <div className="manifest-customer-field">
                 <span className="manifest-field-label">Documento:</span>
@@ -425,7 +416,7 @@ const ManifestSheet = ({
               </div>
             )}
             {billing.email && (
-              <div className="manifest-customer-field">
+              <div className="manifest-customer-field manifest-email-field">
                 <span className="manifest-field-label">Email:</span>
                 <span className="manifest-field-value">{billing.email}</span>
               </div>
@@ -436,235 +427,201 @@ const ManifestSheet = ({
                 <span className="manifest-field-value">{metodoPago}</span>
               </div>
             )}
-          </div>
-          <div className="manifest-customer-row">
+            <div className="manifest-customer-field">
+              <span className="manifest-field-label">Picker:</span>
+              <span className="manifest-field-value">{pickerName}</span>
+            </div>
+
+            {billing.company && (
+              <div className="manifest-customer-field field-company">
+                <span className="manifest-field-label">Empresa:</span>
+                <span className="manifest-field-value">{billing.company}</span>
+              </div>
+            )}
+
             {billingAddress && (
-              <div className="manifest-customer-field">
+              <div className="manifest-customer-field field-address">
                 <span className="manifest-field-label">Dir. Facturación:</span>
                 <span className="manifest-field-value">{billingAddress}</span>
               </div>
             )}
             {shippingAddress && shippingAddress !== billingAddress && (
-              <div className="manifest-customer-field">
+              <div className="manifest-customer-field field-address">
                 <span className="manifest-field-label">Dir. Envío:</span>
                 <span className="manifest-field-value">{shippingAddress}</span>
               </div>
             )}
-            <div className="manifest-customer-field">
-              <span className="manifest-field-label">Picker:</span>
-              <span className="manifest-field-value">{pickerName}</span>
-            </div>
           </div>
           {order.customer_note && (
-            <div className="manifest-customer-row manifest-note-row">
-              <div className="manifest-customer-field" style={{ flex: 1 }}>
-                <span className="manifest-field-label">📝 Nota:</span>
-                <span className="manifest-field-value manifest-field-note">
-                  {order.customer_note}
-                </span>
-              </div>
+            <div className="manifest-customer-note">
+              <span className="manifest-field-label">📝 NOTA:</span>
+              <span className="manifest-field-value manifest-field-note">
+                {order.customer_note}
+              </span>
             </div>
           )}
         </div>
 
         {/* QR Code Section */}
-        <div
-          className={`manifest-qr-section ${!showFullDetails ? "manifest-qr-only" : ""}`}
-        >
-          {showFullDetails ? (
-            /* ---- Modo manifiesto completo: QR siempre visible (para impresión) ---- */
-            <>
-              <div className="qr-wrapper">
-                <QRCode value={qrValue || " "} size={180} level="Q" />
-              </div>
-              <div className="qr-info">
-                <h4>CERTIFICADO DE SALIDA</h4>
-                <div className="qr-scan-once-warning">
-                  ⚠️ ESCANEAR UNA SOLA VEZ
+        {!showFullDetails && (
+          <div className="manifest-qr-section manifest-qr-only">
+            {qrVisible ? (
+              /* ---- Modo solo QR + timer activo: ventana de escaneo ---- */
+              <>
+                <div className="qr-countdown-timer">
+                  <svg viewBox="0 0 50 50" className="qr-countdown-svg">
+                    <circle
+                      cx="25"
+                      cy="25"
+                      r="22"
+                      className="qr-countdown-track"
+                    />
+                    <circle
+                      cx="25"
+                      cy="25"
+                      r="22"
+                      className="qr-countdown-progress"
+                      style={{
+                        strokeDashoffset: `${138.23 * (1 - countdown / SCAN_WINDOW_SECONDS)}`,
+                      }}
+                    />
+                  </svg>
+                  <span className="qr-countdown-num">{countdown}</span>
                 </div>
-                <p>
-                  {productItems.length - omittedItems.length} de{" "}
-                  {productItems.length} productos —{" "}
-                  <strong>{qrLineCount} entradas en el QR</strong>
+                <div className="qr-wrapper">
+                  <QRCode value={qrValue || " "} size={480} level="Q" />
+                </div>
+                <div className="qr-info">
+                  <div className="qr-scan-once-warning">
+                    ⚠️ ESCANEAR UNA SOLA VEZ
+                  </div>
+                  <p>
+                    {productItems.length - omittedItems.length} de{" "}
+                    {productItems.length} productos —{" "}
+                    <strong>{qrLineCount} entradas en el QR</strong>
+                  </p>
+                  {qrExceedsCapacity && (
+                    <div
+                      style={{
+                        marginTop: "6px",
+                        padding: "6px 10px",
+                        background: "#fff7ed",
+                        border: "1px solid #f97316",
+                        borderRadius: "4px",
+                        color: "#c2410c",
+                        fontSize: "0.75rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      ⚠️ QR muy denso ({qrValue.length} bytes). Imprimir a
+                      máxima calidad.
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              /* ---- Modo solo QR + timer inactivo: botón para activar ventana ---- */
+              <div className="qr-reveal-container">
+                <h4 className="qr-reveal-title">CERTIFICADO DE SALIDA</h4>
+                {everUsed && (
+                  <div className="qr-ever-used-badge">
+                    ✅ QR procesado — se ocultó automáticamente
+                  </div>
+                )}
+                <p className="qr-reveal-info">
+                  {productItems.length - omittedItems.length} productos —{" "}
+                  {qrLineCount} entradas en el QR
                 </p>
-                {qrExceedsCapacity && (
+                <div className="qr-scan-instructions">
+                  <div className="qr-scan-step">
+                    <span className="qr-step-num">1</span>
+                    <span>Apunte el escáner al código QR</span>
+                  </div>
+                  <div className="qr-scan-step">
+                    <span className="qr-step-num">2</span>
+                    <span>
+                      Espere el <strong>PITIDO</strong> de confirmación
+                    </span>
+                  </div>
+                  <div className="qr-scan-step">
+                    <span
+                      className="qr-step-num"
+                      style={{ backgroundColor: "#ca8a04", color: "white" }}
+                    >
+                      3
+                    </span>
+                    <span>
+                      <strong>
+                        RECUERDA NO TOCAR LA PANTALLA HASTA QUE EL ESCÁNER
+                        TERMINE LA ESCRITURA DE CÓDIGOS, O LA OPERACIÓN
+                      </strong>
+                    </span>
+                  </div>
+                  <div className="qr-scan-step qr-scan-step--critical">
+                    <span className="qr-step-num qr-step-num--critical">4</span>
+                    <span>
+                      Al sonar el pitido →{" "}
+                      <strong>ALEJE el QR de inmediato</strong>
+                    </span>
+                  </div>
+                </div>
+                {qrIsComplex && (
                   <div
                     style={{
-                      marginTop: "6px",
-                      padding: "6px 10px",
-                      background: "#fff7ed",
-                      border: "1px solid #f97316",
+                      padding: "6px 12px",
+                      background: "#fefce8",
+                      border: "1px solid #fbbf24",
                       borderRadius: "4px",
-                      color: "#c2410c",
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
+                      color: "#92400e",
+                      fontSize: "0.85rem",
+                      width: "100%",
+                      maxWidth: "460px",
                     }}
                   >
-                    ⚠️ QR muy denso ({qrValue.length} bytes). Imprimir a máxima
-                    calidad.
+                    Pedido grande — verificar que el escáner leyó {qrLineCount}{" "}
+                    entradas en SIESA.
                   </div>
                 )}
                 {omittedItems.length > 0 && (
                   <div
                     style={{
-                      marginTop: "8px",
-                      padding: "6px 10px",
+                      padding: "6px 12px",
                       background: "#fef2f2",
                       border: "1px solid #fca5a5",
                       borderRadius: "4px",
                       color: "#b91c1c",
-                      fontSize: "0.75rem",
+                      fontSize: "0.85rem",
                       textAlign: "left",
+                      width: "100%",
+                      maxWidth: "460px",
                     }}
                   >
                     <strong>Advertencia:</strong> {omittedItems.length}{" "}
-                    producto(s) omitidos del QR.
+                    producto(s) omitidos del QR:
+                    <ul style={{ margin: "3px 0 0 16px", paddingLeft: 0 }}>
+                      {omittedItems.map((item, idx) => (
+                        <li key={idx}>
+                          {item.name} {item.qty && `(x${item.qty})`}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
-              </div>
-            </>
-          ) : qrVisible ? (
-            /* ---- Modo solo QR + timer activo: ventana de escaneo ---- */
-            <>
-              <div className="qr-countdown-timer">
-                <svg viewBox="0 0 50 50" className="qr-countdown-svg">
-                  <circle
-                    cx="25"
-                    cy="25"
-                    r="22"
-                    className="qr-countdown-track"
-                  />
-                  <circle
-                    cx="25"
-                    cy="25"
-                    r="22"
-                    className="qr-countdown-progress"
-                    style={{
-                      strokeDashoffset: `${138.23 * (1 - countdown / SCAN_WINDOW_SECONDS)}`,
-                    }}
-                  />
-                </svg>
-                <span className="qr-countdown-num">{countdown}</span>
-              </div>
-              <div className="qr-wrapper">
-                <QRCode value={qrValue || " "} size={480} level="Q" />
-              </div>
-              <div className="qr-info">
-                <div className="qr-scan-once-warning">
-                  ⚠️ ESCANEAR UNA SOLA VEZ
-                </div>
-                <p>
-                  {productItems.length - omittedItems.length} de{" "}
-                  {productItems.length} productos —{" "}
-                  <strong>{qrLineCount} entradas en el QR</strong>
+                <button
+                  className="qr-reveal-btn no-print"
+                  onClick={startScanWindow}
+                >
+                  {everUsed
+                    ? "🔁 Volver a mostrar QR (5 seg)"
+                    : "👁️ Mostrar QR para escanear (5 seg)"}
+                </button>
+                <p className="qr-reveal-hint">
+                  Se ocultará automáticamente en 5 segundos
                 </p>
-                {qrExceedsCapacity && (
-                  <div
-                    style={{
-                      marginTop: "6px",
-                      padding: "6px 10px",
-                      background: "#fff7ed",
-                      border: "1px solid #f97316",
-                      borderRadius: "4px",
-                      color: "#c2410c",
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                    }}
-                  >
-                    ⚠️ QR muy denso ({qrValue.length} bytes). Imprimir a máxima
-                    calidad.
-                  </div>
-                )}
               </div>
-            </>
-          ) : (
-            /* ---- Modo solo QR + timer inactivo: botón para activar ventana ---- */
-            <div className="qr-reveal-container">
-              <h4 className="qr-reveal-title">CERTIFICADO DE SALIDA</h4>
-              {everUsed && (
-                <div className="qr-ever-used-badge">
-                  ✅ QR procesado — se ocultó automáticamente
-                </div>
-              )}
-              <p className="qr-reveal-info">
-                {productItems.length - omittedItems.length} productos —{" "}
-                {qrLineCount} entradas en el QR
-              </p>
-              <div className="qr-scan-instructions">
-                <div className="qr-scan-step">
-                  <span className="qr-step-num">1</span>
-                  <span>Apunte el escáner al código QR</span>
-                </div>
-                <div className="qr-scan-step">
-                  <span className="qr-step-num">2</span>
-                  <span>
-                    Espere el <strong>PITIDO</strong> de confirmación
-                  </span>
-                </div>
-                <div className="qr-scan-step qr-scan-step--critical">
-                  <span className="qr-step-num qr-step-num--critical">3</span>
-                  <span>
-                    Al sonar el pitido →{" "}
-                    <strong>ALEJE el QR de inmediato</strong>
-                  </span>
-                </div>
-              </div>
-              {qrIsComplex && (
-                <div
-                  style={{
-                    padding: "6px 12px",
-                    background: "#fefce8",
-                    border: "1px solid #fbbf24",
-                    borderRadius: "4px",
-                    color: "#92400e",
-                    fontSize: "0.85rem",
-                    width: "100%",
-                    maxWidth: "460px",
-                  }}
-                >
-                  Pedido grande — verificar que el escáner leyó {qrLineCount}{" "}
-                  entradas en SIESA.
-                </div>
-              )}
-              {omittedItems.length > 0 && (
-                <div
-                  style={{
-                    padding: "6px 12px",
-                    background: "#fef2f2",
-                    border: "1px solid #fca5a5",
-                    borderRadius: "4px",
-                    color: "#b91c1c",
-                    fontSize: "0.85rem",
-                    textAlign: "left",
-                    width: "100%",
-                    maxWidth: "460px",
-                  }}
-                >
-                  <strong>Advertencia:</strong> {omittedItems.length}{" "}
-                  producto(s) omitidos del QR:
-                  <ul style={{ margin: "3px 0 0 16px", paddingLeft: 0 }}>
-                    {omittedItems.map((item, idx) => (
-                      <li key={idx}>
-                        {item.name} {item.qty && `(x${item.qty})`}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <button
-                className="qr-reveal-btn no-print"
-                onClick={startScanWindow}
-              >
-                {everUsed
-                  ? "🔁 Volver a mostrar QR (5 seg)"
-                  : "👁️ Mostrar QR para escanear (5 seg)"}
-              </button>
-              <p className="qr-reveal-hint">
-                Se ocultará automáticamente en 5 segundos
-              </p>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {showFullDetails && (
@@ -749,7 +706,7 @@ const ManifestSheet = ({
                               color: "#64748b",
                             }}
                           >
-                            {cantUnitSuffix(item.unidad_medida)}
+                            {cantUnitSuffix(item.unidad_medida, item.name)}
                           </span>
                         )}
                       </td>

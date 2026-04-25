@@ -371,7 +371,7 @@ exports.getActiveSessionsDashboard = async (req, res) => {
           telefonos: orders.map((o) => o.billing?.phone || "").filter(Boolean),
           documentos: orders.map((o) => extractDocumento(o)),
           metodos_pago: orders.map((o) => extractMetodoPago(o)),
-          totales: orders.map((o) => o.total || null),
+          totales: calcTotalesFromDatosSalida(null, orders, sess.ids_pedidos),
         };
       }),
     );
@@ -496,12 +496,15 @@ function calcTotalesFromDatosSalida(
       if (!order) return null;
 
       const productItems = (order.items || []).filter(
-        (i) => !i.is_shipping_method,
+        (i) => !i.is_shipping_method && !i.is_removed,
       );
       const itemsTotal = productItems.reduce((sum, item) => {
         const qty = item.qty || item.count || 1;
         const price =
-          parseFloat(item.line_total) || parseFloat(item.price) || parseFloat(item.catalog_price) || 0;
+          parseFloat(item.line_total) ||
+          parseFloat(item.price) ||
+          parseFloat(item.catalog_price) ||
+          0;
         return sum + price * qty;
       }, 0);
       const shippingTotal = (order.shipping_lines || []).reduce(
@@ -523,9 +526,36 @@ function calcTotalesFromDatosSalida(
     });
   }
 
-  // 2. Fallback: Si no hay datos_salida pero tenemos el snapshot, usar el total de WooCommerce
+  // 2. Fallback: Si no hay datos_salida pero tenemos el snapshot, usar el total calculándolo sin productos eliminados
   if (snapshotPedidos?.length) {
-    return snapshotPedidos.map((o) => parseFloat(o.total) || null);
+    return snapshotPedidos.map((order) => {
+      const productItems = (order.line_items || order.items || []).filter(
+        (i) => !i.is_shipping_method && !i.is_removed,
+      );
+      const itemsTotal = productItems.reduce((sum, item) => {
+        const qty = item.qty || item.count || item.quantity || 1;
+        const price =
+          parseFloat(item.line_total) ||
+          parseFloat(item.price) ||
+          parseFloat(item.catalog_price) ||
+          0;
+        return sum + price * qty;
+      }, 0);
+      const shippingTotal = (order.shipping_lines || []).reduce(
+        (sum, s) => sum + (parseFloat(s.total) || 0),
+        0,
+      );
+      const calculatedTotal = itemsTotal + shippingTotal;
+
+      const wooOrderTotal = parseFloat(order.total) || 0;
+      if (
+        Math.abs(calculatedTotal - wooOrderTotal) > 1 &&
+        calculatedTotal > 0
+      ) {
+        return calculatedTotal;
+      }
+      return wooOrderTotal > 0 ? wooOrderTotal : calculatedTotal || null;
+    });
   }
 
   return (idsPedidos || []).map(() => null);

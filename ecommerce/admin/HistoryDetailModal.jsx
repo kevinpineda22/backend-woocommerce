@@ -299,7 +299,9 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
   ).length;
 
   // Calcular total dinámicamente (order.total en snapshot puede estar desactualizado)
-  const productItems = (order.items || []).filter((i) => !i.is_shipping_method);
+  const productItems = (order.items || []).filter(
+    (i) => !i.is_shipping_method && !i.is_removed,
+  );
   const calcItemsTotal = productItems.reduce((sum, item) => {
     const qty = item.qty || item.count || 1;
     return sum + (parseFloat(item.price) || 0) * qty;

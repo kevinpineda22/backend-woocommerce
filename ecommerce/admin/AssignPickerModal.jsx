@@ -64,6 +64,7 @@ const AssignPickerModal = ({
             flexDirection: "column",
             height: "100%",
             overflow: "hidden",
+            minHeight: 0,
           }}
         >
           {/* Barra de búsqueda decorativa (puedes hacerla funcional si tienes muchos pickers) */}
@@ -76,7 +77,7 @@ const AssignPickerModal = ({
 
           <div
             className="apm-list-container"
-            style={{ flex: 1, overflowY: "auto" }}
+            style={{ flex: 1, overflowY: "auto", minHeight: 0 }}
           >
             {sortedPickers.map((picker) => {
               const isBusy = picker.estado_picker !== "disponible";

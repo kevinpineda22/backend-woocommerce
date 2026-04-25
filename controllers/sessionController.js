@@ -76,7 +76,8 @@ async function getBarcodesFromSiesa(productIds) {
 }
 
 exports.createPickingSession = async (req, res) => {
-  const { id_picker, picker_email, ids_pedidos, admin_name, admin_email } = req.body;
+  const { id_picker, picker_email, ids_pedidos, admin_name, admin_email } =
+    req.body;
   try {
     // 1. Obtener Nombre y Sede del Picker (Priorizar búsqueda por Email para evitar desajustes de ID)
     let pickerQuery = supabase
@@ -95,7 +96,9 @@ exports.createPickingSession = async (req, res) => {
     const { data: pickerData, error: pickerError } = await pickerQuery.single();
 
     if (pickerError || !pickerData) {
-      throw new Error("No se encontró el picker operativo con el identificador proporcionado.");
+      throw new Error(
+        "No se encontró el picker operativo con el identificador proporcionado.",
+      );
     }
 
     const nombrePicker = pickerData.nombre_completo || "Picker";
@@ -224,7 +227,7 @@ exports.createPickingSession = async (req, res) => {
       message: "Sesión creada",
       session_id: session.id,
       sede_id: sedeId,
-      picker_id: targetPickerId
+      picker_id: targetPickerId,
     });
   } catch (error) {
     console.error("Error createSession:", error.message || error);
@@ -586,7 +589,32 @@ exports.getSessionActive = async (req, res) => {
         email: o.billing?.email,
         billing: o.billing,
         shipping: o.shipping,
-        total: o.total,
+        total: (() => {
+          const productItems = (o.line_items || o.items || []).filter(
+            (i) => !i.is_shipping_method && !i.is_removed,
+          );
+          const itemsTotal = productItems.reduce((sum, item) => {
+            const qty = item.qty || item.count || item.quantity || 1;
+            const price =
+              parseFloat(item.line_total) ||
+              parseFloat(item.price) ||
+              parseFloat(item.catalog_price) ||
+              0;
+            return sum + price * qty;
+          }, 0);
+          const shippingTotal = (o.shipping_lines || []).reduce(
+            (sum, s) => sum + (parseFloat(s.total) || 0),
+            0,
+          );
+          const calculatedTotal = itemsTotal + shippingTotal;
+          const wooOrderTotal = parseFloat(o.total) || 0;
+          if (
+            Math.abs(calculatedTotal - wooOrderTotal) > 1 &&
+            calculatedTotal > 0
+          )
+            return calculatedTotal;
+          return wooOrderTotal > 0 ? wooOrderTotal : calculatedTotal || null;
+        })(),
         customer_note: o.customer_note || null,
         payment_method_title: o.payment_method_title || "",
         meta_data: o.meta_data || [],
@@ -659,7 +687,9 @@ exports.cancelAssignment = async (req, res) => {
   const { id_picker } = req.body;
   try {
     // Resolver Picker Operativo
-    let pickerQuery = supabase.from("wc_pickers").select("id, nombre_completo, id_sesion_actual");
+    let pickerQuery = supabase
+      .from("wc_pickers")
+      .select("id, nombre_completo, id_sesion_actual");
     if (id_picker && id_picker.includes("@")) {
       pickerQuery = pickerQuery.eq("email", id_picker.toLowerCase().trim());
     } else {
