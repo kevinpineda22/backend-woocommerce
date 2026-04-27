@@ -678,6 +678,485 @@ exports.getPickerRoute = async (req, res) => {
   }
 };
 
+// =========================================================
+// 5. CENTRO DE INTELIGENCIA — Endpoint consolidado
+// Devuelve financieros, operación, pickers, productos y tendencias
+// en una sola respuesta coherente para el panel de admin.
+// =========================================================
+
+const COD_LABELS = {
+  cash: "Efectivo",
+  efectivo: "Efectivo",
+  card: "Tarjeta",
+  tarjeta: "Tarjeta",
+  qr: "QR",
+  datafono: "Datáfono",
+  credito: "Crédito",
+};
+
+const PAY_LABELS = {
+  efectivo: "Efectivo",
+  credito: "Crédito",
+  qr: "QR",
+  datafono: "Datáfono",
+};
+
+const WEEKDAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+// Resuelve método de pago: prefiere lo registrado al cobrar, fallback al snapshot.
+function resolvePaymentMethod(session, snapshotOrder) {
+  if (session?.metodo_pago && PAY_LABELS[session.metodo_pago]) {
+    return PAY_LABELS[session.metodo_pago];
+  }
+  const meta = snapshotOrder?.meta_data;
+  if (Array.isArray(meta)) {
+    const cod = meta.find((m) => m.key === "_billing_cod_payment_mode");
+    if (cod?.value) {
+      const v = cod.value.toString().toLowerCase();
+      return COD_LABELS[v] || cod.value;
+    }
+  }
+  const title = (snapshotOrder?.payment_method_title || "")
+    .toString()
+    .toLowerCase();
+  if (title === "card") return "Tarjeta";
+  if (title === "cash") return "Efectivo";
+  return snapshotOrder?.payment_method_title || "Otros";
+}
+
+// Suma el total real de un pedido a partir de datos_salida (post-picking).
+function orderRevenue(order) {
+  if (!order) return 0;
+  const items = (order.items || order.line_items || []).filter(
+    (i) => !i.is_shipping_method && !i.is_removed,
+  );
+  const itemsTotal = items.reduce((s, it) => {
+    const qty = it.qty || it.count || it.quantity || 1;
+    const price =
+      parseFloat(it.line_total) ||
+      parseFloat(it.price) ||
+      parseFloat(it.catalog_price) ||
+      0;
+    return s + price * qty;
+  }, 0);
+  const shipping = (order.shipping_lines || []).reduce(
+    (s, x) => s + (parseFloat(x.total) || 0),
+    0,
+  );
+  const calc = itemsTotal + shipping;
+  const wooTotal = parseFloat(order.total) || 0;
+  if (Math.abs(calc - wooTotal) > 1 && calc > 0) return calc;
+  return wooTotal > 0 ? wooTotal : calc;
+}
+
+// Convierte UTC a hora Colombia (UTC-5) sin dependencias extra.
+function toBogota(d) {
+  return dayjs(d).subtract(5, "hour");
+}
+
+function rangeBounds(range) {
+  const now = dayjs();
+  if (range === "today") return { start: now.startOf("day"), days: 1 };
+  if (range === "30d") return { start: now.subtract(30, "day").startOf("day"), days: 30 };
+  if (range === "all") return { start: null, days: null };
+  return { start: now.subtract(7, "day").startOf("day"), days: 7 };
+}
+
+exports.getIntelligenceCenter = async (req, res) => {
+  try {
+    const { range = "7d" } = req.query;
+    const { start, days } = rangeBounds(range);
+    const sedeId = req.sedeId || null;
+
+    // ---- 1. SESIONES (financieros + ritmo) ---------------------------------
+    let sessQ = supabase
+      .from("wc_picking_sessions")
+      .select(
+        "id, sede_id, id_picker, fecha_inicio, fecha_fin, fecha_pago, estado, metodo_pago, snapshot_pedidos, datos_salida, ids_pedidos, wc_sedes(nombre)",
+      )
+      .in("estado", ["finalizado", "auditado", "pendiente_auditoria"]);
+    if (sedeId) sessQ = sessQ.eq("sede_id", sedeId);
+    if (start) sessQ = sessQ.gte("fecha_fin", start.toISOString());
+
+    const { data: sessions = [], error: sessErr } = await sessQ;
+    if (sessErr) throw sessErr;
+
+    // ---- 2. ASIGNACIONES (operación + pickers) -----------------------------
+    let asigQ = supabase
+      .from("wc_asignaciones_pedidos")
+      .select(
+        "id, id_picker, nombre_picker, id_pedido, tiempo_total_segundos, fecha_inicio, fecha_fin, sede_id",
+      )
+      .eq("estado_asignacion", "completado")
+      .not("tiempo_total_segundos", "is", null);
+    if (sedeId) asigQ = asigQ.eq("sede_id", sedeId);
+    if (start) asigQ = asigQ.gte("fecha_fin", start.toISOString());
+
+    const { data: asignaciones = [], error: asigErr } = await asigQ;
+    if (asigErr) throw asigErr;
+
+    // ---- 3. LOGS (acciones de picking) -------------------------------------
+    const asigIds = asignaciones.map((a) => a.id);
+    let logs = [];
+    if (asigIds.length > 0) {
+      const { data: logsData = [], error: logErr } = await supabase
+        .from("wc_log_picking")
+        .select("id_asignacion, accion, motivo, nombre_producto, id_pedido, fecha_registro")
+        .in("id_asignacion", asigIds);
+      if (logErr) throw logErr;
+      logs = logsData;
+    }
+
+    // =======================================================================
+    // FINANCIEROS
+    // =======================================================================
+    let totalRevenue = 0;
+    let orderCount = 0;
+    const revByMethod = new Map();
+    const revBySede = new Map();
+    const revByDay = new Map(); // "YYYY-MM-DD" → { revenue, orders }
+    const revByWeekday = new Map(); // 0..6 → { revenue, orders }
+
+    for (const sess of sessions) {
+      const orders =
+        sess.datos_salida?.orders ||
+        sess.snapshot_pedidos ||
+        sess.ids_pedidos?.map(() => ({})) ||
+        [];
+
+      const dateRef = sess.fecha_pago || sess.fecha_fin || sess.fecha_inicio;
+      const dBog = toBogota(dateRef);
+      const dayKey = dBog.format("YYYY-MM-DD");
+      const wd = dBog.day();
+      const sedeName = sess.wc_sedes?.nombre || "Sin sede";
+
+      orders.forEach((order, idx) => {
+        const snapshot =
+          (sess.snapshot_pedidos || []).find(
+            (o) => String(o.id) === String(order.id),
+          ) || sess.snapshot_pedidos?.[idx];
+        const rev = orderRevenue(order) || orderRevenue(snapshot);
+        if (rev <= 0) return;
+
+        totalRevenue += rev;
+        orderCount += 1;
+
+        const method = resolvePaymentMethod(sess, snapshot || order);
+        revByMethod.set(method, (revByMethod.get(method) || 0) + rev);
+
+        revBySede.set(
+          sedeName,
+          (revBySede.get(sedeName) || 0) + rev,
+        );
+
+        const dayBucket = revByDay.get(dayKey) || { revenue: 0, orders: 0 };
+        dayBucket.revenue += rev;
+        dayBucket.orders += 1;
+        revByDay.set(dayKey, dayBucket);
+
+        const wdBucket = revByWeekday.get(wd) || { revenue: 0, orders: 0 };
+        wdBucket.revenue += rev;
+        wdBucket.orders += 1;
+        revByWeekday.set(wd, wdBucket);
+      });
+    }
+
+    const revenueByMethod = Array.from(revByMethod, ([name, value]) => ({
+      name,
+      value: Math.round(value),
+    })).sort((a, b) => b.value - a.value);
+
+    const revenueBySede = Array.from(revBySede, ([name, value]) => ({
+      name,
+      value: Math.round(value),
+    })).sort((a, b) => b.value - a.value);
+
+    // Serie temporal: rellenar días faltantes para que el área no tenga huecos
+    const revenueTrend = [];
+    if (days && days > 1) {
+      for (let i = days - 1; i >= 0; i--) {
+        const d = toBogota(dayjs().toISOString()).subtract(i, "day");
+        const key = d.format("YYYY-MM-DD");
+        const bucket = revByDay.get(key) || { revenue: 0, orders: 0 };
+        revenueTrend.push({
+          date: d.format("DD/MM"),
+          dateKey: key,
+          revenue: Math.round(bucket.revenue),
+          orders: bucket.orders,
+        });
+      }
+    } else {
+      // 'today' o 'all': serializar lo que haya
+      Array.from(revByDay.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .forEach(([key, b]) => {
+          revenueTrend.push({
+            date: dayjs(key).format("DD/MM"),
+            dateKey: key,
+            revenue: Math.round(b.revenue),
+            orders: b.orders,
+          });
+        });
+    }
+
+    const weekdayActivity = WEEKDAY_LABELS.map((label, idx) => {
+      const b = revByWeekday.get(idx) || { revenue: 0, orders: 0 };
+      return {
+        day: label,
+        pedidos: b.orders,
+        revenue: Math.round(b.revenue),
+      };
+    });
+
+    // =======================================================================
+    // OPERACIÓN + PICKERS
+    // =======================================================================
+    const pickerMap = new Map();
+    const ordersWithIssues = new Set();
+    const productIssues = new Map(); // nombre → { count, motivos }
+    const topProducts = new Map(); // nombre → { qty, revenue }
+
+    // Pre-clasificar logs por pedido
+    logs.forEach((l) => {
+      if (l.accion === "no_encontrado" || l.accion === "sustituido") {
+        ordersWithIssues.add(l.id_pedido);
+      }
+      if (l.accion === "no_encontrado" || l.accion === "sustituido") {
+        const name = l.nombre_producto || "Sin nombre";
+        const entry = productIssues.get(name) || { count: 0, motivos: {} };
+        entry.count += 1;
+        const motivo = l.motivo || "Sin motivo";
+        entry.motivos[motivo] = (entry.motivos[motivo] || 0) + 1;
+        productIssues.set(name, entry);
+      }
+    });
+
+    // Top productos vendidos (de sesiones finalizadas con datos_salida)
+    sessions.forEach((sess) => {
+      const orders = sess.datos_salida?.orders || [];
+      orders.forEach((order) => {
+        const items = (order.items || []).filter(
+          (i) => !i.is_shipping_method && !i.is_removed,
+        );
+        items.forEach((it) => {
+          const name = it.name || it.product_name || "Sin nombre";
+          const qty = parseFloat(it.qty || it.count || it.quantity || 1);
+          const price =
+            parseFloat(it.line_total) ||
+            parseFloat(it.price) ||
+            parseFloat(it.catalog_price) ||
+            0;
+          const entry = topProducts.get(name) || { qty: 0, revenue: 0 };
+          entry.qty += qty;
+          entry.revenue += price * qty;
+          topProducts.set(name, entry);
+        });
+      });
+    });
+
+    // Indexar logs por id_asignacion
+    const logsByAsig = new Map();
+    logs.forEach((l) => {
+      const arr = logsByAsig.get(l.id_asignacion) || [];
+      arr.push(l);
+      logsByAsig.set(l.id_asignacion, arr);
+    });
+
+    asignaciones.forEach((a) => {
+      const id = a.id_picker;
+      if (!pickerMap.has(id)) {
+        pickerMap.set(id, {
+          id,
+          nombre: a.nombre_picker || "Sin nombre",
+          pedidos: 0,
+          pedidos_perfectos: 0,
+          tiempo_total_seg: 0,
+          items_recolectados: 0,
+          items_sustituidos: 0,
+          items_no_encontrados: 0,
+          motivos: {},
+        });
+      }
+      const p = pickerMap.get(id);
+      p.pedidos += 1;
+      p.tiempo_total_seg += a.tiempo_total_segundos || 0;
+      if (!ordersWithIssues.has(a.id_pedido)) p.pedidos_perfectos += 1;
+
+      const aLogs = logsByAsig.get(a.id) || [];
+      aLogs.forEach((l) => {
+        if (l.accion === "recolectado") p.items_recolectados += 1;
+        else if (l.accion === "sustituido") p.items_sustituidos += 1;
+        else if (l.accion === "no_encontrado") p.items_no_encontrados += 1;
+        if (l.motivo && (l.accion === "no_encontrado" || l.accion === "sustituido")) {
+          p.motivos[l.motivo] = (p.motivos[l.motivo] || 0) + 1;
+        }
+      });
+    });
+
+    const pickers = Array.from(pickerMap.values())
+      .map((p) => {
+        const totalAcciones =
+          p.items_recolectados + p.items_sustituidos + p.items_no_encontrados;
+        const minutos = p.tiempo_total_seg / 60 || 1;
+        const topMotivo = Object.entries(p.motivos).sort(
+          (a, b) => b[1] - a[1],
+        )[0];
+        return {
+          id: p.id,
+          nombre: p.nombre,
+          pedidos: p.pedidos,
+          items_recolectados: p.items_recolectados,
+          items_sustituidos: p.items_sustituidos,
+          items_no_encontrados: p.items_no_encontrados,
+          tiempo_promedio_min: Math.round(minutos / p.pedidos),
+          segundos_por_item:
+            totalAcciones > 0
+              ? Math.round(p.tiempo_total_seg / totalAcciones)
+              : 0,
+          velocidad_items_min:
+            minutos > 0
+              ? parseFloat((p.items_recolectados / minutos).toFixed(2))
+              : 0,
+          tasa_precision:
+            totalAcciones > 0
+              ? Math.round((p.items_recolectados / totalAcciones) * 100)
+              : 0,
+          tasa_pedido_perfecto:
+            p.pedidos > 0
+              ? Math.round((p.pedidos_perfectos / p.pedidos) * 100)
+              : 0,
+          motivo_top: topMotivo ? `${topMotivo[0]} (${topMotivo[1]})` : null,
+        };
+      })
+      .sort((a, b) => b.pedidos - a.pedidos);
+
+    // =======================================================================
+    // OPERACIÓN — agregados globales
+    // =======================================================================
+    const totalAcciones = pickers.reduce(
+      (s, p) =>
+        s + p.items_recolectados + p.items_sustituidos + p.items_no_encontrados,
+      0,
+    );
+    const totalRecolectados = pickers.reduce(
+      (s, p) => s + p.items_recolectados,
+      0,
+    );
+    const totalSustituidos = pickers.reduce(
+      (s, p) => s + p.items_sustituidos,
+      0,
+    );
+    const totalNoEncontrados = pickers.reduce(
+      (s, p) => s + p.items_no_encontrados,
+      0,
+    );
+    const tiempoTotalSeg = asignaciones.reduce(
+      (s, a) => s + (a.tiempo_total_segundos || 0),
+      0,
+    );
+    const totalPedidosCompletos = asignaciones.length;
+    const pedidosPerfectos = asignaciones.filter(
+      (a) => !ordersWithIssues.has(a.id_pedido),
+    ).length;
+
+    const operations = {
+      totalSessions: sessions.length,
+      totalCompletedOrders: totalPedidosCompletos,
+      avgSessionMin:
+        totalPedidosCompletos > 0
+          ? Math.round(tiempoTotalSeg / totalPedidosCompletos / 60)
+          : 0,
+      spiAverage:
+        totalAcciones > 0 ? Math.round(tiempoTotalSeg / totalAcciones) : 0,
+      avgItemsPerOrder:
+        totalPedidosCompletos > 0
+          ? Math.round(totalAcciones / totalPedidosCompletos)
+          : 0,
+      completionRate:
+        totalAcciones > 0
+          ? Math.round((totalRecolectados / totalAcciones) * 100)
+          : 0,
+      substitutionRate:
+        totalAcciones > 0
+          ? Math.round((totalSustituidos / totalAcciones) * 100)
+          : 0,
+      notFoundRate:
+        totalAcciones > 0
+          ? Math.round((totalNoEncontrados / totalAcciones) * 100)
+          : 0,
+      perfectOrderRate:
+        totalPedidosCompletos > 0
+          ? Math.round((pedidosPerfectos / totalPedidosCompletos) * 100)
+          : 0,
+    };
+
+    // =======================================================================
+    // RITMO POR HORA
+    // =======================================================================
+    const hourly = Array.from({ length: 24 }, () => 0);
+    asignaciones.forEach((a) => {
+      if (!a.fecha_inicio) return;
+      const h = toBogota(a.fecha_inicio).hour();
+      if (h >= 0 && h < 24) hourly[h] += 1;
+    });
+    const hourlyActivity = hourly.map((v, h) => ({
+      hour: `${String(h).padStart(2, "0")}h`,
+      pedidos: v,
+    }));
+
+    // =======================================================================
+    // PRODUCTOS — top vendidos + problemas
+    // =======================================================================
+    const topSellingProducts = Array.from(topProducts, ([name, v]) => ({
+      name,
+      qty: Math.round(v.qty * 100) / 100,
+      revenue: Math.round(v.revenue),
+    }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 15);
+
+    const productIssuesArr = Array.from(productIssues, ([name, v]) => {
+      const top = Object.entries(v.motivos).sort((a, b) => b[1] - a[1])[0];
+      return {
+        name,
+        count: v.count,
+        top_motivo: top ? top[0] : "Sin motivo",
+      };
+    })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
+
+    // =======================================================================
+    // RESPUESTA
+    // =======================================================================
+    res.status(200).json({
+      rangeMeta: {
+        range,
+        days,
+        from: start ? start.toISOString() : null,
+        to: dayjs().toISOString(),
+      },
+      financials: {
+        totalRevenue: Math.round(totalRevenue),
+        orderCount,
+        avgTicket: orderCount > 0 ? Math.round(totalRevenue / orderCount) : 0,
+        revenueByMethod,
+        revenueBySede,
+        revenueTrend,
+      },
+      operations,
+      pickers,
+      hourlyActivity,
+      weekdayActivity,
+      topSellingProducts,
+      productIssues: productIssuesArr,
+    });
+  } catch (error) {
+    console.error("Error getIntelligenceCenter:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // 7. Listado de Rutas Completadas (Historial para Selección)
 exports.getCompletedRoutesList = async (req, res) => {
   try {

@@ -6,6 +6,7 @@ const { sedeMiddleware } = require("../middleware/sedeMiddleware");
 // Middleware Multi-Sede
 router.use(sedeMiddleware);
 
+router.get("/intelligence", analyticsController.getIntelligenceCenter);
 router.get("/performance", analyticsController.getCollectorPerformance);
 router.get("/heatmap", analyticsController.getProductHeatmap);
 router.get("/audit", analyticsController.getAuditLogs);
