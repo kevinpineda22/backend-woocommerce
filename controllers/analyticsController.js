@@ -73,13 +73,32 @@ exports.getCollectorPerformance = async (req, res) => {
     let logsQuery = supabase
       .from("wc_log_picking")
       .select(
-        "accion, motivo, id_pedido, pasillo, fecha_registro, wc_asignaciones_pedidos!inner(id_picker)",
+        "accion, motivo, id_pedido, pasillo, fecha_registro, wc_asignaciones_pedidos!inner(id_picker, fecha_inicio)",
       )
       .order("fecha_registro", { ascending: true });
+
     // Filtro Multi-Sede
     if (req.sedeId) {
       logsQuery = logsQuery.eq("sede_id", req.sedeId);
     }
+
+    // Aplicar mismo filtro de fecha a los logs para evitar traer miles de registros innecesarios
+    if (range && range !== "all") {
+      const now = dayjs();
+      let startDate;
+      if (range === "today") startDate = now.startOf("day");
+      else if (range === "7d") startDate = now.subtract(7, "day").startOf("day");
+      else if (range === "30d")
+        startDate = now.subtract(30, "day").startOf("day");
+
+      if (startDate) {
+        logsQuery = logsQuery.gte(
+          "wc_asignaciones_pedidos.fecha_inicio",
+          startDate.toISOString(),
+        );
+      }
+    }
+
     const { data: logs, error: logError } = await logsQuery;
 
     if (logError) throw logError;
@@ -261,7 +280,7 @@ exports.getCollectorPerformance = async (req, res) => {
 
     const globalStats = {
       total_pedidos: total_pedidos_global,
-      total_recaudado,
+      total_recaudado: totalRecaudado,
       spi_promedio:
         total_items_global > 0
           ? Math.round(tiempo_total_global / total_items_global)
