@@ -37,11 +37,11 @@ function extractDocumento(orderSnapshot) {
   if (!meta || !Array.isArray(meta)) return "";
   const found = meta.find((m) => DOC_META_KEYS.includes(m.key));
   return found?.value || "";
-}
-
 const COD_MODE_LABELS = {
   cash: "Efectivo",
   efectivo: "Efectivo",
+  card: "Tarjeta",
+  tarjeta: "Tarjeta",
   qr: "QR",
   datafono: "Datáfono",
   credito: "Crédito",
@@ -52,9 +52,18 @@ function extractMetodoPago(orderSnapshot) {
   if (meta && Array.isArray(meta)) {
     const codMode = meta.find((m) => m.key === "_billing_cod_payment_mode");
     if (codMode?.value) {
-      return COD_MODE_LABELS[codMode.value] || codMode.value;
+      const val = codMode.value.toString().toLowerCase();
+      return COD_MODE_LABELS[val] || codMode.value;
     }
   }
+  if (orderSnapshot?.payment_method_title) {
+    const title = orderSnapshot.payment_method_title.toString().toLowerCase();
+    if (title === "card") return "Tarjeta";
+    if (title === "cash") return "Efectivo";
+    return orderSnapshot.payment_method_title;
+  }
+  return null;
+}
   return orderSnapshot?.payment_method_title || "";
 }
 

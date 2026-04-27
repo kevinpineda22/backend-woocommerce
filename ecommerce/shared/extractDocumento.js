@@ -11,6 +11,8 @@ const DOC_META_KEYS = [
 const COD_MODE_LABELS = {
   cash: "Efectivo",
   efectivo: "Efectivo",
+  card: "Tarjeta",
+  tarjeta: "Tarjeta",
   qr: "QR",
   datafono: "Datáfono",
   credito: "Crédito",
@@ -36,10 +38,14 @@ export function extractMetodoPago(orderOrMeta) {
   if (meta && Array.isArray(meta)) {
     const codMode = meta.find((m) => m.key === "_billing_cod_payment_mode");
     if (codMode?.value) {
-      return COD_MODE_LABELS[codMode.value] || codMode.value;
+      const val = codMode.value.toString().toLowerCase();
+      return COD_MODE_LABELS[val] || codMode.value;
     }
   }
   if (!Array.isArray(orderOrMeta) && orderOrMeta?.payment_method_title) {
+    const title = orderOrMeta.payment_method_title.toString().toLowerCase();
+    if (title === "card") return "Tarjeta";
+    if (title === "cash") return "Efectivo";
     return orderOrMeta.payment_method_title;
   }
   return "";

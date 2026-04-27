@@ -543,22 +543,8 @@ const ManifestSheet = ({
                       Espere el <strong>PITIDO</strong> de confirmación
                     </span>
                   </div>
-                  <div className="qr-scan-step">
-                    <span
-                      className="qr-step-num"
-                      style={{ backgroundColor: "#ca8a04", color: "white" }}
-                    >
-                      3
-                    </span>
-                    <span>
-                      <strong>
-                        RECUERDA NO TOCAR LA PANTALLA HASTA QUE EL ESCÁNER
-                        TERMINE LA ESCRITURA DE CÓDIGOS, O LA OPERACIÓN
-                      </strong>
-                    </span>
-                  </div>
                   <div className="qr-scan-step qr-scan-step--critical">
-                    <span className="qr-step-num qr-step-num--critical">4</span>
+                    <span className="qr-step-num qr-step-num--critical">3</span>
                     <span>
                       Al sonar el pitido →{" "}
                       <strong>ALEJE el QR de inmediato</strong>

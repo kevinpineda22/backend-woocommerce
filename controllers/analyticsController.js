@@ -84,6 +84,39 @@ exports.getCollectorPerformance = async (req, res) => {
 
     if (logError) throw logError;
 
+    // 3. Obtener Total Recaudado (Sesiones Finalizadas)
+    let sessionsQuery = supabase
+      .from("wc_picking_sessions")
+      .select("datos_salida, fecha_fin")
+      .eq("estado", "finalizado");
+
+    if (req.sedeId) {
+      sessionsQuery = sessionsQuery.eq("sede_id", req.sedeId);
+    }
+
+    if (range && range !== "all") {
+      const now = dayjs();
+      let startDate;
+      if (range === "today") startDate = now.startOf("day");
+      else if (range === "7d") startDate = now.subtract(7, "day").startOf("day");
+      else if (range === "30d")
+        startDate = now.subtract(30, "day").startOf("day");
+
+      if (startDate) {
+        sessionsQuery = sessionsQuery.gte("fecha_fin", startDate.toISOString());
+      }
+    }
+
+    const { data: sessionsFin } = await sessionsQuery;
+    let totalRecaudado = 0;
+    sessionsFin?.forEach((s) => {
+      if (s.datos_salida?.orders) {
+        s.datos_salida.orders.forEach((o) => {
+          totalRecaudado += parseFloat(o.total) || 0;
+        });
+      }
+    });
+
     const stats = {};
     const pedidosConFallas = new Set(); // Para rastrear pedidos imperfectos
 
@@ -228,6 +261,7 @@ exports.getCollectorPerformance = async (req, res) => {
 
     const globalStats = {
       total_pedidos: total_pedidos_global,
+      total_recaudado,
       spi_promedio:
         total_items_global > 0
           ? Math.round(tiempo_total_global / total_items_global)

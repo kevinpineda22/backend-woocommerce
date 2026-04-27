@@ -26,6 +26,14 @@ const METODO_PAGO_CONFIG = {
     className: "hv-badge-metodo hv-badge-metodo--cash",
     label: "💵 Efectivo",
   },
+  card: {
+    className: "hv-badge-metodo hv-badge-metodo--datafono",
+    label: "💳 Tarjeta",
+  },
+  tarjeta: {
+    className: "hv-badge-metodo hv-badge-metodo--datafono",
+    label: "💳 Tarjeta",
+  },
   qr: {
     className: "hv-badge-metodo hv-badge-metodo--qr",
     label: "📱 QR",

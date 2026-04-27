@@ -96,7 +96,7 @@ const formatPrice = (amount) =>
 
 const PedidosAdmin = () => {
   // --- MULTI-SEDE ---
-  const { sedeId, getSedeParam } = useSedeContext();
+  const { sedeId, getSedeParam, isSuperAdmin } = useSedeContext();
 
   // --- MOBILE SIDEBAR ---
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -637,20 +637,24 @@ const PedidosAdmin = () => {
             <span className="pedidos-badge-count-blue">{stats.process}</span>
           </button>
 
-          <div className="pedidos-nav-label">Auditoría</div>
-          <button
-            className={`pedidos-layout-sidebar-button ${currentView === "audit_pending" ? "active" : ""}`}
-            onClick={() => {
-              setCurrentView("audit_pending");
-              fetchPendingAudit();
-              setSidebarOpen(false);
-            }}
-          >
-            <FaClipboardCheck /> <span>Pendiente Auditoría</span>
-            <span className="pedidos-badge-count-blue">
-              {stats.auditPending || 0}
-            </span>
-          </button>
+          {isSuperAdmin && (
+            <>
+              <div className="pedidos-nav-label">Auditoría</div>
+              <button
+                className={`pedidos-layout-sidebar-button ${currentView === "audit_pending" ? "active" : ""}`}
+                onClick={() => {
+                  setCurrentView("audit_pending");
+                  fetchPendingAudit();
+                  setSidebarOpen(false);
+                }}
+              >
+                <FaClipboardCheck /> <span>Pendiente Auditoría</span>
+                <span className="pedidos-badge-count-blue">
+                  {stats.auditPending || 0}
+                </span>
+              </button>
+            </>
+          )}
 
           <div className="pedidos-nav-label">Pagos</div>
           <button
@@ -680,14 +684,17 @@ const PedidosAdmin = () => {
           </button>
 
           <div className="pedidos-nav-label">Administración</div>
-          {/* TODO: Habilitar cuando Inteligencia tenga datos reales
-          <button
-            className={`pedidos-layout-sidebar-button ${currentView === "analitica" ? "active" : ""}`}
-            onClick={() => { setCurrentView("analitica"); setSidebarOpen(false); }}
-          >
-            <FaChartLine /> <span>Inteligencia</span>
-          </button>
-          */}
+          {isSuperAdmin && (
+            <button
+              className={`pedidos-layout-sidebar-button ${currentView === "analitica" ? "active" : ""}`}
+              onClick={() => {
+                setCurrentView("analitica");
+                setSidebarOpen(false);
+              }}
+            >
+              <FaChartLine /> <span>Inteligencia</span>
+            </button>
+          )}
           <button
             className={`pedidos-layout-sidebar-button ${currentView === "pickers" ? "active" : ""}`}
             onClick={() => {
@@ -707,15 +714,17 @@ const PedidosAdmin = () => {
           >
             <FaTrashAlt /> <span>Pedidos Cancelados</span>
           </button>
-          <button
-            className={`pedidos-layout-sidebar-button ${currentView === "audit_log" ? "active" : ""}`}
-            onClick={() => {
-              setCurrentView("audit_log");
-              setSidebarOpen(false);
-            }}
-          >
-            <FaClipboardList /> <span>Auditoría</span>
-          </button>
+          {isSuperAdmin && (
+            <button
+              className={`pedidos-layout-sidebar-button ${currentView === "audit_log" ? "active" : ""}`}
+              onClick={() => {
+                setCurrentView("audit_log");
+                setSidebarOpen(false);
+              }}
+            >
+              <FaClipboardList /> <span>Auditoría</span>
+            </button>
+          )}
         </nav>
         <div className="pedidos-sidebar-footer">
           «{getQuote(shuffledQuotes, 0).text}»
@@ -725,7 +734,9 @@ const PedidosAdmin = () => {
 
       {/* CONTENIDO PRINCIPAL */}
       <main className="pedidos-layout-content">
-        {currentView === "audit_log" ? (
+        {currentView === "analitica" ? (
+          <AnaliticaPickers />
+        ) : currentView === "audit_log" ? (
           <AuditLogView />
         ) : currentView === "cancelled" ? (
           <>

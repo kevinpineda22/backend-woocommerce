@@ -16,10 +16,18 @@ import {
   FaTimes,
   FaQuestionCircle,
   FaExchangeAlt,
-  FaBan, // [NEW]
+  FaBan,
+  FaMoneyBillWave,
 } from "react-icons/fa";
 import "./AnaliticaPickers.css";
 import WarehouseMap from "./WarehouseMap";
+
+const formatPrice = (amount) =>
+  new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(amount);
 
 const RouteSelectionView = ({ fetchPickerRoute, dateRange, getSedeParam }) => {
   // [MOD]: Recibe dateRange
@@ -407,6 +415,33 @@ const AnaliticaPickers = () => {
                 marginBottom: 10,
               }}
             >
+              <div
+                className="card-analitica"
+                style={{
+                  flex: 1,
+                  padding: 20,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  borderLeft: "4px solid #27ae60",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: "0.9rem", color: "#7f8c8d" }}>
+                    Total Recaudado
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "1.8rem",
+                      fontWeight: "bold",
+                      color: "#27ae60",
+                    }}
+                  >
+                    {formatPrice(globalStats.total_recaudado || 0)}
+                  </div>
+                </div>
+                <FaMoneyBillWave size={32} color="#27ae60" opacity={0.2} />
+              </div>
               <div
                 className="card-analitica"
                 style={{
