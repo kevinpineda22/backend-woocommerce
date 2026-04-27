@@ -37,6 +37,8 @@ function extractDocumento(orderSnapshot) {
   if (!meta || !Array.isArray(meta)) return "";
   const found = meta.find((m) => DOC_META_KEYS.includes(m.key));
   return found?.value || "";
+}
+
 const COD_MODE_LABELS = {
   cash: "Efectivo",
   efectivo: "Efectivo",
@@ -62,8 +64,6 @@ function extractMetodoPago(orderSnapshot) {
     if (title === "cash") return "Efectivo";
     return orderSnapshot.payment_method_title;
   }
-  return null;
-}
   return orderSnapshot?.payment_method_title || "";
 }
 
