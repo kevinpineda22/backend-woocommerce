@@ -1,0 +1,235 @@
+.vp-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1rem 0;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* KPIs */
+.vp-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.vp-kpi-card {
+  background: white;
+  padding: 1.25rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.vp-kpi-card__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6366f1;
+}
+
+.vp-kpi-card__content {
+  display: flex;
+  flex-direction: column;
+}
+
+.vp-kpi-card__label {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  font-weight: 600;
+}
+
+.vp-kpi-card__value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.vp-kpi-card__trend {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.vp-kpi-card__trend.pos { color: #10b981; }
+.vp-kpi-card__trend.neg { color: #ef4444; }
+
+/* Table */
+.vp-table-container {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.vp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.vp-table th {
+  background: #f8fafc;
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.vp-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.vp-table th.num, .vp-table td.num {
+  text-align: right;
+}
+
+.vp-row {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.vp-row:hover {
+  background: #f1f5f9;
+}
+
+.vp-row.expanded {
+  background: #f8fafc;
+}
+
+.vp-row .strong {
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.vp-row .pos { color: #10b981; display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.vp-row .neg { color: #ef4444; display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+
+.vp-row__toggle {
+  color: #94a3b8;
+  width: 40px;
+}
+
+/* Detail Accordion */
+.vp-detail-row td {
+  padding: 0;
+  background: #fdfdfd;
+}
+
+.vp-detail {
+  padding: 1.5rem 2rem;
+  border-bottom: 2px solid #e2e8f0;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.vp-detail h4 {
+  margin: 0 0 1rem 0;
+  font-size: 0.85rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Timeline */
+.vp-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-left: 2px solid #e2e8f0;
+  margin-left: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.vp-event {
+  position: relative;
+  display: flex;
+  gap: 1rem;
+  padding: 0.5rem 0;
+}
+
+.vp-event::before {
+  content: '';
+  position: absolute;
+  left: -1.5rem;
+  top: 14px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid #cbd5e1;
+  transform: translateX(-50%);
+}
+
+.vp-event--sustitucion::before { border-color: #6366f1; background: #6366f1; }
+.vp-event--faltante::before { border-color: #f59e0b; background: #f59e0b; }
+.vp-event--peso::before { border-color: #10b981; background: #10b981; }
+.vp-event--admin::before { border-color: #ef4444; background: #ef4444; }
+
+.vp-event__time {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  min-width: 45px;
+  font-weight: 500;
+}
+
+.vp-event__icon {
+  color: #64748b;
+  display: flex;
+  align-items: center;
+}
+
+.vp-event__body {
+  flex: 1;
+}
+
+.vp-event__title {
+  font-size: 0.9rem;
+  color: #1e293b;
+}
+
+.vp-event__meta {
+  font-size: 0.8rem;
+  color: #64748b;
+  display: flex;
+  gap: 1rem;
+  margin-top: 2px;
+}
+
+.vp-timeline-empty {
+  font-style: italic;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+/* Loading/Empty */
+.vp-loading, .vp-empty {
+  padding: 3rem;
+  text-align: center;
+  color: #64748b;
+  background: white;
+  border-radius: 12px;
+  border: 1px dashed #cbd5e1;
+}

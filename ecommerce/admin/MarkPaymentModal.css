@@ -1,0 +1,355 @@
+/* ============================================================================
+   MARK PAYMENT MODAL — Pagos por pedido
+   ============================================================================
+   Cada pedido de la sesión es independiente y tiene su propio método de pago.
+   Convención de prefijo: .mp-* (mark-payment). No mezclar con otros modales.
+   ========================================================================= */
+
+.mp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.mp-content {
+  width: min(720px, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+  animation: mp-pop 160ms ease-out;
+}
+
+@keyframes mp-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ── Header ───────────────────────────────────────────────────────────── */
+
+.mp-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.mp-header-titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.mp-title {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.mp-subtitle {
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.mp-subtitle-icon {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.mp-subtitle-sep {
+  color: #cbd5e1;
+}
+
+.mp-hint {
+  margin: 4px 0 0;
+  font-size: 0.74rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.mp-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 120ms ease;
+}
+
+.mp-close:hover:not(:disabled) {
+  background: #e2e8f0;
+}
+
+.mp-close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────── */
+
+.mp-body {
+  padding: 18px 22px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.mp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mp-section-title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.mp-section--done .mp-section-title {
+  color: #16a34a;
+}
+
+/* ── Filas de pedido ─────────────────────────────────────────────────── */
+
+.mp-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.mp-row:hover {
+  border-color: #cbd5e1;
+}
+
+.mp-row--done {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.mp-row-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.mp-order-id {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-weight: 700;
+  color: #1e293b;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
+.mp-cliente {
+  font-weight: 600;
+  color: #0f172a;
+  flex: 1;
+  min-width: 120px;
+}
+
+.mp-total {
+  font-weight: 700;
+  color: #16a34a;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-method-tag {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ── Botones de método ───────────────────────────────────────────────── */
+
+.mp-methods {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mp-btn {
+  padding: 10px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.mp-btn:hover:not(:disabled) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.mp-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mp-btn--active {
+  border-width: 2px;
+  padding: 9px 7px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+}
+
+.mp-btn--efectivo.mp-btn--active {
+  border-color: #16a34a;
+  background: #f0fdf4;
+  color: #14532d;
+}
+
+.mp-btn--qr.mp-btn--active {
+  border-color: #6366f1;
+  background: #eef2ff;
+  color: #312e81;
+}
+
+.mp-btn--datafono.mp-btn--active {
+  border-color: #0ea5e9;
+  background: #f0f9ff;
+  color: #0c4a6e;
+}
+
+.mp-btn--credito.mp-btn--active {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+/* ── Footer / acciones ───────────────────────────────────────────────── */
+
+.mp-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.mp-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 120ms ease;
+}
+
+.mp-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mp-action--cancel {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.mp-action--cancel:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.mp-action--confirm {
+  background: #16a34a;
+  color: #ffffff;
+  border-color: #16a34a;
+}
+
+.mp-action--confirm:hover:not(:disabled) {
+  background: #15803d;
+  border-color: #15803d;
+}
+
+.mp-spin {
+  animation: mp-spin 900ms linear infinite;
+}
+
+@keyframes mp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+
+@media (max-width: 560px) {
+  .mp-content {
+    max-height: 100vh;
+    border-radius: 14px;
+  }
+
+  .mp-methods {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mp-footer {
+    flex-direction: column-reverse;
+  }
+
+  .mp-action {
+    width: 100%;
+    justify-content: center;
+  }
+}

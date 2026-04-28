@@ -703,11 +703,20 @@ const PAY_LABELS = {
 
 const WEEKDAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-// Resuelve método de pago: prefiere lo registrado al cobrar, fallback al snapshot.
-function resolvePaymentMethod(session, snapshotOrder) {
-  if (session?.metodo_pago && PAY_LABELS[session.metodo_pago]) {
+// Resuelve método de pago: 
+// 1. Prioridad: Lo registrado individualmente en wc_asignaciones_pedidos (Fase 4).
+// 2. Fallback: Lo registrado en la sesión (modelo previo).
+// 3. Fallback: Lo que venía en el snapshot de WooCommerce.
+function resolvePaymentMethod(session, snapshotOrder, assignment = null) {
+  // A. Si tenemos el dato de la asignación individual (Fase 4), es la fuente de verdad.
+  if (assignment?.metodo_pago && PAY_LABELS[assignment.metodo_pago]) {
+    return PAY_LABELS[assignment.metodo_pago];
+  }
+  // B. Fallback a la sesión (para sesiones antiguas o cierres globales).
+  if (session?.metodo_pago && PAY_LABELS[session.metodo_pago] && session.metodo_pago !== 'mixto') {
     return PAY_LABELS[session.metodo_pago];
   }
+  // C. Fallback al snapshot de WooCommerce.
   const meta = snapshotOrder?.meta_data;
   if (Array.isArray(meta)) {
     const cod = meta.find((m) => m.key === "_billing_cod_payment_mode");
@@ -772,7 +781,7 @@ exports.getIntelligenceCenter = async (req, res) => {
     let sessQ = supabase
       .from("wc_picking_sessions")
       .select(
-        "id, sede_id, id_picker, fecha_inicio, fecha_fin, fecha_pago, estado, metodo_pago, snapshot_pedidos, datos_salida, ids_pedidos, wc_sedes(nombre)",
+        "id, sede_id, id_picker, fecha_inicio, fecha_fin, fecha_pago, estado, metodo_pago, snapshot_pedidos, datos_salida, ids_pedidos, wc_sedes(nombre), wc_asignaciones_pedidos(id_pedido, metodo_pago, fecha_pago, pagado_por)",
       )
       .in("estado", ["finalizado", "auditado", "pendiente_auditoria"]);
     if (sedeId) sessQ = sessQ.eq("sede_id", sedeId);
@@ -821,7 +830,7 @@ exports.getIntelligenceCenter = async (req, res) => {
       const orders =
         sess.datos_salida?.orders ||
         sess.snapshot_pedidos ||
-        sess.ids_pedidos?.map(() => ({})) ||
+        sess.ids_pedidos?.map((id) => ({ id })) ||
         [];
 
       const dateRef = sess.fecha_pago || sess.fecha_fin || sess.fecha_inicio;
@@ -830,18 +839,33 @@ exports.getIntelligenceCenter = async (req, res) => {
       const wd = dBog.day();
       const sedeName = sess.wc_sedes?.nombre || "Sin sede";
 
+      // Mapear asignaciones por pedido para acceso rápido (Fase 4)
+      const asignacionesByPedido = new Map(
+        (sess.wc_asignaciones_pedidos || []).map((a) => [String(a.id_pedido), a]),
+      );
+
       orders.forEach((order, idx) => {
+        const orderId = String(order.id);
         const snapshot =
           (sess.snapshot_pedidos || []).find(
-            (o) => String(o.id) === String(order.id),
+            (o) => String(o.id) === orderId,
           ) || sess.snapshot_pedidos?.[idx];
+        
         const rev = orderRevenue(order) || orderRevenue(snapshot);
         if (rev <= 0) return;
+
+        // Solo sumar a recaudación si REALMENTE tiene un método de pago confirmado
+        const assignment = asignacionesByPedido.get(orderId);
+        const method = resolvePaymentMethod(sess, snapshot || order, assignment);
+        
+        // Si está en 'auditado' pero no tiene método en la asignación ni en la sesión,
+        // es un pedido que falta por cobrar. No lo sumamos a RECAUDACIÓN real.
+        const isPaid = !!(assignment?.metodo_pago || (sess.metodo_pago && sess.metodo_pago !== 'mixto'));
+        if (!isPaid && sess.estado === 'auditado') return;
 
         totalRevenue += rev;
         orderCount += 1;
 
-        const method = resolvePaymentMethod(sess, snapshot || order);
         revByMethod.set(method, (revByMethod.get(method) || 0) + rev);
 
         revBySede.set(

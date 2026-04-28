@@ -575,7 +575,7 @@ exports.getPendingPaymentSessions = async (req, res) => {
     let payQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, datos_salida, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, datos_salida, sede_id, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre ), wc_asignaciones_pedidos ( id_pedido, metodo_pago, fecha_pago, pagado_por )`,
       )
       .eq("estado", "auditado")
       .order("fecha_fin", { ascending: false });
@@ -640,6 +640,22 @@ exports.getPendingPaymentSessions = async (req, res) => {
         ? sess.snapshot_pedidos.map((o) => extractMetodoPago(o))
         : [];
 
+      // Estado de pago real por pedido (desde la junction wc_asignaciones_pedidos).
+      // El front lo usa para mostrar progreso parcial y bloquear botones de
+      // pedidos ya pagados.
+      const asignacionesById = new Map(
+        (sess.wc_asignaciones_pedidos || []).map((a) => [a.id_pedido, a]),
+      );
+      const pagos_pedidos = (sess.ids_pedidos || []).map((idPedido) => {
+        const a = asignacionesById.get(idPedido);
+        return {
+          id_pedido: idPedido,
+          metodo_pago: a?.metodo_pago || null,
+          fecha_pago: a?.fecha_pago || null,
+          pagado_por: a?.pagado_por || null,
+        };
+      });
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
@@ -651,6 +667,7 @@ exports.getPendingPaymentSessions = async (req, res) => {
         totales,
         documentos,
         metodos_pago,
+        pagos_pedidos,
         fecha: end.toLocaleDateString("es-CO", optionsDate),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
@@ -666,71 +683,133 @@ exports.getPendingPaymentSessions = async (req, res) => {
   }
 };
 
+// Métodos de pago aceptados a nivel de pedido individual.
+const VALID_PAYMENT_METHODS = ["efectivo", "qr", "datafono", "credito"];
+
+// Cada pedido de una sesión puede pagarse con un método distinto. La fuente de
+// verdad es wc_asignaciones_pedidos (junction sesión↔pedido). El campo
+// metodo_pago en wc_picking_sessions queda como resumen derivado:
+//   - método único si todos los pedidos coinciden
+//   - "mixto" si hubo más de un método
+// La sesión solo pasa a estado "finalizado" cuando TODAS sus asignaciones
+// tienen metodo_pago no nulo.
 exports.markSessionAsPaid = async (req, res) => {
-  const {
-    session_id,
-    payment_method = "efectivo",
-    admin_name,
-    admin_email,
-  } = req.body;
-  try {
-    if (!session_id) return res.status(400).json({ error: "Falta session_id" });
-    if (!["efectivo", "credito", "qr", "datafono"].includes(payment_method)) {
+  const { session_id, payments, admin_name, admin_email } = req.body;
+
+  if (!session_id) return res.status(400).json({ error: "Falta session_id" });
+  if (!Array.isArray(payments) || payments.length === 0) {
+    return res
+      .status(400)
+      .json({ error: "Falta payments[] con al menos un pago" });
+  }
+
+  for (const p of payments) {
+    if (!p.id_pedido) {
+      return res
+        .status(400)
+        .json({ error: "Cada item de payments[] requiere id_pedido" });
+    }
+    if (!VALID_PAYMENT_METHODS.includes(p.payment_method)) {
       return res.status(400).json({
-        error:
-          "payment_method inválido. Debe ser 'efectivo', 'credito', 'qr' o 'datafono'.",
+        error: `payment_method inválido para pedido ${p.id_pedido}. Esperado: ${VALID_PAYMENT_METHODS.join(", ")}`,
+      });
+    }
+  }
+
+  const now = new Date().toISOString();
+  const actorName = (admin_name || "").trim() || "Admin";
+
+  try {
+    // 1. Persistir el método por pedido en la junction.
+    for (const p of payments) {
+      const { error: updErr } = await supabase
+        .from("wc_asignaciones_pedidos")
+        .update({
+          metodo_pago: p.payment_method,
+          fecha_pago: now,
+          pagado_por: actorName,
+        })
+        .eq("id_sesion", session_id)
+        .eq("id_pedido", p.id_pedido);
+      if (updErr) throw updErr;
+    }
+
+    // 2. Releer asignaciones para decidir si la sesión queda lista.
+    const { data: asignaciones, error: readErr } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("id_pedido, metodo_pago")
+      .eq("id_sesion", session_id);
+    if (readErr) throw readErr;
+
+    const todasPagas =
+      asignaciones.length > 0 &&
+      asignaciones.every((a) => a.metodo_pago !== null);
+
+    let sessionFinalized = false;
+    let sedeIdForLog = req.sedeId || null;
+    let pickerName = null;
+
+    if (todasPagas) {
+      const metodosUnicos = [
+        ...new Set(asignaciones.map((a) => a.metodo_pago)),
+      ];
+      const metodoSesion =
+        metodosUnicos.length === 1 ? metodosUnicos[0] : "mixto";
+
+      const { data: sessUpdated, error: sessErr } = await supabase
+        .from("wc_picking_sessions")
+        .update({
+          estado: "finalizado",
+          metodo_pago: metodoSesion,
+          fecha_pago: now,
+          pagado_por: actorName,
+        })
+        .eq("id", session_id)
+        .select("sede_id, wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo)")
+        .single();
+      if (sessErr) throw sessErr;
+      sessionFinalized = true;
+      sedeIdForLog = sessUpdated?.sede_id || sedeIdForLog;
+      pickerName = sessUpdated?.wc_pickers?.nombre_completo || null;
+    } else {
+      const { data: sessRead } = await supabase
+        .from("wc_picking_sessions")
+        .select(
+          "sede_id, wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo)",
+        )
+        .eq("id", session_id)
+        .single();
+      sedeIdForLog = sessRead?.sede_id || sedeIdForLog;
+      pickerName = sessRead?.wc_pickers?.nombre_completo || null;
+    }
+
+    // 3. Una entrada de auditoría por pago registrado.
+    for (const p of payments) {
+      logAuditEvent({
+        actor: { type: "admin", id: admin_email || null, name: actorName },
+        action: "payment.marked",
+        entity: { type: "order", id: p.id_pedido },
+        sedeId: sedeIdForLog,
+        metadata: {
+          session_id,
+          payment_method: p.payment_method,
+          picker_name: pickerName,
+        },
       });
     }
 
-    const now = new Date().toISOString();
-    const actorName = (admin_name || "").trim() || "Admin";
-
-    const { data: updated, error } = await supabase
-      .from("wc_picking_sessions")
-      .update({
-        estado: "finalizado",
-        metodo_pago: payment_method,
-        fecha_pago: now,
-        pagado_por: actorName,
-      })
-      .eq("id", session_id)
-      .select("id, ids_pedidos, sede_id")
-      .single();
-
-    if (error) throw error;
-
-    // Resolver nombre del picker para trazabilidad
-    let paymentPickerName = null;
-    {
-      const { data: sessForPicker } = await supabase
-        .from("wc_picking_sessions")
-        .select("id_picker, wc_pickers(nombre_completo)")
-        .eq("id", session_id)
-        .single();
-      paymentPickerName = sessForPicker?.wc_pickers?.nombre_completo || null;
-    }
-
-    logAuditEvent({
-      actor: { type: "admin", id: admin_email || null, name: actorName },
-      action: "payment.marked",
-      entity: { type: "session", id: session_id },
-      sedeId: updated?.sede_id || req.sedeId || null,
-      metadata: {
-        payment_method,
-        orders: updated?.ids_pedidos || [],
-        picker_name: paymentPickerName,
-      },
-    });
-
     res.status(200).json({
-      message: "Sesión marcada como pagada/finalizada.",
-      payment_method,
+      message: sessionFinalized
+        ? "Todos los pedidos pagados. Sesión finalizada."
+        : "Pagos parciales registrados.",
+      session_finalized: sessionFinalized,
+      payments_recorded: payments.length,
     });
   } catch (error) {
     console.error("Error markSessionAsPaid:", error.message);
     res
       .status(500)
-      .json({ error: `Error al marcar sesión como pagada: ${error.message}` });
+      .json({ error: `Error al registrar pagos: ${error.message}` });
   }
 };
 
@@ -739,7 +818,7 @@ exports.getHistorySessions = async (req, res) => {
     let histQuery = supabase
       .from("wc_picking_sessions")
       .select(
-        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, datos_salida, sede_id, metodo_pago, fecha_pago, pagado_por, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre )`,
+        `id, fecha_inicio, fecha_fin, estado, ids_pedidos, snapshot_pedidos, datos_salida, sede_id, metodo_pago, fecha_pago, pagado_por, wc_pickers!wc_picking_sessions_picker_fkey ( nombre_completo, email ), wc_sedes ( nombre ), wc_asignaciones_pedidos ( id_pedido, metodo_pago, fecha_pago, pagado_por )`,
       )
       .in("estado", ["finalizado"])
       .order("fecha_fin", { ascending: false })
@@ -805,6 +884,20 @@ exports.getHistorySessions = async (req, res) => {
         ? sess.snapshot_pedidos.map((o) => extractMetodoPago(o))
         : [];
 
+      // Estado de pago real por pedido (desde la junction wc_asignaciones_pedidos).
+      const asignacionesById = new Map(
+        (sess.wc_asignaciones_pedidos || []).map((a) => [a.id_pedido, a]),
+      );
+      const pagos_pedidos = (sess.ids_pedidos || []).map((idPedido) => {
+        const a = asignacionesById.get(idPedido);
+        return {
+          id_pedido: idPedido,
+          metodo_pago: a?.metodo_pago || null,
+          fecha_pago: a?.fecha_pago || null,
+          pagado_por: a?.pagado_por || null,
+        };
+      });
+
       return {
         id: sess.id,
         picker: sess.wc_pickers?.nombre_completo || "Desconocido",
@@ -816,6 +909,7 @@ exports.getHistorySessions = async (req, res) => {
         totales,
         documentos,
         metodos_pago,
+        pagos_pedidos,
         fecha: end.toLocaleDateString("es-CO", optionsDate),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
         duracion: `${durationMin} min`,
