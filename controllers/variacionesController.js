@@ -13,7 +13,7 @@ exports.getVariaciones = async (req, res) => {
     // 1. Fetch Finished Sessions in range
     let sessionsQuery = supabase
       .from("wc_picking_sessions")
-      .select("id, ids_pedidos, snapshot_pedidos, datos_salida, fecha_fin, id_picker, nombre_picker, sede_id")
+      .select("id, ids_pedidos, snapshot_pedidos, datos_salida, fecha_fin, id_picker, wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo), sede_id")
       .eq("estado", "finalizado")
       .order("fecha_fin", { ascending: false });
 
