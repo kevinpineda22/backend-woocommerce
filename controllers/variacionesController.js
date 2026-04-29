@@ -148,7 +148,7 @@ exports.getVariaciones = async (req, res) => {
           results.push({
             id_pedido: initialOrder.id,
             id_sesion: session.id,
-            picker: session.nombre_picker,
+            picker: session.wc_pickers?.nombre_completo || "Desconocido",
             fecha: session.fecha_fin,
             total_inicial: initialTotal,
             total_final: finalTotal,
