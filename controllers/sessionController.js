@@ -647,9 +647,53 @@ exports.completeSession = async (req, res) => {
 
     const { data: sessData } = await supabase
       .from("wc_picking_sessions")
-      .select("sede_id, ids_pedidos")
+      .select("sede_id, ids_pedidos, snapshot_pedidos")
       .eq("id", id_sesion)
       .single();
+
+    if (!sessData) throw new Error("Sesión no encontrada");
+
+    // ✅ VALIDACIÓN ESTRICTA: No permitir finalizar si hay pendientes
+    const { data: assignments } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("id, id_pedido")
+      .eq("id_sesion", id_sesion);
+
+    const assignIds = (assignments || []).map(a => a.id);
+    const { data: logs } = await supabase
+      .from("wc_log_picking")
+      .select("id_producto, id_producto_original, accion, id_pedido")
+      .in("id_asignacion", assignIds);
+
+    const pendingItems = [];
+    const snapshotOrders = sessData.snapshot_pedidos || [];
+
+    snapshotOrders.forEach((order) => {
+      const orderLogs = (logs || []).filter(l => String(l.id_pedido) === String(order.id));
+      
+      order.line_items?.forEach((item) => {
+        const pId = String(item.product_id);
+        const vId = item.variation_id ? String(item.variation_id) : null;
+        
+        // Buscar si existe algún log definitivo para este ítem (o su variación)
+        const hasAction = orderLogs.some(l => 
+          (String(l.id_producto) === pId || (vId && String(l.id_producto) === vId) || 
+           String(l.id_producto_original) === pId || (vId && String(l.id_producto_original) === vId)) &&
+          ["recolectado", "sustituido", "no_encontrado", "eliminado_admin"].includes(l.accion)
+        );
+
+        if (!hasAction) {
+          pendingItems.push(`${item.name} (#${order.id})`);
+        }
+      });
+    });
+
+    if (pendingItems.length > 0) {
+      return res.status(400).json({ 
+        error: "No puedes finalizar la sesión. Aún tienes productos pendientes.",
+        details: pendingItems 
+      });
+    }
 
     await supabase
       .from("wc_picking_sessions")

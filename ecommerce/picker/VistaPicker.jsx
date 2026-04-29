@@ -1010,11 +1010,19 @@ const VistaPicker = () => {
                 );
                 return;
               }
+              if (pendingItems.length > 0) {
+                showToast(
+                  `❌ No puedes finalizar. Tienes ${pendingItems.length} productos pendientes en la lista.`,
+                  "error",
+                );
+                // Vibración de error si el navegador lo permite
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                return;
+              }
               setShowFinishConfirm(true);
             }}
             disabled={isFinishing}
-          >
-            <div className="ec-fab-content">
+          >            <div className="ec-fab-content">
               {isFinishing ? (
                 <FaSpinner className="ec-spin" size={24} />
               ) : (
