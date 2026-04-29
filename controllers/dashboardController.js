@@ -1114,6 +1114,55 @@ exports.completeAuditSession = async (req, res) => {
         .eq("id", session.id_picker);
     }
 
+    // ✅ BLINDAJE ANTI-FANTASMAS: Detectar ítems no procesados y marcarlos como faltantes por sistema
+    const snapshotOrders = session.snapshot_pedidos || [];
+    const { data: allSessionLogs } = await supabase
+      .from("wc_log_picking")
+      .select("*")
+      .eq("id_sesion", session_id); // Aunque no tenga id_sesion, usamos el filtro id_pedido para ser precisos
+
+    const { data: sessionAssignments } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("id, id_pedido")
+      .eq("id_sesion", session_id);
+
+    const ghostLogs = [];
+    snapshotOrders.forEach((orderSnap) => {
+      const assign = sessionAssignments?.find(a => String(a.id_pedido) === String(orderSnap.id));
+      if (!assign) return;
+
+      const orderLogs = (allSessionLogs || []).filter(l => String(l.id_pedido) === String(orderSnap.id));
+      
+      orderSnap.line_items?.forEach((item) => {
+        const pId = item.product_id;
+        const vId = item.variation_id;
+        // ¿Tiene algún log de acción real? (recolectado, sustituido, no_encontrado, eliminado_admin)
+        const hasAction = orderLogs.some(l => 
+          (String(l.id_producto) === String(pId) || (vId && String(l.id_producto) === String(vId))) &&
+          ["recolectado", "sustituido", "no_encontrado", "eliminado_admin"].includes(l.accion)
+        );
+
+        if (!hasAction) {
+          console.warn(`👻 Detectado ítem fantasma: ${item.name} en pedido #${orderSnap.id}. Registrando faltante por sistema.`);
+          ghostLogs.push({
+            id_asignacion: assign.id,
+            id_pedido: orderSnap.id,
+            id_producto: vId || pId,
+            id_producto_original: vId || pId,
+            nombre_producto: item.name,
+            accion: "no_encontrado",
+            motivo: "SISTEMA: No procesado por el picker al cerrar sesión",
+            fecha_registro: now,
+            sede_id: session.sede_id
+          });
+        }
+      });
+    });
+
+    if (ghostLogs.length > 0) {
+      await supabase.from("wc_log_picking").insert(ghostLogs);
+    }
+
     // Log de Sistema
     const { data: assignments } = await supabase
       .from("wc_asignaciones_pedidos")
