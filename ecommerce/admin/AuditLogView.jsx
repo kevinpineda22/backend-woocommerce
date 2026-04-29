@@ -110,7 +110,7 @@ const buildSentence = (evt) => {
 };
 
 const AuditLogView = () => {
-  const { getSedeParam, sedeId } = useSedeContext();
+  const { getSedeParam, sedeId, isSuperAdmin, sedes } = useSedeContext();
 
   const [events, setEvents] = useState([]);
   const [pagination, setPagination] = useState({
@@ -129,6 +129,7 @@ const AuditLogView = () => {
     q: "",
     date_from: "",
     date_to: "",
+    sede_id: "",
   });
 
   const fetchEvents = useCallback(
@@ -184,7 +185,8 @@ const AuditLogView = () => {
         (payload) => {
           const row = payload.new;
           // Si hay filtro de sede, ignorar eventos de otras sedes
-          if (sedeId && row.sede_id && row.sede_id !== sedeId) return;
+          const activeSedeId = filters.sede_id || sedeId;
+          if (activeSedeId && row.sede_id && row.sede_id !== activeSedeId) return;
           console.log("⚡ [AUDIT RT] Nuevo evento:", row.action);
           // Solo refrescar si estamos en página 1 (los nuevos van arriba)
           if (paginationRef.current.page === 1) {
@@ -197,7 +199,7 @@ const AuditLogView = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sedeId]);
+  }, [sedeId, filters.sede_id]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -211,6 +213,7 @@ const AuditLogView = () => {
       q: "",
       date_from: "",
       date_to: "",
+      sede_id: "",
     });
   };
 
@@ -234,6 +237,25 @@ const AuditLogView = () => {
       <div className="pedidos-layout-body">
         {/* FILTROS */}
         <div className="audit-filters">
+          {isSuperAdmin && (
+            <div className="audit-filter-group">
+              <label>
+                <FaStoreAlt /> Sede
+              </label>
+              <select
+                value={filters.sede_id}
+                onChange={(e) => handleFilterChange("sede_id", e.target.value)}
+              >
+                <option value="">Todas</option>
+                {sedes.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="audit-filter-group">
             <label>
               <FaFilter /> Actor

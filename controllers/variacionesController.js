@@ -145,6 +145,54 @@ exports.getVariaciones = async (req, res) => {
             };
           });
 
+          // Detectar "Faltantes Implícitos" (ítems del snapshot que no están en la salida ni tienen log)
+          initialOrder.line_items?.forEach((origItem) => {
+            const pId = origItem.product_id;
+            const vId = origItem.variation_id;
+            const effId = vId || pId;
+
+            // Verificar si el ítem pasó a la salida (por ID o por SKU aproximado si hubo cambio de estructura, pero el ID es más seguro)
+            const inFinal = (finalOrder.items || []).find((fi) => {
+              const fiId = String(fi.id || '');
+              const fiPid = String(fi.product_id || '');
+              const fiVid = String(fi.variation_id || '');
+              return fiPid === String(pId) || 
+                     (vId && fiVid === String(vId)) || 
+                     fiId === String(effId) ||
+                     fiId.startsWith(String(effId) + '-');
+            });
+
+            if (!inFinal) {
+              // Verificar si ya se registró como sustituido, faltante explícito o eliminado
+              const hasEvent = events.some((e) => 
+                String(e.producto) === String(origItem.name) || 
+                String(e.metadata?.precio_original) === String(origItem.price) ||
+                // En el caso de sustitución, el producto original está en log.id_producto que sacamos antes
+                orderLogs.some(l => (String(l.id_producto) === String(pId) || String(l.id_producto) === String(vId)) && l.accion !== 'recolectado')
+              );
+
+              if (!hasEvent) {
+                stats.reasons.faltante++;
+                events.push({
+                  id: `implicit-${effId}-${initialOrder.id}`,
+                  fecha: session.fecha_fin,
+                  producto: origItem.name,
+                  accion: "no_encontrado_implicito",
+                  motivo: "No recolectado (removido al cerrar la sesión)",
+                  reason_label: "Faltante",
+                  type: "faltante",
+                  metadata: {
+                    sustituto: null,
+                    peso: null,
+                    cantidad: origItem.quantity,
+                    precio_original: parseFloat(origItem.price) || 0,
+                    precio_sustituto: 0
+                  }
+                });
+              }
+            }
+          });
+
           results.push({
             id_pedido: initialOrder.id,
             id_sesion: session.id,
