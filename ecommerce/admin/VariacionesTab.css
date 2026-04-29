@@ -218,6 +218,11 @@
   margin-top: 2px;
 }
 
+.vp-event__prices {
+  font-weight: 600;
+  color: #475569;
+}
+
 .vp-timeline-empty {
   font-style: italic;
   color: #94a3b8;

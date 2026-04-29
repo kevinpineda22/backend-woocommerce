@@ -220,13 +220,9 @@ const ManifestSheet = ({
     (sum, s) => sum + (parseFloat(s.total) || 0),
     0,
   );
-  // Total del pedido: si Woo nos dio order.total, ESE es el real (incluye cupones,
-  // fees, impuestos, ajustes). Solo usamos el calculado como fallback.
-  const wooOrderTotal = parseFloat(order.total) || 0;
-  const orderTotal =
-    wooOrderTotal > 0
-      ? wooOrderTotal
-      : calculatedItemsTotal + shippingTotal || null;
+  // Total del pedido: Siempre usamos el calculado, ya que order.total de Woo puede estar desactualizado
+  // si hubo sustituciones o eliminaciones en el picking.
+  const orderTotal = calculatedItemsTotal + shippingTotal || null;
 
   const omittedItems = [];
 

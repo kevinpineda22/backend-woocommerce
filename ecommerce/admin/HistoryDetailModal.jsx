@@ -299,12 +299,17 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
   ).length;
 
   // Calcular total dinámicamente (order.total en snapshot puede estar desactualizado)
-  const productItems = (order.items || []).filter(
+  const finalOrder = historyDetail?.final_snapshot?.orders?.find(
+    (o) => String(o.id) === String(order.id)
+  );
+  const productItems = (finalOrder?.items || order.items || []).filter(
     (i) => !i.is_shipping_method && !i.is_removed,
   );
   const calcItemsTotal = productItems.reduce((sum, item) => {
     const qty = item.qty || item.count || 1;
-    return sum + (parseFloat(item.price) || 0) * qty;
+    // Debemos usar el precio final por unidad, igual que en ManifestSheet
+    const unitFinal = parseFloat(item.line_total) || parseFloat(item.price) || 0;
+    return sum + unitFinal * qty;
   }, 0);
   const calcShipping = (order.shipping_lines || []).reduce(
     (sum, s) => sum + (parseFloat(s.total) || 0),

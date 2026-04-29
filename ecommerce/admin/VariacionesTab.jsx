@@ -9,7 +9,6 @@ import {
   RefreshCw, 
   AlertTriangle,
   User,
-  Clock,
   DollarSign
 } from "lucide-react";
 import { analyticsApi } from "../shared/ecommerceApi";
@@ -71,6 +70,16 @@ const EventRow = ({ event }) => {
         </div>
         <div className="vp-event__meta">
           {event.metadata.sustituto && <span>Sustituido por: {event.metadata.sustituto}</span>}
+          {event.type === 'sustitucion' && (
+            <span className="vp-event__prices">
+              (Orig: {fmtCurrency(event.metadata.precio_original)} → Nuevo: {fmtCurrency(event.metadata.precio_sustituto)})
+            </span>
+          )}
+          {event.type === 'faltante' && event.metadata.precio_original > 0 && (
+            <span className="vp-event__prices">
+              (Perdido: -{fmtCurrency(event.metadata.precio_original)})
+            </span>
+          )}
           {event.metadata.peso && <span>Peso: {event.metadata.peso}kg</span>}
           {event.motivo && <span>Motivo: {event.motivo}</span>}
         </div>
@@ -111,7 +120,7 @@ const VariacionesTab = ({ range, sedeId }) => {
 
   return (
     <div className="vp-container">
-      <div className="vp-stats">
+      <div className="vp-stats vp-stats--extended">
         <KPICard 
           label="Variación Total" 
           value={fmtCurrency(data.stats.total_delta)} 
@@ -124,14 +133,19 @@ const VariacionesTab = ({ range, sedeId }) => {
           icon={TrendingUp}
         />
         <KPICard 
-          label="Pedidos con Cambios" 
-          value={data.stats.count_variations} 
-          icon={Package}
-        />
-        <KPICard 
           label="Sustituciones" 
           value={data.stats.reasons.sustitucion} 
           icon={RefreshCw}
+        />
+        <KPICard 
+          label="Prom. Sustituidos/Ped" 
+          value={Number(data.stats.avg_sustituciones_por_pedido || 0).toFixed(2)} 
+          icon={RefreshCw}
+        />
+        <KPICard 
+          label="Prom. Removidos/Ped" 
+          value={Number((data.stats.avg_eliminados_por_pedido || 0) + (data.stats.avg_faltantes_por_pedido || 0)).toFixed(2)} 
+          icon={AlertTriangle}
         />
       </div>
 
