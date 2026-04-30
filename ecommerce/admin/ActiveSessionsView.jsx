@@ -77,7 +77,7 @@ const DualTimer = ({ startTime, pickingStartTime }) => {
 };
 
 const ActiveSessionsView = ({ onViewDetail, loadingDetailId }) => {
-  const { getSedeParam, isSuperAdmin } = useSedeContext();
+  const { getSedeParam, isSuperAdmin, loading: sedeLoading } = useSedeContext();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -97,6 +97,7 @@ const ActiveSessionsView = ({ onViewDetail, loadingDetailId }) => {
   }, [getSedeParam]);
 
   useEffect(() => {
+    if (sedeLoading) return;
     fetchSessions();
 
     // Canal principal para cambios en la base de datos
@@ -166,7 +167,7 @@ const ActiveSessionsView = ({ onViewDetail, loadingDetailId }) => {
       supabase.removeChannel(dbChannel);
       supabase.removeChannel(broadcastChannel);
     };
-  }, [fetchSessions]);
+  }, [fetchSessions, sedeLoading]);
 
   const handleManualRefresh = () => {
     setLoading(true);

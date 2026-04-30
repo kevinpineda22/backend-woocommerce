@@ -110,7 +110,7 @@ const buildSentence = (evt) => {
 };
 
 const AuditLogView = () => {
-  const { getSedeParam, sedeId, isSuperAdmin, sedes } = useSedeContext();
+  const { getSedeParam, sedeId, isSuperAdmin, sedes, loading: sedeLoading } = useSedeContext();
 
   const [events, setEvents] = useState([]);
   const [pagination, setPagination] = useState({
@@ -167,8 +167,9 @@ const AuditLogView = () => {
   }, []);
 
   useEffect(() => {
+    if (sedeLoading) return;
     fetchEvents(1);
-  }, [fetchEvents]);
+  }, [fetchEvents, sedeLoading]);
 
   // ── Realtime: suscripción a INSERT en wc_audit_log ──
   const fetchEventsRef = useRef(fetchEvents);

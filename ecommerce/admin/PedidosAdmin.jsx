@@ -94,7 +94,7 @@ const formatPrice = (amount) =>
 
 const PedidosAdmin = () => {
   // --- MULTI-SEDE ---
-  const { sedeId, getSedeParam, isSuperAdmin } = useSedeContext();
+  const { sedeId, getSedeParam, isSuperAdmin, loading: sedeLoading } = useSedeContext();
 
   // --- MOBILE SIDEBAR ---
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -207,6 +207,8 @@ const PedidosAdmin = () => {
 
   // Refresco automático + Realtime
   useEffect(() => {
+    if (sedeLoading) return;
+
     fetchData();
 
     // Polling de respaldo (30s)
@@ -231,7 +233,7 @@ const PedidosAdmin = () => {
       clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [fetchData, sedeId]); // Re-fetch when sede changes
+  }, [fetchData, sedeId, sedeLoading]); // Re-fetch when sede changes or loading finishes
 
   // REAL-TIME WEBHOOKS: Refrescar al instante cuando WooCommerce envía un pedido nuevo
   useRealtimeOrders(() => {

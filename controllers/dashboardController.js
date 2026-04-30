@@ -427,11 +427,7 @@ exports.getPendingOrders = async (req, res) => {
       .from("wc_asignaciones_pedidos")
       .select("id_pedido, wc_picking_sessions!inner(estado)")
       .in("estado_asignacion", ["en_proceso", "completado"])
-      .not(
-        "wc_picking_sessions.estado",
-        "in",
-        '("cancelado","finalizado","auditado")',
-      );
+      .neq("wc_picking_sessions.estado", "cancelado");
 
     if (req.sedeId) {
       assignQuery = assignQuery.eq("sede_id", req.sedeId);

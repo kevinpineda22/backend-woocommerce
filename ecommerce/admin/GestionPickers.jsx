@@ -19,7 +19,7 @@ import {
 } from "react-icons/fa";
 
 export const GestionPickers = () => {
-  const { sedeId, sedeName, sedes, getSedeParam, isSuperAdmin, ecommerceRol } =
+  const { sedeId, sedeName, sedes, getSedeParam, isSuperAdmin, ecommerceRol, loading: sedeLoading } =
     useSedeContext();
 
   // Solo super_admin y admin_sede pueden crear pickers
@@ -148,6 +148,7 @@ export const GestionPickers = () => {
   };
 
   useEffect(() => {
+    if (sedeLoading) return;
     fetchPickers();
 
     // REALTIME SUPABASE
@@ -168,7 +169,7 @@ export const GestionPickers = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sedeId]); // Re-fetch when sede changes
+  }, [sedeId, sedeLoading]); // Re-fetch when sede changes or loading finishes
 
   // --- HANDLERS ---
   const handleCreateClick = () => {

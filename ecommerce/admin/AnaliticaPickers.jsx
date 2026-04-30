@@ -704,7 +704,7 @@ const RANGES = [
 ];
 
 const AnaliticaPickers = () => {
-  const { getSedeParam, sedeId, sedeName } = useSedeContext();
+  const { getSedeParam, sedeId, sedeName, loading: sedeLoading } = useSedeContext();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("7d");
@@ -731,8 +731,9 @@ const AnaliticaPickers = () => {
   };
 
   useEffect(() => {
+    if (sedeLoading) return;
     fetchData();
-  }, [range, sedeId]);
+  }, [range, sedeId, sedeLoading]);
 
   if (loading && !data) {
     return (
