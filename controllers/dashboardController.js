@@ -1345,6 +1345,7 @@ exports.getSessionLogsDetail = async (req, res) => {
             o.line_items?.reduce((acc, i) => acc + i.quantity, 0) || 0,
           date_created: o.date_created,
           customer_note: o.customer_note,
+          items: o.line_items || [],
         };
       });
     };

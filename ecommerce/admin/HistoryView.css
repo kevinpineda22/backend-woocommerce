@@ -343,6 +343,90 @@
   }
 }
 
+/* --- View Selector (HistoryDetailModal) --- */
+.hdm-view-selector {
+  display: flex;
+  padding: 10px 16px;
+  gap: 10px;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.hdm-view-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: white;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hdm-view-btn.active {
+  background: #3b82f6;
+  color: white;
+  border-color: #2563eb;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.hdm-view-btn:hover:not(.active) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+/* --- Original Order Table --- */
+.hdm-original-order-table-container {
+  overflow-x: auto;
+  padding: 10px 0;
+}
+
+.hdm-original-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.hdm-original-table th {
+  text-align: left;
+  padding: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.hdm-original-table td {
+  padding: 10px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.hdm-orig-item-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.hdm-orig-item-name {
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.hdm-orig-item-sku {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
 /* =========================================
    HISTORY DETAIL MODAL
    ========================================= */

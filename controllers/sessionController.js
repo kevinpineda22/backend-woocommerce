@@ -589,6 +589,7 @@ exports.getSessionActive = async (req, res) => {
         email: o.billing?.email,
         billing: o.billing,
         shipping: o.shipping,
+        items: o.line_items || [],
         total: (() => {
           const productItems = (o.line_items || o.items || []).filter(
             (i) => !i.is_shipping_method && !i.is_removed,

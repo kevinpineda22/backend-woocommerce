@@ -18,6 +18,7 @@ import {
   FaMoneyBillWave,
   FaIdCard,
   FaCreditCard,
+  FaClipboardCheck,
 } from "react-icons/fa";
 import "./HistoryView.css";
 import {
@@ -280,7 +281,8 @@ const ProductCard = ({ log, productsMap, snapshotItemsByKey }) => {
 };
 
 /* ─── Order Card (mejorado) ─── */
-const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
+const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey, historyDetail }) => {
+  const [viewMode, setViewMode] = React.useState("logs"); // "logs" o "original"
   const order = orderInfo || {};
   const billing = order.billing || {};
   const shipping = order.shipping || {};
@@ -431,18 +433,66 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
         </div>
       )}
 
-      {/* Lista de productos como tarjetas */}
+      {/* Selector de Vista */}
+      <div className="hdm-view-selector">
+        <button 
+          className={`hdm-view-btn ${viewMode === "logs" ? "active" : ""}`}
+          onClick={() => setViewMode("logs")}
+        >
+          <FaClipboardCheck /> Trazabilidad Picking
+        </button>
+        <button 
+          className={`hdm-view-btn ${viewMode === "original" ? "active" : ""}`}
+          onClick={() => setViewMode("original")}
+        >
+          <FaBoxOpen /> Pedido Original (WooCommerce)
+        </button>
+      </div>
+
+      {/* Lista de productos */}
       <div className="hdm-products-list">
-        {orderLogs.map((log) => (
-          <ProductCard
-            key={log.id}
-            log={log}
-            productsMap={productsMap}
-            snapshotItemsByKey={snapshotItemsByKey}
-          />
-        ))}
-        {orderLogs.length === 0 && (
-          <p className="hdm-no-logs">Sin novedades registradas</p>
+        {viewMode === "logs" ? (
+          <>
+            {orderLogs.map((log) => (
+              <ProductCard
+                key={log.id}
+                log={log}
+                productsMap={productsMap}
+                snapshotItemsByKey={snapshotItemsByKey}
+              />
+            ))}
+            {orderLogs.length === 0 && (
+              <p className="hdm-no-logs">Sin novedades registradas</p>
+            )}
+          </>
+        ) : (
+          <div className="hdm-original-order-table-container">
+            <table className="hdm-original-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Cant.</th>
+                  <th>Precio Unit.</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(order.items || []).map((item, idx) => (
+                  <tr key={idx}>
+                    <td>
+                      <div className="hdm-orig-item-info">
+                        <span className="hdm-orig-item-name">{item.name}</span>
+                        <span className="hdm-orig-item-sku">SKU: {item.sku}</span>
+                      </div>
+                    </td>
+                    <td>{item.quantity}</td>
+                    <td>{formatPrice(item.price)}</td>
+                    <td>{formatPrice(item.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
@@ -451,30 +501,30 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey }) => {
 
 /* ─── Componente Principal ─── */
 const HistoryDetailModal = ({ historyDetail, onClose, onViewManifest }) => {
-  if (!historyDetail) return null;
-
-  const { metadata, orders_info, logs, products_map, final_snapshot } =
-    historyDetail;
-
-  // Filtrar logs del sistema
-  const actionLogs = useMemo(
-    () => (logs || []).filter((l) => l.accion !== "auditoria_finalizada"),
-    [logs],
-  );
-
   // Mapa de items del final_snapshot por clave "<prodId>-<orderId>" — nos da el
   // MISMO código que emitió el manifiesto de salida (EAN-13 real, GS1-29 pesable o fallback sintético).
   const snapshotItemsByKey = useMemo(() => {
     const map = {};
-    if (final_snapshot?.orders) {
-      final_snapshot.orders.forEach((order) => {
+    if (historyDetail?.final_snapshot?.orders) {
+      historyDetail.final_snapshot.orders.forEach((order) => {
         (order.items || []).forEach((item) => {
           if (item.id) map[item.id] = item;
         });
       });
     }
     return map;
-  }, [final_snapshot]);
+  }, [historyDetail]);
+
+  // Filtrar logs del sistema
+  const actionLogs = useMemo(
+    () => (historyDetail?.logs || []).filter((l) => l.accion !== "auditoria_finalizada"),
+    [historyDetail],
+  );
+
+  if (!historyDetail) return null;
+
+  const { metadata, orders_info, logs, products_map, final_snapshot } =
+    historyDetail;
 
   const handleViewCertificate = () => {
     const mData = {
@@ -538,6 +588,7 @@ const HistoryDetailModal = ({ historyDetail, onClose, onViewManifest }) => {
                   logs={actionLogs}
                   productsMap={products_map}
                   snapshotItemsByKey={snapshotItemsByKey}
+                  historyDetail={historyDetail}
                 />
               ))}
             </>

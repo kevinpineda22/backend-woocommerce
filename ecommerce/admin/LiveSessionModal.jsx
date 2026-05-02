@@ -305,6 +305,15 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
               >
                 <FaUserFriends /> Pedidos
               </button>
+              <button
+                className={`lsm-toggle-btn ${viewMode === "original" ? "active" : ""}`}
+                onClick={() => {
+                  setViewMode("original");
+                  setShowTrash(false);
+                }}
+              >
+                <FaBox /> Pedido Original
+              </button>
             </div>
             <button
               className={`lsm-trash-toggle ${showTrash ? "active" : ""}`}
@@ -775,6 +784,49 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* VISTA ORIGINAL */}
+          {viewMode === "original" && (
+            <div className="live-orders-container">
+              {routeData.orders_info.map((order) => (
+                <div key={order.id} className="lsm-order-group">
+                  <div className="lsm-og-header">
+                    <div>
+                      <strong style={{ fontSize: "1.1rem", color: "#1e293b", textTransform: "uppercase" }}>
+                        {order.customer}
+                      </strong>
+                      <div style={{ fontSize: "0.8rem", color: "#64748b" }}>
+                        Pedido Original #{order.id}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="lsm-sub-list">
+                    {(order.items || []).map((item, idx) => (
+                      <div key={idx} className="lsm-sub-item">
+                        <div className="lsm-mini-status done">
+                          <FaCheck />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: "600", color: "#334155" }}>
+                            {item.name}
+                          </div>
+                          <div style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
+                            Cant: <strong>{item.quantity}</strong> | SKU: {item.sku}
+                          </div>
+                        </div>
+                        <div style={{ fontWeight: "700", fontSize: "0.9rem" }}>
+                          {formatPrice(item.total)}
+                        </div>
+                      </div>
+                    ))}
+                    {(!order.items || order.items.length === 0) && (
+                      <p className="lsm-empty-state">No se cargaron los items originales.</p>
+                    )}
                   </div>
                 </div>
               ))}
