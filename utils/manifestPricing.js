@@ -57,13 +57,8 @@ function calcLineCharge(item) {
     if (kind === "half") return Math.round(price * 2 * peso);
   }
 
-  // No pesable o pesable sin peso registrado: line_total como unitario × qty
-  const unitFinal =
-    parseFloat(item.line_total) ||
-    parseFloat(item.price) ||
-    parseFloat(item.catalog_price) ||
-    0;
-  return Math.round(unitFinal * qty);
+  // No pesable o pesable sin peso registrado: usar precio unitario × qty
+  return Math.round(price * qty);
 }
 
 module.exports = { calcLineCharge };
