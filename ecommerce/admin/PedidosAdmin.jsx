@@ -539,6 +539,7 @@ const PedidosAdmin = () => {
             meta_data: order.meta_data || orderInfo.meta_data || [],
             billing: order.billing || orderInfo.billing,
             shipping: order.shipping || orderInfo.shipping,
+            shipping_lines: order.shipping_lines || orderInfo.shipping_lines || [],
             total: order.total || orderInfo.total || null,
             items: order.items.map((item) => {
               const pm = products_map[item.id] || {};
