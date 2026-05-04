@@ -25,6 +25,7 @@ import {
   extractDocumento,
   extractMetodoPago,
 } from "../shared/extractDocumento";
+import { calcLineCharge } from "../shared/manifestPricing";
 
 /* ─── Helpers ─── */
 const formatPrice = (amount) =>
@@ -281,7 +282,13 @@ const ProductCard = ({ log, productsMap, snapshotItemsByKey }) => {
 };
 
 /* ─── Order Card (mejorado) ─── */
-const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey, historyDetail }) => {
+const OrderCard = ({
+  orderInfo,
+  logs,
+  productsMap,
+  snapshotItemsByKey,
+  historyDetail,
+}) => {
   const [viewMode, setViewMode] = React.useState("logs"); // "logs" o "original"
   const order = orderInfo || {};
   const billing = order.billing || {};
@@ -302,17 +309,15 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey, historyDe
 
   // Calcular total dinámicamente (order.total en snapshot puede estar desactualizado)
   const finalOrder = historyDetail?.final_snapshot?.orders?.find(
-    (o) => String(o.id) === String(order.id)
+    (o) => String(o.id) === String(order.id),
   );
   const productItems = (finalOrder?.items || order.items || []).filter(
     (i) => !i.is_shipping_method && !i.is_removed,
   );
-  const calcItemsTotal = productItems.reduce((sum, item) => {
-    const qty = item.qty || item.count || 1;
-    // Debemos usar el precio final por unidad, igual que en ManifestSheet
-    const unitFinal = parseFloat(item.line_total) || parseFloat(item.price) || 0;
-    return sum + unitFinal * qty;
-  }, 0);
+  const calcItemsTotal = productItems.reduce(
+    (sum, item) => sum + calcLineCharge(item),
+    0,
+  );
   const calcShipping = (order.shipping_lines || []).reduce(
     (sum, s) => sum + (parseFloat(s.total) || 0),
     0,
@@ -435,13 +440,13 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey, historyDe
 
       {/* Selector de Vista */}
       <div className="hdm-view-selector">
-        <button 
+        <button
           className={`hdm-view-btn ${viewMode === "logs" ? "active" : ""}`}
           onClick={() => setViewMode("logs")}
         >
           <FaClipboardCheck /> Trazabilidad Picking
         </button>
-        <button 
+        <button
           className={`hdm-view-btn ${viewMode === "original" ? "active" : ""}`}
           onClick={() => setViewMode("original")}
         >
@@ -482,7 +487,9 @@ const OrderCard = ({ orderInfo, logs, productsMap, snapshotItemsByKey, historyDe
                     <td>
                       <div className="hdm-orig-item-info">
                         <span className="hdm-orig-item-name">{item.name}</span>
-                        <span className="hdm-orig-item-sku">SKU: {item.sku}</span>
+                        <span className="hdm-orig-item-sku">
+                          SKU: {item.sku}
+                        </span>
                       </div>
                     </td>
                     <td>{item.quantity}</td>
@@ -517,7 +524,10 @@ const HistoryDetailModal = ({ historyDetail, onClose, onViewManifest }) => {
 
   // Filtrar logs del sistema
   const actionLogs = useMemo(
-    () => (historyDetail?.logs || []).filter((l) => l.accion !== "auditoria_finalizada"),
+    () =>
+      (historyDetail?.logs || []).filter(
+        (l) => l.accion !== "auditoria_finalizada",
+      ),
     [historyDetail],
   );
 

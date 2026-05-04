@@ -8,6 +8,7 @@ const {
   getSedeById,
 } = require("../services/sedeConfig");
 const { logAuditEvent } = require("../services/auditService");
+const { calcLineCharge } = require("../utils/manifestPricing");
 
 // Multi-sede WooCommerce (WordPress Multisite)
 const { getWooClient } = require("../services/wooMultiService");
@@ -594,15 +595,10 @@ exports.getSessionActive = async (req, res) => {
           const productItems = (o.line_items || o.items || []).filter(
             (i) => !i.is_shipping_method && !i.is_removed,
           );
-          const itemsTotal = productItems.reduce((sum, item) => {
-            const qty = item.qty || item.count || item.quantity || 1;
-            const price =
-              parseFloat(item.line_total) ||
-              parseFloat(item.price) ||
-              parseFloat(item.catalog_price) ||
-              0;
-            return sum + price * qty;
-          }, 0);
+          const itemsTotal = productItems.reduce(
+            (sum, item) => sum + calcLineCharge(item),
+            0,
+          );
           const shippingTotal = (o.shipping_lines || []).reduce(
             (sum, s) => sum + (parseFloat(s.total) || 0),
             0,
@@ -660,7 +656,7 @@ exports.completeSession = async (req, res) => {
       .select("id, id_pedido")
       .eq("id_sesion", id_sesion);
 
-    const assignIds = (assignments || []).map(a => a.id);
+    const assignIds = (assignments || []).map((a) => a.id);
     const { data: logs } = await supabase
       .from("wc_log_picking")
       .select("id_producto, id_producto_original, accion, id_pedido")
@@ -670,17 +666,27 @@ exports.completeSession = async (req, res) => {
     const snapshotOrders = sessData.snapshot_pedidos || [];
 
     snapshotOrders.forEach((order) => {
-      const orderLogs = (logs || []).filter(l => String(l.id_pedido) === String(order.id));
-      
+      const orderLogs = (logs || []).filter(
+        (l) => String(l.id_pedido) === String(order.id),
+      );
+
       order.line_items?.forEach((item) => {
         const pId = String(item.product_id);
         const vId = item.variation_id ? String(item.variation_id) : null;
-        
+
         // Buscar si existe algún log definitivo para este ítem (o su variación)
-        const hasAction = orderLogs.some(l => 
-          (String(l.id_producto) === pId || (vId && String(l.id_producto) === vId) || 
-           String(l.id_producto_original) === pId || (vId && String(l.id_producto_original) === vId)) &&
-          ["recolectado", "sustituido", "no_encontrado", "eliminado_admin"].includes(l.accion)
+        const hasAction = orderLogs.some(
+          (l) =>
+            (String(l.id_producto) === pId ||
+              (vId && String(l.id_producto) === vId) ||
+              String(l.id_producto_original) === pId ||
+              (vId && String(l.id_producto_original) === vId)) &&
+            [
+              "recolectado",
+              "sustituido",
+              "no_encontrado",
+              "eliminado_admin",
+            ].includes(l.accion),
         );
 
         if (!hasAction) {
@@ -690,9 +696,10 @@ exports.completeSession = async (req, res) => {
     });
 
     if (pendingItems.length > 0) {
-      return res.status(400).json({ 
-        error: "No puedes finalizar la sesión. Aún tienes productos pendientes.",
-        details: pendingItems 
+      return res.status(400).json({
+        error:
+          "No puedes finalizar la sesión. Aún tienes productos pendientes.",
+        details: pendingItems,
       });
     }
 

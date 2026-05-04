@@ -1,5 +1,6 @@
 const { supabase } = require("../services/supabaseClient");
 const dayjs = require("dayjs");
+const { calcLineCharge } = require("../utils/manifestPricing");
 
 /**
  * Controller for Price Variations Analytics
@@ -13,7 +14,9 @@ exports.getVariaciones = async (req, res) => {
     // 1. Fetch Finished Sessions in range
     let sessionsQuery = supabase
       .from("wc_picking_sessions")
-      .select("id, ids_pedidos, snapshot_pedidos, datos_salida, fecha_fin, id_picker, wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo), sede_id")
+      .select(
+        "id, ids_pedidos, snapshot_pedidos, datos_salida, fecha_fin, id_picker, wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo), sede_id",
+      )
       .eq("estado", "finalizado")
       .order("fecha_fin", { ascending: false });
 
@@ -25,8 +28,10 @@ exports.getVariaciones = async (req, res) => {
       const now = dayjs();
       let startDate;
       if (range === "today") startDate = now.startOf("day");
-      else if (range === "7d") startDate = now.subtract(7, "day").startOf("day");
-      else if (range === "30d") startDate = now.subtract(30, "day").startOf("day");
+      else if (range === "7d")
+        startDate = now.subtract(7, "day").startOf("day");
+      else if (range === "30d")
+        startDate = now.subtract(30, "day").startOf("day");
 
       if (startDate) {
         sessionsQuery = sessionsQuery.gte("fecha_fin", startDate.toISOString());
@@ -41,7 +46,7 @@ exports.getVariaciones = async (req, res) => {
     }
 
     const allOrderIds = sessions.flatMap((s) => s.ids_pedidos || []);
-    
+
     // 2. Fetch Logs for these orders
     let logs = [];
     if (allOrderIds.length > 0) {
@@ -65,8 +70,8 @@ exports.getVariaciones = async (req, res) => {
         sustitucion: 0,
         faltante: 0,
         peso: 0,
-        admin: 0
-      }
+        admin: 0,
+      },
     };
 
     sessions.forEach((session) => {
@@ -75,32 +80,41 @@ exports.getVariaciones = async (req, res) => {
       total_orders += initialOrders.length;
 
       initialOrders.forEach((initialOrder) => {
-        const finalOrder = finalOrders.find(fo => String(fo.id) === String(initialOrder.id));
+        const finalOrder = finalOrders.find(
+          (fo) => String(fo.id) === String(initialOrder.id),
+        );
         if (!finalOrder) return;
 
         const initialTotal = parseFloat(initialOrder.total) || 0;
-        
+
         // Calcular total final real desde los items (igual que ManifestSheet)
-        const finalItemsTotal = (finalOrder.items || []).filter(i => !i.is_shipping_method && !i.is_removed).reduce((sum, item) => {
-           const qty = item.qty || item.count || 1;
-           const unitFinal = parseFloat(item.line_total) || parseFloat(item.price) || 0;
-           return sum + unitFinal * qty;
-        }, 0);
-        const finalShipping = (finalOrder.shipping_lines || initialOrder.shipping_lines || []).reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0);
+        const finalItemsTotal = (finalOrder.items || [])
+          .filter((i) => !i.is_shipping_method && !i.is_removed)
+          .reduce((sum, item) => sum + calcLineCharge(item), 0);
+        const finalShipping = (
+          finalOrder.shipping_lines ||
+          initialOrder.shipping_lines ||
+          []
+        ).reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0);
         const finalTotal = finalItemsTotal + finalShipping;
 
         const delta = finalTotal - initialTotal;
 
         // Solo reportar como variación si el delta es significativo o si hay logs relevantes
-        const orderLogs = logs.filter(l => String(l.id_pedido) === String(initialOrder.id) && l.accion !== 'auditoria_finalizada' && l.accion !== 'recolectado');
-        
+        const orderLogs = logs.filter(
+          (l) =>
+            String(l.id_pedido) === String(initialOrder.id) &&
+            l.accion !== "auditoria_finalizada" &&
+            l.accion !== "recolectado",
+        );
+
         if (Math.abs(delta) > 0.01 || orderLogs.length > 0) {
           if (Math.abs(delta) > 0.01) {
             stats.total_delta += delta;
             stats.count_variations += 1;
           }
 
-          const events = orderLogs.map(log => {
+          const events = orderLogs.map((log) => {
             let reason = "Otro";
             let type = "other";
 
@@ -123,25 +137,33 @@ exports.getVariaciones = async (req, res) => {
             }
 
             // Buscar precio original en el snapshot
-            const origItem = initialOrder.line_items?.find(i => String(i.product_id) === String(log.id_producto) || String(i.variation_id) === String(log.id_producto));
+            const origItem = initialOrder.line_items?.find(
+              (i) =>
+                String(i.product_id) === String(log.id_producto) ||
+                String(i.variation_id) === String(log.id_producto),
+            );
             const precio_original = origItem ? parseFloat(origItem.price) : 0;
             const precio_sustituto = log.precio_nuevo || 0;
 
             return {
               id: log.id,
               fecha: log.fecha_registro,
-              producto: log.nombre_producto || log.nombre_producto_original || log.id_producto,
+              producto:
+                log.nombre_producto ||
+                log.nombre_producto_original ||
+                log.id_producto,
               accion: log.accion,
               motivo: log.motivo,
               reason_label: reason,
               type,
               metadata: {
-                sustituto: log.nombre_sustituto || log.datos_sustituto?.nombre || null,
+                sustituto:
+                  log.nombre_sustituto || log.datos_sustituto?.nombre || null,
                 peso: log.peso_real || null,
                 cantidad: log.cantidad_afectada || 1,
                 precio_original,
-                precio_sustituto
-              }
+                precio_sustituto,
+              },
             };
           });
 
@@ -153,22 +175,31 @@ exports.getVariaciones = async (req, res) => {
 
             // Verificar si el ítem pasó a la salida (por ID o por SKU aproximado si hubo cambio de estructura, pero el ID es más seguro)
             const inFinal = (finalOrder.items || []).find((fi) => {
-              const fiId = String(fi.id || '');
-              const fiPid = String(fi.product_id || '');
-              const fiVid = String(fi.variation_id || '');
-              return fiPid === String(pId) || 
-                     (vId && fiVid === String(vId)) || 
-                     fiId === String(effId) ||
-                     fiId.startsWith(String(effId) + '-');
+              const fiId = String(fi.id || "");
+              const fiPid = String(fi.product_id || "");
+              const fiVid = String(fi.variation_id || "");
+              return (
+                fiPid === String(pId) ||
+                (vId && fiVid === String(vId)) ||
+                fiId === String(effId) ||
+                fiId.startsWith(String(effId) + "-")
+              );
             });
 
             if (!inFinal) {
               // Verificar si ya se registró como sustituido, faltante explícito o eliminado
-              const hasEvent = events.some((e) => 
-                String(e.producto) === String(origItem.name) || 
-                String(e.metadata?.precio_original) === String(origItem.price) ||
-                // En el caso de sustitución, el producto original está en log.id_producto que sacamos antes
-                orderLogs.some(l => (String(l.id_producto) === String(pId) || String(l.id_producto) === String(vId)) && l.accion !== 'recolectado')
+              const hasEvent = events.some(
+                (e) =>
+                  String(e.producto) === String(origItem.name) ||
+                  String(e.metadata?.precio_original) ===
+                    String(origItem.price) ||
+                  // En el caso de sustitución, el producto original está en log.id_producto que sacamos antes
+                  orderLogs.some(
+                    (l) =>
+                      (String(l.id_producto) === String(pId) ||
+                        String(l.id_producto) === String(vId)) &&
+                      l.accion !== "recolectado",
+                  ),
               );
 
               if (!hasEvent) {
@@ -186,8 +217,8 @@ exports.getVariaciones = async (req, res) => {
                     peso: null,
                     cantidad: origItem.quantity,
                     precio_original: parseFloat(origItem.price) || 0,
-                    precio_sustituto: 0
-                  }
+                    precio_sustituto: 0,
+                  },
                 });
               }
             }
@@ -201,7 +232,7 @@ exports.getVariaciones = async (req, res) => {
             total_inicial: initialTotal,
             total_final: finalTotal,
             delta,
-            events
+            events,
           });
         }
       });
@@ -212,13 +243,18 @@ exports.getVariaciones = async (req, res) => {
       stats: {
         ...stats,
         total_orders,
-        avg_delta: stats.count_variations > 0 ? stats.total_delta / stats.count_variations : 0,
-        avg_sustituciones_por_pedido: total_orders > 0 ? stats.reasons.sustitucion / total_orders : 0,
-        avg_faltantes_por_pedido: total_orders > 0 ? stats.reasons.faltante / total_orders : 0,
-        avg_eliminados_por_pedido: total_orders > 0 ? stats.reasons.admin / total_orders : 0,
-      }
+        avg_delta:
+          stats.count_variations > 0
+            ? stats.total_delta / stats.count_variations
+            : 0,
+        avg_sustituciones_por_pedido:
+          total_orders > 0 ? stats.reasons.sustitucion / total_orders : 0,
+        avg_faltantes_por_pedido:
+          total_orders > 0 ? stats.reasons.faltante / total_orders : 0,
+        avg_eliminados_por_pedido:
+          total_orders > 0 ? stats.reasons.admin / total_orders : 0,
+      },
     });
-
   } catch (error) {
     console.error("Error in getVariaciones:", error);
     res.status(500).json({ error: error.message });

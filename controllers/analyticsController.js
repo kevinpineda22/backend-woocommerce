@@ -1,5 +1,6 @@
 const { supabase } = require("../services/supabaseClient");
 const dayjs = require("dayjs");
+const { calcLineCharge } = require("../utils/manifestPricing");
 
 // Coordenadas aproximadas para cálculo de distancias (Basado en WarehouseMap.jsx)
 // Se toman los puntos centrales de cada bloque.
@@ -87,7 +88,8 @@ exports.getCollectorPerformance = async (req, res) => {
       const now = dayjs();
       let startDate;
       if (range === "today") startDate = now.startOf("day");
-      else if (range === "7d") startDate = now.subtract(7, "day").startOf("day");
+      else if (range === "7d")
+        startDate = now.subtract(7, "day").startOf("day");
       else if (range === "30d")
         startDate = now.subtract(30, "day").startOf("day");
 
@@ -117,7 +119,8 @@ exports.getCollectorPerformance = async (req, res) => {
       const now = dayjs();
       let startDate;
       if (range === "today") startDate = now.startOf("day");
-      else if (range === "7d") startDate = now.subtract(7, "day").startOf("day");
+      else if (range === "7d")
+        startDate = now.subtract(7, "day").startOf("day");
       else if (range === "30d")
         startDate = now.subtract(30, "day").startOf("day");
 
@@ -703,7 +706,7 @@ const PAY_LABELS = {
 
 const WEEKDAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-// Resuelve método de pago: 
+// Resuelve método de pago:
 // 1. Prioridad: Lo registrado individualmente en wc_asignaciones_pedidos (Fase 4).
 // 2. Fallback: Lo registrado en la sesión (modelo previo).
 // 3. Fallback: Lo que venía en el snapshot de WooCommerce.
@@ -713,7 +716,11 @@ function resolvePaymentMethod(session, snapshotOrder, assignment = null) {
     return PAY_LABELS[assignment.metodo_pago];
   }
   // B. Fallback a la sesión (para sesiones antiguas o cierres globales).
-  if (session?.metodo_pago && PAY_LABELS[session.metodo_pago] && session.metodo_pago !== 'mixto') {
+  if (
+    session?.metodo_pago &&
+    PAY_LABELS[session.metodo_pago] &&
+    session.metodo_pago !== "mixto"
+  ) {
     return PAY_LABELS[session.metodo_pago];
   }
   // C. Fallback al snapshot de WooCommerce.
@@ -739,15 +746,7 @@ function orderRevenue(order) {
   const items = (order.items || order.line_items || []).filter(
     (i) => !i.is_shipping_method && !i.is_removed,
   );
-  const itemsTotal = items.reduce((s, it) => {
-    const qty = it.qty || it.count || it.quantity || 1;
-    const price =
-      parseFloat(it.line_total) ||
-      parseFloat(it.price) ||
-      parseFloat(it.catalog_price) ||
-      0;
-    return s + price * qty;
-  }, 0);
+  const itemsTotal = items.reduce((s, it) => s + calcLineCharge(it), 0);
   const shipping = (order.shipping_lines || []).reduce(
     (s, x) => s + (parseFloat(x.total) || 0),
     0,
@@ -766,7 +765,8 @@ function toBogota(d) {
 function rangeBounds(range) {
   const now = dayjs();
   if (range === "today") return { start: now.startOf("day"), days: 1 };
-  if (range === "30d") return { start: now.subtract(30, "day").startOf("day"), days: 30 };
+  if (range === "30d")
+    return { start: now.subtract(30, "day").startOf("day"), days: 30 };
   if (range === "all") return { start: null, days: null };
   return { start: now.subtract(7, "day").startOf("day"), days: 7 };
 }
@@ -810,7 +810,9 @@ exports.getIntelligenceCenter = async (req, res) => {
     if (asigIds.length > 0) {
       const { data: logsData = [], error: logErr } = await supabase
         .from("wc_log_picking")
-        .select("id_asignacion, accion, motivo, nombre_producto, id_pedido, fecha_registro")
+        .select(
+          "id_asignacion, accion, motivo, nombre_producto, id_pedido, fecha_registro",
+        )
         .in("id_asignacion", asigIds);
       if (logErr) throw logErr;
       logs = logsData;
@@ -841,37 +843,43 @@ exports.getIntelligenceCenter = async (req, res) => {
 
       // Mapear asignaciones por pedido para acceso rápido (Fase 4)
       const asignacionesByPedido = new Map(
-        (sess.wc_asignaciones_pedidos || []).map((a) => [String(a.id_pedido), a]),
+        (sess.wc_asignaciones_pedidos || []).map((a) => [
+          String(a.id_pedido),
+          a,
+        ]),
       );
 
       orders.forEach((order, idx) => {
         const orderId = String(order.id);
         const snapshot =
-          (sess.snapshot_pedidos || []).find(
-            (o) => String(o.id) === orderId,
-          ) || sess.snapshot_pedidos?.[idx];
-        
+          (sess.snapshot_pedidos || []).find((o) => String(o.id) === orderId) ||
+          sess.snapshot_pedidos?.[idx];
+
         const rev = orderRevenue(order) || orderRevenue(snapshot);
         if (rev <= 0) return;
 
         // Solo sumar a recaudación si REALMENTE tiene un método de pago confirmado
         const assignment = asignacionesByPedido.get(orderId);
-        const method = resolvePaymentMethod(sess, snapshot || order, assignment);
-        
+        const method = resolvePaymentMethod(
+          sess,
+          snapshot || order,
+          assignment,
+        );
+
         // Si está en 'auditado' pero no tiene método en la asignación ni en la sesión,
         // es un pedido que falta por cobrar. No lo sumamos a RECAUDACIÓN real.
-        const isPaid = !!(assignment?.metodo_pago || (sess.metodo_pago && sess.metodo_pago !== 'mixto'));
-        if (!isPaid && sess.estado === 'auditado') return;
+        const isPaid = !!(
+          assignment?.metodo_pago ||
+          (sess.metodo_pago && sess.metodo_pago !== "mixto")
+        );
+        if (!isPaid && sess.estado === "auditado") return;
 
         totalRevenue += rev;
         orderCount += 1;
 
         revByMethod.set(method, (revByMethod.get(method) || 0) + rev);
 
-        revBySede.set(
-          sedeName,
-          (revBySede.get(sedeName) || 0) + rev,
-        );
+        revBySede.set(sedeName, (revBySede.get(sedeName) || 0) + rev);
 
         const dayBucket = revByDay.get(dayKey) || { revenue: 0, orders: 0 };
         dayBucket.revenue += rev;
@@ -1011,7 +1019,10 @@ exports.getIntelligenceCenter = async (req, res) => {
         if (l.accion === "recolectado") p.items_recolectados += 1;
         else if (l.accion === "sustituido") p.items_sustituidos += 1;
         else if (l.accion === "no_encontrado") p.items_no_encontrados += 1;
-        if (l.motivo && (l.accion === "no_encontrado" || l.accion === "sustituido")) {
+        if (
+          l.motivo &&
+          (l.accion === "no_encontrado" || l.accion === "sustituido")
+        ) {
           p.motivos[l.motivo] = (p.motivos[l.motivo] || 0) + 1;
         }
       });
