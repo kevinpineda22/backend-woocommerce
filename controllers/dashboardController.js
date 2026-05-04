@@ -745,7 +745,9 @@ exports.markSessionAsPaid = async (req, res) => {
           pagado_por: actorName,
         })
         .eq("id", session_id)
-        .select("sede_id, wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo)")
+        .select(
+          "sede_id, wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo)",
+        )
         .single();
       if (sessErr) throw sessErr;
       sessionFinalized = true;
@@ -1108,22 +1110,35 @@ exports.completeAuditSession = async (req, res) => {
 
     const ghostLogs = [];
     snapshotOrders.forEach((orderSnap) => {
-      const assign = sessionAssignments?.find(a => String(a.id_pedido) === String(orderSnap.id));
+      const assign = sessionAssignments?.find(
+        (a) => String(a.id_pedido) === String(orderSnap.id),
+      );
       if (!assign) return;
 
-      const orderLogs = (allSessionLogs || []).filter(l => String(l.id_pedido) === String(orderSnap.id));
-      
+      const orderLogs = (allSessionLogs || []).filter(
+        (l) => String(l.id_pedido) === String(orderSnap.id),
+      );
+
       orderSnap.line_items?.forEach((item) => {
         const pId = item.product_id;
         const vId = item.variation_id;
         // ¿Tiene algún log de acción real? (recolectado, sustituido, no_encontrado, eliminado_admin)
-        const hasAction = orderLogs.some(l => 
-          (String(l.id_producto) === String(pId) || (vId && String(l.id_producto) === String(vId))) &&
-          ["recolectado", "sustituido", "no_encontrado", "eliminado_admin"].includes(l.accion)
+        const hasAction = orderLogs.some(
+          (l) =>
+            (String(l.id_producto) === String(pId) ||
+              (vId && String(l.id_producto) === String(vId))) &&
+            [
+              "recolectado",
+              "sustituido",
+              "no_encontrado",
+              "eliminado_admin",
+            ].includes(l.accion),
         );
 
         if (!hasAction) {
-          console.warn(`👻 Detectado ítem fantasma: ${item.name} en pedido #${orderSnap.id}. Registrando faltante por sistema.`);
+          console.warn(
+            `👻 Detectado ítem fantasma: ${item.name} en pedido #${orderSnap.id}. Registrando faltante por sistema.`,
+          );
           ghostLogs.push({
             id_asignacion: assign.id,
             id_pedido: orderSnap.id,
@@ -1133,7 +1148,7 @@ exports.completeAuditSession = async (req, res) => {
             accion: "no_encontrado",
             motivo: "SISTEMA: No procesado por el picker al cerrar sesión",
             fecha_registro: now,
-            sede_id: session.sede_id
+            sede_id: session.sede_id,
           });
         }
       });

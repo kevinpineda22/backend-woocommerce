@@ -311,7 +311,7 @@ const OrderCard = ({
   const finalOrder = historyDetail?.final_snapshot?.orders?.find(
     (o) => String(o.id) === String(order.id),
   );
-  
+
   // Si existe final_snapshot, usar TODO de ahí (items, shipping, totales)
   const productItems = (finalOrder?.items || order.items || []).filter(
     (i) => !i.is_shipping_method && !i.is_removed,
@@ -320,10 +320,11 @@ const OrderCard = ({
     (sum, item) => sum + calcLineCharge(item),
     0,
   );
-  const calcShipping = (finalOrder?.shipping_lines || order.shipping_lines || []).reduce(
-    (sum, s) => sum + (parseFloat(s.total) || 0),
-    0,
-  );
+  const calcShipping = (
+    finalOrder?.shipping_lines ||
+    order.shipping_lines ||
+    []
+  ).reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0);
   const calcTotal = calcItemsTotal + calcShipping || null;
 
   const addr = shipping.address_1 || billing.address_1 || "";

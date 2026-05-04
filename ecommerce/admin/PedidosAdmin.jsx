@@ -523,7 +523,7 @@ const PedidosAdmin = () => {
       // Solo enriquecemos con barcodes del products_map (datos de la sesión misma)
       // NUNCA mezclamos con orderInfo (WooCommerce) — eso causa inconsistencias
       const enrichedSnapshot = { ...final_snapshot };
-      
+
       if (products_map && enrichedSnapshot.orders) {
         enrichedSnapshot.orders = enrichedSnapshot.orders.map((order) => ({
           ...order,
