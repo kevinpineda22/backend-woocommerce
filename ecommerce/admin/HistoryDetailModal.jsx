@@ -472,6 +472,28 @@ const OrderCard = ({
             {orderLogs.length === 0 && (
               <p className="hdm-no-logs">Sin novedades registradas</p>
             )}
+            {calcTotal > 0 && (
+              <div
+                className="hdm-final-total"
+                style={{
+                  marginTop: "15px",
+                  textAlign: "right",
+                  fontWeight: "bold",
+                  fontSize: "1.1rem",
+                  color: "#16a34a",
+                  padding: "12px 16px",
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "8px",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+              >
+                <FaClipboardCheck /> Total Final (Auditado): {formatPrice(calcTotal)}
+              </div>
+            )}
           </>
         ) : (
           <div className="hdm-original-order-table-container">
@@ -502,6 +524,28 @@ const OrderCard = ({
                 ))}
               </tbody>
             </table>
+            {order.total > 0 && (
+              <div
+                className="hdm-original-total"
+                style={{
+                  marginTop: "10px",
+                  textAlign: "right",
+                  fontWeight: "bold",
+                  fontSize: "1.1rem",
+                  color: "#475569",
+                  padding: "12px 16px",
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "8px",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  gap: "8px"
+                }}
+              >
+                <FaBoxOpen /> Total Original (WooCommerce): {formatPrice(order.total)}
+              </div>
+            )}
           </div>
         )}
       </div>

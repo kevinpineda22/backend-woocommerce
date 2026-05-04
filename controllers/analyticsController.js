@@ -50,19 +50,24 @@ exports.getCollectorPerformance = async (req, res) => {
     if (range && range !== "all") {
       const now = dayjs(); // Server time
       let startDate;
+      let endDate;
 
       if (range === "today") {
-        // Inicio del día actual
         startDate = now.startOf("day");
       } else if (range === "7d") {
         startDate = now.subtract(7, "day").startOf("day");
+      } else if (range === "last_week") {
+        startDate = now.subtract(1, "week").startOf("week").add(1, "day"); // Lunes semana pasada
+        endDate = now.subtract(1, "week").endOf("week").add(1, "day"); // Domingo semana pasada
       } else if (range === "30d") {
         startDate = now.subtract(30, "day").startOf("day");
+      } else if (range === "last_month") {
+        startDate = now.subtract(1, "month").startOf("month");
+        endDate = now.subtract(1, "month").endOf("month");
       }
 
-      if (startDate) {
-        query = query.gte("fecha_inicio", startDate.toISOString());
-      }
+      if (startDate) query = query.gte("fecha_inicio", startDate.toISOString());
+      if (endDate) query = query.lte("fecha_inicio", endDate.toISOString());
     }
 
     // 1. Obtenemos asignaciones completadas (Base para Tiempo y Cantidad de Pedidos)
@@ -87,16 +92,30 @@ exports.getCollectorPerformance = async (req, res) => {
     if (range && range !== "all") {
       const now = dayjs();
       let startDate;
+      let endDate;
+      
       if (range === "today") startDate = now.startOf("day");
-      else if (range === "7d")
-        startDate = now.subtract(7, "day").startOf("day");
-      else if (range === "30d")
-        startDate = now.subtract(30, "day").startOf("day");
+      else if (range === "7d") startDate = now.subtract(7, "day").startOf("day");
+      else if (range === "last_week") {
+        startDate = now.subtract(1, "week").startOf("week").add(1, "day");
+        endDate = now.subtract(1, "week").endOf("week").add(1, "day");
+      }
+      else if (range === "30d") startDate = now.subtract(30, "day").startOf("day");
+      else if (range === "last_month") {
+        startDate = now.subtract(1, "month").startOf("month");
+        endDate = now.subtract(1, "month").endOf("month");
+      }
 
       if (startDate) {
         logsQuery = logsQuery.gte(
           "wc_asignaciones_pedidos.fecha_inicio",
           startDate.toISOString(),
+        );
+      }
+      if (endDate) {
+        logsQuery = logsQuery.lte(
+          "wc_asignaciones_pedidos.fecha_inicio",
+          endDate.toISOString(),
         );
       }
     }
@@ -118,14 +137,24 @@ exports.getCollectorPerformance = async (req, res) => {
     if (range && range !== "all") {
       const now = dayjs();
       let startDate;
+      let endDate;
       if (range === "today") startDate = now.startOf("day");
-      else if (range === "7d")
-        startDate = now.subtract(7, "day").startOf("day");
-      else if (range === "30d")
-        startDate = now.subtract(30, "day").startOf("day");
+      else if (range === "7d") startDate = now.subtract(7, "day").startOf("day");
+      else if (range === "last_week") {
+        startDate = now.subtract(1, "week").startOf("week").add(1, "day");
+        endDate = now.subtract(1, "week").endOf("week").add(1, "day");
+      }
+      else if (range === "30d") startDate = now.subtract(30, "day").startOf("day");
+      else if (range === "last_month") {
+        startDate = now.subtract(1, "month").startOf("month");
+        endDate = now.subtract(1, "month").endOf("month");
+      }
 
       if (startDate) {
         sessionsQuery = sessionsQuery.gte("fecha_fin", startDate.toISOString());
+      }
+      if (endDate) {
+        sessionsQuery = sessionsQuery.lte("fecha_fin", endDate.toISOString());
       }
     }
 
@@ -957,7 +986,10 @@ exports.getIntelligenceCenter = async (req, res) => {
         const name = l.nombre_producto || "Sin nombre";
         const entry = productIssues.get(name) || { count: 0, motivos: {} };
         entry.count += 1;
-        const motivo = l.motivo || "Sin motivo";
+        
+        const labelAccion = l.accion === "no_encontrado" ? "No encontrado" : "Sustituido";
+        const motivo = l.motivo ? `${l.motivo} (${labelAccion})` : labelAccion;
+        
         entry.motivos[motivo] = (entry.motivos[motivo] || 0) + 1;
         productIssues.set(name, entry);
       }

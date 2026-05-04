@@ -584,7 +584,7 @@ const ProductosTab = ({ data }) => {
     <div className="ip-grid">
       <ChartCard
         title="Top productos por ingresos"
-        subtitle="Lo que más vende en el rango"
+        subtitle="Facturación total (precio × cantidad) en el rango"
       >
         {hasSelling ? (
           <div className="ip-chart">
@@ -698,8 +698,10 @@ const TABS = [
 
 const RANGES = [
   { id: "today", label: "Hoy" },
-  { id: "7d", label: "7 días" },
-  { id: "30d", label: "30 días" },
+  { id: "7d", label: "Últimos 7 días" },
+  { id: "last_week", label: "Semana pasada" },
+  { id: "30d", label: "Últimos 30 días" },
+  { id: "last_month", label: "Mes pasado" },
   { id: "all", label: "Histórico" },
 ];
 
