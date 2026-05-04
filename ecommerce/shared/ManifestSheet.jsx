@@ -688,8 +688,11 @@ const ManifestSheet = ({
                               color: "#64748b",
                             }}
                           >
-                            {cantUnitSuffix(item.unidad_medida, item.name)}
-                          </span>
+                            {cantUnitSuffix(
+                              item.unidad_medida,
+                              item.name,
+                              item.sku,
+                            )}                          </span>
                         )}
                       </td>
                       <td className="cell-item">
@@ -717,8 +720,8 @@ const ManifestSheet = ({
                           // unit values provistos por VistaAuditor y dashboardController
                           const unitSubtotal = parseFloat(item.subtotal) || 0;
                           const unitFinal =
-                            parseFloat(item.line_total) ||
                             parseFloat(item.price) ||
+                            parseFloat(item.line_total) ||
                             0;
 
                           // Para pesables el cobro real va contra peso_total, no qty.
@@ -757,7 +760,21 @@ const ManifestSheet = ({
                               )}
                               {hasRealWeight && (
                                 <span className="manifest-weight-detail">
-                                  {pesoKg.toFixed(3)} kg pesado
+                                  {(() => {
+                                    const u =
+                                      item.unidad_medida?.toLowerCase();
+                                    if (u === "lb" || u === "libra") {
+                                      return `${(pesoKg * 2).toFixed(2)} LB pesado`;
+                                    }
+                                    if (
+                                      u === "500gr" ||
+                                      u === "500g" ||
+                                      u === "500grs"
+                                    ) {
+                                      return `${(pesoKg * 2).toFixed(2)} porciones pesado`;
+                                    }
+                                    return `${pesoKg.toFixed(3)} kg pesado`;
+                                  })()}
                                 </span>
                               )}
                             </div>

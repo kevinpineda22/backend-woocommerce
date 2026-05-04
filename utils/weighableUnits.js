@@ -7,7 +7,7 @@
  *
  * Conversiones kg/unidad pedida:
  *   KL / KG / KILO  → 1.000
- *   LB / LIBRA      → 0.4536
+ *   LB / LIBRA      → 0.500
  *   500GR / 500G    → 0.500
  */
 
@@ -29,7 +29,7 @@ function isWeighableUnit(unidadMedida) {
 
 function kgPerUnit(unidadMedida) {
   const u = (unidadMedida || "").toString().toLowerCase();
-  if (u === "lb" || u === "libra") return 0.4536;
+  if (u === "lb" || u === "libra") return 0.5;
   if (u === "500gr" || u === "500g" || u === "500grs") return 0.5;
   return 1.0;
 }

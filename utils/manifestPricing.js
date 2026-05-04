@@ -24,12 +24,12 @@ const KG_UNIT_TOKENS = new Set(["kl", "kg", "kilo"]);
 const HALF_KG_UNIT_TOKENS = new Set(["lb", "libra", "500gr", "500g", "500grs"]);
 
 function classifyWeighable(item) {
-  const sku = (item.sku_final || item.sku || "").toString().toLowerCase();
+  const sku = (item.sku_final || item.sku || "").toString().trim().toLowerCase();
   const skuSuffix = sku.match(/[a-z]+\d*$/)?.[0] || "";
   if (HALF_KG_UNIT_TOKENS.has(skuSuffix)) return "half";
   if (KG_UNIT_TOKENS.has(skuSuffix)) return "kg";
 
-  const um = (item.unidad_medida || "").toString().toLowerCase();
+  const um = (item.unidad_medida || "").toString().trim().toLowerCase();
   if (HALF_KG_UNIT_TOKENS.has(um)) return "half";
   if (KG_UNIT_TOKENS.has(um)) return "kg";
 

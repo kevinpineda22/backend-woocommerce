@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ecommerceApi } from "../shared/ecommerceApi";
 import { isWeighableUnit } from "../shared/weighableUnits";
+import { calcLineCharge } from "../shared/manifestPricing";
 import EscanerBarras from "../../DesarrolloSurtido_API/EscanerBarras";
 import ManifestInvoiceModal from "../shared/ManifestInvoiceModal";
 import {
@@ -716,10 +717,7 @@ const VistaAuditor = ({ initialSessionId = null, onClose = null }) => {
         productItems
           .filter((i) => !i.is_removed)
           .reduce((sum, item) => {
-            // Extraemos el subtotal de origen y normalizamos según unidades
-            const unitPrice =
-              parseFloat(item.price) || parseFloat(item.line_total) || 0;
-            return sum + unitPrice * item.qty;
+            return sum + calcLineCharge(item);
           }, 0) + shippingPrice;
 
       productItems.push({

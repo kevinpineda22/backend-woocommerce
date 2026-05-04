@@ -120,6 +120,7 @@ const ManifestInvoiceModal = ({ manifestData, onClose }) => {
                   shipping: currentOrder.shipping,
                   meta_data: currentOrder.meta_data,
                   total: currentOrder.total,
+                  shipping_lines: currentOrder.shipping_lines || [],
                   items: normalizedItems,
                 }}
                 timestamp={manifestData.timestamp}
