@@ -56,9 +56,6 @@ exports.getCollectorPerformance = async (req, res) => {
         startDate = now.startOf("day");
       } else if (range === "7d") {
         startDate = now.subtract(7, "day").startOf("day");
-      } else if (range === "last_week") {
-        startDate = now.subtract(1, "week").startOf("week").add(1, "day"); // Lunes semana pasada
-        endDate = now.subtract(1, "week").endOf("week").add(1, "day"); // Domingo semana pasada
       } else if (range === "30d") {
         startDate = now.subtract(30, "day").startOf("day");
       } else if (range === "last_month") {

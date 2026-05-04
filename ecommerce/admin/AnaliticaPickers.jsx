@@ -699,7 +699,6 @@ const TABS = [
 const RANGES = [
   { id: "today", label: "Hoy" },
   { id: "7d", label: "Últimos 7 días" },
-  { id: "last_week", label: "Semana pasada" },
   { id: "30d", label: "Últimos 30 días" },
   { id: "last_month", label: "Mes pasado" },
   { id: "all", label: "Histórico" },
