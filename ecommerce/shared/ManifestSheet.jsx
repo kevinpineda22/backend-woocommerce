@@ -4,6 +4,7 @@ import { getAssetUrl } from "../../../config/storage";
 import { calcularDigitoVerificador } from "../picker/modals/utils/gs1Utils";
 import { extractMetodoPago } from "./extractDocumento";
 import { isWeighableUnit, kgPerUnit, cantUnitSuffix } from "./weighableUnits";
+import { calcLineCharge } from "./manifestPricing";
 import "./ManifestSheet.css";
 
 /**
@@ -208,14 +209,13 @@ const ManifestSheet = ({
     (sum, item) => sum + (item.qty || item.count || 1),
     0,
   );
-  // Subtotal de artículos: preferir line_total (lo efectivamente cobrado por Woo,
-  // ya incluye promos y ajustes de peso) y caer a price*qty solo si no viene.
-  const calculatedItemsTotal = productItems.reduce((sum, item) => {
-    const qty = item.qty || item.count || 1;
-    const unitFinal =
-      parseFloat(item.line_total) || parseFloat(item.price) || 0;
-    return sum + unitFinal * qty;
-  }, 0);
+  // Subtotal de artículos: para pesables (KL/LB) se cobra contra peso_total real,
+  // no contra qty solicitada — es lo que hace la caja registradora.
+  // Ver utils/manifestPricing.js para la regla.
+  const calculatedItemsTotal = productItems.reduce(
+    (sum, item) => sum + calcLineCharge(item),
+    0,
+  );
   const shippingTotal = (order.shipping_lines || []).reduce(
     (sum, s) => sum + (parseFloat(s.total) || 0),
     0,
@@ -721,7 +721,8 @@ const ManifestSheet = ({
                             parseFloat(item.price) ||
                             0;
 
-                          const lineFinal = unitFinal * qty;
+                          // Para pesables el cobro real va contra peso_total, no qty.
+                          const lineFinal = calcLineCharge(item);
 
                           // Detectar promoción: subtotal_unitario > total_unitario (con margen de 1 peso)
                           const hasPromo =
@@ -744,7 +745,7 @@ const ManifestSheet = ({
                               <span className="manifest-unit-price">
                                 {fmt(Math.round(unitFinal))}
                               </span>
-                              {qty > 1 && (
+                              {(qty > 1 || hasRealWeight) && (
                                 <span className="manifest-line-total manifest-line-total--bold">
                                   = {fmt(Math.round(lineFinal))}
                                 </span>

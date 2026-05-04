@@ -4,6 +4,7 @@ const { agruparItemsParaPicking } = require("./pickingUtils");
 const { syncOrderToWoo } = require("../services/syncWooService");
 const { logAuditEvent } = require("../services/auditService");
 const { isWeighableUnit } = require("../utils/weighableUnits");
+const { calcLineCharge } = require("../utils/manifestPricing");
 const {
   getSedeFromWooOrder,
   extractSedeFromOrder,
@@ -503,15 +504,10 @@ function calcTotalesFromDatosSalida(
       const productItems = (order.items || []).filter(
         (i) => !i.is_shipping_method && !i.is_removed,
       );
-      const itemsTotal = productItems.reduce((sum, item) => {
-        const qty = item.qty || item.count || 1;
-        const price =
-          parseFloat(item.line_total) ||
-          parseFloat(item.price) ||
-          parseFloat(item.catalog_price) ||
-          0;
-        return sum + price * qty;
-      }, 0);
+      const itemsTotal = productItems.reduce(
+        (sum, item) => sum + calcLineCharge(item),
+        0,
+      );
       const shippingTotal = (order.shipping_lines || []).reduce(
         (sum, s) => sum + (parseFloat(s.total) || 0),
         0,
@@ -537,15 +533,10 @@ function calcTotalesFromDatosSalida(
       const productItems = (order.line_items || order.items || []).filter(
         (i) => !i.is_shipping_method && !i.is_removed,
       );
-      const itemsTotal = productItems.reduce((sum, item) => {
-        const qty = item.qty || item.count || item.quantity || 1;
-        const price =
-          parseFloat(item.line_total) ||
-          parseFloat(item.price) ||
-          parseFloat(item.catalog_price) ||
-          0;
-        return sum + price * qty;
-      }, 0);
+      const itemsTotal = productItems.reduce(
+        (sum, item) => sum + calcLineCharge(item),
+        0,
+      );
       const shippingTotal = (order.shipping_lines || []).reduce(
         (sum, s) => sum + (parseFloat(s.total) || 0),
         0,
