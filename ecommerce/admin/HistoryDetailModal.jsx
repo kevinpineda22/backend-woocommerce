@@ -307,10 +307,12 @@ const OrderCard = ({
     (l) => l.accion === "eliminado_admin",
   ).length;
 
-  // Calcular total dinámicamente (order.total en snapshot puede estar desactualizado)
+  // ✅ REGLA DE ORO: Usar final_snapshot como única fuente de verdad
   const finalOrder = historyDetail?.final_snapshot?.orders?.find(
     (o) => String(o.id) === String(order.id),
   );
+  
+  // Si existe final_snapshot, usar TODO de ahí (items, shipping, totales)
   const productItems = (finalOrder?.items || order.items || []).filter(
     (i) => !i.is_shipping_method && !i.is_removed,
   );
@@ -318,7 +320,7 @@ const OrderCard = ({
     (sum, item) => sum + calcLineCharge(item),
     0,
   );
-  const calcShipping = (order.shipping_lines || []).reduce(
+  const calcShipping = (finalOrder?.shipping_lines || order.shipping_lines || []).reduce(
     (sum, s) => sum + (parseFloat(s.total) || 0),
     0,
   );

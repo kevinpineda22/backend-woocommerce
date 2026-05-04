@@ -94,7 +94,12 @@ const formatPrice = (amount) =>
 
 const PedidosAdmin = () => {
   // --- MULTI-SEDE ---
-  const { sedeId, getSedeParam, isSuperAdmin, loading: sedeLoading } = useSedeContext();
+  const {
+    sedeId,
+    getSedeParam,
+    isSuperAdmin,
+    loading: sedeLoading,
+  } = useSedeContext();
 
   // --- MOBILE SIDEBAR ---
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -424,7 +429,12 @@ const PedidosAdmin = () => {
   };
 
   const handleConfirmPayments = async (payments) => {
-    if (!paymentModal.session || !Array.isArray(payments) || payments.length === 0) return;
+    if (
+      !paymentModal.session ||
+      !Array.isArray(payments) ||
+      payments.length === 0
+    )
+      return;
     const empleado = JSON.parse(localStorage.getItem("empleado_info") || "{}");
     const adminName = empleado.nombre || "Admin";
     const adminEmail = localStorage.getItem("correo_empleado") || "";
@@ -509,62 +519,29 @@ const PedidosAdmin = () => {
         return;
       }
 
-      // ✅ Mergear códigos de barras del products_map con los items del snapshot
-      // Prioridad: barcode_sku_um (SKU+UM validado en SIESA) > datos_salida > barcode general > fallback
+      // ✅ REGLA DE ORO: datos_salida es la ÚNICA fuente de verdad
+      // Solo enriquecemos con barcodes del products_map (datos de la sesión misma)
+      // NUNCA mezclamos con orderInfo (WooCommerce) — eso causa inconsistencias
       const enrichedSnapshot = { ...final_snapshot };
-      // Construir mapa de orders_info para enriquecer con meta_data (cédula, etc.)
-      const ordersInfoMap = {};
-      if (orders_info) {
-        orders_info.forEach((oi) => {
-          ordersInfoMap[oi.id] = oi;
-        });
-      }
+      
       if (products_map && enrichedSnapshot.orders) {
-        // Construir mapas SKU → precio para enriquecer items del snapshot
-        // (el item.id en snapshots viejos es clave compuesta "prodId-orderId",
-        //  no matchea products_map directamente — el fallback por SKU es necesario)
-        const skuPriceMap = {};
-        const skuCatalogPriceMap = {};
-        Object.values(products_map).forEach((p) => {
-          if (p.sku) {
-            if (p.price != null) skuPriceMap[p.sku] = p.price;
-            if (p.catalog_price != null)
-              skuCatalogPriceMap[p.sku] = p.catalog_price;
-          }
-        });
-        enrichedSnapshot.orders = enrichedSnapshot.orders.map((order) => {
-          const orderInfo = ordersInfoMap[order.id] || {};
-          return {
-            ...order,
-            meta_data: order.meta_data || orderInfo.meta_data || [],
-            billing: order.billing || orderInfo.billing,
-            shipping: order.shipping || orderInfo.shipping,
-            shipping_lines: order.shipping_lines || orderInfo.shipping_lines || [],
-            total: order.total || orderInfo.total || null,
-            items: order.items.map((item) => {
-              const pm = products_map[item.id] || {};
-              return {
-                ...item,
-                barcode:
-                  pm.barcode_sku_um ||
-                  item.barcode ||
-                  pm.barcode ||
-                  item.sku ||
-                  item.id,
-                unidad_medida: pm.unidad_medida || item.unidad_medida || "",
-                price: item.price || pm.price || skuPriceMap[item.sku] || 0,
-                catalog_price:
-                  item.catalog_price ||
-                  pm.catalog_price ||
-                  skuCatalogPriceMap[item.sku] ||
-                  item.price ||
-                  pm.price ||
-                  skuPriceMap[item.sku] ||
-                  0,
-              };
-            }),
-          };
-        });
+        enrichedSnapshot.orders = enrichedSnapshot.orders.map((order) => ({
+          ...order,
+          items: order.items.map((item) => {
+            const pm = products_map[item.id] || {};
+            return {
+              ...item,
+              // Solo enriquecemos barcode y unidad_medida (datos de sesión, no de Woo)
+              barcode:
+                pm.barcode_sku_um ||
+                item.barcode ||
+                pm.barcode ||
+                item.sku ||
+                item.id,
+              unidad_medida: pm.unidad_medida || item.unidad_medida || "",
+            };
+          }),
+        }));
       }
 
       setManifestData({

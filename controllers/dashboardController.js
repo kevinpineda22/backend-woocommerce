@@ -514,16 +514,9 @@ function calcTotalesFromDatosSalida(
       );
       const calculatedTotal = itemsTotal + shippingTotal;
 
-      // ✅ Preferir el calculado si hay diferencia con el total de WooCommerce
-      const wooOrderTotal = parseFloat(order.total) || 0;
-      if (
-        Math.abs(calculatedTotal - wooOrderTotal) > 1 &&
-        calculatedTotal > 0
-      ) {
-        return calculatedTotal;
-      }
-
-      return wooOrderTotal > 0 ? wooOrderTotal : calculatedTotal || null;
+      // ✅ REGLA DE ORO: datos_salida es la única fuente de verdad
+      // Siempre usamos el total recalculado con calcLineCharge (consistente en todo el sistema)
+      return calculatedTotal || null;
     });
   }
 
