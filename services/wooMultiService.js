@@ -191,7 +191,10 @@ async function fetchFromAllSedes(endpoint, params = {}) {
 
   const combined = results
     .filter((r) => r.status === "fulfilled")
-    .flatMap((r) => r.value);
+    .flatMap((r) => r.value)
+    // Ordenar por fecha de creación descendente (más reciente primero)
+    // para que en modo "todas las sedes" el orden sea consistente con sede individual
+    .sort((a, b) => new Date(b.date_created) - new Date(a.date_created));
 
   setCachedResponse(cacheKey, combined);
   return combined;

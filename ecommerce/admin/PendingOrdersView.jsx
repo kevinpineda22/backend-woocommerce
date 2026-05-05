@@ -120,7 +120,18 @@ const PendingOrdersView = ({
       groups[dateKey].orders.push(order);
     });
 
-    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a));
+    // Ordenar grupos por fecha desc y dentro de cada grupo por hora de llegada desc
+    return Object.entries(groups)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([key, group]) => [
+        key,
+        {
+          ...group,
+          orders: group.orders.sort(
+            (a, b) => new Date(b.date_created) - new Date(a.date_created),
+          ),
+        },
+      ]);
   }, [displayedOrders]);
 
   const toggleSelection = (orderId) => {
