@@ -169,13 +169,6 @@ const ResumenTab = ({ data }) => {
           value={fmtPercent(operations.perfectOrderRate)}
           hint="Sin sustituciones ni faltantes"
         />
-        <KPICard
-          icon={Zap}
-          accent="violet"
-          label="SPI promedio"
-          value={`${operations.spiAverage}s`}
-          hint="Segundos por ítem global"
-        />
       </div>
 
       <div className="ip-grid">
@@ -700,8 +693,8 @@ const RANGES = [
   { id: "today", label: "Hoy" },
   { id: "7d", label: "Últimos 7 días" },
   { id: "30d", label: "Últimos 30 días" },
-  { id: "last_month", label: "Mes pasado" },
   { id: "all", label: "Histórico" },
+  { id: "custom", label: "Personalizado" },
 ];
 
 const AnaliticaPickers = () => {
@@ -709,6 +702,8 @@ const AnaliticaPickers = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState("7d");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
   const [tab, setTab] = useState("overview");
   const [error, setError] = useState(null);
 
@@ -719,6 +714,8 @@ const AnaliticaPickers = () => {
       const sp = getSedeParam();
       const params = {
         range,
+        start_date: range === "custom" ? customStart : undefined,
+        end_date: range === "custom" ? customEnd : undefined,
         ...Object.fromEntries(new URLSearchParams(sp)),
       };
       const res = await analyticsApi.get("/intelligence", { params });
@@ -733,8 +730,9 @@ const AnaliticaPickers = () => {
 
   useEffect(() => {
     if (sedeLoading) return;
+    if (range === "custom" && (!customStart || !customEnd)) return;
     fetchData();
-  }, [range, sedeId, sedeLoading]);
+  }, [range, customStart, customEnd, sedeId, sedeLoading]);
 
   if (loading && !data) {
     return (
@@ -804,7 +802,7 @@ const AnaliticaPickers = () => {
         </main>
       ) : tab === "variations" ? (
         <main className="ip-content">
-          <VariacionesTab range={range} sedeId={sedeId} />
+          <VariacionesTab range={range} customStart={customStart} customEnd={customEnd} sedeId={sedeId} />
         </main>
       ) : (
         data && (

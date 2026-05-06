@@ -88,7 +88,7 @@ const EventRow = ({ event }) => {
   );
 };
 
-const VariacionesTab = ({ range, sedeId }) => {
+const VariacionesTab = ({ range, customStart, customEnd, sedeId }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState(null);
@@ -97,7 +97,7 @@ const VariacionesTab = ({ range, sedeId }) => {
     setLoading(true);
     try {
       const res = await analyticsApi.get("/variaciones", {
-        params: { range, sede_id: sedeId }
+        params: { range, start_date: customStart, end_date: customEnd, sede_id: sedeId }
       });
       setData(res.data);
     } catch (err) {
@@ -108,8 +108,9 @@ const VariacionesTab = ({ range, sedeId }) => {
   };
 
   useEffect(() => {
+    if (range === "custom" && (!customStart || !customEnd)) return;
     fetchVariaciones();
-  }, [range, sedeId]);
+  }, [range, customStart, customEnd, sedeId]);
 
   if (loading) return <div className="vp-loading">Cargando variaciones...</div>;
   if (!data || !data.variaciones.length) return <div className="vp-empty">No se encontraron variaciones de precio en este periodo.</div>;
@@ -118,9 +119,16 @@ const VariacionesTab = ({ range, sedeId }) => {
     setExpandedRow(expandedRow === id ? null : id);
   };
 
+  const pedidosConVariaciones = new Set(data.variaciones.map(v => v.id_pedido)).size;
+
   return (
     <div className="vp-container">
       <div className="vp-stats vp-stats--extended">
+        <KPICard 
+          label="Pedidos c/ Variación" 
+          value={pedidosConVariaciones} 
+          icon={Package}
+        />
         <KPICard 
           label="Variación Total" 
           value={fmtCurrency(data.stats.total_delta)} 
@@ -135,11 +143,6 @@ const VariacionesTab = ({ range, sedeId }) => {
         <KPICard 
           label="Sustituciones" 
           value={data.stats.reasons.sustitucion} 
-          icon={RefreshCw}
-        />
-        <KPICard 
-          label="Prom. Sustituidos/Ped" 
-          value={Number(data.stats.avg_sustituciones_por_pedido || 0).toFixed(2)} 
           icon={RefreshCw}
         />
         <KPICard 

@@ -799,8 +799,18 @@ function rangeBounds(range) {
 
 exports.getIntelligenceCenter = async (req, res) => {
   try {
-    const { range = "7d" } = req.query;
-    const { start, days } = rangeBounds(range);
+    const { range = "7d", start_date, end_date } = req.query;
+    let start, end, days;
+    
+    if (range === "custom") {
+      start = start_date ? dayjs(start_date).startOf("day") : null;
+      end = end_date ? dayjs(end_date).endOf("day") : null;
+      days = start && end ? end.diff(start, 'day') + 1 : 30; // default for missing dates
+    } else {
+      const bounds = rangeBounds(range);
+      start = bounds.start;
+      days = bounds.days;
+    }
     const sedeId = req.sedeId || null;
 
     // ---- 1. SESIONES (financieros + ritmo) ---------------------------------
@@ -812,6 +822,7 @@ exports.getIntelligenceCenter = async (req, res) => {
       .in("estado", ["finalizado", "auditado", "pendiente_auditoria"]);
     if (sedeId) sessQ = sessQ.eq("sede_id", sedeId);
     if (start) sessQ = sessQ.gte("fecha_fin", start.toISOString());
+    if (end) sessQ = sessQ.lte("fecha_fin", end.toISOString());
 
     const { data: sessions = [], error: sessErr } = await sessQ;
     if (sessErr) throw sessErr;
@@ -826,6 +837,7 @@ exports.getIntelligenceCenter = async (req, res) => {
       .not("tiempo_total_segundos", "is", null);
     if (sedeId) asigQ = asigQ.eq("sede_id", sedeId);
     if (start) asigQ = asigQ.gte("fecha_fin", start.toISOString());
+    if (end) asigQ = asigQ.lte("fecha_fin", end.toISOString());
 
     const { data: asignaciones = [], error: asigErr } = await asigQ;
     if (asigErr) throw asigErr;

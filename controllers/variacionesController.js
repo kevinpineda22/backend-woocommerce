@@ -8,7 +8,7 @@ const { calcLineCharge } = require("../utils/manifestPricing");
 
 exports.getVariaciones = async (req, res) => {
   try {
-    const { range } = req.query;
+    const { range, start_date, end_date } = req.query;
     const sedeId = req.sedeId;
 
     // 1. Fetch Finished Sessions in range
@@ -24,7 +24,14 @@ exports.getVariaciones = async (req, res) => {
       sessionsQuery = sessionsQuery.eq("sede_id", sedeId);
     }
 
-    if (range && range !== "all") {
+    if (range === "custom") {
+       if (start_date) {
+         sessionsQuery = sessionsQuery.gte("fecha_fin", dayjs(start_date).startOf('day').toISOString());
+       }
+       if (end_date) {
+         sessionsQuery = sessionsQuery.lte("fecha_fin", dayjs(end_date).endOf('day').toISOString());
+       }
+    } else if (range && range !== "all") {
       const now = dayjs();
       let startDate;
       if (range === "today") startDate = now.startOf("day");
