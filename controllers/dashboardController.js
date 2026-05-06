@@ -457,15 +457,33 @@ exports.getPendingOrders = async (req, res) => {
 // =========================================================
 exports.getPickers = async (req, res) => {
   const { email } = req.query;
+
+  // Only return pickers that still have an active profile (deleted users leave orphan wc_pickers rows)
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("correo")
+    .eq("role", "picker");
+
+  if (profilesError)
+    return res
+      .status(500)
+      .json({ error: `Error al consultar profiles: ${profilesError.message}` });
+
+  const activeEmails = profiles
+    .map((p) => (p.correo || "").toLowerCase().trim())
+    .filter(Boolean);
+
+  if (activeEmails.length === 0) return res.status(200).json([]);
+
   let query = supabase
     .from("wc_pickers")
     .select("*, wc_sedes(nombre, slug)")
+    .in("email", activeEmails)
     .order("nombre_completo", { ascending: true });
+
   if (email) query = query.eq("email", email.toLowerCase().trim());
-  // Filtro Multi-Sede
-  if (req.sedeId) {
-    query = query.eq("sede_id", req.sedeId);
-  }
+  if (req.sedeId) query = query.eq("sede_id", req.sedeId);
+
   const { data, error } = await query;
   if (error)
     return res
