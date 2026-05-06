@@ -195,18 +195,12 @@ exports.getVariaciones = async (req, res) => {
 
             if (!inFinal) {
               // Verificar si ya se registró como sustituido, faltante explícito o eliminado
-              const hasEvent = events.some(
-                (e) =>
-                  String(e.producto) === String(origItem.name) ||
-                  String(e.metadata?.precio_original) ===
-                    String(origItem.price) ||
-                  // En el caso de sustitución, el producto original está en log.id_producto que sacamos antes
-                  orderLogs.some(
-                    (l) =>
-                      (String(l.id_producto) === String(pId) ||
-                        String(l.id_producto) === String(vId)) &&
-                      l.accion !== "recolectado",
-                  ),
+              const hasEvent = orderLogs.some(
+                (l) =>
+                  (String(l.id_producto) === String(pId) ||
+                    (vId && String(l.id_producto) === String(vId)) ||
+                    String(l.nombre_producto) === String(origItem.name)) &&
+                  l.accion !== "recolectado"
               );
 
               if (!hasEvent) {
