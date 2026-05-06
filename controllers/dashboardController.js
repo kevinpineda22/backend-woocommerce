@@ -843,7 +843,7 @@ exports.getHistorySessions = async (req, res) => {
       )
       .in("estado", ["finalizado"])
       .order("fecha_fin", { ascending: false })
-      .limit(50);
+      .limit(500);
     // Filtro Multi-Sede
     if (req.sedeId) {
       histQuery = histQuery.eq("sede_id", req.sedeId);

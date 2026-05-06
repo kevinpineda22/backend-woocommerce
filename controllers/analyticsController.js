@@ -1243,7 +1243,7 @@ exports.getCompletedRoutesList = async (req, res) => {
       )
       .eq("estado_asignacion", "completado")
       .order("fecha_fin", { ascending: false })
-      .limit(50);
+      .limit(500);
     // Filtro Multi-Sede
     if (req.sedeId) {
       routesQuery = routesQuery.eq("sede_id", req.sedeId);

@@ -126,14 +126,13 @@ const VariacionesTab = ({ range, customStart, customEnd, sedeId }) => {
       <div className="vp-stats vp-stats--extended">
         <KPICard 
           label="Pedidos c/ Variación" 
-          value={pedidosConVariaciones} 
+          value={`${pedidosConVariaciones} / ${data.stats.total_orders || 0}`} 
           icon={Package}
         />
         <KPICard 
           label="Variación Total" 
           value={fmtCurrency(data.stats.total_delta)} 
           icon={DollarSign}
-          trend={data.stats.total_delta}
         />
         <KPICard 
           label="Delta Promedio" 

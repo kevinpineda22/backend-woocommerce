@@ -26,7 +26,6 @@ import {
   Target,
   Users,
   Package,
-  Zap,
   Award,
   Activity,
   Inbox,
@@ -376,13 +375,6 @@ const OperacionTab = ({ data }) => {
           hint={`${fmtNumber(operations.totalSessions)} sesiones`}
         />
         <KPICard
-          icon={Clock}
-          accent="emerald"
-          label="Duración promedio"
-          value={`${operations.avgSessionMin} min`}
-          hint="Por pedido"
-        />
-        <KPICard
           icon={Activity}
           accent="amber"
           label="Tasa de éxito"
@@ -412,8 +404,6 @@ const OperacionTab = ({ data }) => {
                     <th>Picker</th>
                     <th className="num">Pedidos</th>
                     <th className="num">Ítems</th>
-                    <th className="num">SPI</th>
-                    <th className="num">Velocidad</th>
                     <th className="num">Precisión</th>
                     <th className="num">Perfectos</th>
                   </tr>
@@ -435,8 +425,6 @@ const OperacionTab = ({ data }) => {
                       <td className="num">
                         {fmtNumber(p.items_recolectados)}
                       </td>
-                      <td className="num">{p.segundos_por_item}s</td>
-                      <td className="num">{p.velocidad_items_min}/min</td>
                       <td className="num">
                         <ProgressPill
                           value={p.tasa_precision}
@@ -763,6 +751,23 @@ const AnaliticaPickers = () => {
                 {r.label}
               </button>
             ))}
+            {range === "custom" && (
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", marginLeft: "8px" }}>
+                <input 
+                  type="date" 
+                  value={customStart} 
+                  onChange={e => setCustomStart(e.target.value)} 
+                  style={{ padding: "4px 8px", borderRadius: "4px", border: "1px solid #cbd5e1" }}
+                />
+                <span style={{ color: "#64748b" }}>-</span>
+                <input 
+                  type="date" 
+                  value={customEnd} 
+                  onChange={e => setCustomEnd(e.target.value)} 
+                  style={{ padding: "4px 8px", borderRadius: "4px", border: "1px solid #cbd5e1" }}
+                />
+              </div>
+            )}
           </div>
           <button
             onClick={fetchData}
