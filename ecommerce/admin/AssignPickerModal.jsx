@@ -17,6 +17,7 @@ const AssignPickerModal = ({
   onClose,
   onConfirm,
   isAssigning,
+  selectedOrdersCount = 0,
 }) => {
   if (!isOpen) return null;
 
@@ -33,7 +34,6 @@ const AssignPickerModal = ({
 
   return (
     <div className="pedidos-modal-overlay high-z" onClick={onClose}>
-      {/* Añadimos la clase 'compact' para que este modal sea más angosto que el de pedidos */}
       <div
         className="pedidos-modal-content compact animate-fade-in"
         onClick={(e) => e.stopPropagation()}
@@ -47,7 +47,7 @@ const AssignPickerModal = ({
             <div>
               <h2 className="pa-modal-id">Asignar Picker</h2>
               <span className="pa-modal-date">
-                Selecciona un colaborador disponible
+                Asignando {selectedOrdersCount} pedido{selectedOrdersCount !== 1 ? 's' : ''}
               </span>
             </div>
           </div>
@@ -67,7 +67,6 @@ const AssignPickerModal = ({
             minHeight: 0,
           }}
         >
-          {/* Barra de búsqueda decorativa (puedes hacerla funcional si tienes muchos pickers) */}
           <div className="apm-search-bar">
             <FaSearch color="#94a3b8" />
             <span className="apm-search-bar-label">
@@ -81,12 +80,13 @@ const AssignPickerModal = ({
           >
             {sortedPickers.map((picker) => {
               const isBusy = picker.estado_picker !== "disponible";
+              const isDisabled = isBusy || isAssigning;
 
               return (
                 <div
                   key={picker.id}
                   className={`apm-picker-card ${isBusy ? "busy" : "available"} ${isAssigning ? "disabled" : ""}`}
-                  onClick={() => !isBusy && !isAssigning && onConfirm(picker)}
+                  onClick={() => !isDisabled && onConfirm(picker)}
                 >
                   {/* AVATAR */}
                   <div className="apm-avatar-wrapper">

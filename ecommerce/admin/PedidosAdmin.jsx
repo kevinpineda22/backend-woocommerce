@@ -803,6 +803,7 @@ const PedidosAdmin = () => {
                   onForceSync={() => fetchData(false, true)}
                   onCancelOrder={handleCancelOrder}
                   isCancelling={isCancelling}
+                  showToast={showToast}
                 />
               ) : (
                 <ActiveSessionsView
@@ -823,6 +824,7 @@ const PedidosAdmin = () => {
         onClose={() => !isAssigning && setShowAssignModal(false)}
         onConfirm={handleConfirmAssignment}
         isAssigning={isAssigning}
+        selectedOrdersCount={selectedIds.size}
       />
 
       {showLiveModal && liveSessionDetail && (

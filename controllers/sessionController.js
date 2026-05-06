@@ -109,6 +109,20 @@ exports.createPickingSession = async (req, res) => {
     // Multi-Sede: La sede de la sesión viene del picker, o del request
     let sedeId = req.sedeId || pickerData?.sede_id || null;
 
+    // VALIDACIÓN: Límite de 10 pedidos activos
+    const { data: activeAssignments } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("id")
+      .eq("id_picker", targetPickerId)
+      .eq("estado_asignacion", "en_proceso");
+
+    const currentCount = activeAssignments ? activeAssignments.length : 0;
+    if (currentCount + ids_pedidos.length > 10) {
+      throw new Error(
+        `El picker ya tiene ${currentCount} pedidos activos. No puede exceder el límite de 10 (intentó asignar ${ids_pedidos.length} nuevos).`
+      );
+    }
+
     let sessClient;
     let responses;
 

@@ -136,8 +136,15 @@ const PendingOrdersView = ({
 
   const toggleSelection = (orderId) => {
     const newSet = new Set(selectedIds);
-    if (newSet.has(orderId)) newSet.delete(orderId);
-    else newSet.add(orderId);
+    if (newSet.has(orderId)) {
+      newSet.delete(orderId);
+    } else {
+      if (newSet.size >= 10) {
+        if (showToast) showToast("Has alcanzado el límite de 10 pedidos por picker.", "warning");
+        return;
+      }
+      newSet.add(orderId);
+    }
     setSelectedIds(newSet);
   };
 
@@ -259,16 +266,10 @@ const PendingOrdersView = ({
                         key={order.id}
                         className={`pa-ticket-card ${isSelected ? "selected" : ""}`}
                         onClick={() => setLocalSelectedOrder(order)}
+                        style={{ display: "flex", flexDirection: "column", height: "100%" }}
                       >
                         <div className="pa-ticket-header">
                           <div className="pa-ticket-tags-row">
-                            <input
-                              type="checkbox"
-                              className="pa-ticket-checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleSelection(order.id)}
-                              onClick={(e) => e.stopPropagation()}
-                            />
                             <span className="pa-ticket-id">#{order.id}</span>
                             {order.sede_detected && (
                               <span className="pa-ticket-sede-tag">
@@ -353,6 +354,37 @@ const PendingOrdersView = ({
                               : order.customer_note}
                           </div>
                         )}
+                        {/* Selector Profesional */}
+                        <div style={{ marginTop: "auto", borderTop: "1px solid #f1f5f9", paddingTop: "12px", display: "flex", gap: "8px" }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSelection(order.id);
+                            }}
+                            style={{
+                              flex: 1,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "6px",
+                              padding: "8px 12px",
+                              borderRadius: "6px",
+                              fontWeight: "600",
+                              fontSize: "0.85rem",
+                              transition: "all 0.2s",
+                              border: isSelected ? "none" : "1px solid #e2e8f0",
+                              backgroundColor: isSelected ? "#3b82f6" : "#f8fafc",
+                              color: isSelected ? "#ffffff" : "#475569",
+                              cursor: "pointer"
+                            }}
+                          >
+                            {isSelected ? (
+                              <><FaCheckDouble /> Seleccionado</>
+                            ) : (
+                              "Seleccionar"
+                            )}
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -608,7 +640,7 @@ const PendingOrdersView = ({
       {selectedIds.size > 0 && (
         <div className="batch-action-bar">
           <div className="batch-info">
-            <strong>{selectedIds.size}</strong> seleccionados
+            <strong>{selectedIds.size} / 10</strong> seleccionados
           </div>
           <div className="pa-batch-buttons">
             <button

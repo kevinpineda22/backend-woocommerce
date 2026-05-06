@@ -489,7 +489,28 @@ exports.getPickers = async (req, res) => {
     return res
       .status(500)
       .json({ error: `Error al consultar pickers: ${error.message}` });
-  res.status(200).json(data);
+
+  // Calcular cantidad de pedidos activos por picker
+  const pickerIds = data.map(p => p.id);
+  const { data: activeAssignments } = await supabase
+    .from("wc_asignaciones_pedidos")
+    .select("id_picker")
+    .in("id_picker", pickerIds)
+    .eq("estado_asignacion", "en_proceso");
+
+  const assignmentsCountByPicker = {};
+  if (activeAssignments) {
+    activeAssignments.forEach(a => {
+      assignmentsCountByPicker[a.id_picker] = (assignmentsCountByPicker[a.id_picker] || 0) + 1;
+    });
+  }
+
+  const enrichedData = data.map(picker => ({
+    ...picker,
+    active_orders_count: assignmentsCountByPicker[picker.id] || 0,
+  }));
+
+  res.status(200).json(enrichedData);
 };
 
 // =========================================================
