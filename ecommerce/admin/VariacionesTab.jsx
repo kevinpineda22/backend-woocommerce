@@ -66,7 +66,7 @@ const EventRow = ({ event }) => {
       <div className="vp-event__icon">{getIcon()}</div>
       <div className="vp-event__body">
         <div className="vp-event__title">
-          <strong>{event.reason_label}</strong>: {event.producto}
+          <strong>{event.reason_label}</strong>: {event.producto} {event.metadata?.cantidad > 1 ? `(${event.metadata.cantidad} unds)` : ''}
         </div>
         <div className="vp-event__meta">
           {event.metadata.sustituto && <span>Sustituido por: {event.metadata.sustituto}</span>}
@@ -75,9 +75,9 @@ const EventRow = ({ event }) => {
               (Orig: {fmtCurrency(event.metadata.precio_original)} → Nuevo: {fmtCurrency(event.metadata.precio_sustituto)})
             </span>
           )}
-          {event.type === 'faltante' && event.metadata.precio_original > 0 && (
+          {(event.type === 'faltante' || event.type === 'admin') && event.metadata.precio_original > 0 && (
             <span className="vp-event__prices">
-              (Perdido: -{fmtCurrency(event.metadata.precio_original)})
+              (Perdido: -{fmtCurrency(event.metadata.precio_original * (event.metadata.cantidad || 1))})
             </span>
           )}
           {event.metadata.peso && <span>Peso: {event.metadata.peso}kg</span>}

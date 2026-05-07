@@ -152,6 +152,33 @@ exports.getVariaciones = async (req, res) => {
             const precio_original = origItem ? parseFloat(origItem.price) : 0;
             const precio_sustituto = log.precio_nuevo || 0;
 
+            let cantidad_perdida = log.cantidad_afectada || 1;
+            
+            if ((type === "admin" || type === "faltante") && origItem) {
+              const pId = origItem.product_id;
+              const vId = origItem.variation_id;
+              const effId = vId || pId;
+              
+              const inFinal = (finalOrder.items || []).find((fi) => {
+                const fiId = String(fi.id || "");
+                const fiPid = String(fi.product_id || "");
+                const fiVid = String(fi.variation_id || "");
+                return (
+                  fiPid === String(pId) ||
+                  (vId && fiVid === String(vId)) ||
+                  fiId === String(effId) ||
+                  fiId.startsWith(String(effId) + "-") ||
+                  (origItem.sku && String(fi.sku) === String(origItem.sku))
+                );
+              });
+              
+              const finalQty = inFinal ? (parseFloat(inFinal.qty) || 0) : 0;
+              const originalQty = parseFloat(origItem.quantity) || 1;
+              cantidad_perdida = Math.max(0, originalQty - finalQty);
+              if (cantidad_perdida === 0 && !inFinal) cantidad_perdida = originalQty;
+              else if (cantidad_perdida === 0) cantidad_perdida = 1; // Fallback
+            }
+
             return {
               id: log.id,
               fecha: log.fecha_registro,
@@ -167,7 +194,7 @@ exports.getVariaciones = async (req, res) => {
                 sustituto:
                   log.nombre_sustituto || log.datos_sustituto?.nombre || null,
                 peso: log.peso_real || null,
-                cantidad: log.cantidad_afectada || 1,
+                cantidad: cantidad_perdida,
                 precio_original,
                 precio_sustituto,
               },
