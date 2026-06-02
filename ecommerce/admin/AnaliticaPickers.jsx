@@ -143,6 +143,7 @@ const ResumenTab = ({ data }) => {
   const hasTrend = financials.revenueTrend?.length > 0;
   const hasMethods = financials.revenueByMethod?.length > 0;
   const hasWeekday = data.weekdayActivity?.some((d) => d.pedidos > 0);
+  const hasSede = financials.revenueBySede?.length > 0;
 
   return (
     <>
@@ -342,6 +343,51 @@ const ResumenTab = ({ data }) => {
               </ResponsiveContainer>
             ) : (
               <EmptyState message="Sin patrón semanal todavía" />
+            )}
+          </div>
+        </ChartCard>
+
+        <ChartCard
+          title="Ventas por sede"
+          subtitle="Recaudación cobrada por ubicación"
+        >
+          <div className="ip-chart">
+            {hasSede ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={financials.revenueBySede}
+                  layout="vertical"
+                  margin={{ left: 4, right: 16 }}
+                >
+                  <CartesianGrid stroke="#f1f5f9" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tickFormatter={fmtCurrencyCompact}
+                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: "#1e293b" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={130}
+                    tickFormatter={(v) =>
+                      v.length > 18 ? v.slice(0, 18) + "…" : v
+                    }
+                  />
+                  <Tooltip content={<TooltipBox formatter={fmtCurrency} />} />
+                  <Bar dataKey="value" name="Ventas" radius={[0, 6, 6, 0]}>
+                    {financials.revenueBySede.map((_, i) => (
+                      <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <EmptyState message="Sin ventas por sede en el rango" />
             )}
           </div>
         </ChartCard>

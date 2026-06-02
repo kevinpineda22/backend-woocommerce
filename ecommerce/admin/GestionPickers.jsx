@@ -16,6 +16,10 @@ import {
   FaBoxes,
   FaMapMarkerAlt,
   FaInfoCircle,
+  FaUserSlash,
+  FaUserCheck,
+  FaEye,
+  FaEyeSlash,
 } from "react-icons/fa";
 
 export const GestionPickers = () => {
@@ -34,6 +38,11 @@ export const GestionPickers = () => {
   const [confirmCancel, setConfirmCancel] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [toasts, setToasts] = useState([]);
+
+  // -- INACTIVAR / ACTIVAR PICKER --
+  const [confirmDeactivate, setConfirmDeactivate] = useState(null);
+  const [showInactivos, setShowInactivos] = useState(false);
+  const [isUpdatingEstado, setIsUpdatingEstado] = useState(null);
 
   const showToast = (msg, type = "success") => {
     const id = Date.now() + Math.random();
@@ -216,11 +225,86 @@ export const GestionPickers = () => {
     }
   };
 
+  // --- DESACTIVAR / REACTIVAR PICKER ---
+  // Un picker inactivo NO aparece en el modal de asignación de pedidos. Sigue
+  // existiendo en la base, solo queda oculto del flujo operativo hasta que un
+  // admin lo reactive.
+  const handleToggleActivoRequested = (picker) => {
+    // Si está activando (volver a disponible), lo hacemos sin confirmación.
+    if (picker.estado_picker === "inactivo") {
+      handleActivar(picker);
+      return;
+    }
+    // Si está desactivando, validar primero que no tenga pedidos activos.
+    if (picker.estado_picker === "picking") {
+      showToast(
+        "No puede desactivar a un picker que tiene pedidos en ruta. Cancele la asignación primero.",
+        "error",
+      );
+      return;
+    }
+    setConfirmDeactivate(picker);
+  };
+
+  const handleActivar = async (picker) => {
+    if (!picker?.wc_id) return;
+    setIsUpdatingEstado(picker.wc_id);
+    try {
+      const { error } = await supabase
+        .from("wc_pickers")
+        .update({ estado_picker: "disponible" })
+        .eq("id", picker.wc_id);
+      if (error) throw error;
+      showToast(`${picker.nombre_completo} fue reactivado.`, "success");
+      fetchPickers();
+    } catch (err) {
+      console.error("Error al reactivar picker:", err);
+      showToast("No se pudo reactivar el picker. " + (err.message || ""), "error");
+    } finally {
+      setIsUpdatingEstado(null);
+    }
+  };
+
+  const handleDeactivateConfirm = async () => {
+    if (!confirmDeactivate?.wc_id) return;
+    setIsProcessing(true);
+    try {
+      const { error } = await supabase
+        .from("wc_pickers")
+        .update({ estado_picker: "inactivo" })
+        .eq("id", confirmDeactivate.wc_id);
+      if (error) throw error;
+      showToast(
+        `${confirmDeactivate.nombre_completo} fue desactivado. Ya no aparecerá al asignar pedidos.`,
+        "success",
+      );
+      fetchPickers();
+    } catch (err) {
+      console.error("Error al desactivar picker:", err);
+      showToast("No se pudo desactivar el picker. " + (err.message || ""), "error");
+    } finally {
+      setIsProcessing(false);
+      setConfirmDeactivate(null);
+    }
+  };
+
   return (
     <div className="gestion-pickers-container">
       <div className="gestion-pickers-header">
         <h2>Gestión de Pickers</h2>
         <div className="gestion-pickers-actions">
+          <button
+            className={`pedidos-admin-refresh-btn gp-toggle-inactivos ${showInactivos ? "active" : ""}`}
+            onClick={() => setShowInactivos((v) => !v)}
+            title={
+              showInactivos
+                ? "Ocultar pickers inactivos"
+                : "Mostrar pickers inactivos"
+            }
+          >
+            {showInactivos ? <FaEyeSlash /> : <FaEye />}
+            {showInactivos ? "Ocultar inactivos" : "Ver inactivos"}
+          </button>
           <button className="pedidos-admin-refresh-btn" onClick={fetchPickers}>
             <FaSync /> Actualizar
           </button>
@@ -292,23 +376,35 @@ export const GestionPickers = () => {
                     Cargando equipo...
                   </td>
                 </tr>
-              ) : pickers.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="gp-premium-empty-state">
-                    <div className="gp-premium-empty-icon">
-                      <FaUserPlus size={60} />
-                    </div>
-                    <h3 className="gp-premium-empty-title">
-                      Aún no hay operarios en esta sede
-                    </h3>
-                    <p className="gp-premium-empty-text">
-                      Crea tu primer Picker usando el botón superior para
-                      empezar a asignar recolecciones.
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                pickers.map((r) => (
+              ) : (() => {
+                // Filtramos inactivos según preferencia del admin.
+                const visibles = showInactivos
+                  ? pickers
+                  : pickers.filter((p) => p.estado_picker !== "inactivo");
+
+                if (visibles.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan="6" className="gp-premium-empty-state">
+                        <div className="gp-premium-empty-icon">
+                          <FaUserPlus size={60} />
+                        </div>
+                        <h3 className="gp-premium-empty-title">
+                          {pickers.length === 0
+                            ? "Aún no hay operarios en esta sede"
+                            : "No hay pickers activos para mostrar"}
+                        </h3>
+                        <p className="gp-premium-empty-text">
+                          {pickers.length === 0
+                            ? "Crea tu primer Picker usando el botón superior para empezar a asignar recolecciones."
+                            : "Todos los pickers están desactivados. Activa la opción 'Ver inactivos' para gestionarlos."}
+                        </p>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return visibles.map((r) => (
                   <tr key={r.id}>
                     <td>
                       <div className="picker-name-cell">
@@ -371,6 +467,8 @@ export const GestionPickers = () => {
                     <td>
                       {r.estado_picker === "picking" ? (
                         <span className="gp-badge gp-busy">En Ruta</span>
+                      ) : r.estado_picker === "inactivo" ? (
+                        <span className="gp-badge gp-inactive">Inactivo</span>
                       ) : (
                         <span className="gp-badge gp-free">Disponible</span>
                       )}
@@ -395,9 +493,40 @@ export const GestionPickers = () => {
                           className="gp-btn-icon warning"
                           onClick={() => handleEditClick(r)}
                           title="Editar Usuario"
+                          disabled={isUpdatingEstado === r.wc_id}
                         >
                           <FaEdit />
                         </button>
+
+                        {/* Activar / Desactivar picker.
+                            No se puede desactivar si está en picking — primero
+                            debe liberarse con el botón de pánico. */}
+                        {r.estado_picker === "inactivo" ? (
+                          <button
+                            className="gp-btn-icon success"
+                            onClick={() => handleToggleActivoRequested(r)}
+                            title="Reactivar picker"
+                            disabled={isUpdatingEstado === r.wc_id}
+                          >
+                            <FaUserCheck />
+                          </button>
+                        ) : (
+                          <button
+                            className="gp-btn-icon muted"
+                            onClick={() => handleToggleActivoRequested(r)}
+                            title={
+                              r.estado_picker === "picking"
+                                ? "No se puede desactivar: el picker tiene pedidos en ruta"
+                                : "Desactivar picker (deja de aparecer al asignar pedidos)"
+                            }
+                            disabled={
+                              r.estado_picker === "picking" ||
+                              isUpdatingEstado === r.wc_id
+                            }
+                          >
+                            <FaUserSlash />
+                          </button>
+                        )}
 
                         {/* Botón de pánico (Solo si está en picking) */}
                         {r.estado_picker === "picking" && (
@@ -412,8 +541,8 @@ export const GestionPickers = () => {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                ));
+              })()}
             </tbody>
           </table>
         </div>
@@ -433,6 +562,23 @@ export const GestionPickers = () => {
         isDanger={true}
         onConfirm={handleCancelAssignmentConfirm}
         onCancel={() => setConfirmCancel(null)}
+        isProcessing={isProcessing}
+      />
+
+      {/* MODAL DE CONFIRMACIÓN DESACTIVAR PICKER */}
+      <ConfirmModal
+        isOpen={!!confirmDeactivate}
+        title="Desactivar picker"
+        message={
+          confirmDeactivate
+            ? `${confirmDeactivate.nombre_completo} dejará de aparecer en la lista al asignar pedidos. Sus datos y su historial se conservan, y podrá reactivarlo cuando quiera desde esta misma pantalla activando "Ver inactivos".\n\n¿Desactivar a este picker?`
+            : ""
+        }
+        confirmText="Sí, desactivar"
+        cancelText="Mantener activo"
+        isDanger={false}
+        onConfirm={handleDeactivateConfirm}
+        onCancel={() => setConfirmDeactivate(null)}
         isProcessing={isProcessing}
       />
 

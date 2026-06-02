@@ -21,14 +21,19 @@ const AssignPickerModal = ({
 }) => {
   if (!isOpen) return null;
 
-  // 1. Lógica de Ordenamiento: Disponibles primero, luego por nombre
-  const sortedPickers = [...pickers].sort((a, b) => {
-    // Primero estado: disponible gana
+  // Excluimos pickers inactivos del flujo de asignación: si están desactivados,
+  // no deben distraer al admin que está asignando pedidos. Para reactivarlos
+  // se usa la pantalla de Gestión de Pickers.
+  const pickersActivos = pickers.filter(
+    (p) => p.estado_picker !== "inactivo",
+  );
+
+  // Ordenamiento: disponibles primero, luego ocupados, finalmente por nombre.
+  const sortedPickers = [...pickersActivos].sort((a, b) => {
     if (a.estado_picker === "disponible" && b.estado_picker !== "disponible")
       return -1;
     if (a.estado_picker !== "disponible" && b.estado_picker === "disponible")
       return 1;
-    // Si empate en estado, por nombre
     return a.nombre_completo.localeCompare(b.nombre_completo);
   });
 
@@ -70,7 +75,7 @@ const AssignPickerModal = ({
           <div className="apm-search-bar">
             <FaSearch color="#94a3b8" />
             <span className="apm-search-bar-label">
-              Lista de colaboradores ({pickers.length})
+              Lista de colaboradores ({pickersActivos.length})
             </span>
           </div>
 

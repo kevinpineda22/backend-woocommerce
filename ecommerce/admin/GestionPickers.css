@@ -120,6 +120,12 @@
   color: #155724;
 }
 
+.gp-inactive {
+  background: #e5e7eb;
+  color: #4b5563;
+  border: 1px dashed #9ca3af;
+}
+
 /* --- ESTILOS NUEVOS: CARGA DE TRABAJO --- */
 .gp-avatar-small {
   width: 32px;
@@ -197,6 +203,40 @@
 
 .gp-btn-icon.danger {
   color: #e74c3c;
+}
+
+.gp-btn-icon.muted {
+  color: #64748b;
+}
+
+.gp-btn-icon.muted:hover:not(:disabled) {
+  color: #1f2937;
+}
+
+.gp-btn-icon.success {
+  color: #10b981;
+}
+
+.gp-btn-icon.success:hover:not(:disabled) {
+  color: #047857;
+}
+
+.gp-btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Toggle "Ver inactivos" en el header */
+.gp-toggle-inactivos {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gp-toggle-inactivos.active {
+  background: #1f2937 !important;
+  color: #fff !important;
 }
 
 /* Sede column styles */
