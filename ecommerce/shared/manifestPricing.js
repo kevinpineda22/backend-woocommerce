@@ -20,6 +20,7 @@
  * así que el SKU es la fuente de verdad operativa.
  */
 
+
 const KG_UNIT_TOKENS = new Set(["kl", "kg", "kilo"]);
 const HALF_KG_UNIT_TOKENS = new Set(["lb", "libra", "500gr", "500g", "500grs"]);
 
