@@ -107,6 +107,58 @@ exports.getBaseEanFruver = async (req, res) => {
   }
 };
 
+// ✅ IMÁGENES DE PRODUCTO POR f120_id (= SKU en WooCommerce)
+// Usado por "Sin Filas" para enriquecer el carrito de forma DIFERIDA (lazy):
+// el escaneo NO espera esta llamada. Recibe ?f120_ids=1039,2050 y devuelve
+// { "1039": "https://...", "2050": null }. Best-effort por id: si un SKU no
+// existe en Woo o falla, su valor queda en null sin romper el resto.
+exports.getProductImages = async (req, res) => {
+  const raw = req.query.f120_ids || "";
+  const ids = [
+    ...new Set(
+      raw
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => /^\d+$/.test(s)),
+    ),
+  ].slice(0, 50); // tope defensivo: un carrito real no trae cientos de SKUs
+
+  if (ids.length === 0) {
+    return res.status(400).json({ error: "f120_ids requerido (CSV numérico)" });
+  }
+
+  try {
+    // Multi-sede: mismo cliente WC por sede que usa searchProduct
+    const client = await getWooClient(req.sedeId);
+
+    const settled = await Promise.allSettled(
+      ids.map(async (id) => {
+        const { data } = await client.get("products", {
+          sku: String(id),
+          status: "publish",
+          _fields: "images", // solo imágenes: respuesta liviana
+        });
+        return [id, data?.[0]?.images?.[0]?.src || null];
+      }),
+    );
+
+    const result = Object.fromEntries(ids.map((id) => [id, null]));
+    for (const entry of settled) {
+      if (entry.status === "fulfilled") {
+        const [id, src] = entry.value;
+        result[id] = src;
+      }
+    }
+
+    res.status(200).json(result);
+  } catch (error) {
+    console.error("Error getProductImages:", error.message || error);
+    res.status(500).json({
+      error: `Error al obtener imágenes: ${error.message || "Servicio no disponible"}`,
+    });
+  }
+};
+
 // ✅ BÚSQUEDA INTELIGENTE DE SUSTITUTOS
 // Busca por: nombre, SKU/item, código de barras (SIESA)
 // Devuelve stock real incluso para productos con variaciones

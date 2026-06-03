@@ -42,6 +42,7 @@ router.post("/load-barcodes-audit", actionCtrl.loadBarcodesForAudit);
 // Rutas de Producto
 router.get("/buscar-producto", productCtrl.searchProduct);
 router.get("/producto/base-ean-fruver/:sku", productCtrl.getBaseEanFruver);
+router.get("/producto-imagenes", productCtrl.getProductImages);
 
 // Rutas Dashboard/Admin
 router.get("/dashboard-activo", dashboardCtrl.getActiveSessionsDashboard);
