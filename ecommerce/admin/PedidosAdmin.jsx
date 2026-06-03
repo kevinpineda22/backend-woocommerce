@@ -185,11 +185,19 @@ const PedidosAdmin = () => {
             ecommerceApi.get(`/pendientes-pago`, { params }),
           ]);
 
-        const listPending = resPending.data.filter((o) => !o.is_assigned);
+        // Filtrar pedidos duplicados o problemáticos (ej. 12345)
+        const filterValidOrders = (orders) => {
+          if (!orders) return [];
+          return orders
+            .filter((o) => String(o.id) !== "12345")
+            .filter((v, i, a) => a.findIndex((o) => o.id === v.id) === i);
+        };
+
+        const listPending = filterValidOrders(resPending.data).filter((o) => !o.is_assigned);
         setOrders(listPending);
         setActiveSessions(resActive.data);
-        setPendingAuditOrders(resAuditPending.data || []);
-        setPaymentPendingOrders(resPaymentPending.data || []);
+        setPendingAuditOrders(filterValidOrders(resAuditPending.data));
+        setPaymentPendingOrders(filterValidOrders(resPaymentPending.data));
 
         const totalProcessOrders = resActive.data.reduce(
           (sum, s) => sum + (s.orders_count || 0),
@@ -308,7 +316,10 @@ const PedidosAdmin = () => {
     setLoading(true);
     try {
       const res = await ecommerceApi.get(`/historial?${getSedeParam()}`);
-      setHistoryOrders(res.data);
+      const validHistory = res.data
+        ? res.data.filter((o) => String(o.id) !== "12345").filter((v, i, a) => a.findIndex((o) => o.id === v.id) === i)
+        : [];
+      setHistoryOrders(validHistory);
     } catch (e) {
       console.error(e);
     } finally {
@@ -322,8 +333,9 @@ const PedidosAdmin = () => {
       const res = await ecommerceApi.get(
         `/pendientes-auditoria?${getSedeParam()}`,
       );
-      setPendingAuditOrders(res.data || []);
-      setStats((prev) => ({ ...prev, auditPending: res.data?.length || 0 }));
+      const validData = res.data ? res.data.filter((o) => String(o.id) !== "12345").filter((v, i, a) => a.findIndex((o) => o.id === v.id) === i) : [];
+      setPendingAuditOrders(validData);
+      setStats((prev) => ({ ...prev, auditPending: validData.length }));
     } catch (e) {
       console.error(e);
     } finally {
@@ -335,8 +347,9 @@ const PedidosAdmin = () => {
     setLoading(true);
     try {
       const res = await ecommerceApi.get(`/pendientes-pago?${getSedeParam()}`);
-      setPaymentPendingOrders(res.data || []);
-      setStats((prev) => ({ ...prev, paymentPending: res.data?.length || 0 }));
+      const validData = res.data ? res.data.filter((o) => String(o.id) !== "12345").filter((v, i, a) => a.findIndex((o) => o.id === v.id) === i) : [];
+      setPaymentPendingOrders(validData);
+      setStats((prev) => ({ ...prev, paymentPending: validData.length }));
     } catch (e) {
       console.error(e);
     } finally {
@@ -351,7 +364,8 @@ const PedidosAdmin = () => {
       const res = await ecommerceApi.get(
         `/pedidos-cancelados?${getSedeParam()}`,
       );
-      setCancelledOrders(res.data || []);
+      const validData = res.data ? res.data.filter((o) => String(o.id) !== "12345").filter((v, i, a) => a.findIndex((o) => o.id === v.id) === i) : [];
+      setCancelledOrders(validData);
     } catch (e) {
       console.error(e);
     } finally {
@@ -473,7 +487,7 @@ const PedidosAdmin = () => {
     setLoadingDetailId(session.session_id);
     try {
       const res = await ecommerceApi.get(
-        `/sesion-activa?id_picker=${session.picker_id}&include_removed=true&${getSedeParam()}`,
+        `/sesion-activa?session_id=${session.session_id}&include_removed=true&${getSedeParam()}`,
       );
       setLiveSessionDetail({ sessionInfo: session, routeData: res.data });
       setShowLiveModal(true);

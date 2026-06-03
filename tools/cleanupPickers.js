@@ -13,11 +13,15 @@ async function cleanupPickers() {
     if (error) throw error;
 
     const emailMap = {};
-    const toDelete = [];
+    // ✅ FIX: antes borrábamos el duplicado sin reasignar sus dependencias.
+    // Eso dejaba sesiones huérfanas (en_proceso apuntando a un picker borrado),
+    // que rompían "ver detalles en vivo" con 404. Ahora reasignamos trash → master
+    // (igual que mergePickers.js) ANTES de borrar.
+    const reassign = []; // [{ trashId, masterId }]
 
     for (const picker of pickers) {
       const cleanEmail = (picker.email || "").toLowerCase().trim();
-      
+
       if (!cleanEmail) continue;
 
       // Si el email actual tiene mayúsculas, lo normalizamos de una
@@ -46,22 +50,42 @@ async function cleanupPickers() {
           trash = original;
         }
 
-        console.log(`🗑️ Marcando para borrar ID duplicado: ${trash.id}`);
-        toDelete.push(trash.id);
+        console.log(`🔗 Duplicado ${trash.id} → master ${master.id}`);
+        reassign.push({ trashId: trash.id, masterId: master.id });
         emailMap[cleanEmail] = master; // El master queda como referencia
       }
     }
 
-    // 2. Borrar los duplicados
-    if (toDelete.length > 0) {
-      console.log(`⏳ Borrando ${toDelete.length} registros duplicados...`);
-      const { error: delError } = await supabase
-        .from("wc_pickers")
-        .delete()
-        .in("id", toDelete);
-      
-      if (delError) throw delError;
-      console.log("✅ Duplicados eliminados satisfactoriamente.");
+    // 2. Reasignar dependencias y borrar los duplicados
+    if (reassign.length > 0) {
+      console.log(`⏳ Reasignando y borrando ${reassign.length} duplicado(s)...`);
+      for (const { trashId, masterId } of reassign) {
+        // A. Mover asignaciones, sesiones y logs al master (no dejar huérfanos)
+        await supabase
+          .from("wc_asignaciones_pedidos")
+          .update({ id_picker: masterId })
+          .eq("id_picker", trashId);
+        await supabase
+          .from("wc_picking_sessions")
+          .update({ id_picker: masterId })
+          .eq("id_picker", trashId);
+        try {
+          await supabase
+            .from("wc_log_picking")
+            .update({ id_picker: masterId })
+            .eq("id_picker", trashId);
+        } catch (e) {
+          // Ignorar si la columna no existe en wc_log_picking
+        }
+
+        // B. Recién ahora, sin dependencias colgando, borrar el duplicado
+        const { error: delError } = await supabase
+          .from("wc_pickers")
+          .delete()
+          .eq("id", trashId);
+        if (delError) throw delError;
+        console.log(`✅ ${trashId} reasignado a ${masterId} y eliminado.`);
+      }
     } else {
       console.log("✨ No se encontraron duplicados para borrar.");
     }

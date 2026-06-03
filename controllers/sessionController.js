@@ -254,27 +254,41 @@ exports.createPickingSession = async (req, res) => {
 
 // ✅ LÓGICA CORREGIDA: Resolución flexible de Picker (Email/ID)
 exports.getSessionActive = async (req, res) => {
-  const { id_picker, include_removed } = req.query;
+  const { id_picker, include_removed, session_id } = req.query;
 
   try {
-    // 1. Resolver Picker Operativo
-    let pickerQuery = supabase
-      .from("wc_pickers")
-      .select("id, id_sesion_actual");
+    let sessionId;
+    let targetPickerId = null;
 
-    if (id_picker && id_picker.includes("@")) {
-      pickerQuery = pickerQuery.eq("email", id_picker.toLowerCase().trim());
+    // ✅ MODO DIRECTO (admin "ver detalles en vivo"): cargar la sesión por su
+    // propio ID. Evita el 404 de "sesiones fantasma" — sesiones que siguen en
+    // estado en_proceso pero que el picker ya no tiene como id_sesion_actual.
+    // Antes resolvíamos SIEMPRE por el picker, así que una sesión huérfana era
+    // imposible de abrir desde el panel aunque siguiera apareciendo en la lista.
+    if (session_id) {
+      sessionId = session_id;
     } else {
-      pickerQuery = pickerQuery.eq("id", id_picker);
+      // 1. MODO PICKER (app del picker): resolver la sesión actual del picker.
+      let pickerQuery = supabase
+        .from("wc_pickers")
+        .select("id, id_sesion_actual");
+
+      if (id_picker && id_picker.includes("@")) {
+        pickerQuery = pickerQuery.eq("email", id_picker.toLowerCase().trim());
+      } else {
+        pickerQuery = pickerQuery.eq("id", id_picker);
+      }
+
+      const { data: picker, error: pError } = await pickerQuery.single();
+
+      if (pError || !picker || !picker.id_sesion_actual)
+        return res
+          .status(404)
+          .json({ message: "No tienes una sesión activa." });
+
+      sessionId = picker.id_sesion_actual;
+      targetPickerId = picker.id;
     }
-
-    const { data: picker, error: pError } = await pickerQuery.single();
-
-    if (pError || !picker || !picker.id_sesion_actual)
-      return res.status(404).json({ message: "No tienes una sesión activa." });
-
-    const sessionId = picker.id_sesion_actual;
-    const targetPickerId = picker.id;
 
     const { data: session } = await supabase
       .from("wc_picking_sessions")
@@ -283,11 +297,14 @@ exports.getSessionActive = async (req, res) => {
       .single();
 
     if (!session) {
-      // Si la sesión fue eliminada manualmente de Supabase, limpiamos el estado del picker
-      await supabase
-        .from("wc_pickers")
-        .update({ id_sesion_actual: null, estado_picker: "disponible" })
-        .eq("id", targetPickerId);
+      // Si la sesión fue eliminada manualmente de Supabase, limpiamos el estado
+      // del picker (solo en modo picker; en modo directo no hay picker que tocar).
+      if (targetPickerId) {
+        await supabase
+          .from("wc_pickers")
+          .update({ id_sesion_actual: null, estado_picker: "disponible" })
+          .eq("id", targetPickerId);
+      }
 
       return res
         .status(404)

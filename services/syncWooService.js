@@ -1,5 +1,6 @@
 const { getWooClient } = require("./wooMultiService");
 const { supabase } = require("./supabaseClient");
+const { classifyWeighable } = require("../utils/manifestPricing");
 
 /**
  * Función Principal: Sincroniza los cambios físicos hacia WooCommerce.
@@ -50,6 +51,7 @@ const syncOrderToWoo = async (sessionId, orderId) => {
       productMap[effectiveKey] = {
         line_id: item.id,
         name: item.name,
+        sku: item.sku || "",
         original_price: parseFloat(item.price || 0),
         requested_qty: item.quantity,
         picked_qty: 0,
@@ -92,9 +94,15 @@ const syncOrderToWoo = async (sessionId, orderId) => {
       const item = productMap[prodId];
 
       if (item.weight_total > 0 && item.picked_qty > 0) {
-        const nuevoTotal = item.original_price * item.weight_total;
+        // ✅ FIX: respetar la convención de unidad (igual que la caja POS).
+        // LB / LIBRA / 500GR → el price es por MEDIA libra → cobro = price × 2 × peso.
+        // KL / KG / KILO (o desconocido) → cobro = price × peso.
+        // Clasificación centralizada en manifestPricing (SKU es la fuente de verdad).
+        const kind = classifyWeighable({ sku: item.sku });
+        const factor = kind === "half" ? 2 : 1;
+        const nuevoTotal = item.original_price * factor * item.weight_total;
         console.log(
-          `⚖️ [PESO] ${item.name}: ${item.weight_total}Kg -> $${nuevoTotal.toFixed(2)}`,
+          `⚖️ [PESO] ${item.name} (${item.sku || "?"}, ${kind || "kg?"}): ${item.weight_total}Kg × $${item.original_price} × ${factor} -> $${nuevoTotal.toFixed(2)}`,
         );
 
         lineItemsPayload.push({

@@ -71,10 +71,10 @@ export const LiveSessionModal = ({ sessionDetail, onClose }) => {
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
   const refreshRouteData = useCallback(async () => {
-    if (!sessionDetail?.sessionInfo?.picker_id) return;
+    if (!sessionDetail?.sessionInfo?.session_id) return;
     try {
       const res = await ecommerceApi.get(
-        `/sesion-activa?id_picker=${sessionDetail.sessionInfo.picker_id}&include_removed=true`,
+        `/sesion-activa?session_id=${sessionDetail.sessionInfo.session_id}&include_removed=true`,
       );
       if (res.data) {
         setLocalRouteData(res.data);

@@ -61,4 +61,4 @@ function calcLineCharge(item) {
   return Math.round(price * qty);
 }
 
-module.exports = { calcLineCharge };
+module.exports = { calcLineCharge, classifyWeighable };
