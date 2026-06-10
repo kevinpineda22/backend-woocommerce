@@ -24,7 +24,7 @@
  */
 
 const { supabase } = require("../services/supabaseClient");
-const { getAllSedes } = require("../services/sedeConfig");
+const { getAllSedesSinFilas } = require("../services/sedeConfig");
 const { obtenerInfoPasillo, SEDES_CONFIG } = require("./mapeadorPasillos");
 
 const UPSERT_BATCH = 500;
@@ -168,14 +168,14 @@ async function main() {
     console.log("🔍 MODO DRY-RUN — no se escribe nada, solo se mide la cobertura.\n");
   }
 
-  const sedes = await getAllSedes();
+  const sedes = await getAllSedesSinFilas();
   const target = onlySlug ? sedes.filter((s) => s.slug === onlySlug) : sedes;
 
   if (target.length === 0) {
     console.error(
       onlySlug
-        ? `No se encontró una sede activa con slug "${onlySlug}".`
-        : "No hay sedes activas.",
+        ? `No se encontró una sede (activa o sf_activa) con slug "${onlySlug}".`
+        : "No hay sedes para Sin Filas.",
     );
     process.exit(1);
   }

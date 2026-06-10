@@ -413,6 +413,16 @@ const SEDES_CONFIG = {
   },
 };
 
+// ============================================================
+// SEDES NUEVAS (Sin Filas) — puntos de venta chicos que SOLO operan en Sin Filas.
+// Aún no tienen layout propio relevado, así que por ahora REPLICAN el de
+// Girardota Parque (slug "girardota"). El usuario reemplazará cada una por su
+// mapeo real cuando lo levante en la tienda.
+// ============================================================
+SEDES_CONFIG["girardota-llano"] = SEDES_CONFIG.girardota;
+SEDES_CONFIG["copacabana-vegas"] = SEDES_CONFIG.girardota;
+SEDES_CONFIG["copacabana-san-juan"] = SEDES_CONFIG.girardota;
+
 const SEDE_DEFAULT = "copacabana-plaza";
 
 const removeAccents = (str) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");

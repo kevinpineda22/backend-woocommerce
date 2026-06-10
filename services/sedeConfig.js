@@ -72,6 +72,30 @@ async function getAllSedes() {
 }
 
 /**
+ * Obtener las sedes visibles para Sin Filas.
+ *
+ * A diferencia de `getAllSedes` (que filtra `activa=true` y es la que usan Woo y
+ * el picking), acá incluimos también las sedes con `sf_activa=true`: los puntos
+ * de venta chicos que SOLO operan en Sin Filas (van con `activa=false` para
+ * quedar fuera del picking/ecommerce). Sin esto, el sync de pasillos las saltea.
+ *
+ * No usa el cache en memoria de `getAllSedes` para no mezclar ambos conjuntos.
+ */
+async function getAllSedesSinFilas() {
+  const { data, error } = await supabase
+    .from("wc_sedes")
+    .select("*")
+    .or("activa.eq.true,sf_activa.eq.true")
+    .order("nombre", { ascending: true });
+
+  if (error) {
+    console.error("Error obteniendo sedes Sin Filas:", error);
+    return [];
+  }
+  return data || [];
+}
+
+/**
  * Obtener una sede por su ID
  */
 async function getSedeById(sedeId) {
@@ -262,6 +286,7 @@ async function getUserSedeId(email) {
 module.exports = {
   WOO_SEDE_META_KEYS,
   getAllSedes,
+  getAllSedesSinFilas,
   getSedeById,
   getSedeBySlug,
   invalidateSedeCache,
