@@ -426,7 +426,7 @@ exports.getPendingOrders = async (req, res) => {
     // y su sesión correspondiente AÚN está activa (no finalizada/cancelada).
     let assignQuery = supabase
       .from("wc_asignaciones_pedidos")
-      .select("id_pedido, wc_picking_sessions!inner(estado)")
+      .select("id_pedido, sede_id, wc_picking_sessions!inner(estado)")
       .in("estado_asignacion", ["en_proceso", "completado"])
       .neq("wc_picking_sessions.estado", "cancelado");
 
@@ -434,11 +434,17 @@ exports.getPendingOrders = async (req, res) => {
       assignQuery = assignQuery.eq("sede_id", req.sedeId);
     }
     const { data: activeAssignments } = await assignQuery;
-    const assignedIds = new Set(activeAssignments.map((a) => a.id_pedido));
+    // Multisede: el order_id NO es único global (cada sede tiene su propio
+    // auto-increment). La asignación debe cotejarse por (id_pedido, sede_id);
+    // si no, un pedido asignado en una sede oculta el pedido con el mismo id
+    // en otra sede en modo "Todas las sedes".
+    const assignedKeys = new Set(
+      (activeAssignments || []).map((a) => `${a.id_pedido}-${a.sede_id}`),
+    );
 
     const cleanOrders = wcOrders.map((order) => ({
       ...order,
-      is_assigned: assignedIds.has(order.id),
+      is_assigned: assignedKeys.has(`${order.id}-${order._sede_id}`),
       sede_detected: order._sede_name || null,
       sede_id: order._sede_id || null,
     }));
