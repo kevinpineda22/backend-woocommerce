@@ -386,11 +386,16 @@ exports.cancelOrder = async (req, res) => {
       });
     }
 
-    // 2. Verificar que no esté ya cancelado en nuestra tabla
+    // Multisite: el order_id NO es único global (cada sede tiene su propio
+    // auto-increment), así que la clave real es (order_id, sede_id).
+    const effectiveSedeId = sede_id || req.sedeId;
+
+    // 2. Verificar que no esté ya cancelado en nuestra tabla (por sede)
     const { data: existing } = await supabase
       .from("wc_pedidos_cancelados")
       .select("id")
       .eq("order_id", order_id)
+      .eq("sede_id", effectiveSedeId)
       .is("restored_at", null)
       .maybeSingle();
 
@@ -401,7 +406,6 @@ exports.cancelOrder = async (req, res) => {
     }
 
     // 3. Obtener datos completos del pedido desde WooCommerce antes de cancelar
-    const effectiveSedeId = sede_id || req.sedeId;
     const wooClient = await getWooClient(effectiveSedeId);
     const { data: orderData } = await wooClient.get(`orders/${order_id}`);
 

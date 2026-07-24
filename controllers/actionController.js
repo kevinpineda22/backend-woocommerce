@@ -26,6 +26,7 @@ exports.registerAction = async (req, res) => {
     f120_id_siesa, // ✅ NUEVO: f120_id encontrado en SIESA
     unidad_medida_siesa, // ✅ NUEVO: unidad_medida encontrada en SIESA
     id_pedido, // ✅ NUEVO: Para desambiguar cuando el mismo producto está en varios pedidos
+    action_id, // ✅ NUEVO: UUID de idempotencia generado por el picker al encolar
   } = req.body;
 
   try {
@@ -256,27 +257,29 @@ exports.registerAction = async (req, res) => {
     }
 
     // =================================================================
-    // 🛡️ GUARD 1: DEBOUNCE — Rechazar acción duplicada en ventana de 3 segundos
-    // Previene: double-tap del picker, replay de cola offline
+    // 🛡️ GUARD 1: IDEMPOTENCIA — Ignorar reenvíos de la MISMA acción.
+    // Deduplica por action_id (UUID que el picker genera al encolar y que se
+    // conserva en los replays de la cola offline). A diferencia del debounce
+    // por ventana de tiempo anterior, esto NO descarta unidades legítimas
+    // distintas del mismo producto: cada scan trae su propio action_id.
+    // Todas las filas de una acción con qty>1 comparten el mismo action_id,
+    // así que un replay encuentra las filas existentes y se ignora entero.
     // =================================================================
-    if (accion === "recolectado" || accion === "sustituido") {
-      const threeSecondsAgo = new Date(Date.now() - 3000).toISOString();
-      const { data: recentDups } = await supabase
+    if (action_id) {
+      const { data: alreadyApplied } = await supabase
         .from("wc_log_picking")
         .select("id")
-        .eq("id_asignacion", targetAssignment.id)
-        .eq("id_producto_original", id_producto_original)
-        .eq("accion", accion)
-        .gte("fecha_registro", threeSecondsAgo)
+        .eq("action_id", action_id)
         .limit(1);
 
-      if (recentDups && recentDups.length > 0) {
+      if (alreadyApplied && alreadyApplied.length > 0) {
         console.warn(
-          `⚠️ DEBOUNCE: Acción duplicada bloqueada — ${accion} producto ${id_producto_original} asignación ${targetAssignment.id}`,
+          `⚠️ IDEMPOTENCIA: Acción ya aplicada (action_id=${action_id}) — reenvío ignorado`,
         );
-        return res
-          .status(200)
-          .json({ success: true, message: "Acción duplicada ignorada" });
+        return res.status(200).json({
+          success: true,
+          message: "Acción ya registrada (idempotente)",
+        });
       }
     }
 
@@ -333,6 +336,7 @@ exports.registerAction = async (req, res) => {
       pasillo: pasillo || "General",
       codigo_barras_escaneado: finalScannedBarcode,
       sede_id: sedeId,
+      action_id: action_id || null,
     };
 
     if (accion === "sustituido" && datos_sustituto) {

@@ -47,6 +47,16 @@ export const useOfflineQueue = (resetSesionLocal) => {
       }
     }
 
+    // 🔑 Idempotencia: llave única por acción. Un replay de la cola conserva el
+    // mismo action_id, así el backend ignora reenvíos sin descartar unidades
+    // legítimas distintas del mismo producto (cada scan trae su propio id).
+    if (!payload.action_id) {
+      payload.action_id =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+
     payload._queued_at = Date.now();
     queue.push(payload);
     localStorage.setItem("offline_actions_queue", JSON.stringify(queue));
