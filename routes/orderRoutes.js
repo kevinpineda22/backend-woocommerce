@@ -31,6 +31,7 @@ router.post("/crear-sesion", sessionCtrl.createPickingSession);
 router.get("/sesion-activa", sessionCtrl.getSessionActive);
 router.post("/finalizar-sesion", sessionCtrl.completeSession);
 router.post("/cancelar-asignacion", sessionCtrl.cancelAssignment);
+router.post("/cancelar-sesion", sessionCtrl.adminCancelSession);
 
 // Rutas de Acción
 router.post("/registrar-accion", actionCtrl.registerAction);

@@ -123,6 +123,31 @@ exports.createPickingSession = async (req, res) => {
       );
     }
 
+    // ✅ GUARD ANTI-SOBREESCRITURA: Verificar que el picker no tenga ya una
+    // sesión activa (id_sesion_actual apuntando a una sesión en_proceso).
+    // Antes esto se sobreescribía silenciosamente, dejando la sesión anterior
+    // huérfana (activa pero sin picker referenciándola).
+    if (pickerData.id_sesion_actual) {
+      const { data: existingSession } = await supabase
+        .from("wc_picking_sessions")
+        .select("estado")
+        .eq("id", pickerData.id_sesion_actual)
+        .single();
+
+      if (existingSession && existingSession.estado === "en_proceso") {
+        throw new Error(
+          `El picker ya tiene una sesión activa (#${pickerData.id_sesion_actual.slice(0, 6)}). Finalícela o cancélela antes de crear una nueva.`
+        );
+      }
+
+      if (existingSession) {
+        console.warn(
+          `⚠️ Sobrescribiendo id_sesion_actual del picker ${targetPickerId}: ` +
+          `la sesión anterior (#${pickerData.id_sesion_actual.slice(0, 6)}) estaba en estado "${existingSession.estado}" (no activa).`,
+        );
+      }
+    }
+
     let sessClient;
     let responses;
 
@@ -744,6 +769,17 @@ exports.completeSession = async (req, res) => {
       .update({ estado_asignacion: "completado", fecha_fin: now })
       .eq("id_sesion", id_sesion);
 
+    // ✅ Liberar picker: sin esto, id_sesion_actual queda apuntando a una
+    // sesión ya completada, lo que impide que el picker tome una nueva
+    // y, peor aún, si se crea una nueva sesión se sobreescribe el puntero
+    // dejando la anterior huérfana (id_sesion_actual = NULL con sesión activa).
+    if (targetPickerId) {
+      await supabase
+        .from("wc_pickers")
+        .update({ estado_picker: "disponible", id_sesion_actual: null })
+        .eq("id", targetPickerId);
+    }
+
     logAuditEvent({
       actor: { type: "picker", id: targetPickerId, name: pickerName },
       action: "session.completed",
@@ -831,5 +867,87 @@ exports.cancelAssignment = async (req, res) => {
     res
       .status(500)
       .json({ error: `Error al cancelar asignación: ${error.message}` });
+  }
+};
+
+// ✅ ADMIN CANCEL SESSION: Revertir sesión por session_id (no por picker)
+// El frontend (ActiveSessionsView) usa este endpoint para que el admin pueda
+// cancelar incluso sesiones huérfanas donde id_sesion_actual = NULL pero la
+// sesión sigue activa (estado = en_proceso).
+exports.adminCancelSession = async (req, res) => {
+  const { session_id, motivo, admin_name, admin_email } = req.body;
+
+  try {
+    if (!session_id) return res.status(400).json({ error: "Falta session_id" });
+
+    const now = new Date().toISOString();
+
+    // 1. Obtener la sesión
+    const { data: session, error: sessError } = await supabase
+      .from("wc_picking_sessions")
+      .select("id, id_picker, ids_pedidos, sede_id")
+      .eq("id", session_id)
+      .single();
+
+    if (sessError || !session) throw new Error("Sesión no encontrada");
+
+    // 2. Nombre del picker para auditoría
+    let pickerName = null;
+    if (session.id_picker) {
+      const { data: pickerRow } = await supabase
+        .from("wc_pickers")
+        .select("nombre_completo")
+        .eq("id", session.id_picker)
+        .single();
+      pickerName = pickerRow?.nombre_completo || null;
+    }
+
+    // 3. Cancelar sesión
+    await supabase
+      .from("wc_picking_sessions")
+      .update({ estado: "cancelado", fecha_fin: now })
+      .eq("id", session_id);
+
+    // 4. Cancelar asignaciones
+    await supabase
+      .from("wc_asignaciones_pedidos")
+      .update({ estado_asignacion: "cancelado", fecha_fin: now })
+      .eq("id_sesion", session_id);
+
+    // 5. Liberar picker (si tiene)
+    if (session.id_picker) {
+      await supabase
+        .from("wc_pickers")
+        .update({ estado_picker: "disponible", id_sesion_actual: null })
+        .eq("id", session.id_picker);
+    }
+
+    // 6. Audit log
+    logAuditEvent({
+      actor: {
+        type: "admin",
+        id: admin_email || null,
+        name: (admin_name || "").trim() || "Admin",
+      },
+      action: "session.cancelled",
+      entity: { type: "session", id: session_id },
+      sedeId: session?.sede_id || req.sedeId || null,
+      metadata: {
+        orders: session?.ids_pedidos || [],
+        picker_name: pickerName,
+        motivo: (motivo || "").trim() || null,
+      },
+    });
+
+    console.log(
+      `🗑️ [ADMIN] Sesión #${session_id} cancelada por ${admin_name || "Admin"}${motivo ? ` — Motivo: ${motivo}` : ""}`,
+    );
+
+    res.status(200).json({ message: "Sesión cancelada correctamente." });
+  } catch (error) {
+    console.error("Error adminCancelSession:", error.message || error);
+    res
+      .status(500)
+      .json({ error: `Error al cancelar sesión: ${error.message}` });
   }
 };
