@@ -18,6 +18,9 @@ const { supabase } = require("./supabaseClient");
 // ⚠️ IMPORTANTE: Debes ajustar estos nombres según tu plugin de multisede.
 //    Usa GET /api/orders/espiar-pedido/:id para descubrir el nombre real.
 const WOO_SEDE_META_KEYS = [
+  // Meta canónico del clon de traslado entre sedes: el webhook de la sede destino
+  // la detecta ANTES que el fallback por x-wc-webhook-source (ADR-7 del design de traslados).
+  "_mkh_lite_branch_name",
   "_sede",
   "sede",
   "_branch",
