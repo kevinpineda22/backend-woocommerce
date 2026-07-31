@@ -288,36 +288,33 @@ describe("buildOrderMetaData", () => {
 // =============================================
 
 describe("buildCustomerNote", () => {
-  const base = {
-    adminName: "Juan Pérez",
-    motivo: "Cliente vive más cerca de Norte",
-    sedeOrigenNombre: "Centro",
-    orderIdOrigen: 80446,
-  };
-
-  it("preserva la nota original y agrega el bloque de traslado", () => {
-    const nota = buildCustomerNote({ ...base, customerNote: "Dejar en portería" });
-    expect(nota).toContain("Dejar en portería");
-    expect(nota).toContain("trasladado desde Centro (pedido original #80446) por Juan Pérez");
-    expect(nota).toContain("Motivo: Cliente vive más cerca de Norte");
+  it("preserva la nota original sin agregar anotaciones de traslado", () => {
+    const nota = buildCustomerNote({ customerNote: "Dejar en portería" });
+    expect(nota).toBe("Dejar en portería");
+    expect(nota).not.toContain("trasladado desde");
+    expect(nota).not.toContain("pedido original");
   });
 
-  it("sin nota original devuelve solo el bloque de traslado", () => {
-    const nota = buildCustomerNote({ ...base, customerNote: "" });
-    expect(nota).toBe(
-      "Este pedido fue trasladado desde Centro (pedido original #80446) por Juan Pérez. Motivo: Cliente vive más cerca de Norte",
-    );
+  it("sin nota original devuelve string vacío", () => {
+    const nota = buildCustomerNote({ customerNote: "" });
+    expect(nota).toBe("");
   });
 
-  it("omite el motivo si no está presente", () => {
-    const nota = buildCustomerNote({ ...base, motivo: "" });
-    expect(nota).not.toContain("Motivo:");
+  it("limpia anotaciones de traslado heredadas de clonaciones previas", () => {
+    const nota = buildCustomerNote({
+      customerNote:
+        "PEDIDO DE PRUEBA\n\n" +
+        "Este pedido fue trasladado desde Girardota (pedido original #80063) por Johan Sanchez. Motivo: Traslado de prueba.\n\n" +
+        "Este pedido fue trasladado desde Copacabana Plaza (pedido original #80447) por Johan Sanchez. Motivo: S",
+    });
+    expect(nota).toBe("PEDIDO DE PRUEBA");
+    expect(nota).not.toContain("trasladado desde");
+    expect(nota).not.toContain("pedido original");
   });
 
   it("no rompe con campos faltantes", () => {
     const nota = buildCustomerNote({});
-    expect(nota).toContain("otra sede");
-    expect(nota).toContain("admin");
+    expect(nota).toBe("");
   });
 });
 
@@ -459,7 +456,7 @@ describe("buildClonePayload", () => {
     ]);
   });
 
-  it("incluye customer_note con el bloque de traslado y metas de pedido con destino", () => {
+  it("incluye customer_note original (sin bloque de traslado) y metas de pedido con destino", () => {
     const payload = buildClonePayload({
       order: pedidoOrigen,
       sedeOrigen,
@@ -468,8 +465,8 @@ describe("buildClonePayload", () => {
       motivo: "Traslado",
       orderIdOrigen: 80446,
     });
-    expect(payload.customer_note).toContain("Dejar en portería");
-    expect(payload.customer_note).toContain("pedido original #80446");
+    expect(payload.customer_note).toBe("Dejar en portería");
+    expect(payload.customer_note).not.toContain("pedido original #80446");
     expect(payload.meta_data).toContainEqual({
       key: "_mkh_lite_branch_name",
       value: "norte",

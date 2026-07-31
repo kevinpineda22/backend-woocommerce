@@ -208,6 +208,11 @@ beforeEach(() => {
 
   wooCentro = makeWooClient();
   wooNorte = makeWooClient();
+  // El pedido origen se busca PRIMERO en la sede explícita (body.sede_id):
+  // el order_id NO es único entre sub-sitios WooCommerce (Multisite).
+  wooCentro.get.mockImplementation(async (endpoint) =>
+    endpoint === `orders/${pedidoProcessing.id}` ? { data: pedidoProcessing } : { data: [] },
+  );
   getWooClient.mockImplementation(async (sedeId) =>
     sedeId === SEDE_NORTE.id ? wooNorte : wooCentro,
   );
@@ -263,15 +268,16 @@ describe("validateTraslado", () => {
     expect(getWooClient).not.toHaveBeenCalled();
   });
 
-  it("404 si el pedido no existe en ninguna sede", async () => {
-    getOrderFromAnySede.mockResolvedValue(null);
+  it("404 si el pedido no existe en la sede indicada", async () => {
+    wooCentro.get.mockRejectedValue(new Error("not found"));
     const req = { body: bodyValido, sedeId: null };
     const res = mockRes();
     await validateTraslado(req, res);
 
     expect(res.statusCode).toBe(404);
     expect(res.body.error).toBe("Pedido no encontrado en WooCommerce.");
-    expect(getWooClient).not.toHaveBeenCalled();
+    expect(wooNorte.post).not.toHaveBeenCalled();
+    expect(inserted).toHaveLength(0);
   });
 
   it("400 si el destino es la misma sede del pedido", async () => {
@@ -281,7 +287,6 @@ describe("validateTraslado", () => {
 
     expect(res.statusCode).toBe(400);
     expect(res.body.error).toBe("El pedido ya pertenece a la sede destino.");
-    expect(getWooClient).not.toHaveBeenCalled();
   });
 
   it("400 si el pedido no está en estado processing", async () => {
@@ -290,7 +295,8 @@ describe("validateTraslado", () => {
       sedeId: SEDE_CENTRO.id,
       sedeName: "Centro",
     });
-    const req = { body: bodyValido, sedeId: null };
+    // Sin sede_id en el request → fallback a la búsqueda global.
+    const req = { body: { ...bodyValido, sede_id: null }, sedeId: null };
     const res = mockRes();
     await validateTraslado(req, res);
 
@@ -311,7 +317,6 @@ describe("validateTraslado", () => {
 
     expect(res.statusCode).toBe(409);
     expect(res.body.error).toContain("sesión de picking activa");
-    expect(getWooClient).not.toHaveBeenCalled();
   });
 
   it("409 si el pedido ya fue trasladado previamente (idempotencia)", async () => {
@@ -324,7 +329,6 @@ describe("validateTraslado", () => {
 
     expect(res.statusCode).toBe(409);
     expect(res.body.error).toBe("Este pedido ya fue trasladado previamente.");
-    expect(getWooClient).not.toHaveBeenCalled();
   });
 
   it("200 feliz: valido, resumen y warnings vacíos; sin mutar nada", async () => {
@@ -370,7 +374,8 @@ describe("validateTraslado", () => {
       ],
     });
 
-    const req = { body: bodyValido, sedeId: null };
+    // Sin sede_id en el request → fallback a la búsqueda global.
+    const req = { body: { ...bodyValido, sede_id: null }, sedeId: null };
     const res = mockRes();
     await validateTraslado(req, res);
 
@@ -398,13 +403,17 @@ describe("ejecutarTraslado", () => {
       return { data: {} };
     });
 
-    wooCentro.get.mockResolvedValue({
-      data: [
-        { id: 1, note: "Hola, espero el pedido", customer_note: true, author: "Ana Gómez" },
-        { id: 2, note: "Email sent to ana@x.com", customer_note: false, author: "system" },
-        { id: 3, note: "Niveles de inventario reducidos: 3 unidades", customer_note: false, author: "WooCommerce" },
-      ],
-    });
+    wooCentro.get.mockImplementation(async (endpoint) =>
+      endpoint === `orders/${pedidoProcessing.id}`
+        ? { data: pedidoProcessing }
+        : {
+            data: [
+              { id: 1, note: "Hola, espero el pedido", customer_note: true, author: "Ana Gómez" },
+              { id: 2, note: "Email sent to ana@x.com", customer_note: false, author: "system" },
+              { id: 3, note: "Niveles de inventario reducidos: 3 unidades", customer_note: false, author: "WooCommerce" },
+            ],
+          },
+    );
 
     const req = { body: bodyValido, sedeId: null };
     const res = mockRes();
@@ -435,9 +444,7 @@ describe("ejecutarTraslado", () => {
       total: "100000",
       meta_data: [{ key: "pa_presentacion", value: "x6" }],
     });
-    expect(payloadClon.customer_note).toContain(
-      "Este pedido fue trasladado desde Centro (pedido original #80446)",
-    );
+    expect(payloadClon.customer_note).toBe("Dejar en portería");
     expect(payloadClon.meta_data).toEqual(
       expect.arrayContaining([
         { key: "_mkh_lite_branch_name", value: "norte" },
@@ -499,7 +506,9 @@ describe("ejecutarTraslado", () => {
   it("estado pendiente_cancelar si falla la cancelación del origen (post-clon)", async () => {
     setupStockSuficiente();
     wooNorte.post.mockResolvedValue({ data: { id: 80062 } });
-    wooCentro.get.mockResolvedValue({ data: [] });
+    wooCentro.get.mockImplementation(async (endpoint) =>
+      endpoint === `orders/${pedidoProcessing.id}` ? { data: pedidoProcessing } : { data: [] },
+    );
     wooCentro.put.mockRejectedValue(new Error("Woo API 500"));
 
     const req = { body: bodyValido, sedeId: null };
@@ -575,7 +584,8 @@ describe("ejecutarTraslado", () => {
       sedeName: "Centro",
     });
 
-    const req = { body: bodyValido, sedeId: null };
+    // Sin sede_id en el request → fallback a la búsqueda global.
+    const req = { body: { ...bodyValido, sede_id: null }, sedeId: null };
     const res = mockRes();
     await ejecutarTraslado(req, res);
 
@@ -590,14 +600,13 @@ describe("ejecutarTraslado", () => {
   });
 
   it("resuelve customer_id por EMAIL en el destino: si existe, lo usa", async () => {
-    getOrderFromAnySede.mockResolvedValue({
-      order: {
-        ...pedidoProcessing,
-        billing: { first_name: "Ana", last_name: "Gómez", email: "ana@x.com" },
-      },
-      sedeId: SEDE_CENTRO.id,
-      sedeName: "Centro",
-    });
+    const pedidoConEmail = {
+      ...pedidoProcessing,
+      billing: { first_name: "Ana", last_name: "Gómez", email: "ana@x.com" },
+    };
+    wooCentro.get.mockImplementation(async (endpoint) =>
+      endpoint === `orders/${pedidoProcessing.id}` ? { data: pedidoConEmail } : { data: [] },
+    );
     wooNorte.get.mockImplementation(async (endpoint, params) => {
       if (endpoint === "products") {
         return {
@@ -615,7 +624,6 @@ describe("ejecutarTraslado", () => {
       if (endpoint === "orders") return { data: { id: 80062, ...payload } };
       return { data: {} };
     });
-    wooCentro.get.mockResolvedValue({ data: [] });
 
     const req = { body: bodyValido, sedeId: null };
     const res = mockRes();
@@ -628,8 +636,8 @@ describe("ejecutarTraslado", () => {
     expect(inserted[0].rows[0].estado).toBe("completado");
   });
 
-  it("404 si el pedido no existe (las guardas corren también al ejecutar)", async () => {
-    getOrderFromAnySede.mockResolvedValue(null);
+  it("404 si el pedido no existe en la sede indicada (las guardas corren también al ejecutar)", async () => {
+    wooCentro.get.mockRejectedValue(new Error("not found"));
     const req = { body: bodyValido, sedeId: null };
     const res = mockRes();
     await ejecutarTraslado(req, res);
@@ -637,5 +645,66 @@ describe("ejecutarTraslado", () => {
     expect(res.statusCode).toBe(404);
     expect(wooNorte.post).not.toHaveBeenCalled();
     expect(inserted).toHaveLength(0);
+  });
+
+  it("colisión de order_id: usa el pedido de la sede explícita, no el de otra sede", async () => {
+    setupStockSuficiente();
+    // Bug real #79857: existe como processing en Villahermosa y como completed
+    // en Girardota. La búsqueda global responde PRIMERO el de Girardota (el
+    // "malo") — pero la sede explícita (body.sede_id) tiene el correcto.
+    getOrderFromAnySede.mockResolvedValue({
+      order: { ...pedidoProcessing, id: 79857, status: "completed", total: "64749.00" },
+      sedeId: "uuid-otra",
+      sedeName: "Otra",
+    });
+    wooCentro.get.mockImplementation(async (endpoint) =>
+      endpoint === "orders/79857"
+        ? { data: { ...pedidoProcessing, id: 79857, status: "processing" } }
+        : { data: [] },
+    );
+    wooNorte.post.mockImplementation(async (endpoint, payload) => {
+      if (endpoint === "orders") return { data: { id: 80062, ...payload } };
+      return { data: {} };
+    });
+
+    const req = { body: { ...bodyValido, order_id: 79857 }, sedeId: null };
+    const res = mockRes();
+    await ejecutarTraslado(req, res);
+
+    expect(res.statusCode).toBe(200);
+    // Ganó la sede explícita: la búsqueda global ni siquiera se consultó.
+    expect(getOrderFromAnySede).not.toHaveBeenCalled();
+    const clonCall = wooNorte.post.mock.calls.find(([endpoint]) => endpoint === "orders");
+    // El clon documenta el origen real (Centro #79857), no el de la otra sede
+    // (que compartía el mismo order_id con status completed).
+    expect(clonCall[1].meta_data).toEqual(
+      expect.arrayContaining([
+        { key: "_mkh_transferred_from", value: "Centro (pedido #79857)" },
+      ]),
+    );
+    expect(inserted[0].rows[0]).toMatchObject({
+      order_id_origen: 79857,
+      sede_origen_id: SEDE_CENTRO.id,
+      estado: "completado",
+    });
+  });
+
+  it("sin sede_id en el request usa getOrderFromAnySede como fallback", async () => {
+    setupStockSuficiente();
+    wooNorte.post.mockImplementation(async (endpoint, payload) => {
+      if (endpoint === "orders") return { data: { id: 80062, ...payload } };
+      return { data: {} };
+    });
+
+    const req = { body: { ...bodyValido, sede_id: null }, sedeId: null };
+    const res = mockRes();
+    await ejecutarTraslado(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(getOrderFromAnySede).toHaveBeenCalledWith(80446);
+    expect(inserted[0].rows[0]).toMatchObject({
+      order_id_origen: 80446,
+      sede_origen_id: SEDE_CENTRO.id,
+    });
   });
 });

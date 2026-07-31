@@ -187,22 +187,28 @@ function buildOrderMetaData({ order, sedeOrigen, sedeDestino, orderIdOrigen }) {
 // NOTA DE CLIENTE DEL CLON
 // ============================================================
 
+// Anotación de traslado que versiones previas agregaban a la customer_note
+// ("Este pedido fue trasladado desde X (pedido original #N) por A. Motivo: M.").
+// Ya NO se agrega (decisión del cliente: el pedido no debe llevar anotaciones);
+// pero si el origen trae una heredada de un traslado anterior, se limpia para
+// que no se siga acumulando entre clonaciones. Cada anotación es un párrafo
+// propio (la arma el service viejo como bloque separado por \n\n), así que se
+// descarta el párrafo completo que empiece con ese patrón.
+const ES_ANOTACION_TRASLADO =
+  /^Este pedido fue trasladado desde .*\(pedido original #\d+\) por .*/i;
+
 /**
- * Arma la customer_note del clon: preserva la nota original del cliente
- * (si existe) y le agrega un bloque que documenta el traslado.
+ * Arma la customer_note del clon: preserva la nota original del cliente,
+ * SIN anotaciones de traslado (el seguimiento vive en wc_pedidos_trasladados,
+ * audit y el meta `_mkh_transferred_from`).
  */
-function buildCustomerNote({ customerNote, adminName, motivo, sedeOrigenNombre, orderIdOrigen }) {
-  const notaBase = (customerNote || "").trim();
-  const motivoPart = (motivo || "").trim();
-  const admin = (adminName || "admin").trim();
-  const origen = sedeOrigenNombre || "otra sede";
-  const traslado = [
-    `Este pedido fue trasladado desde ${origen} (pedido original #${orderIdOrigen}) por ${admin}.`,
-    motivoPart ? `Motivo: ${motivoPart}` : null,
-  ]
+function buildCustomerNote({ customerNote }) {
+  return (customerNote || "")
+    .split(/\n{2,}/)
+    .map((bloque) => bloque.trim())
     .filter(Boolean)
-    .join(" ");
-  return notaBase ? `${notaBase}\n\n${traslado}` : traslado;
+    .filter((bloque) => !ES_ANOTACION_TRASLADO.test(bloque.replace(/\s+/g, " ")))
+    .join("\n\n");
 }
 
 /**
@@ -277,10 +283,6 @@ function buildClonePayload({ order, sedeOrigen, sedeDestino, adminName, motivo, 
     customer_id: customerId !== undefined ? customerId : order.customer_id || 0,
     customer_note: buildCustomerNote({
       customerNote: order.customer_note,
-      adminName,
-      motivo,
-      sedeOrigenNombre: sedeOrigen && (sedeOrigen.nombre || sedeOrigen.slug),
-      orderIdOrigen,
     }),
     billing: order.billing || {},
     shipping: order.shipping || {},

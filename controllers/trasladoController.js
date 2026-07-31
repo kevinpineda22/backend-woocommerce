@@ -14,9 +14,11 @@
  *     invalidar caché → audit `order.transferred`.
  *
  * Decisiones:
- *   - La sede de ORIGEN sale del request (`sede_id`, la conoce el frontend:
- *     el order_id NO es único global entre sub-sitios) con fallback a la sede
- *     donde `getOrderFromAnySede` encontró el pedido.
+ *   - El pedido de ORIGEN se busca PRIMERO en la sede explícita del request
+ *     (`sede_id`, la conoce el frontend: `order.sede_id`): el order_id NO es
+ *     único entre sub-sitios (colisión real #79857 en Villahermosa vs
+ *     Girardota). `getOrderFromAnySede` solo se usa como fallback cuando la
+ *     sede es desconocida o no tiene WooCommerce configurado.
  *   - `cancelarOrigen` (helper interno) NO escribe snapshot en
  *     `wc_pedidos_cancelados` (spec R5/ADR-4: un traslado no es una
  *     cancelación; si el cancel falla post-clon queda `pendiente_cancelar`).
@@ -74,8 +76,9 @@ function createTrasladoController(deps = {}) {
   // ============================================================
 
   /**
-   * Busca el pedido origen en cualquier sede (order_id no es único global entre
-   * sub-sitios). Devuelve { order, sedeId, sedeName } o null.
+   * FALLBACK: busca el pedido origen en cualquier sede. Solo se usa cuando no
+   * se conoce la sede de origen (body.sede_id ausente) o esa sede no tiene
+   * WooCommerce. Devuelve { order, sedeId, sedeName } o null.
    */
   async function getOrdenOrigen(orderId) {
     return woo.getOrderFromAnySede(orderId);
@@ -136,21 +139,45 @@ function createTrasladoController(deps = {}) {
       return null;
     }
 
-    // Pedido origen: 404 si no existe en NINGUNA sede.
-    const found = await getOrdenOrigen(body.order_id);
+    // Origen: el frontend lo conoce (order.sede_id) y lo envía en `sede_id`.
+    // CRÍTICO: el order_id NO es único entre sub-sitios (Multisite) — colisión
+    // real #79857 (Villahermosa processing vs Girardota completed). Por eso el
+    // pedido se busca PRIMERO en la sede explícita y solo si la sede es
+    // desconocida/sin WooCommerce se usa la búsqueda global como fallback.
+    const sedeOrigenIdBody = body.sede_id || req.sedeId || null;
+    const sedeOrigen = sedeOrigenIdBody
+      ? await sedes.getSedeById(sedeOrigenIdBody)
+      : null;
+
+    let found;
+    if (sedeOrigen && sedeOrigen.wc_url) {
+      try {
+        const wooClientOrigen = await woo.getWooClient(sedeOrigen.id);
+        const { data: order } = await wooClientOrigen.get(
+          `orders/${body.order_id}`,
+        );
+        found = {
+          order,
+          sedeId: sedeOrigen.id,
+          sedeName: sedeOrigen.nombre || "Sede origen",
+        };
+      } catch (error) {
+        found = null; // no existe en la sede indicada → 404
+      }
+    } else {
+      found = await getOrdenOrigen(body.order_id);
+    }
+
     if (!found || !found.order) {
       res.status(404).json({ error: "Pedido no encontrado en WooCommerce." });
       return null;
     }
     const order = found.order;
-
-    // Origen: el frontend lo conoce (order.sede_id) y lo envía en `sede_id`;
-    // si no viene, usamos la sede donde la búsqueda encontró el pedido.
-    const sedeOrigenIdBody = body.sede_id || req.sedeId || null;
-    const sedeOrigen = sedeOrigenIdBody ? await sedes.getSedeById(sedeOrigenIdBody) : null;
-    const origenId = (sedeOrigen && sedeOrigen.id) || found.sedeId;
-    const origenInfo =
-      sedeOrigen || { id: found.sedeId, nombre: found.sedeName || "Sede origen" };
+    const origenId = found.sedeId;
+    const origenInfo = {
+      id: found.sedeId,
+      nombre: found.sedeName || "Sede origen",
+    };
 
     if (isSameSede(origenId, sedeDestino.id)) {
       res.status(400).json({ error: "El pedido ya pertenece a la sede destino." });
