@@ -14,8 +14,10 @@
  *   - ADR-5: warnings de stock NO bloqueantes (persistidos en la tabla).
  *   - `_mkh_transferred_from` = `{sedeOrigen.nombre} (pedido #{orderIdOrigen})`
  *     (resolución de sdd-tasks Risk 1 sobre el formato del meta en el clon).
- *   - `customer_id` se copia del origen por defecto (open question del design;
- *     si el destino lo rechaza con 404, probar con 0 en staging).
+ *   - `customer_id` del clon se resuelve por EMAIL en la sede destino
+ *     (resolveCustomerDestino): si el cliente existe → su id; si no → invitado
+ *     (0). En Multisite cada sub-sitio tiene clientes independientes, así que
+ *     el customer_id del ORIGEN no es válido en destino.
  */
 
 // ============================================================
@@ -203,6 +205,40 @@ function buildCustomerNote({ customerNote, adminName, motivo, sedeOrigenNombre, 
   return notaBase ? `${notaBase}\n\n${traslado}` : traslado;
 }
 
+/**
+ * Resuelve el `customer_id` del clon en la sede destino.
+ *
+ * En WooCommerce Multisite cada sub-sitio tiene clientes independientes: el
+ * customer_id del ORIGEN no existe (o apunta a otro usuario) en el destino.
+ * Regla (hotfix post-verify):
+ *   - Si hay email de facturación y existe un cliente con ese email en destino
+ *     → se usa su id (el pedido queda vinculado al perfil, sin duplicados).
+ *   - Si no hay email o el cliente no existe → invitado (`customer_id: 0`).
+ *
+ * `fetchCustomerByEmail(email)` está inyectado para testear sin red.
+ *
+ * @param {Object} params
+ * @param {Object} params.order - Pedido origen (usa `billing.email`).
+ * @param {Function} params.fetchCustomerByEmail - async (email) => Array
+ * @returns {Promise<number>} customer_id a usar en el clon.
+ */
+async function resolveCustomerDestino({ order, fetchCustomerByEmail }) {
+  const email = String((order && order.billing && order.billing.email) || "")
+    .trim()
+    .toLowerCase();
+  if (!email || typeof fetchCustomerByEmail !== "function") return 0;
+
+  try {
+    const found = await fetchCustomerByEmail(email);
+    if (Array.isArray(found) && found.length > 0 && found[0] && found[0].id) {
+      return found[0].id;
+    }
+  } catch (error) {
+    console.warn("[traslado] Error consultando cliente en destino:", error.message);
+  }
+  return 0;
+}
+
 // ============================================================
 // PAYLOAD DE CLONADO
 // ============================================================
@@ -215,9 +251,10 @@ function buildCustomerNote({ customerNote, adminName, motivo, sedeOrigenNombre, 
  *   - Metas de línea filtradas (solo las 4 de preparación) y metas de pedido
  *     con branch destino + `_mkh_transferred_from`.
  *   - Billing/shipping completos del origen y shipping_lines con sus totales.
- *   - `customer_id` copiado del origen (default del design; validar en staging).
+ *   - `customer_id`: si viene `customerId` (resuelto por email en el destino)
+ *     se usa ese; si no, por compatibilidad se usa el del origen o invitado (0).
  */
-function buildClonePayload({ order, sedeOrigen, sedeDestino, adminName, motivo, orderIdOrigen }) {
+function buildClonePayload({ order, sedeOrigen, sedeDestino, adminName, motivo, orderIdOrigen, customerId }) {
   const lineItems = (order.line_items || []).map((item) => ({
     product_id: item.product_id,
     variation_id: item.variation_id || 0,
@@ -237,7 +274,7 @@ function buildClonePayload({ order, sedeOrigen, sedeDestino, adminName, motivo, 
     status: "processing",
     payment_method: "cod",
     payment_method_title: order.payment_method_title || null,
-    customer_id: order.customer_id || 0,
+    customer_id: customerId !== undefined ? customerId : order.customer_id || 0,
     customer_note: buildCustomerNote({
       customerNote: order.customer_note,
       adminName,
@@ -419,4 +456,5 @@ module.exports = {
   buildClonePayload,
   filterOrderNotes,
   checkStockDestino,
+  resolveCustomerDestino,
 };

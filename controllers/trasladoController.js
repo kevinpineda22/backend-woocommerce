@@ -66,6 +66,7 @@ function createTrasladoController(deps = {}) {
     buildClonePayload,
     filterOrderNotes,
     checkStockDestino,
+    resolveCustomerDestino,
   } = deps.service || trasladoService;
 
   // ============================================================
@@ -157,9 +158,9 @@ function createTrasladoController(deps = {}) {
     }
 
     if (order.status !== "processing") {
-      res
-        .status(400)
-        .json({ error: "Solo se pueden trasladar pedidos en estado processing." });
+      res.status(400).json({
+        error: `Solo se pueden trasladar pedidos en estado processing (estado actual: ${order.status}).`,
+      });
       return null;
     }
 
@@ -241,11 +242,33 @@ function createTrasladoController(deps = {}) {
 
       const wooClientDestino = await woo.getWooClient(sedeDestino.id);
 
-      // 1. Re-chequeo de stock (race validar→ejecutar); warnings NO bloqueantes.
+      // 1. Re-chequeo de stock (race validar→ejecutar). Si un producto NO
+      //    existe en el destino (item_missing), el clon fallaría con 400 de
+      //    WooCommerce: mejor bloquear acá con un mensaje claro.
       const warnings = await checkStockDestino({
         lineItems: order.line_items,
         fetchProducts: async (endpoint, params) => {
           const { data } = await wooClientDestino.get(endpoint, params);
+          return data;
+        },
+      });
+      const itemMissing = warnings.filter((w) => w.tipo === "item_missing");
+      if (itemMissing.length > 0) {
+        const nombres = itemMissing
+          .slice(0, 5)
+          .map((w) => w.nombre)
+          .join(", ");
+        return res.status(400).json({
+          error: `No se puede trasladar: hay productos que no existen en la sede destino (${nombres}${itemMissing.length > 5 ? ", ..." : ""}). Revisa el pedido antes de reintentar.`,
+        });
+      }
+
+      // 1.5. Resolver cliente en destino por email (Multisite: clientes
+      //      independientes por sub-sitio). Si no existe → invitado (0).
+      const customerId = await resolveCustomerDestino({
+        order,
+        fetchCustomerByEmail: async (email) => {
+          const { data } = await wooClientDestino.get("customers", { email });
           return data;
         },
       });
@@ -265,6 +288,7 @@ function createTrasladoController(deps = {}) {
             adminName,
             motivo,
             orderIdOrigen: order.id,
+            customerId,
           }),
         );
         clone = data;
@@ -289,6 +313,7 @@ function createTrasladoController(deps = {}) {
                 adminName,
                 motivo,
                 orderIdOrigen: order.id,
+                customerId: 0,
               }),
             );
             clone = data;

@@ -295,7 +295,9 @@ describe("validateTraslado", () => {
     await validateTraslado(req, res);
 
     expect(res.statusCode).toBe(400);
-    expect(res.body.error).toBe("Solo se pueden trasladar pedidos en estado processing.");
+    expect(res.body.error).toBe(
+      "Solo se pueden trasladar pedidos en estado processing (estado actual: completed).",
+    );
     expect(getWooClient).not.toHaveBeenCalled();
   });
 
@@ -425,7 +427,8 @@ describe("ejecutarTraslado", () => {
     expect(payloadClon.status).toBe("processing");
     expect(payloadClon.payment_method).toBe("cod");
     expect(payloadClon.total_tax).toBe("0");
-    expect(payloadClon.customer_id).toBe(42);
+    // El fixture billing no tiene email → cliente no resuelto → invitado (0).
+    expect(payloadClon.customer_id).toBe(0);
     expect(payloadClon.line_items[0]).toMatchObject({
       product_id: 101,
       price: "20000",
@@ -557,6 +560,72 @@ describe("ejecutarTraslado", () => {
     expect(inserted).toHaveLength(0);
     expect(wooCentro.put).not.toHaveBeenCalled();
     expect(logAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("400 bloqueante si hay item_missing (producto no existe en destino) — sin clonar", async () => {
+    setupStockSuficiente();
+    getOrderFromAnySede.mockResolvedValue({
+      order: {
+        ...pedidoProcessing,
+        line_items: [
+          { product_id: 202, variation_id: 0, quantity: 1, price: "1000", total: "1000", name: "Producto inexistente", meta_data: [] },
+        ],
+      },
+      sedeId: SEDE_CENTRO.id,
+      sedeName: "Centro",
+    });
+
+    const req = { body: bodyValido, sedeId: null };
+    const res = mockRes();
+    await ejecutarTraslado(req, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toContain("hay productos que no existen en la sede destino");
+    expect(res.body.error).toContain("Producto inexistente");
+    // No clona, no cancela, no persiste.
+    expect(wooNorte.post).not.toHaveBeenCalled();
+    expect(wooCentro.put).not.toHaveBeenCalled();
+    expect(inserted).toHaveLength(0);
+    expect(logAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("resuelve customer_id por EMAIL en el destino: si existe, lo usa", async () => {
+    getOrderFromAnySede.mockResolvedValue({
+      order: {
+        ...pedidoProcessing,
+        billing: { first_name: "Ana", last_name: "Gómez", email: "ana@x.com" },
+      },
+      sedeId: SEDE_CENTRO.id,
+      sedeName: "Centro",
+    });
+    wooNorte.get.mockImplementation(async (endpoint, params) => {
+      if (endpoint === "products") {
+        return {
+          data: [
+            { id: 101, manage_stock: true, stock_quantity: 10, stock_status: "instock", name: "Papel higiénico x6" },
+          ],
+        };
+      }
+      if (endpoint === "customers") {
+        return { data: [{ id: 999, email: "ana@x.com" }] };
+      }
+      return { data: [] };
+    });
+    wooNorte.post.mockImplementation(async (endpoint, payload) => {
+      if (endpoint === "orders") return { data: { id: 80062, ...payload } };
+      return { data: {} };
+    });
+    wooCentro.get.mockResolvedValue({ data: [] });
+
+    const req = { body: bodyValido, sedeId: null };
+    const res = mockRes();
+    await ejecutarTraslado(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(wooNorte.get).toHaveBeenCalledWith("customers", { email: "ana@x.com" });
+    const clonCall = wooNorte.post.mock.calls.find(([endpoint]) => endpoint === "orders");
+    expect(clonCall[1].customer_id).toBe(999);
+    expect(inserted[0].rows[0].estado).toBe("completado");
   });
 
   it("404 si el pedido no existe (las guardas corren también al ejecutar)", async () => {

@@ -15,6 +15,7 @@ const {
   buildClonePayload,
   filterOrderNotes,
   checkStockDestino,
+  resolveCustomerDestino,
 } = require("./trasladoService");
 
 // =============================================
@@ -387,7 +388,7 @@ describe("buildClonePayload", () => {
     expect(payload.total_tax).toBe("0");
   });
 
-  it("copia el customer_id del origen (open question del design)", () => {
+  it("copia el customer_id del origen por compatibilidad si no se pasa customerId", () => {
     const payload = buildClonePayload({
       order: pedidoOrigen,
       sedeOrigen,
@@ -397,6 +398,19 @@ describe("buildClonePayload", () => {
       orderIdOrigen: 80446,
     });
     expect(payload.customer_id).toBe(123);
+  });
+
+  it("usa customerId resuelto (por email en destino) cuando se pasa", () => {
+    const payload = buildClonePayload({
+      order: pedidoOrigen,
+      sedeOrigen,
+      sedeDestino,
+      adminName: "Juan",
+      motivo: "m",
+      orderIdOrigen: 80446,
+      customerId: 999,
+    });
+    expect(payload.customer_id).toBe(999);
   });
 
   it("fuerza price/total de ORIGEN por línea y filtra las metas de línea", () => {
@@ -723,5 +737,48 @@ describe("checkStockDestino", () => {
       fetchProducts,
     });
     expect(warnings).toEqual([]);
+  });
+});
+
+// =============================================
+// resolveCustomerDestino — cliente por email en la sede destino
+// =============================================
+
+describe("resolveCustomerDestino", () => {
+  it("usa el id del cliente si existe con ese email en destino", async () => {
+    const customerId = await resolveCustomerDestino({
+      order: { billing: { email: "  ANA@x.com " } },
+      fetchCustomerByEmail: async (email) => {
+        expect(email).toBe("ana@x.com"); // normalizado (trim + lowercase)
+        return [{ id: 999, email: "ana@x.com" }];
+      },
+    });
+    expect(customerId).toBe(999);
+  });
+
+  it("devuelve 0 (invitado) si el cliente no existe en destino", async () => {
+    const customerId = await resolveCustomerDestino({
+      order: { billing: { email: "nadie@x.com" } },
+      fetchCustomerByEmail: async () => [],
+    });
+    expect(customerId).toBe(0);
+  });
+
+  it("devuelve 0 si el pedido no tiene email de billing", async () => {
+    const customerId = await resolveCustomerDestino({
+      order: { billing: { first_name: "Ana" } },
+      fetchCustomerByEmail: vi.fn(),
+    });
+    expect(customerId).toBe(0);
+  });
+
+  it("devuelve 0 si la consulta al destino falla (no bloquea el traslado)", async () => {
+    const customerId = await resolveCustomerDestino({
+      order: { billing: { email: "ana@x.com" } },
+      fetchCustomerByEmail: async () => {
+        throw new Error("timeout");
+      },
+    });
+    expect(customerId).toBe(0);
   });
 });
