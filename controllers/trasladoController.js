@@ -251,6 +251,9 @@ function createTrasladoController(deps = {}) {
       });
 
       // 2. Clonar en destino con precios de ORIGEN (ADR-1).
+      // Si WooCommerce rechaza el customer_id del origen (cliente inexistente en
+      // el sub-sitio destino, común en Multisite), se reintenta como invitado
+      // (customer_id 0). Un POST rechazado no crea pedido, así que es seguro.
       let clone;
       try {
         const { data } = await wooClientDestino.post(
@@ -266,11 +269,46 @@ function createTrasladoController(deps = {}) {
         );
         clone = data;
       } catch (error) {
-        // Mapa de errores: POST clon rechazado → 400, NO se persiste ni se cancela.
-        const detalle = (error && error.message) || "error desconocido";
-        return res.status(400).json({
-          error: `No se pudo crear el pedido en la sede destino: ${detalle}`,
-        });
+        const detalleClon =
+          (error.response &&
+            error.response.data &&
+            (error.response.data.message ||
+              JSON.stringify(error.response.data))) ||
+          error.message ||
+          "error desconocido";
+
+        if (/customer/i.test(String(detalleClon))) {
+          // El cliente del origen no existe en el destino → pedido de invitado.
+          try {
+            const { data } = await wooClientDestino.post(
+              "orders",
+              buildClonePayload({
+                order: { ...order, customer_id: 0 },
+                sedeOrigen,
+                sedeDestino,
+                adminName,
+                motivo,
+                orderIdOrigen: order.id,
+              }),
+            );
+            clone = data;
+          } catch (error2) {
+            const detalle2 =
+              (error2.response &&
+                error2.response.data &&
+                (error2.response.data.message ||
+                  JSON.stringify(error2.response.data))) ||
+              error2.message ||
+              "error desconocido";
+            return res.status(400).json({
+              error: `No se pudo crear el pedido en la sede destino: ${detalle2}`,
+            });
+          }
+        } else {
+          return res.status(400).json({
+            error: `No se pudo crear el pedido en la sede destino: ${detalleClon}`,
+          });
+        }
       }
       const orderIdDestino = clone.id;
 
