@@ -9,6 +9,7 @@ const dashboardCtrl = require("../controllers/dashboardController");
 const adminCtrl = require("../controllers/adminController");
 const sedeCtrl = require("../controllers/sedeController");
 const auditCtrl = require("../controllers/auditLogController");
+const trasladoCtrl = require("../controllers/trasladoController");
 
 // Middleware Multi-Sede (se aplica a TODAS las rutas de este router)
 const { sedeMiddleware } = require("../middleware/sedeMiddleware");
@@ -66,6 +67,10 @@ router.post("/admin-force-pick", adminCtrl.forcePickItemToSession);
 router.post("/cancelar-pedido", adminCtrl.cancelOrder);
 router.post("/restaurar-pedido", adminCtrl.restoreOrder);
 router.get("/pedidos-cancelados", adminCtrl.getCancelledOrders);
+
+// Rutas de Traslado de Pedidos entre Sedes
+router.post("/trasladar-pedido/validar", trasladoCtrl.validateTraslado);
+router.post("/trasladar-pedido", trasladoCtrl.ejecutarTraslado);
 
 // Audit Log (timeline global del sistema)
 router.get("/audit-log", auditCtrl.listAuditEvents);
