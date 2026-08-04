@@ -424,12 +424,38 @@ exports.searchProduct = async (req, res) => {
             )?.value || p.sku;
         }
 
+        // ⚠️ STOCK: WooCommerce devuelve `stock_quantity: null` cuando el producto
+        // NO gestiona inventario (`manage_stock: false`), que es el caso normal en
+        // supermercado. Ese null NO significa "sin existencias" — la fuente de
+        // verdad es `stock_status`. Tratar el null como 0 hacía que TODOS los
+        // sustitutos aparecieran "Sin Stock" y el picker no pudiera elegirlos.
+        // En variaciones `manage_stock` puede ser "parent": hereda del padre.
+        const parent = p._parentProduct || null;
+        const managesOwnStock = p.manage_stock === true;
+        const stockStatus = (
+          p.stock_status ||
+          parent?.stock_status ||
+          "instock"
+        )
+          .toString()
+          .toLowerCase();
+        const stockQty =
+          managesOwnStock && p.stock_quantity !== null
+            ? p.stock_quantity
+            : null;
+        // Disponible = Woo lo marca en stock Y (no lleva inventario O le queda)
+        const disponible =
+          stockStatus === "instock" && (stockQty === null || stockQty > 0);
+
         return {
           id: p.id,
           name: displayName,
           price: p.price,
           image: displayImage,
-          stock: p.stock_quantity ?? 0,
+          // `stock` es la cantidad REAL o null si el producto no lleva inventario
+          stock: stockQty,
+          stock_status: stockStatus,
+          disponible,
           sku: p.sku,
           categories: p.categories || p._parentProduct?.categories,
           unidad_medida: unidadMedida,

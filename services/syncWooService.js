@@ -39,6 +39,22 @@ const syncOrderToWoo = async (sessionId, orderId) => {
       .eq("id_asignacion", assignment.id)
       .order("fecha_registro", { ascending: true });
 
+    // 4b. Anulaciones del admin — se consultan a nivel de SESIÓN, no de pedido.
+    // `removeItemFromSession` marca el producto como retirado en TODOS los
+    // pedidos del snapshot pero deja un único log colgado de una asignación
+    // cualquiera, así que filtrar por `assignment.id` lo perdería en el resto
+    // de los pedidos de la sesión.
+    const { data: sessionAssignments } = await supabase
+      .from("wc_asignaciones_pedidos")
+      .select("id")
+      .eq("id_sesion", sessionId);
+
+    const { data: adminRemovals } = await supabase
+      .from("wc_log_picking")
+      .select("id_producto")
+      .in("id_asignacion", (sessionAssignments || []).map((a) => a.id))
+      .eq("accion", "eliminado_admin");
+
     // --- LÓGICA DE PROCESAMIENTO --- //
     const productMap = {};
 
@@ -55,6 +71,9 @@ const syncOrderToWoo = async (sessionId, orderId) => {
         original_price: parseFloat(item.price || 0),
         requested_qty: item.quantity,
         picked_qty: 0,
+        subbed_qty: 0,
+        notfound_qty: 0,
+        removed_by_admin: false,
         weight_total: 0,
       };
       // Mapa inverso: si el log trae product_id padre, también lo encontramos
@@ -65,12 +84,14 @@ const syncOrderToWoo = async (sessionId, orderId) => {
     // B. Procesar Logs para entender la realidad
     const itemsToAdd = [];
 
+    // ✅ Resuelve la línea de Woo a la que pertenece un log (directo o vía variación)
+    const resolveKey = (logProdId) =>
+      productMap[logProdId] ? logProdId : pidToKey[logProdId] || null;
+
     logs.forEach((log) => {
+      const key = resolveKey(log.id_producto);
+
       if (log.accion === "recolectado" && !log.es_sustituto) {
-        // ✅ FIX: Buscar por id_producto directo o a través del mapa de variaciones
-        const key = productMap[log.id_producto]
-          ? log.id_producto
-          : pidToKey[log.id_producto] || null;
         if (key && productMap[key]) {
           productMap[key].picked_qty += 1;
           if (log.peso_real && parseFloat(log.peso_real) > 0) {
@@ -83,15 +104,39 @@ const syncOrderToWoo = async (sessionId, orderId) => {
           qty: 1,
           price: parseFloat(log.precio_nuevo || 0),
         });
+        // La unidad sustituida SÍ sale de la línea original (se agrega como línea nueva)
+        if (key && productMap[key]) productMap[key].subbed_qty += 1;
+      } else if (log.accion === "no_encontrado") {
+        if (key && productMap[key]) productMap[key].notfound_qty += 1;
       }
+    });
+
+    // Marcar las líneas anuladas por el admin (log a nivel de sesión)
+    (adminRemovals || []).forEach((r) => {
+      const key = resolveKey(r.id_producto);
+      if (key && productMap[key]) productMap[key].removed_by_admin = true;
     });
 
     // CONSTRUIR EL PAYLOAD BATCH
     const lineItemsPayload = [];
 
-    // 4. Líneas Existentes (Actualizar o Eliminar)
+    // 4. Líneas Existentes (Actualizar, Eliminar o dejar en $0)
+    //
+    // 📌 REGLA DE NEGOCIO — ítems NO ENCONTRADOS:
+    // La línea NO se borra del pedido de WooCommerce: sigue visible con su
+    // cantidad original para que el cliente vea qué pidió, pero se cobra solo
+    // lo que se entregó de verdad (`picked_qty × precio`) y se marca con un meta
+    // "NO ENTREGADO". Si no se encontró ninguna unidad el cobro queda en $0.
+    // Así el total de Woo coincide con el manifiesto, que solo suma lo
+    // recolectado y lo sustituido.
+    // La línea solo desaparece cuando la unidad salió de verdad del pedido:
+    // sustitución total (se agrega la línea del sustituto) o retiro del admin.
     for (const prodId in productMap) {
       const item = productMap[prodId];
+
+      const targetQty = item.removed_by_admin
+        ? 0
+        : Math.max(0, item.requested_qty - item.subbed_qty);
 
       if (item.weight_total > 0 && item.picked_qty > 0) {
         // ✅ FIX: respetar la convención de unidad (igual que la caja POS).
@@ -105,29 +150,63 @@ const syncOrderToWoo = async (sessionId, orderId) => {
           `⚖️ [PESO] ${item.name} (${item.sku || "?"}, ${kind || "kg?"}): ${item.weight_total}Kg × $${item.original_price} × ${factor} -> $${nuevoTotal.toFixed(2)}`,
         );
 
+        const metaPeso = [
+          { key: "Peso Real Facturado", value: `${item.weight_total} Kg` },
+          { key: "_picking_adjusted", value: "true" },
+        ];
+        // Pesable con unidades faltantes: se factura solo el peso realmente
+        // pesado, así que el faltante ya queda sin cobro. Se deja constancia.
+        if (item.notfound_qty > 0) {
+          metaPeso.unshift({
+            key: "NO ENTREGADO",
+            value: `${item.notfound_qty} de ${item.requested_qty} sin existencias`,
+          });
+        }
+
         lineItemsPayload.push({
           id: item.line_id,
           quantity: item.picked_qty,
           total: nuevoTotal.toFixed(2),
           subtotal: nuevoTotal.toFixed(2),
-          meta_data: [
-            { key: "Peso Real Facturado", value: `${item.weight_total} Kg` },
-            { key: "_picking_adjusted", value: "true" },
-          ],
+          meta_data: metaPeso,
         });
-      } else if (item.picked_qty < item.requested_qty && item.picked_qty > 0) {
+      } else if (targetQty === 0) {
+        // Sustitución total o retiro del admin → la línea sale del pedido
         console.log(
-          `📉 [SHORT] ${item.name}: ${item.requested_qty} -> ${item.picked_qty}`,
+          `🗑️ [DELETE] ${item.name}: Eliminando línea (sustituidas=${item.subbed_qty}, retiro_admin=${item.removed_by_admin}).`,
         );
         lineItemsPayload.push({
           id: item.line_id,
-          quantity: item.picked_qty,
+          quantity: 0,
         });
-      } else if (item.picked_qty === 0) {
-        console.log(`🗑️ [DELETE] ${item.name}: Eliminando línea.`);
+      } else if (item.notfound_qty > 0) {
+        // 🚫 NO ENTREGADO: la línea se queda en el pedido pero solo se cobra lo
+        // que se entregó. Sin unidades recolectadas el cobro es $0.
+        const cobro = item.original_price * item.picked_qty;
+        console.log(
+          `🚫 [NO-ENTREGADO] ${item.name}: ${item.notfound_qty}/${item.requested_qty} sin existencias — se cobran ${item.picked_qty} un. -> $${cobro.toFixed(2)}`,
+        );
         lineItemsPayload.push({
           id: item.line_id,
-          quantity: 0,
+          quantity: targetQty,
+          total: cobro.toFixed(2),
+          subtotal: cobro.toFixed(2),
+          meta_data: [
+            {
+              key: "NO ENTREGADO",
+              value: `${item.notfound_qty} de ${item.requested_qty} sin existencias`,
+            },
+            { key: "_picking_adjusted", value: "true" },
+          ],
+        });
+      } else if (targetQty !== item.requested_qty) {
+        // Sustitución parcial → solo se descuentan las unidades sustituidas
+        console.log(
+          `📉 [SUB-PARCIAL] ${item.name}: ${item.requested_qty} -> ${targetQty}`,
+        );
+        lineItemsPayload.push({
+          id: item.line_id,
+          quantity: targetQty,
         });
       }
     }

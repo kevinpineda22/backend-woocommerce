@@ -545,6 +545,9 @@ exports.getSessionActive = async (req, res) => {
       // Datos del sustituto (si existe alguno)
       const lastSub = itemLogs.find((l) => l.accion === "sustituido");
 
+      // Último reporte de "no encontrado" (para mostrar el motivo al admin)
+      const lastNotFound = itemLogs.find((l) => l.accion === "no_encontrado");
+
       // SKU y f120_id desde el SKU original de WooCommerce
       let skuFinal = item.sku;
       let f120_idFinal = parseInt(item.sku);
@@ -558,6 +561,10 @@ exports.getSessionActive = async (req, res) => {
 
       if (totalProcessed >= item.quantity_total) {
         if (qtySubbed >= item.quantity_total) status = "sustituido";
+        // ✅ Ítem resuelto SIN llevar nada: el picker reportó que no hay.
+        // Estado propio para que picker, admin y auditor lo distingan de un
+        // "recolectado" real (antes caía en recolectado y se perdía el matiz).
+        else if (qtyShort >= item.quantity_total) status = "no_encontrado";
         else status = "recolectado";
       } else if (totalProcessed > 0) {
         status = "parcial";
@@ -582,6 +589,10 @@ exports.getSessionActive = async (req, res) => {
         // El frontend calculará (Total - Originales) para saber cuántos son sustitutos
         qty_scanned: qtyPicked,
         peso_real: pesoRealTotal > 0 ? parseFloat(pesoRealTotal.toFixed(3)) : 0,
+
+        // ✅ Unidades que el picker reportó como NO ENCONTRADAS (y su motivo)
+        qty_no_encontrada: qtyShort,
+        motivo_no_encontrado: lastNotFound?.motivo || null,
 
         // ✅ SKU FINAL: Reconstruido desde SIESA si está disponible
         sku_final: skuFinal,

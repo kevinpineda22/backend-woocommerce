@@ -1203,6 +1203,99 @@ exports.getIntelligenceCenter = async (req, res) => {
       .slice(0, 20);
 
     // =======================================================================
+    // PEDIDOS — desglose por pedido de recolectado / sustituido / no encontrado
+    // Responde a: "¿cuántos productos por pedido son no encontrados y cuáles
+    // fueron sustituidos?" — una fila por pedido, con el detalle de productos.
+    // =======================================================================
+    const orderMeta = new Map(); // id_pedido → { picker, fecha_fin }
+    asignaciones.forEach((a) => {
+      const key = String(a.id_pedido);
+      if (!orderMeta.has(key)) {
+        orderMeta.set(key, {
+          picker: a.nombre_picker || "Sin nombre",
+          fecha_fin: a.fecha_fin || null,
+        });
+      }
+    });
+
+    const orderStats = new Map();
+    logs.forEach((l) => {
+      const key = String(l.id_pedido || "");
+      if (!key) return;
+      if (!orderStats.has(key)) {
+        const meta = orderMeta.get(key) || {};
+        orderStats.set(key, {
+          id_pedido: l.id_pedido,
+          picker: meta.picker || "Sin nombre",
+          fecha_fin: meta.fecha_fin || null,
+          recolectados: 0,
+          sustituidos: 0,
+          no_encontrados: 0,
+          productos_no_encontrados: new Map(), // nombre → { unidades, motivo }
+          productos_sustituidos: new Map(), // nombre → unidades
+        });
+      }
+      const o = orderStats.get(key);
+      const nombre = l.nombre_producto || "Sin nombre";
+
+      if (l.accion === "recolectado") {
+        o.recolectados += 1;
+      } else if (l.accion === "sustituido") {
+        o.sustituidos += 1;
+        o.productos_sustituidos.set(
+          nombre,
+          (o.productos_sustituidos.get(nombre) || 0) + 1,
+        );
+      } else if (l.accion === "no_encontrado") {
+        o.no_encontrados += 1;
+        const prev = o.productos_no_encontrados.get(nombre) || {
+          unidades: 0,
+          motivo: null,
+        };
+        prev.unidades += 1;
+        if (!prev.motivo && l.motivo) prev.motivo = l.motivo;
+        o.productos_no_encontrados.set(nombre, prev);
+      }
+    });
+
+    const orderIssues = Array.from(orderStats.values())
+      .map((o) => {
+        const totalItems = o.recolectados + o.sustituidos + o.no_encontrados;
+        return {
+          id_pedido: o.id_pedido,
+          picker: o.picker,
+          fecha_fin: o.fecha_fin,
+          total_items: totalItems,
+          recolectados: o.recolectados,
+          sustituidos: o.sustituidos,
+          no_encontrados: o.no_encontrados,
+          tasa_faltantes:
+            totalItems > 0
+              ? Math.round((o.no_encontrados / totalItems) * 100)
+              : 0,
+          detalle_no_encontrados: Array.from(
+            o.productos_no_encontrados,
+            ([name, v]) => ({
+              name,
+              unidades: v.unidades,
+              motivo: v.motivo || "Sin motivo",
+            }),
+          ).sort((a, b) => b.unidades - a.unidades),
+          detalle_sustituidos: Array.from(
+            o.productos_sustituidos,
+            ([name, unidades]) => ({ name, unidades }),
+          ).sort((a, b) => b.unidades - a.unidades),
+        };
+      })
+      // Solo interesan los pedidos que tuvieron alguna incidencia
+      .filter((o) => o.no_encontrados > 0 || o.sustituidos > 0)
+      .sort(
+        (a, b) =>
+          b.no_encontrados - a.no_encontrados || b.sustituidos - a.sustituidos,
+      )
+      .slice(0, 100);
+
+    // =======================================================================
     // RESPUESTA
     // =======================================================================
     res.status(200).json({
@@ -1226,6 +1319,7 @@ exports.getIntelligenceCenter = async (req, res) => {
       weekdayActivity,
       topSellingProducts,
       productIssues: productIssuesArr,
+      orderIssues,
     });
   } catch (error) {
     console.error("Error getIntelligenceCenter:", error);
