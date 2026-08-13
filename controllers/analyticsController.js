@@ -1,6 +1,10 @@
 const { supabase } = require("../services/supabaseClient");
 const dayjs = require("dayjs");
 const { calcLineCharge } = require("../utils/manifestPricing");
+const {
+  resolvePaymentLabel,
+  CREDITO_LABEL,
+} = require("../utils/paymentMethods");
 
 // Coordenadas aproximadas para cálculo de distancias (Basado en WarehouseMap.jsx)
 // Se toman los puntos centrales de cada bloque.
@@ -713,19 +717,9 @@ exports.getPickerRoute = async (req, res) => {
 // en una sola respuesta coherente para el panel de admin.
 // =========================================================
 
-const COD_LABELS = {
-  cash: "Efectivo",
-  efectivo: "Efectivo",
-  card: "Tarjeta",
-  tarjeta: "Tarjeta",
-  qr: "QR",
-  datafono: "Datáfono",
-  credito: "Crédito",
-};
-
 const PAY_LABELS = {
   efectivo: "Efectivo",
-  credito: "Crédito",
+  credito: CREDITO_LABEL,
   qr: "QR",
   datafono: "Datáfono",
 };
@@ -749,21 +743,8 @@ function resolvePaymentMethod(session, snapshotOrder, assignment = null) {
   ) {
     return PAY_LABELS[session.metodo_pago];
   }
-  // C. Fallback al snapshot de WooCommerce.
-  const meta = snapshotOrder?.meta_data;
-  if (Array.isArray(meta)) {
-    const cod = meta.find((m) => m.key === "_billing_cod_payment_mode");
-    if (cod?.value) {
-      const v = cod.value.toString().toLowerCase();
-      return COD_LABELS[v] || cod.value;
-    }
-  }
-  const title = (snapshotOrder?.payment_method_title || "")
-    .toString()
-    .toLowerCase();
-  if (title === "card") return "Tarjeta";
-  if (title === "cash") return "Efectivo";
-  return snapshotOrder?.payment_method_title || "Otros";
+  // C. Fallback al snapshot de WooCommerce (utils/paymentMethods.js).
+  return resolvePaymentLabel(snapshotOrder) || "Otros";
 }
 
 // Suma el total real de un pedido a partir de datos_salida (post-picking).

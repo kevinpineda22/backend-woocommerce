@@ -52,6 +52,10 @@ router.get("/pendientes", dashboardCtrl.getPendingOrders);
 router.get("/pickers", dashboardCtrl.getPickers);
 router.get("/pendientes-pago", dashboardCtrl.getPendingPaymentSessions);
 router.post("/marcar-pagado", dashboardCtrl.markSessionAsPaid);
+
+// Cartera: deudas vivas de clientes a crédito (metodo_pago='credito' sin cobrar)
+router.get("/cartera", dashboardCtrl.getCarteraPendiente);
+router.post("/cartera/marcar-cobrado", dashboardCtrl.marcarCarteraCobrada);
 router.get("/historial", dashboardCtrl.getHistorySessions);
 router.get("/pendientes-auditoria", dashboardCtrl.getPendingAuditSessions);
 

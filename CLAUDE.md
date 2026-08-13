@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Multi-location warehouse picking system backend (Node.js/Express) integrated with WooCommerce stores and Supabase (PostgreSQL). Includes embedded React frontend components for picker, admin, and auditor interfaces. Deployed on Vercel as a serverless function.
+Multi-location warehouse picking system backend (Node.js/Express) integrated with WooCommerce stores and Supabase (PostgreSQL). Deployed on Vercel as a serverless function.
+
+**This repo is backend only.** The React frontend (picker / admin / auditor) lives in a separate repo at `Pagina-web_React` under `src/pages/ecommerce/`. It is not built, served, or deployed from here — there is no React dependency and `app.js` serves no static files.
 
 ## Commands
 
@@ -13,7 +15,7 @@ Multi-location warehouse picking system backend (Node.js/Express) integrated wit
 - **Run all tests (watch):** `npm test` (vitest)
 - **Run tests once:** `npm run test:run`
 
-Test files use `.test.js` suffix and live alongside the source files they test (`utils/`, `services/`, `controllers/`, `ecommerce/picker/modals/utils/`).
+Test files use `.test.js` suffix and live alongside the source files they test (`utils/`, `services/`, `controllers/`).
 
 ## Environment Variables
 
@@ -56,7 +58,7 @@ Required in `.env` (no `.env.example` exists):
 - `auditService.js` — fire-and-forget logger (`logAuditEvent`); **never use `await`**; writes to `wc_audit_log`; resolves picker names from an in-memory cache (10min TTL)
 
 **Utilities** (`utils/`):
-- `manifestPricing.js` — `calcLineCharge(item)` handles weighable pricing (KL/LB/500GR); **this file is duplicated in `ecommerce/shared/manifestPricing.js` (ESM) and must be kept in sync**
+- `manifestPricing.js` — `calcLineCharge(item)` handles weighable pricing (KL/LB/500GR); mirrored as `ecommerce/shared/manifestPricing.js` (ESM), guarded by `utils/manifestPricing.test.js`
 - `barcode.js`, `barcodeFilter.js` — barcode validation and filtering logic
 - `weighableUnits.js` — unit classification helpers
 - `shippingMethod.js` — shipping method detection
@@ -74,22 +76,31 @@ Pickers can be looked up by email or UUID throughout all controllers. The patter
 ### Session State Machine
 
 ```
-en_proceso → pendiente_auditoria → finalizado
+en_proceso → pendiente_auditoria → auditado → finalizado
            ↘ cancelado
 ```
 
 `wc_picking_sessions.estado` drives this flow. `snapshot_pedidos` (JSONB) is written at session creation and is the source of truth during picking. `datos_salida` (JSONB) is written at audit completion and holds the final order state used for price variation analysis.
 
-### Frontend (React, embedded in `ecommerce/`)
+`auditado` is the "pending payment" tray (`getPendingPaymentSessions` filters on it). A session only reaches `finalizado` once **every** assignment has a non-null `metodo_pago` — and `finalizado` is what the revenue reports (`analyticsController`) and price-variation analysis (`variacionesController`) filter on. A single unresolved order therefore keeps its whole session out of the reports, including siblings that were already collected.
 
-Three role-based interfaces sharing `ecommerce/shared/` utilities:
-- **`ecommerce/picker/`** — warehouse staff picking interface with barcode scanning, offline queue (localStorage), session timer
-- **`ecommerce/admin/`** — dashboard for session monitoring, order management, picker analytics, warehouse map, price variations tab
-- **`ecommerce/auditor/`** — quality control verification of picked items
+### Frontend (separate repo)
 
-Key hooks: `usePickerSession` (session state + offline queue), `useOfflineQueue` (localStorage action queue), `useRealtimeOrders` (Supabase broadcast channel subscriptions).
+The React 19 + Vite app lives at `Pagina-web_React/src/pages/ecommerce/` — three role-based interfaces (`picker/`, `admin/`, `auditor/`) sharing `shared/` utilities. It calls this backend over HTTP at `https://backend-woocommerce.vercel.app/api` and is deployed independently. Edit UI there, not here.
 
-API client: `ecommerce/shared/ecommerceApi.js` — Axios instances hardcoded to `https://backend-woocommerce.vercel.app/api` with auto cache-busting on GET requests. The frontend `supabase` client is imported from `../../../../supabaseClient` (outside this repo).
+### `ecommerce/shared/` — mirrored business rules only
+
+This repo keeps exactly **three** files under `ecommerce/shared/`, ESM twins of backend CommonJS modules:
+
+| Mirror | Backend twin | Guarded by |
+|---|---|---|
+| `weighableUnits.js` | `utils/weighableUnits.js` | `utils/weighableUnits.test.js` |
+| `manifestPricing.js` | `utils/manifestPricing.js` | `utils/manifestPricing.test.js` |
+| `paymentMethods.js` | `utils/paymentMethods.js` | `utils/paymentMethods.test.js` |
+
+They exist because backend (CJS) and frontend (ESM) must agree on rules where a divergence costs money — weighable pricing already undercharged LB/500GR by half once. Each pair has a sync test that fails if the copies drift.
+
+**The rule: nothing lives in `ecommerce/shared/` without a sync test.** Do not add UI, CSS, or components here — this repo does not build them. When you edit one of these three, edit its twin in `Pagina-web_React` too; nothing syncs automatically.
 
 ### Picking Workflow
 
@@ -103,9 +114,31 @@ API client: `ecommerce/shared/ecommerceApi.js` — Axios instances hardcoded to 
 
 No ORM — direct Supabase JS client queries. Key tables: `wc_sedes`, `wc_pickers`, `wc_picking_sessions`, `wc_asignaciones_pedidos`, `wc_log_picking`, `wc_audit_log`, `siesa_codigos_barras`, `profiles`.
 
+### Payment Methods & Cartera (credit customers)
+
+WooCommerce exposes payment on **two levels**, and confusing them causes real money bugs:
+
+1. **Gateway** (`payment_method` / `payment_method_title`) — what the customer chose at checkout. Today: `cod` ("Contra entrega") and `cheque` ("Crédito"). ⚠️ The credit gateway's slug is **`cheque`** (a repurposed native Cheque Payments gateway), *not* `credito`.
+2. **COD sub-mode** (`_billing_cod_payment_mode` meta) — how they'll pay at the door: `cash` / `card` / `qr`. It only makes sense inside contra-entrega; Woo writes the literal `na` when the gateway is something else.
+
+**Gateway wins over sub-mode.** All of this lives in `utils/paymentMethods.js` (CJS) mirrored as `ecommerce/shared/paymentMethods.js` (ESM); `utils/paymentMethods.test.js` fails if the two copies diverge. Adding a gateway = one line in `GATEWAY_LABELS`, in both copies. Never read `_billing_cod_payment_mode` directly — call `resolvePaymentLabel()` / `isCreditoOrder()`.
+
+The user-facing label is **"Cliente Crédito"**, never "Crédito" alone: a cashier reading "Crédito" interprets *credit card* and collects money on an order that is already invoiced on credit.
+
+**Settlement model** (`utils/paymentSettlement.js`, pure/no-I/O):
+
+| Column (`wc_asignaciones_pedidos`) | Answers |
+|---|---|
+| `metodo_pago` | How the charge is resolved → closes the operational session |
+| `fecha_pago` | Whether the money actually arrived |
+
+A credit order is `metodo_pago='credito'` + `fecha_pago=NULL`: session closes and enters the reports, while the debt stays live. `completeAuditSession` calls `autoResolveCreditoOrders()` (idempotent — only touches assignments with `metodo_pago IS NULL`, never overwrites a cashier). `settleSessionIfComplete()` is the single close criterion shared by the cashier path and the system path. Cartera endpoints: `GET /api/orders/cartera`, `POST /api/orders/cartera/marcar-cobrado`.
+
+⚠️ **Landmine in `completeAuditSession`:** its `SELECT` doesn't request `snapshot_pedidos`, but the ghost-item block below does `session.snapshot_pedidos || []` — so that block is currently inert. Adding `snapshot_pedidos` to that `SELECT` wakes it up and starts inserting `no_encontrado` logs. The credit auto-resolution deliberately queries the snapshot separately to avoid this.
+
 ### Barcode System
 
-Products linked to SIESA ERP via `siesa_codigos_barras` table (keyed by `f120_id` = numeric SKU). Supports multiple barcodes per product grouped by `unidad_medida`. Barcode lookup is strict: if a product has a known presentation (P6, UND, KL), only barcodes for that exact `unidad_medida` are returned (no fallback to `_all`). Weighable items (fruver/carnicería) use GS1 prefix "29". Parsing logic in `ecommerce/picker/modals/utils/gs1Utils.js`.
+Products linked to SIESA ERP via `siesa_codigos_barras` table (keyed by `f120_id` = numeric SKU). Supports multiple barcodes per product grouped by `unidad_medida`. Barcode lookup is strict: if a product has a known presentation (P6, UND, KL), only barcodes for that exact `unidad_medida` are returned (no fallback to `_all`). Weighable items (fruver/carnicería) use GS1 prefix "29". Parsing logic lives in the frontend repo (`Pagina-web_React/src/pages/ecommerce/picker/modals/utils/gs1Utils.js`), which owns its own tests for it.
 
 ### Aisle Routing
 
@@ -124,44 +157,8 @@ Vercel serverless (see `vercel.json`): single function from `app.js`, 50MB max b
 - Audit events use dot-namespaced actions: `session.created`, `item.picked`, `payment.marked`, etc.
 - Language: codebase mixes Spanish naming (controllers, routes, DB fields) with English patterns
 
-## Frontend Style Rules (ecommerce/)
+## Frontend
 
-### React 19
+Not in this repo. UI code, styling conventions, and React rules live in `Pagina-web_React/CLAUDE.md`. The only frontend-facing files here are the three ESM mirrors in `ecommerce/shared/` described above — business rules, not UI.
 
-- **No manual memoization.** Never use `useMemo` or `useCallback` — the React Compiler handles optimization automatically.
-- **Named imports only.** `import { useState, useEffect } from "react"` — never `import React from "react"` or `import * as React`.
-- **`ref` as a plain prop.** No `forwardRef` — pass `ref` directly like any other prop.
-- **Prefer `use()` hook** over `useContext` when reading context conditionally, and over `.then()` when unwrapping promises inside components.
-- **`useActionState`** for form submissions with pending state instead of manual `useState` + `try/catch` in handlers.
-
-### TypeScript
-
-- **Const types pattern** — always define a `const` object first, then derive the type with `(typeof X)[keyof typeof X]`. Never write raw union strings (`"active" | "inactive"`).
-- **Flat interfaces** — one level of depth per interface; nest by reference, not inline.
-- **Never `any`** — use `unknown` for truly opaque values, generics for flexible types.
-- **`import type`** for type-only imports: `import type { User } from "./types"`.
-- Use utility types (`Pick`, `Omit`, `Partial`, `Record`, `ReturnType`, etc.) instead of re-declaring shapes.
-
-### Tailwind CSS 4
-
-Styling decision order:
-1. Tailwind class exists → `className="..."`
-2. Conditional/conflicting classes → `cn("base", condition && "variant")`
-3. Truly dynamic value → `style={{ width: \`${x}%\` }}`
-4. Third-party lib that can't accept `className` → constant object with `var(--token)` used in the `style`/prop
-
-Rules:
-- **Never `var()` inside `className`** — use semantic Tailwind classes (`bg-primary`, not `bg-[var(--color-primary)]`).
-- **Never hex colors in `className`** — use Tailwind color classes (`text-white`, not `text-[#fff]`).
-- **`cn()` only when needed** — static classes use plain `className="..."` without wrapping in `cn()`.
-- Arbitrary values (`w-[327px]`) are fine for one-off layout values; never for colors.
-
-### Zustand 5
-
-- Stores are typed with a dedicated interface: `create<MyStore>((set) => ({ ... }))`.
-- **Select specific fields** to avoid unnecessary re-renders: `useStore((s) => s.field)`.
-- **Multiple fields** → use `useShallow`: `useStore(useShallow((s) => ({ a: s.a, b: s.b })))`. Never destructure the whole store.
-- **Async actions** live inside the store (set loading/error state around the fetch).
-- Split large stores into **slices** (`createUserSlice`, `createCartSlice`) composed in a single `create` call.
-- Use `persist` middleware for data that must survive page reload (replaces raw `localStorage` access in new code).
-- Access state outside components via `useStore.getState()`; subscribe with `useStore.subscribe()`.
+One convention worth repeating because it costs money if broken: **green means collected.** Anything unpaid (credit / cartera) is amber, overdue is red.

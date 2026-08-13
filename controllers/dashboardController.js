@@ -6,6 +6,21 @@ const { logAuditEvent } = require("../services/auditService");
 const { isWeighableUnit } = require("../utils/weighableUnits");
 const { calcLineCharge } = require("../utils/manifestPricing");
 const {
+  resolvePaymentLabel,
+  isCreditoOrder,
+  COD_MODE_META_KEY,
+} = require("../utils/paymentMethods");
+const {
+  CREDITO_METHOD,
+  SYSTEM_ACTOR,
+  paymentDateFor,
+  findCreditoOrderIds,
+  allSettled,
+  summarizeSessionMethod,
+  isPendingCartera,
+  dedupeByOrder,
+} = require("../utils/paymentSettlement");
+const {
   getSedeFromWooOrder,
   extractSedeFromOrder,
   WOO_SEDE_META_KEYS,
@@ -40,32 +55,10 @@ function extractDocumento(orderSnapshot) {
   return found?.value || "";
 }
 
-const COD_MODE_LABELS = {
-  cash: "Efectivo",
-  efectivo: "Efectivo",
-  card: "Tarjeta",
-  tarjeta: "Tarjeta",
-  qr: "QR",
-  datafono: "Datáfono",
-  credito: "Crédito",
-};
-
+// Etiqueta legible del método de pago. La lógica vive en utils/paymentMethods.js
+// (fuente única, compartida con el frontend).
 function extractMetodoPago(orderSnapshot) {
-  const meta = orderSnapshot?.meta_data;
-  if (meta && Array.isArray(meta)) {
-    const codMode = meta.find((m) => m.key === "_billing_cod_payment_mode");
-    if (codMode?.value) {
-      const val = codMode.value.toString().toLowerCase();
-      return COD_MODE_LABELS[val] || codMode.value;
-    }
-  }
-  if (orderSnapshot?.payment_method_title) {
-    const title = orderSnapshot.payment_method_title.toString().toLowerCase();
-    if (title === "card") return "Tarjeta";
-    if (title === "cash") return "Efectivo";
-    return orderSnapshot.payment_method_title;
-  }
-  return orderSnapshot?.payment_method_title || "";
+  return resolvePaymentLabel(orderSnapshot);
 }
 
 // =========================================================
@@ -671,6 +664,12 @@ exports.getPendingPaymentSessions = async (req, res) => {
       const asignacionesById = new Map(
         (sess.wc_asignaciones_pedidos || []).map((a) => [a.id_pedido, a]),
       );
+      // Snapshot por id, para saber qué pedidos llegaron con pasarela Crédito
+      // aunque su asignación todavía no esté resuelta.
+      const snapshotById = new Map(
+        (sess.snapshot_pedidos || []).map((o) => [o.id, o]),
+      );
+
       const pagos_pedidos = (sess.ids_pedidos || []).map((idPedido) => {
         const a = asignacionesById.get(idPedido);
         return {
@@ -678,6 +677,9 @@ exports.getPendingPaymentSessions = async (req, res) => {
           metodo_pago: a?.metodo_pago || null,
           fecha_pago: a?.fecha_pago || null,
           pagado_por: a?.pagado_por || null,
+          // El cajero NO debe cobrar estos: son cartera.
+          es_credito: isCreditoOrder(snapshotById.get(idPedido)),
+          pendiente_cartera: isPendingCartera(a),
         };
       });
 
@@ -710,6 +712,82 @@ exports.getPendingPaymentSessions = async (req, res) => {
 
 // Métodos de pago aceptados a nivel de pedido individual.
 const VALID_PAYMENT_METHODS = ["efectivo", "qr", "datafono", "credito"];
+
+// Cierra la sesión si todos sus pedidos ya tienen método de pago definido.
+// Compartido por markSessionAsPaid (el cajero registra un cobro) y
+// completeAuditSession (el sistema auto-resuelve los pedidos a crédito), para
+// que ambos caminos usen exactamente el mismo criterio de cierre.
+// Devuelve { finalized, sedeId, pickerName }.
+async function settleSessionIfComplete(sessionId, now, actorName) {
+  const { data: asignaciones, error: readErr } = await supabase
+    .from("wc_asignaciones_pedidos")
+    .select("id_pedido, metodo_pago, fecha_pago")
+    .eq("id_sesion", sessionId);
+  if (readErr) throw readErr;
+
+  if (!allSettled(asignaciones)) {
+    const { data: sessRead } = await supabase
+      .from("wc_picking_sessions")
+      .select(
+        "sede_id, wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo)",
+      )
+      .eq("id", sessionId)
+      .single();
+    return {
+      finalized: false,
+      sedeId: sessRead?.sede_id || null,
+      pickerName: sessRead?.wc_pickers?.nombre_completo || null,
+    };
+  }
+
+  const { data: sessUpdated, error: sessErr } = await supabase
+    .from("wc_picking_sessions")
+    .update({
+      estado: "finalizado",
+      metodo_pago: summarizeSessionMethod(asignaciones),
+      // A nivel de sesión, fecha_pago marca cuándo quedó resuelto el tema pago.
+      // El cobro real de un crédito vive en la asignación, no acá.
+      fecha_pago: now,
+      pagado_por: actorName,
+    })
+    .eq("id", sessionId)
+    .select(
+      "sede_id, wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo)",
+    )
+    .single();
+  if (sessErr) throw sessErr;
+
+  return {
+    finalized: true,
+    sedeId: sessUpdated?.sede_id || null,
+    pickerName: sessUpdated?.wc_pickers?.nombre_completo || null,
+  };
+}
+
+// Marca como 'credito' (sin fecha de cobro) los pedidos que llegaron con la
+// pasarela Crédito de WooCommerce. Sin esto la sesión se quedaría esperando un
+// cobro que nunca ocurre en la entrega, arrastrando fuera del recaudo a los
+// pedidos que sí se cobraron. Solo toca asignaciones sin método definido, así
+// que es idempotente y nunca pisa lo que registró un cajero.
+async function autoResolveCreditoOrders(sessionId, snapshotOrders) {
+  const creditoIds = findCreditoOrderIds(snapshotOrders);
+  if (creditoIds.length === 0) return [];
+
+  const { data: updated, error } = await supabase
+    .from("wc_asignaciones_pedidos")
+    .update({
+      metodo_pago: CREDITO_METHOD,
+      fecha_pago: null,
+      pagado_por: SYSTEM_ACTOR,
+    })
+    .eq("id_sesion", sessionId)
+    .in("id_pedido", creditoIds)
+    .is("metodo_pago", null)
+    .select("id_pedido");
+  if (error) throw error;
+
+  return (updated || []).map((a) => a.id_pedido);
+}
 
 // Cada pedido de una sesión puede pagarse con un método distinto. La fuente de
 // verdad es wc_asignaciones_pedidos (junction sesión↔pedido). El campo
@@ -745,13 +823,15 @@ exports.markSessionAsPaid = async (req, res) => {
   const actorName = (admin_name || "").trim() || "Admin";
 
   try {
-    // 1. Persistir el método por pedido en la junction.
+    // 1. Persistir el método por pedido en la junction. Un pedido a crédito se
+    //    registra SIN fecha_pago: queda resuelto pero debiendo, y lo cobra
+    //    cartera después.
     for (const p of payments) {
       const { error: updErr } = await supabase
         .from("wc_asignaciones_pedidos")
         .update({
           metodo_pago: p.payment_method,
-          fecha_pago: now,
+          fecha_pago: paymentDateFor(p.payment_method, now),
           pagado_por: actorName,
         })
         .eq("id_sesion", session_id)
@@ -759,56 +839,11 @@ exports.markSessionAsPaid = async (req, res) => {
       if (updErr) throw updErr;
     }
 
-    // 2. Releer asignaciones para decidir si la sesión queda lista.
-    const { data: asignaciones, error: readErr } = await supabase
-      .from("wc_asignaciones_pedidos")
-      .select("id_pedido, metodo_pago")
-      .eq("id_sesion", session_id);
-    if (readErr) throw readErr;
-
-    const todasPagas =
-      asignaciones.length > 0 &&
-      asignaciones.every((a) => a.metodo_pago !== null);
-
-    let sessionFinalized = false;
-    let sedeIdForLog = req.sedeId || null;
-    let pickerName = null;
-
-    if (todasPagas) {
-      const metodosUnicos = [
-        ...new Set(asignaciones.map((a) => a.metodo_pago)),
-      ];
-      const metodoSesion =
-        metodosUnicos.length === 1 ? metodosUnicos[0] : "mixto";
-
-      const { data: sessUpdated, error: sessErr } = await supabase
-        .from("wc_picking_sessions")
-        .update({
-          estado: "finalizado",
-          metodo_pago: metodoSesion,
-          fecha_pago: now,
-          pagado_por: actorName,
-        })
-        .eq("id", session_id)
-        .select(
-          "sede_id, wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo)",
-        )
-        .single();
-      if (sessErr) throw sessErr;
-      sessionFinalized = true;
-      sedeIdForLog = sessUpdated?.sede_id || sedeIdForLog;
-      pickerName = sessUpdated?.wc_pickers?.nombre_completo || null;
-    } else {
-      const { data: sessRead } = await supabase
-        .from("wc_picking_sessions")
-        .select(
-          "sede_id, wc_pickers!wc_picking_sessions_picker_fkey(nombre_completo)",
-        )
-        .eq("id", session_id)
-        .single();
-      sedeIdForLog = sessRead?.sede_id || sedeIdForLog;
-      pickerName = sessRead?.wc_pickers?.nombre_completo || null;
-    }
+    // 2. Cerrar la sesión si ya no queda ningún pedido sin método.
+    const settlement = await settleSessionIfComplete(session_id, now, actorName);
+    const sessionFinalized = settlement.finalized;
+    const sedeIdForLog = settlement.sedeId || req.sedeId || null;
+    const pickerName = settlement.pickerName;
 
     // 3. Una entrada de auditoría por pago registrado.
     for (const p of payments) {
@@ -825,18 +860,165 @@ exports.markSessionAsPaid = async (req, res) => {
       });
     }
 
+    const aCredito = payments.filter(
+      (p) => p.payment_method === CREDITO_METHOD,
+    ).length;
+
     res.status(200).json({
       message: sessionFinalized
-        ? "Todos los pedidos pagados. Sesión finalizada."
+        ? "Todos los pedidos resueltos. Sesión finalizada."
         : "Pagos parciales registrados.",
       session_finalized: sessionFinalized,
       payments_recorded: payments.length,
+      pendientes_cartera: aCredito,
     });
   } catch (error) {
     console.error("Error markSessionAsPaid:", error.message);
     res
       .status(500)
       .json({ error: `Error al registrar pagos: ${error.message}` });
+  }
+};
+
+// =========================================================
+// CARTERA — deudas vivas de clientes a crédito
+// =========================================================
+// Un pedido a crédito ya cerró su sesión operativa (metodo_pago='credito') pero
+// la plata todavía no entró (fecha_pago IS NULL). Esta bandeja es donde se
+// cobra: es la única vista que responde "¿quién nos debe?".
+
+exports.getCarteraPendiente = async (req, res) => {
+  try {
+    let query = supabase
+      .from("wc_asignaciones_pedidos")
+      .select(
+        "id, id_pedido, id_sesion, metodo_pago, fecha_pago, fecha_fin, pagado_por, sede_id, wc_picking_sessions ( snapshot_pedidos, datos_salida, ids_pedidos, wc_sedes ( nombre ) )",
+      )
+      .eq("metodo_pago", CREDITO_METHOD)
+      .is("fecha_pago", null)
+      .order("fecha_fin", { ascending: true });
+
+    if (req.sedeId) query = query.eq("sede_id", req.sedeId);
+
+    const { data: asignaciones, error } = await query;
+    if (error) throw error;
+
+    // Un pedido reasignado o trasladado puede tener dos asignaciones a crédito.
+    // Sin esto, la deuda se listaría dos veces y el total saldría inflado.
+    const deudas = dedupeByOrder(asignaciones).map((a) => {
+      const sess = a.wc_picking_sessions || {};
+      const snapshot = (sess.snapshot_pedidos || []).find(
+        (o) => String(o.id) === String(a.id_pedido),
+      );
+
+      const totales = calcTotalesFromDatosSalida(
+        sess.datos_salida,
+        sess.snapshot_pedidos,
+        sess.ids_pedidos,
+      );
+      const idx = (sess.ids_pedidos || []).findIndex(
+        (id) => String(id) === String(a.id_pedido),
+      );
+
+      const cliente =
+        `${snapshot?.billing?.first_name || ""} ${snapshot?.billing?.last_name || ""}`.trim() ||
+        "Cliente";
+
+      const desde = a.fecha_fin ? new Date(a.fecha_fin) : null;
+      const diasVencido = desde
+        ? Math.floor((Date.now() - desde.getTime()) / 86400000)
+        : null;
+
+      return {
+        id_asignacion: a.id,
+        id_pedido: a.id_pedido,
+        id_sesion: a.id_sesion,
+        sede_nombre: sess.wc_sedes?.nombre || null,
+        cliente,
+        documento: extractDocumento(snapshot),
+        telefono: snapshot?.billing?.phone || "",
+        email: snapshot?.billing?.email || "",
+        total: idx >= 0 ? totales[idx] : null,
+        fecha_entrega: a.fecha_fin,
+        dias_vencido: diasVencido,
+        resuelto_por: a.pagado_por,
+      };
+    });
+
+    const totalAdeudado = deudas.reduce(
+      (sum, d) => sum + (parseFloat(d.total) || 0),
+      0,
+    );
+
+    res.status(200).json({
+      total_pedidos: deudas.length,
+      total_adeudado: totalAdeudado,
+      deudas,
+    });
+  } catch (error) {
+    console.error("Error getCarteraPendiente:", error.message);
+    res
+      .status(500)
+      .json({ error: `Error al cargar cartera: ${error.message}` });
+  }
+};
+
+// Registra que un cliente a crédito finalmente pagó. Solo estampa fecha_pago:
+// el metodo_pago sigue siendo 'credito' porque así fue como se vendió.
+exports.marcarCarteraCobrada = async (req, res) => {
+  const { id_pedido, id_sesion, admin_name, admin_email } = req.body;
+
+  if (!id_pedido) return res.status(400).json({ error: "Falta id_pedido" });
+
+  const now = new Date().toISOString();
+  const actorName = (admin_name || "").trim() || "Admin";
+
+  try {
+    let query = supabase
+      .from("wc_asignaciones_pedidos")
+      .update({ fecha_pago: now, pagado_por: actorName })
+      .eq("id_pedido", id_pedido)
+      .eq("metodo_pago", CREDITO_METHOD)
+      .is("fecha_pago", null);
+
+    // id_sesion es opcional pero desambigua si un mismo pedido aparece en más
+    // de una sesión (p. ej. tras un traslado entre sedes).
+    if (id_sesion) query = query.eq("id_sesion", id_sesion);
+
+    const { data: updated, error } = await query.select("id, id_sesion, sede_id");
+    if (error) throw error;
+
+    if (!updated || updated.length === 0) {
+      return res.status(404).json({
+        error:
+          "No hay una deuda a crédito pendiente para ese pedido (¿ya se cobró?)",
+      });
+    }
+
+    for (const row of updated) {
+      logAuditEvent({
+        actor: { type: "admin", id: admin_email || null, name: actorName },
+        action: "payment.marked",
+        entity: { type: "order", id: id_pedido },
+        sedeId: row.sede_id || req.sedeId || null,
+        metadata: {
+          session_id: row.id_sesion,
+          payment_method: CREDITO_METHOD,
+          cartera_cobrada: true,
+        },
+      });
+    }
+
+    res.status(200).json({
+      message: "Deuda cobrada.",
+      id_pedido,
+      fecha_pago: now,
+    });
+  } catch (error) {
+    console.error("Error marcarCarteraCobrada:", error.message);
+    res
+      .status(500)
+      .json({ error: `Error al marcar cobro de cartera: ${error.message}` });
   }
 };
 
@@ -915,6 +1097,12 @@ exports.getHistorySessions = async (req, res) => {
       const asignacionesById = new Map(
         (sess.wc_asignaciones_pedidos || []).map((a) => [a.id_pedido, a]),
       );
+      // Snapshot por id, para saber qué pedidos llegaron con pasarela Crédito
+      // aunque su asignación todavía no esté resuelta.
+      const snapshotById = new Map(
+        (sess.snapshot_pedidos || []).map((o) => [o.id, o]),
+      );
+
       const pagos_pedidos = (sess.ids_pedidos || []).map((idPedido) => {
         const a = asignacionesById.get(idPedido);
         return {
@@ -922,6 +1110,9 @@ exports.getHistorySessions = async (req, res) => {
           metodo_pago: a?.metodo_pago || null,
           fecha_pago: a?.fecha_pago || null,
           pagado_por: a?.pagado_por || null,
+          // El cajero NO debe cobrar estos: son cartera.
+          es_credito: isCreditoOrder(snapshotById.get(idPedido)),
+          pendiente_cartera: isPendingCartera(a),
         };
       });
 
@@ -1229,6 +1420,54 @@ exports.completeAuditSession = async (req, res) => {
       ]);
     }
 
+    // ✅ CRÉDITO: los pedidos que llegaron con la pasarela Crédito no se cobran
+    // en la entrega. Se resuelven acá como 'credito' sin fecha_pago, para que la
+    // sesión pueda cerrar y entrar a los reportes mientras la deuda sigue viva
+    // en cartera. Se consulta el snapshot aparte a propósito: agregarlo al
+    // SELECT de arriba activaría el bloque anti-fantasmas de la línea ~1128,
+    // que hoy está inerte porque `session.snapshot_pedidos` nunca se pide.
+    let creditoResueltos = [];
+    try {
+      const { data: snapRow } = await supabase
+        .from("wc_picking_sessions")
+        .select("snapshot_pedidos")
+        .eq("id", session_id)
+        .single();
+
+      creditoResueltos = await autoResolveCreditoOrders(
+        session_id,
+        snapRow?.snapshot_pedidos || [],
+      );
+
+      if (creditoResueltos.length > 0) {
+        // Si TODOS los pedidos de la sesión eran a crédito, nadie va a abrir el
+        // modal de cobro: hay que cerrarla acá o se queda colgada para siempre.
+        await settleSessionIfComplete(session_id, now, SYSTEM_ACTOR);
+
+        for (const orderId of creditoResueltos) {
+          logAuditEvent({
+            actor: { type: "system", id: null, name: SYSTEM_ACTOR },
+            action: "payment.marked",
+            entity: { type: "order", id: orderId },
+            sedeId: session?.sede_id || req.sedeId || null,
+            metadata: {
+              session_id,
+              payment_method: CREDITO_METHOD,
+              auto_resolved: true,
+              reason: "Pedido con pasarela Crédito — cobro pendiente en cartera",
+            },
+          });
+        }
+      }
+    } catch (creditErr) {
+      // Un fallo acá no debe tumbar el cierre de auditoría: el pedido queda
+      // pendiente de cobro y el cajero lo puede marcar a mano.
+      console.error(
+        "⚠️ Error auto-resolviendo pedidos a crédito:",
+        creditErr.message,
+      );
+    }
+
     // Sync Woo — AWAIT obligatorio para que se complete antes de cerrar la respuesta
     // (En Vercel serverless, el proceso muere al enviar res.json si no esperamos)
     const syncResults = [];
@@ -1280,6 +1519,7 @@ exports.completeAuditSession = async (req, res) => {
         ? "Salida aprobada. Pedidos sincronizados con WooCommerce."
         : "Salida aprobada. Algunos pedidos tuvieron errores de sincronización.",
       sync_results: syncResults,
+      credito_auto_resueltos: creditoResueltos,
     });
   } catch (error) {
     console.error("Error finalizando auditoría:", error.message);
@@ -1837,6 +2077,22 @@ exports.espiarPedido = async (req, res) => {
           : "❌ No se detectó sede",
         campos_buscados: WOO_SEDE_META_KEYS,
       },
+
+      // ★ PASARELA DE PAGO (gateway elegido en el checkout)
+      pago: {
+        payment_method: order.payment_method,
+        payment_method_title: order.payment_method_title,
+        // Valor CRUDO a propósito (incluye el literal `na`): este endpoint es
+        // de diagnóstico y debe mostrar lo que manda Woo, no la interpretación.
+        cod_payment_mode:
+          (order.meta_data || []).find((m) => m.key === COD_MODE_META_KEY)
+            ?.value ?? null,
+        etiqueta_resuelta: resolvePaymentLabel(order),
+        es_credito: isCreditoOrder(order),
+      },
+
+      status: order.status,
+      total: order.total,
 
       // Meta_data completa (para encontrar el campo de sede manualmente)
       meta_data: order.meta_data,
