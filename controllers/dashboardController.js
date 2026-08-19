@@ -25,6 +25,10 @@ const {
   extractSedeFromOrder,
   WOO_SEDE_META_KEYS,
 } = require("../services/sedeConfig");
+// Pre-agregado de recaudo por sesión: recalcular tras cada cambio de estado /
+// método de pago para que el total all-time (/analytics/summary) quede exacto.
+const { refreshSessionSummary } = require("../utils/sessionRevenue");
+const { fetchByIdsChunked } = require("../utils/dbPagination");
 
 // Multi-sede WooCommerce (WordPress Multisite)
 const {
@@ -221,17 +225,18 @@ exports.getActiveSessionsDashboard = async (req, res) => {
 
     const allAssignIds = (allAssignments || []).map((a) => a.id);
 
-    // Una sola query para todos los logs de todas las asignaciones
-    const { data: allLogs } =
+    // Todos los logs de todas las asignaciones, paginado por tandas para no
+    // truncar en silencio (varias sesiones activas superan fácil las 1000 filas).
+    const allLogs =
       allAssignIds.length > 0
-        ? await supabase
-            .from("wc_log_picking")
-            .select(
-              "id_asignacion, id_producto, id_producto_original, accion, es_sustituto, fecha_registro, nombre_producto, pasillo",
-            )
-            .in("id_asignacion", allAssignIds)
-            .order("fecha_registro", { ascending: true })
-        : { data: [] };
+        ? await fetchByIdsChunked(
+            "wc_log_picking",
+            "id_asignacion, id_producto, id_producto_original, accion, es_sustituto, fecha_registro, nombre_producto, pasillo",
+            "id_asignacion",
+            allAssignIds,
+            { column: "fecha_registro", ascending: true },
+          )
+        : [];
 
     // Indexar para acceso rápido
     const assignmentsBySession = {};
@@ -864,6 +869,9 @@ exports.markSessionAsPaid = async (req, res) => {
       (p) => p.payment_method === CREDITO_METHOD,
     ).length;
 
+    // Cambió el método de pago de pedidos → recalcular recaudo pre-agregado.
+    await refreshSessionSummary(session_id);
+
     res.status(200).json({
       message: sessionFinalized
         ? "Todos los pedidos resueltos. Sesión finalizada."
@@ -1009,6 +1017,10 @@ exports.marcarCarteraCobrada = async (req, res) => {
       });
     }
 
+    // NOTA: acá NO se llama refreshSessionSummary a propósito. El recaudo cuenta
+    // un pedido a crédito desde que metodo_pago='credito' (isPaid mira el método,
+    // no fecha_pago), y ese método no cambia al cobrar. El pre-agregado ya es
+    // correcto; recalcular sería un round-trip sin efecto.
     res.status(200).json({
       message: "Deuda cobrada.",
       id_pedido,
@@ -1513,6 +1525,10 @@ exports.completeAuditSession = async (req, res) => {
         all_synced: allSynced,
       },
     });
+
+    // Recalcular el recaudo pre-agregado de la sesión (estado ya es 'auditado',
+    // datos_salida y créditos resueltos). Deja exacto el total /analytics/summary.
+    await refreshSessionSummary(session_id);
 
     res.status(200).json({
       message: allSynced

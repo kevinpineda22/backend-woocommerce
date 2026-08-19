@@ -1,10 +1,13 @@
 const { supabase } = require("../services/supabaseClient");
 const dayjs = require("dayjs");
-const { calcLineCharge } = require("../utils/manifestPricing");
+// Recaudo por sesión: FUENTE ÚNICA DE VERDAD (compartida con el pre-agregado
+// y el total all-time). No redefinir orderRevenue/resolvePaymentMethod acá.
 const {
-  resolvePaymentLabel,
-  CREDITO_LABEL,
-} = require("../utils/paymentMethods");
+  REVENUE_STATES,
+  resolvePaymentMethod,
+  orderRevenue,
+} = require("../utils/sessionRevenue");
+const { fetchByIdsChunked } = require("../utils/dbPagination");
 
 // Coordenadas aproximadas para cálculo de distancias (Basado en WarehouseMap.jsx)
 // Se toman los puntos centrales de cada bloque.
@@ -717,52 +720,10 @@ exports.getPickerRoute = async (req, res) => {
 // en una sola respuesta coherente para el panel de admin.
 // =========================================================
 
-const PAY_LABELS = {
-  efectivo: "Efectivo",
-  credito: CREDITO_LABEL,
-  qr: "QR",
-  datafono: "Datáfono",
-};
-
 const WEEKDAY_LABELS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-// Resuelve método de pago:
-// 1. Prioridad: Lo registrado individualmente en wc_asignaciones_pedidos (Fase 4).
-// 2. Fallback: Lo registrado en la sesión (modelo previo).
-// 3. Fallback: Lo que venía en el snapshot de WooCommerce.
-function resolvePaymentMethod(session, snapshotOrder, assignment = null) {
-  // A. Si tenemos el dato de la asignación individual (Fase 4), es la fuente de verdad.
-  if (assignment?.metodo_pago && PAY_LABELS[assignment.metodo_pago]) {
-    return PAY_LABELS[assignment.metodo_pago];
-  }
-  // B. Fallback a la sesión (para sesiones antiguas o cierres globales).
-  if (
-    session?.metodo_pago &&
-    PAY_LABELS[session.metodo_pago] &&
-    session.metodo_pago !== "mixto"
-  ) {
-    return PAY_LABELS[session.metodo_pago];
-  }
-  // C. Fallback al snapshot de WooCommerce (utils/paymentMethods.js).
-  return resolvePaymentLabel(snapshotOrder) || "Otros";
-}
-
-// Suma el total real de un pedido a partir de datos_salida (post-picking).
-function orderRevenue(order) {
-  if (!order) return 0;
-  const items = (order.items || order.line_items || []).filter(
-    (i) => !i.is_shipping_method && !i.is_removed,
-  );
-  const itemsTotal = items.reduce((s, it) => s + calcLineCharge(it), 0);
-  const shipping = (order.shipping_lines || []).reduce(
-    (s, x) => s + (parseFloat(x.total) || 0),
-    0,
-  );
-  const calc = itemsTotal + shipping;
-  const wooTotal = parseFloat(order.total) || 0;
-  if (Math.abs(calc - wooTotal) > 1 && calc > 0) return calc;
-  return wooTotal > 0 ? wooTotal : calc;
-}
+// PAY_LABELS, resolvePaymentMethod y orderRevenue viven en utils/sessionRevenue.js
+// (fuente única de verdad del recaudo). Importados arriba.
 
 // Convierte UTC a hora Colombia (UTC-5) sin dependencias extra.
 function toBogota(d) {
@@ -776,6 +737,24 @@ function rangeBounds(range) {
     return { start: now.subtract(30, "day").startOf("day"), days: 30 };
   if (range === "all") return { start: null, days: null };
   return { start: now.subtract(7, "day").startOf("day"), days: 7 };
+}
+
+// Circuit breakers del DETALLE. El total all-time EXACTO se sirve por
+// /analytics/summary (columnas pre-agregadas). Este endpoint escanea JSONB, así
+// que nunca puede ser ilimitado: se acota a las sesiones/asignaciones más
+// recientes de la ventana pedida.
+const MAX_DETAIL_SESSIONS = 1000;
+const MAX_DETAIL_ASSIGNMENTS = 4000;
+
+// Trae TODOS los logs de un set de asignaciones, paginado y por tandas (ver
+// utils/dbPagination). Evita el querystring gigante y el truncado silencioso.
+function fetchLogsForAsignaciones(asigIds) {
+  return fetchByIdsChunked(
+    "wc_log_picking",
+    "id_asignacion, accion, motivo, nombre_producto, id_pedido, fecha_registro",
+    "id_asignacion",
+    asigIds,
+  );
 }
 
 exports.getIntelligenceCenter = async (req, res) => {
@@ -795,12 +774,15 @@ exports.getIntelligenceCenter = async (req, res) => {
     const sedeId = req.sedeId || null;
 
     // ---- 1. SESIONES (financieros + ritmo) ---------------------------------
+    // Acotado y ordenado: nunca ilimitado (escanea JSONB pesado).
     let sessQ = supabase
       .from("wc_picking_sessions")
       .select(
         "id, sede_id, id_picker, fecha_inicio, fecha_fin, fecha_pago, estado, metodo_pago, snapshot_pedidos, datos_salida, ids_pedidos, wc_sedes(nombre), wc_asignaciones_pedidos(id_pedido, metodo_pago, fecha_pago, pagado_por)",
       )
-      .in("estado", ["finalizado", "auditado", "pendiente_auditoria"]);
+      .in("estado", REVENUE_STATES)
+      .order("fecha_fin", { ascending: false })
+      .limit(MAX_DETAIL_SESSIONS);
     if (sedeId) sessQ = sessQ.eq("sede_id", sedeId);
     if (start) sessQ = sessQ.gte("fecha_fin", start.toISOString());
     if (end) sessQ = sessQ.lte("fecha_fin", end.toISOString());
@@ -815,7 +797,9 @@ exports.getIntelligenceCenter = async (req, res) => {
         "id, id_picker, nombre_picker, id_pedido, tiempo_total_segundos, fecha_inicio, fecha_fin, sede_id",
       )
       .eq("estado_asignacion", "completado")
-      .not("tiempo_total_segundos", "is", null);
+      .not("tiempo_total_segundos", "is", null)
+      .order("fecha_fin", { ascending: false })
+      .limit(MAX_DETAIL_ASSIGNMENTS);
     if (sedeId) asigQ = asigQ.eq("sede_id", sedeId);
     if (start) asigQ = asigQ.gte("fecha_fin", start.toISOString());
     if (end) asigQ = asigQ.lte("fecha_fin", end.toISOString());
@@ -824,18 +808,10 @@ exports.getIntelligenceCenter = async (req, res) => {
     if (asigErr) throw asigErr;
 
     // ---- 3. LOGS (acciones de picking) -------------------------------------
+    // Chunk + paginación: sin querystring gigante ni truncado silencioso.
     const asigIds = asignaciones.map((a) => a.id);
-    let logs = [];
-    if (asigIds.length > 0) {
-      const { data: logsData = [], error: logErr } = await supabase
-        .from("wc_log_picking")
-        .select(
-          "id_asignacion, accion, motivo, nombre_producto, id_pedido, fecha_registro",
-        )
-        .in("id_asignacion", asigIds);
-      if (logErr) throw logErr;
-      logs = logsData;
-    }
+    const logs =
+      asigIds.length > 0 ? await fetchLogsForAsignaciones(asigIds) : [];
 
     // =======================================================================
     // FINANCIEROS
@@ -1330,6 +1306,55 @@ exports.getCompletedRoutesList = async (req, res) => {
     res.status(200).json(routes);
   } catch (error) {
     console.error("Error en getCompletedRoutesList:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// =========================================================
+// 8. RESUMEN GLOBAL (ALL-TIME) — total de recaudo de TODAS las sesiones.
+//
+// Lee las columnas pre-agregadas vía RPC (SUM/COUNT en Postgres, una sola
+// fila). NO escanea JSONB: es constante sin importar cuántas sesiones haya.
+// Este es el endpoint que alimenta las tarjetas "total recaudado / total
+// pedidos / total sesiones" del dashboard, reemplazando a range=all.
+// =========================================================
+exports.getGlobalSummary = async (req, res) => {
+  try {
+    const { data, error } = await supabase.rpc("get_global_session_summary", {
+      p_sede_id: req.sedeId || null,
+    });
+    if (error) throw error;
+
+    // La RPC devuelve un jsonb: { total_recaudado, total_pedidos,
+    // total_sesiones, por_metodo }.
+    const summary = data || {
+      total_recaudado: 0,
+      total_pedidos: 0,
+      total_sesiones: 0,
+      por_metodo: {},
+      por_sede: {},
+    };
+
+    const toSeries = (obj) =>
+      Object.entries(obj || {})
+        .map(([name, value]) => ({ name, value: Number(value) || 0 }))
+        .sort((a, b) => b.value - a.value);
+
+    res.status(200).json({
+      totalRevenue: Number(summary.total_recaudado) || 0,
+      orderCount: Number(summary.total_pedidos) || 0,
+      sessionCount: Number(summary.total_sesiones) || 0,
+      avgTicket:
+        Number(summary.total_pedidos) > 0
+          ? Math.round(
+              Number(summary.total_recaudado) / Number(summary.total_pedidos),
+            )
+          : 0,
+      revenueByMethod: toSeries(summary.por_metodo),
+      revenueBySede: toSeries(summary.por_sede),
+    });
+  } catch (error) {
+    console.error("Error getGlobalSummary:", error);
     res.status(500).json({ error: error.message });
   }
 };
