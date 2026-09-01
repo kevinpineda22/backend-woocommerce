@@ -136,6 +136,19 @@ A credit order is `metodo_pago='credito'` + `fecha_pago=NULL`: session closes an
 
 ⚠️ **Landmine in `completeAuditSession`:** its `SELECT` doesn't request `snapshot_pedidos`, but the ghost-item block below does `session.snapshot_pedidos || []` — so that block is currently inert. Adding `snapshot_pedidos` to that `SELECT` wakes it up and starts inserting `no_encontrado` logs. The credit auto-resolution deliberately queries the snapshot separately to avoid this.
 
+### Bot Order Detection
+
+`utils/botDetection.js` (pure/no-I/O) scores every WooCommerce order against the signature of the spam orders that hit the store in August 2026 (#81334, #81339, #81375): generated names (`ganoacRfitohNzCCDwGSGxeA`), `"… LLC"` companies, non-numeric `_billing_document`, US-format phones, digit-less addresses. `evaluarRiesgoBot(order)` returns `{ sospechoso, puntaje, senales[] }`; `getPendingOrders` attaches it as `riesgo_bot`, and the admin card shows a `⚠️ POSIBLE BOT` tag.
+
+Two rules hold this together:
+
+1. **Weights are calibrated so no single signal reaches the 50-point threshold.** A real customer with one odd field (no cédula, a `@rogers.com` address) must never be flagged — a false positive cancels a real sale.
+2. **It warns, it never blocks.** The order still lists and can still be dispatched. Cancelling is a human call.
+
+Measured against 434 real orders (processing + completed + cancelled): 3 flagged, all 3 genuine bots, zero false positives. `utils/botDetection.test.js` pins the three real bot payloads and a set of real customer shapes; re-run it before touching any threshold.
+
+⚠️ **The root cause is not fixed here.** The bots picked the `cheque` (Crédito) gateway precisely because it takes no payment — it is the open door of the checkout. The real fix is restricting that gateway to approved customer roles **in WooCommerce**, not in this repo.
+
 ### Barcode System
 
 Products linked to SIESA ERP via `siesa_codigos_barras` table (keyed by `f120_id` = numeric SKU). Supports multiple barcodes per product grouped by `unidad_medida`. Barcode lookup is strict: if a product has a known presentation (P6, UND, KL), only barcodes for that exact `unidad_medida` are returned (no fallback to `_all`). Weighable items (fruver/carnicería) use GS1 prefix "29". Parsing logic lives in the frontend repo (`Pagina-web_React/src/pages/ecommerce/picker/modals/utils/gs1Utils.js`), which owns its own tests for it.

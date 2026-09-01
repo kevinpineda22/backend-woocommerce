@@ -20,6 +20,7 @@ const {
   isPendingCartera,
   dedupeByOrder,
 } = require("../utils/paymentSettlement");
+const { evaluarRiesgoBot } = require("../utils/botDetection");
 const {
   getSedeFromWooOrder,
   extractSedeFromOrder,
@@ -440,11 +441,15 @@ exports.getPendingOrders = async (req, res) => {
       (activeAssignments || []).map((a) => `${a.id_pedido}-${a.sede_id}`),
     );
 
+    // Riesgo de bot: se evalúa acá, en la única lista donde un humano decide si
+    // el pedido entra a picking. Marcarlo antes de asignarlo evita que un
+    // pedido inventado de $400k se lleve un picker y stock real.
     const cleanOrders = wcOrders.map((order) => ({
       ...order,
       is_assigned: assignedKeys.has(`${order.id}-${order._sede_id}`),
       sede_detected: order._sede_name || null,
       sede_id: order._sede_id || null,
+      riesgo_bot: evaluarRiesgoBot(order),
     }));
 
     res.status(200).json(cleanOrders);
