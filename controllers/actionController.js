@@ -1,5 +1,15 @@
 const { supabase } = require("../services/supabaseClient");
 const { logAuditEvent } = require("../services/auditService");
+const {
+  REASON,
+  barcodeVariants,
+  normalizeUM,
+  isScannableInput,
+  buildBarcodeIndex,
+  availableUMsFor,
+  matchScannedCode,
+  resolveExpectedUM,
+} = require("../utils/siesaMatching");
 
 // Mapeo de acción de picking → acción de audit log
 const PICKING_ACTION_MAP = {
@@ -405,178 +415,118 @@ exports.validateManualCode = async (req, res) => {
   res.json({ valid: skuMatch || barcodeMatch });
 };
 
-// ✅ FUNCIÓN PRIVADA COMPARTIDA - Validación unificada
-// Picker y Auditor usan esta función con parámetro allowGS1 diferente
+// ============================================================================
+// VALIDACIÓN DE CÓDIGOS CONTRA SIESA — picker y auditor comparten esta función.
+//
+// Toda la lógica de decisión vive en `utils/siesaMatching.js` (módulo puro,
+// con tests de regresión en `utils/siesaMatching.test.js`). Acá solo queda la
+// I/O: traer las filas correctas de SIESA y delegar.
+//
+// Por qué se reescribió (todo esto trababa auditorías sobre productos correctos):
+//   · Se consultaba con `.eq(codigo)` crudo → el '+' de SIESA no matcheaba nunca.
+//   · Se usaba `.single()` → un código en 2 filas devolvía "no encontrado".
+//   · La unidad de medida esperada (una inferencia sobre el nombre del producto)
+//     invalidaba códigos correctos.
+//   · Un producto sin etiqueta física no tenía NINGÚN camino de validación.
+// ============================================================================
 async function _validateSiesaCode(
   codigo,
   f120_id_esperado,
   unidad_medida_esperada,
-  { allowGS1 = false } = {},
+  { allowGS1 = false, umConfiable = null, skuProducto = null, nombreProducto = null } = {},
 ) {
-  const codigoLimpio = codigo.toString().trim().toUpperCase();
-  const isValidBarcode = /^\d{8,}\+?$/.test(codigoLimpio);
-  const isValidSku = /^\d+[A-Z]+\d*$/.test(codigoLimpio);
+  const f120Esperado = parseInt(f120_id_esperado, 10);
 
-  if (!isValidBarcode && !isValidSku) {
+  if (!isScannableInput(codigo)) {
     return {
       status: 200,
       body: {
         valid: false,
-        message:
-          "❌ Código inválido. Escanea el código de barras del producto.",
+        reason: REASON.MALFORMED,
+        message: "❌ Código inválido. Escanea el código de barras del producto.",
         codigo_existe: false,
       },
     };
   }
 
-  // RUTA 1: SKU directo (ej: "1032P2")
-  if (isValidSku) {
-    const skuMatch = codigoLimpio.match(/^(\d+)([A-Z]+\d*)$/);
-    if (skuMatch) {
-      const f120Ingresado = parseInt(skuMatch[1]);
-      const umIngresada = skuMatch[2];
-      const skuIngresado = `${f120Ingresado}${umIngresada}`;
-      const cleanSku = (s) => s.replace(/-/g, "");
-      const skuEsperado = cleanSku(
-        `${f120_id_esperado}${unidad_medida_esperada}`,
-      );
+  // Dos consultas en paralelo, ambas necesarias:
+  //   1. Las filas del código escaneado — con y sin '+' (nunca `.single()`).
+  //   2. TODAS las filas del producto esperado — hacen falta para el prefijo
+  //      GS1, para el SKU+UM y para saber qué presentaciones existen de verdad.
+  const variantes = barcodeVariants(codigo);
+  const [porCodigo, porProducto] = await Promise.all([
+    variantes.length
+      ? supabase
+          .from("siesa_codigos_barras")
+          .select("f120_id, codigo_barras, unidad_medida")
+          .in("codigo_barras", variantes)
+      : Promise.resolve({ data: [] }),
+    !isNaN(f120Esperado)
+      ? supabase
+          .from("siesa_codigos_barras")
+          .select("f120_id, codigo_barras, unidad_medida")
+          .eq("f120_id", f120Esperado)
+      : Promise.resolve({ data: [] }),
+  ]);
 
-      if (skuIngresado === skuEsperado) {
-        return {
-          status: 200,
-          body: {
-            valid: true,
-            message: "✅ SKU validado correctamente",
-            sku_encontrado: skuIngresado,
-            f120_id: f120Ingresado,
-            unidad_medida: umIngresada,
-          },
-        };
-      }
+  // Unión sin duplicados: una misma fila puede venir por los dos caminos.
+  const siesaRows = [];
+  const vistos = new Set();
+  [...(porCodigo.data || []), ...(porProducto.data || [])].forEach((r) => {
+    const k = `${r.f120_id}|${r.codigo_barras}|${r.unidad_medida}`;
+    if (vistos.has(k)) return;
+    vistos.add(k);
+    siesaRows.push(r);
+  });
 
-      if (f120Ingresado === f120_id_esperado) {
-        return {
-          status: 200,
-          body: {
-            valid: false,
-            message: `❌ Presentación incorrecta: digitaste ${umIngresada}, pero se esperaba ${unidad_medida_esperada}`,
-          },
-        };
-      }
-
-      return {
-        status: 200,
-        body: {
-          valid: false,
-          message: "❌ El SKU no corresponde a este producto",
-        },
-      };
-    }
+  // ¿La unidad de medida esperada es un DATO o una adivinanza?
+  // Si el llamador no lo declara, se deriva acá — y solo se considera
+  // confiable cuando hay evidencia real (sufijo del SKU, o SIESA conoce una
+  // sola presentación). Ante la duda: NO confiable, o sea NO bloquea.
+  let confiable = umConfiable;
+  if (confiable === null || confiable === undefined) {
+    const resuelta = resolveExpectedUM({
+      sku: skuProducto,
+      nombre: nombreProducto,
+      umsDisponibles: availableUMsFor(siesaRows, f120Esperado),
+    });
+    confiable =
+      resuelta.confiable &&
+      normalizeUM(resuelta.um) === normalizeUM(unidad_medida_esperada);
   }
 
-  // RUTA 2A: GS1 variable (solo si allowGS1 = true, ej: picker)
-  if (allowGS1) {
-    const isGS1Variable =
-      /^\d{13,14}$/.test(codigoLimpio) && codigoLimpio.startsWith("2");
-    if (isGS1Variable) {
-      const gs1Prefix = codigoLimpio.substring(0, 7);
-      const { data: siesaBarcodes } = await supabase
-        .from("siesa_codigos_barras")
-        .select("f120_id, unidad_medida, codigo_barras")
-        .eq("f120_id", f120_id_esperado);
+  const resultado = matchScannedCode({
+    codigo,
+    f120_id_esperado: f120Esperado,
+    um_esperada: unidad_medida_esperada,
+    umConfiable: confiable,
+    siesaRows,
+    allowF120Manual: true,
+  });
 
-      const gs1Match = (siesaBarcodes || []).some((bc) => {
-        const cleanBarcode = (bc.codigo_barras || "")
-          .toString()
-          .trim()
-          .replace(/\+$/, "");
-        return (
-          cleanBarcode.startsWith("2") &&
-          cleanBarcode.length >= 7 &&
-          gs1Prefix === cleanBarcode.substring(0, 7)
-        );
-      });
-
-      if (gs1Match) {
-        return {
-          status: 200,
-          body: {
-            valid: true,
-            message: "✅ Código GS1 validado correctamente",
-            sku_encontrado: `${f120_id_esperado}${unidad_medida_esperada}`,
-            f120_id: f120_id_esperado,
-            unidad_medida: unidad_medida_esperada,
-          },
-        };
-      }
-
-      return {
-        status: 200,
-        body: {
-          valid: false,
-          message: "❌ El código GS1 no corresponde a este producto",
-          codigo_existe: false,
-        },
-      };
-    }
-  }
-
-  // RUTA 2B: Barcode exacto en SIESA
-  const { data: siesaData, error: siesaError } = await supabase
-    .from("siesa_codigos_barras")
-    .select("f120_id, unidad_medida")
-    .eq("codigo_barras", codigoLimpio)
-    .single();
-
-  if (siesaError || !siesaData) {
-    return {
-      status: 200,
-      body: {
-        valid: false,
-        message: "❌ Código no encontrado en el sistema",
-        codigo_existe: false,
-      },
-    };
-  }
-
-  const cleanSku = (sku) => sku.replace(/-/g, "");
-  const skuEscaneado = cleanSku(
-    `${siesaData.f120_id}${siesaData.unidad_medida}`,
-  );
-  const skuEsperado = cleanSku(`${f120_id_esperado}${unidad_medida_esperada}`);
-
-  if (skuEscaneado !== skuEsperado) {
-    if (siesaData.f120_id === f120_id_esperado) {
-      return {
-        status: 200,
-        body: {
-          valid: false,
-          message: `❌ El código que escaneaste es para ${siesaData.unidad_medida}, pero se esperaba ${unidad_medida_esperada}`,
-          f120_id_coincide: true,
-          unidad_media_encontrada: siesaData.unidad_medida,
-          unidad_medida_esperada,
-        },
-      };
-    }
-    return {
-      status: 200,
-      body: {
-        valid: false,
-        message: "❌ El código pertenece a un producto diferente",
-        f120_id_encontrado: siesaData.f120_id,
-        f120_id_esperado,
-      },
-    };
-  }
+  // Compatibilidad con el frontend actual: los mensajes conservan el emoji.
+  const prefijo = resultado.valid ? "✅ " : "❌ ";
 
   return {
     status: 200,
     body: {
-      valid: true,
-      message: "✅ Código validado correctamente",
-      sku_encontrado: skuEscaneado,
-      f120_id: siesaData.f120_id,
-      unidad_medida: siesaData.unidad_medida,
+      valid: resultado.valid,
+      reason: resultado.reason,
+      message: `${prefijo}${resultado.message}`,
+      advertencia: resultado.advertencia,
+      codigo_existe: resultado.codigo_existe,
+      f120_id: resultado.f120_id,
+      unidad_medida: resultado.unidad_medida,
+      unidad_medida_esperada: normalizeUM(unidad_medida_esperada),
+      um_confiable: confiable,
+      sku_encontrado: resultado.valid
+        ? `${resultado.f120_id}${resultado.unidad_medida || ""}`
+        : undefined,
+      // Se conserva el shape anterior para no romper pantallas existentes.
+      f120_id_coincide: resultado.f120_id_coincide,
+      f120_id_encontrado: resultado.f120_id_encontrado,
+      unidad_media_encontrada: resultado.unidad_medida_encontrada,
+      allowGS1,
     },
   };
 }
@@ -586,12 +536,24 @@ async function _validateSiesaCode(
  * Acepta códigos GS1 de peso variable (carnicería: etiquetas de báscula)
  */
 exports.validateCodeWithSiesa = async (req, res) => {
-  const { codigo, f120_id_esperado, unidad_medida_esperada } = req.body;
+  const {
+    codigo,
+    f120_id_esperado,
+    unidad_medida_esperada,
+    // Opcionales: permiten decidir si la presentación esperada es un DATO
+    // o una inferencia. Si no llegan, el backend lo deriva contra SIESA.
+    um_confiable,
+    sku_producto,
+    nombre_producto,
+  } = req.body;
 
-  if (!codigo || !f120_id_esperado || !unidad_medida_esperada) {
+  // `unidad_medida_esperada` ya NO es obligatoria: un producto sin
+  // presentación conocida se valida igual por f120_id (antes daba 400 y el
+  // picker quedaba sin forma de registrar el ítem).
+  if (!codigo || !f120_id_esperado) {
     return res.status(400).json({
       valid: false,
-      message: "Parámetros incompletos",
+      message: "Parámetros incompletos: se requiere codigo y f120_id_esperado",
     });
   }
 
@@ -600,7 +562,12 @@ exports.validateCodeWithSiesa = async (req, res) => {
       codigo,
       f120_id_esperado,
       unidad_medida_esperada,
-      { allowGS1: true },
+      {
+        allowGS1: true,
+        umConfiable: typeof um_confiable === "boolean" ? um_confiable : null,
+        skuProducto: sku_producto,
+        nombreProducto: nombre_producto,
+      },
     );
     return res.status(result.status).json(result.body);
   } catch (error) {
@@ -614,18 +581,26 @@ exports.validateCodeWithSiesa = async (req, res) => {
 };
 
 /**
- * Validar código para AUDITOR - IGUAL DE RESTRICTIVO QUE PICKER
- * Valida presentación EXACTA (f120_id + unidad_medida)
- * El auditor digita CANTIDAD manualmente (diferencia con picker)
- * Diferencia: Picker valida por unidad, Auditor valida cantidad total de una vez
+ * Validar código para AUDITOR.
+ *
+ * Mismo criterio que el picker: el f120_id manda y la presentación solo
+ * bloquea cuando es un dato real (ver `utils/siesaMatching.js`). El auditor
+ * digita la CANTIDAD a mano; el picker valida unidad por unidad.
  */
 exports.validateCodeForAuditor = async (req, res) => {
-  const { codigo, f120_id_esperado, unidad_medida_esperada } = req.body;
+  const {
+    codigo,
+    f120_id_esperado,
+    unidad_medida_esperada,
+    um_confiable,
+    sku_producto,
+    nombre_producto,
+  } = req.body;
 
-  if (!codigo || !f120_id_esperado || !unidad_medida_esperada) {
+  if (!codigo || !f120_id_esperado) {
     return res.status(400).json({
       valid: false,
-      message: "Parámetros incompletos",
+      message: "Parámetros incompletos: se requiere codigo y f120_id_esperado",
     });
   }
 
@@ -634,7 +609,12 @@ exports.validateCodeForAuditor = async (req, res) => {
       codigo,
       f120_id_esperado,
       unidad_medida_esperada,
-      { allowGS1: true }, // ✅ CAMBIO: Ahora el auditor también acepta GS1
+      {
+        allowGS1: true,
+        umConfiable: typeof um_confiable === "boolean" ? um_confiable : null,
+        skuProducto: sku_producto,
+        nombreProducto: nombre_producto,
+      },
     );
     return res.status(result.status).json(result.body);
   } catch (error) {
@@ -648,8 +628,20 @@ exports.validateCodeForAuditor = async (req, res) => {
 };
 
 /**
- * AUDITOR: Cargar todos los codigo_barras para una lista de f120_ids.
- * Retorna un mapa { codigo_barras: { f120_id, unidad_medida } } para validación local en el frontend.
+ * AUDITOR: Cargar todos los codigo_barras para una lista de f120_ids,
+ * para que el frontend valide en local sin ida y vuelta por cada scan.
+ *
+ * Devuelve dos vistas de lo MISMO:
+ *   · `barcodeIndex` — código normalizado → LISTA de presentaciones.
+ *     Es la buena. Un mismo EAN puede estar registrado para UND y para KL;
+ *     el mapa plano anterior era last-wins y perdía la mitad de las filas
+ *     en silencio, lo que hacía fallar códigos correctos.
+ *   · `barcodeMap` — shape legacy (una presentación por código) para no
+ *     romper las pantallas que todavía lo leen. Trae `presentaciones` con
+ *     la lista completa. Migrar a `barcodeIndex` y borrar este campo.
+ *
+ * Las claves están SIEMPRE normalizadas (sin el '+' final de SIESA), porque
+ * ningún lector físico emite ese '+'.
  */
 exports.loadBarcodesForAudit = async (req, res) => {
   const { f120_ids } = req.body;
@@ -667,22 +659,27 @@ exports.loadBarcodesForAudit = async (req, res) => {
 
     if (error) throw error;
 
-    // Mapa: codigo_barras (normalizado) → { f120_id, unidad_medida }
+    const barcodeIndex = buildBarcodeIndex(data || []);
+
+    // Vista legacy + presentaciones completas por código.
     const barcodeMap = {};
-    (data || []).forEach((row) => {
-      const um = (row.unidad_medida || "").toUpperCase();
-      const cleanCode = row.codigo_barras
-        .toString()
-        .trim()
-        .replace(/\+$/, "")
-        .toUpperCase();
-      barcodeMap[cleanCode] = { f120_id: row.f120_id, unidad_medida: um };
-      // También guardar versión original (con +) por si acaso
-      const original = row.codigo_barras.toString().trim().toUpperCase();
-      barcodeMap[original] = { f120_id: row.f120_id, unidad_medida: um };
+    Object.entries(barcodeIndex).forEach(([code, entries]) => {
+      barcodeMap[code] = {
+        f120_id: entries[0].f120_id,
+        unidad_medida: entries[0].unidad_medida,
+        presentaciones: entries,
+      };
     });
 
-    return res.json({ barcodeMap });
+    // Presentaciones reales por producto: el frontend las necesita para
+    // saber si la UM que muestra es un dato o una suposición.
+    const umsPorProducto = {};
+    f120_ids.forEach((id) => {
+      const n = parseInt(id, 10);
+      if (!isNaN(n)) umsPorProducto[n] = availableUMsFor(data || [], n);
+    });
+
+    return res.json({ barcodeIndex, barcodeMap, umsPorProducto });
   } catch (error) {
     console.error("Error en loadBarcodesForAudit:", error.message);
     return res.status(500).json({ error: "Error cargando códigos de barras" });
