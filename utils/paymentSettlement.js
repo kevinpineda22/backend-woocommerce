@@ -58,41 +58,12 @@ function summarizeSessionMethod(asignaciones) {
   return metodos.length === 1 ? metodos[0] : "mixto";
 }
 
-// ¿Esta asignación es una deuda viva? Es lo que lista la bandeja de cartera.
-// Cubre tanto el crédito auto-resuelto por pasarela como el que marcó un cajero.
-function isPendingCartera(asignacion) {
-  return (
-    asignacion?.metodo_pago === CREDITO_METHOD && !asignacion?.fecha_pago
-  );
-}
-
-// Un mismo pedido puede tener MÁS DE UNA asignación completada (reasignaciones,
-// traslados entre sedes): al 2026-08-13 son 92 de 792. Si las dos quedan a
-// crédito, cartera listaría la deuda dos veces e inflaría el total adeudado.
-// Nos quedamos con la asignación más reciente por pedido.
-function dedupeByOrder(asignaciones) {
-  const porPedido = new Map();
-  for (const a of asignaciones || []) {
-    const actual = porPedido.get(a.id_pedido);
-    if (!actual) {
-      porPedido.set(a.id_pedido, a);
-      continue;
-    }
-    const nueva = new Date(a.fecha_fin || 0).getTime();
-    const vieja = new Date(actual.fecha_fin || 0).getTime();
-    if (nueva > vieja) porPedido.set(a.id_pedido, a);
-  }
-  return [...porPedido.values()];
-}
-
 module.exports = {
   CREDITO_METHOD,
   SYSTEM_ACTOR,
-  dedupeByOrder,
   settlesImmediately,
   paymentDateFor,
   findCreditoOrderIds,
   allSettled,
   summarizeSessionMethod,
-  isPendingCartera,
 };

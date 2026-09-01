@@ -17,8 +17,6 @@ const {
   findCreditoOrderIds,
   allSettled,
   summarizeSessionMethod,
-  isPendingCartera,
-  dedupeByOrder,
 } = require("../utils/paymentSettlement");
 const { evaluarRiesgoBot } = require("../utils/botDetection");
 const {
@@ -687,9 +685,8 @@ exports.getPendingPaymentSessions = async (req, res) => {
           metodo_pago: a?.metodo_pago || null,
           fecha_pago: a?.fecha_pago || null,
           pagado_por: a?.pagado_por || null,
-          // El cajero NO debe cobrar estos: son cartera.
+          // El cajero NO debe cobrarlos: ya quedaron resueltos como crédito.
           es_credito: isCreditoOrder(snapshotById.get(idPedido)),
-          pendiente_cartera: isPendingCartera(a),
         };
       });
 
@@ -893,152 +890,6 @@ exports.markSessionAsPaid = async (req, res) => {
   }
 };
 
-// =========================================================
-// CARTERA — deudas vivas de clientes a crédito
-// =========================================================
-// Un pedido a crédito ya cerró su sesión operativa (metodo_pago='credito') pero
-// la plata todavía no entró (fecha_pago IS NULL). Esta bandeja es donde se
-// cobra: es la única vista que responde "¿quién nos debe?".
-
-exports.getCarteraPendiente = async (req, res) => {
-  try {
-    let query = supabase
-      .from("wc_asignaciones_pedidos")
-      .select(
-        "id, id_pedido, id_sesion, metodo_pago, fecha_pago, fecha_fin, pagado_por, sede_id, wc_picking_sessions ( snapshot_pedidos, datos_salida, ids_pedidos, wc_sedes ( nombre ) )",
-      )
-      .eq("metodo_pago", CREDITO_METHOD)
-      .is("fecha_pago", null)
-      .order("fecha_fin", { ascending: true });
-
-    if (req.sedeId) query = query.eq("sede_id", req.sedeId);
-
-    const { data: asignaciones, error } = await query;
-    if (error) throw error;
-
-    // Un pedido reasignado o trasladado puede tener dos asignaciones a crédito.
-    // Sin esto, la deuda se listaría dos veces y el total saldría inflado.
-    const deudas = dedupeByOrder(asignaciones).map((a) => {
-      const sess = a.wc_picking_sessions || {};
-      const snapshot = (sess.snapshot_pedidos || []).find(
-        (o) => String(o.id) === String(a.id_pedido),
-      );
-
-      const totales = calcTotalesFromDatosSalida(
-        sess.datos_salida,
-        sess.snapshot_pedidos,
-        sess.ids_pedidos,
-      );
-      const idx = (sess.ids_pedidos || []).findIndex(
-        (id) => String(id) === String(a.id_pedido),
-      );
-
-      const cliente =
-        `${snapshot?.billing?.first_name || ""} ${snapshot?.billing?.last_name || ""}`.trim() ||
-        "Cliente";
-
-      const desde = a.fecha_fin ? new Date(a.fecha_fin) : null;
-      const diasVencido = desde
-        ? Math.floor((Date.now() - desde.getTime()) / 86400000)
-        : null;
-
-      return {
-        id_asignacion: a.id,
-        id_pedido: a.id_pedido,
-        id_sesion: a.id_sesion,
-        sede_nombre: sess.wc_sedes?.nombre || null,
-        cliente,
-        documento: extractDocumento(snapshot),
-        telefono: snapshot?.billing?.phone || "",
-        email: snapshot?.billing?.email || "",
-        total: idx >= 0 ? totales[idx] : null,
-        fecha_entrega: a.fecha_fin,
-        dias_vencido: diasVencido,
-        resuelto_por: a.pagado_por,
-      };
-    });
-
-    const totalAdeudado = deudas.reduce(
-      (sum, d) => sum + (parseFloat(d.total) || 0),
-      0,
-    );
-
-    res.status(200).json({
-      total_pedidos: deudas.length,
-      total_adeudado: totalAdeudado,
-      deudas,
-    });
-  } catch (error) {
-    console.error("Error getCarteraPendiente:", error.message);
-    res
-      .status(500)
-      .json({ error: `Error al cargar cartera: ${error.message}` });
-  }
-};
-
-// Registra que un cliente a crédito finalmente pagó. Solo estampa fecha_pago:
-// el metodo_pago sigue siendo 'credito' porque así fue como se vendió.
-exports.marcarCarteraCobrada = async (req, res) => {
-  const { id_pedido, id_sesion, admin_name, admin_email } = req.body;
-
-  if (!id_pedido) return res.status(400).json({ error: "Falta id_pedido" });
-
-  const now = new Date().toISOString();
-  const actorName = (admin_name || "").trim() || "Admin";
-
-  try {
-    let query = supabase
-      .from("wc_asignaciones_pedidos")
-      .update({ fecha_pago: now, pagado_por: actorName })
-      .eq("id_pedido", id_pedido)
-      .eq("metodo_pago", CREDITO_METHOD)
-      .is("fecha_pago", null);
-
-    // id_sesion es opcional pero desambigua si un mismo pedido aparece en más
-    // de una sesión (p. ej. tras un traslado entre sedes).
-    if (id_sesion) query = query.eq("id_sesion", id_sesion);
-
-    const { data: updated, error } = await query.select("id, id_sesion, sede_id");
-    if (error) throw error;
-
-    if (!updated || updated.length === 0) {
-      return res.status(404).json({
-        error:
-          "No hay una deuda a crédito pendiente para ese pedido (¿ya se cobró?)",
-      });
-    }
-
-    for (const row of updated) {
-      logAuditEvent({
-        actor: { type: "admin", id: admin_email || null, name: actorName },
-        action: "payment.marked",
-        entity: { type: "order", id: id_pedido },
-        sedeId: row.sede_id || req.sedeId || null,
-        metadata: {
-          session_id: row.id_sesion,
-          payment_method: CREDITO_METHOD,
-          cartera_cobrada: true,
-        },
-      });
-    }
-
-    // NOTA: acá NO se llama refreshSessionSummary a propósito. El recaudo cuenta
-    // un pedido a crédito desde que metodo_pago='credito' (isPaid mira el método,
-    // no fecha_pago), y ese método no cambia al cobrar. El pre-agregado ya es
-    // correcto; recalcular sería un round-trip sin efecto.
-    res.status(200).json({
-      message: "Deuda cobrada.",
-      id_pedido,
-      fecha_pago: now,
-    });
-  } catch (error) {
-    console.error("Error marcarCarteraCobrada:", error.message);
-    res
-      .status(500)
-      .json({ error: `Error al marcar cobro de cartera: ${error.message}` });
-  }
-};
-
 exports.getHistorySessions = async (req, res) => {
   try {
     let histQuery = supabase
@@ -1127,9 +978,8 @@ exports.getHistorySessions = async (req, res) => {
           metodo_pago: a?.metodo_pago || null,
           fecha_pago: a?.fecha_pago || null,
           pagado_por: a?.pagado_por || null,
-          // El cajero NO debe cobrar estos: son cartera.
+          // El cajero NO debe cobrarlos: ya quedaron resueltos como crédito.
           es_credito: isCreditoOrder(snapshotById.get(idPedido)),
-          pendiente_cartera: isPendingCartera(a),
         };
       });
 
