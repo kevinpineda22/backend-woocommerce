@@ -132,9 +132,7 @@ The user-facing label is **"Cliente Crédito"**, never "Crédito" alone: a cashi
 | `metodo_pago` | How the charge is resolved → closes the operational session |
 | `fecha_pago` | Whether the money actually arrived |
 
-A credit order is `metodo_pago='credito'` + `fecha_pago=NULL`: session closes and enters the reports, while the debt stays live. `completeAuditSession` calls `autoResolveCreditoOrders()` (idempotent — only touches assignments with `metodo_pago IS NULL`, never overwrites a cashier). `settleSessionIfComplete()` is the single close criterion shared by the cashier path and the system path. Cartera endpoints: `GET /api/orders/cartera`, `POST /api/orders/cartera/marcar-cobrado`.
-
-⚠️ **Landmine in `completeAuditSession`:** its `SELECT` doesn't request `snapshot_pedidos`, but the ghost-item block below does `session.snapshot_pedidos || []` — so that block is currently inert. Adding `snapshot_pedidos` to that `SELECT` wakes it up and starts inserting `no_encontrado` logs. The credit auto-resolution deliberately queries the snapshot separately to avoid this.
+A credit order is `metodo_pago='credito'` + `fecha_pago=NULL`: session closes and enters the reports, while the debt stays live. `completeAuditSession` calls `autoResolveCreditoOrders()` (idempotent — only touches assignments with `metodo_pago IS NULL`, never overwrites a cashier). `settleSessionIfComplete()` is the single close criterion shared by the cashier path and the system path.
 
 **There is no cartera panel.** It was removed 2026-08-28. Collections are handled off-system by one person reading the history: the credit customers are few and known by name, so a whole tray to track `fecha_pago` bought nothing. Consequence: **`fecha_pago` is now permanently `NULL` for credit orders** — nothing writes it. Do not build a "collected / not collected" distinction on it; it would read as "nobody ever paid". The history's job is only to make the credit order *visible*: `getHistorySessions` ships `es_credito` per order, and the frontend paints the whole row amber with a `🏦 CLIENTE CRÉDITO` badge. Green is still reserved for money that arrived.
 
@@ -157,7 +155,21 @@ Measured against 434 real orders (processing + completed + cancelled): 3 flagged
 
 ### Barcode System
 
-Products linked to SIESA ERP via `siesa_codigos_barras` table (keyed by `f120_id` = numeric SKU). Supports multiple barcodes per product grouped by `unidad_medida`. Barcode lookup is strict: if a product has a known presentation (P6, UND, KL), only barcodes for that exact `unidad_medida` are returned (no fallback to `_all`). Weighable items (fruver/carnicería) use GS1 prefix "29". Parsing logic lives in the frontend repo (`Pagina-web_React/src/pages/ecommerce/picker/modals/utils/gs1Utils.js`), which owns its own tests for it.
+Products linked to SIESA ERP via `siesa_codigos_barras` (keyed by `f120_id` = numeric SKU), with multiple barcodes per product grouped by `unidad_medida`. Weighable items (fruver/carnicería) use GS1 prefix "29". GS1 parsing lives in the frontend repo (`.../picker/modals/utils/gs1Utils.js`), which owns its tests for it.
+
+**All matching goes through `utils/siesaMatching.js`** — pure, no I/O, guarded by `utils/siesaMatching.test.js`. Do not reimplement normalization inside a controller. Four private copies of this logic once existed (`_validateSiesaCode`, `loadBarcodesForAudit`, `auditBarcodeMap`, `getBarcodesFromSiesaByUnitMeasure`); each normalized slightly differently, and every divergence blocked an auditor holding the correct product. The copies are gone.
+
+Three rules hold it together:
+
+1. **The `f120_id` decides; the presentation only warns.** `unidad_medida` is often a *guess* — WooCommerce frequently ships no `pa_unidad-de-medida-aproximado`, so it gets inferred from the product name. `resolveExpectedUM()` returns `{um, confiable, fuente}` and **only a `confiable: true` UM may invalidate a code**. Ante la duda, no bloquear: a false rejection stops a real sale at the door, while a wrong presentation is caught downstream. The `confiable` flag ships to the frontend as `unidad_medida_confiable`.
+2. **A barcode can live in several rows.** The same EAN registered for UND *and* KL is normal in SIESA. **Never `.single()`** on `codigo_barras` — PostgREST errors on >1 row and the message read "código no encontrado" over a row that existed. Index values are LISTS (`buildBarcodeIndex`), never last-wins maps.
+3. **The `+` does not exist for the scanner.** SIESA stores some codes with a trailing `+`; no physical label has it. Compare only via `normalizeBarcode()`, and query with `barcodeVariants()` so both forms hit.
+
+**Products with no physical barcode** (fruver trays, own packaging) are validated by typing the `f120_id` shown on screen — `REASON.F120_MANUAL`. Without this escape hatch they were impossible to audit: there is nothing to scan. It is deliberately traceable: the reason travels in the response so a manual validation is distinguishable from a scan.
+
+**The QR/manifest is built from `manifest_items`, never from `products_map`.** `products_map` is a lookup index: it writes the same entry under `product_id` *and* `variation_id` (walking it duplicated every variable product) and collapses the same product ordered by two customers into one entry (last one wins). `utils/manifestItems.js` emits one row per real order line, keyed `${order_id}-${line_item_id}`, and reports `manifest_warnings`: `colisiones` (two lines in one order that would emit the same code — the POS reads them as one product) and `sin_codigo`. `buildManifestCode()` returns `null` rather than a bare `f120_id`, which the register cannot resolve.
+
+**`utils/wooLinePayload.js`** owns what gets charged back to WooCommerce (pure, guarded by its test). A substitute that is *already a line in the order* is merged into that line — adding it as a new line duplicated the product on the customer's invoice — and `precio_nuevo` now ships as the line total instead of being read and discarded.
 
 ### Aisle Routing
 
