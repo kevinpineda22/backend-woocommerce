@@ -13,6 +13,8 @@ import {
   matchScannedCode,
   resolveExpectedUM,
   buildManifestCode,
+  findGs1Base,
+  buildWeighableCode,
 } from "./siesaMatching";
 
 // =====================================================================
@@ -488,5 +490,74 @@ describe("buildManifestCode — en el QR solo van códigos de barras REALES", ()
 
   it("sin f120_id numérico y sin código utilizable devuelve null", () => {
     expect(buildManifestCode({ f120_id: "SIN-SKU", um: "UND", barcode: "" })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------
+// REGRESIÓN — el prefijo GS1 de báscula sale de SIESA, no se fabrica
+// ---------------------------------------------------------------------
+describe("REGRESIÓN — findGs1Base / buildWeighableCode no inventan códigos", () => {
+  // Caso real: Naranja Extra Kilo, f120 5073. El manifiesto construía
+  // "29" + SKU = 2950730..., pero SIESA guarda 2900061. Ese prefijo no
+  // existía y la caja no podía resolver la línea.
+  const filas = [
+    { f120_id: 5073, codigo_barras: "0050730050730", unidad_medida: "KL" },
+    { f120_id: 5073, codigo_barras: "61", unidad_medida: "KL" },
+    { f120_id: 5073, codigo_barras: "5073+", unidad_medida: "KL" },
+    { f120_id: 5073, codigo_barras: "5073KL", unidad_medida: "KL" },
+    { f120_id: 5073, codigo_barras: "2900061", unidad_medida: "KL" },
+    { f120_id: 999, codigo_barras: "2900082", unidad_medida: "KL" },
+  ];
+
+  it("encuentra la base real de SIESA, no la fabricada desde el SKU", () => {
+    expect(findGs1Base(filas, 5073)).toBe("2900061");
+    expect(findGs1Base(filas, 5073)).not.toBe("2950730");
+  });
+
+  it("no toma prestada la base de otro producto", () => {
+    expect(findGs1Base(filas, 12345)).toBeNull();
+  });
+
+  it("devuelve null si el producto no tiene base 29", () => {
+    expect(findGs1Base([filas[0], filas[1]], 5073)).toBeNull();
+    // Sin base no se emite nada: el manifiesto lo reporta para digitar.
+  });
+
+  it("ignora códigos que empiezan en 29 pero no son prefijo de 7", () => {
+    const raros = [
+      { f120_id: 7, codigo_barras: "2900061123456", unidad_medida: "KL" },
+      { f120_id: 7, codigo_barras: "2998UND", unidad_medida: "UND" },
+    ];
+    expect(findGs1Base(raros, 7)).toBeNull();
+  });
+
+  it("arma el EAN-13 de peso variable con dígito verificador válido", () => {
+    const code = buildWeighableCode("2900061", 1.5);
+    expect(code).toHaveLength(13);
+    expect(code.startsWith("2900061")).toBe(true);
+    expect(code.slice(7, 12)).toBe("01500"); // 1.5 kg = 1500 g
+  });
+
+  it("el dígito verificador es el estándar GS1", () => {
+    // 2900061 + 01500 -> se recalcula y debe coincidir
+    const code = buildWeighableCode("2900061", 1.5);
+    const cuerpo = code.slice(0, 12);
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      sum += parseInt(cuerpo[i], 10) * ((12 - i) % 2 === 1 ? 3 : 1);
+    }
+    expect(code[12]).toBe(String((10 - (sum % 10)) % 10));
+  });
+
+  it("rechaza una base inválida en vez de emitir basura", () => {
+    expect(buildWeighableCode("2950730123", 1)).toBeNull();
+    expect(buildWeighableCode("", 1)).toBeNull();
+    expect(buildWeighableCode(null, 1)).toBeNull();
+  });
+
+  it("rechaza pesos imposibles", () => {
+    expect(buildWeighableCode("2900061", 0)).toBeNull();
+    expect(buildWeighableCode("2900061", -1)).toBeNull();
+    expect(buildWeighableCode("2900061", 200)).toBeNull(); // 200 kg > 99999 g
   });
 });

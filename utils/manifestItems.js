@@ -65,6 +65,9 @@ function buildManifestItems({ ordersData = [], productDetailsMap = {} }) {
         unidad_medida_siesa: detalle.unidad_medida_siesa || null,
         unidad_medida_confiable: detalle.unidad_medida_confiable === true,
         barcode: detalle.barcode || null,
+        // Prefijo GS1 REAL de SIESA para pesables. El manifiesto lo usa para
+        // armar el código de báscula en vez de fabricarlo desde el SKU.
+        gs1_base: detalle.gs1_base || null,
         // null = no hay código resoluble en la caja. El frontend debe
         // mostrarlo como pendiente, NO emitir una línea de QR inválida.
         // Se elige entre los códigos REALES del producto (los que ya vienen

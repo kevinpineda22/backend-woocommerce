@@ -515,7 +515,54 @@ function buildManifestCode({ f120_id, um, barcode, siesaRows = [] }) {
   return null;
 }
 
+// ---------------------------------------------------------------------
+// Pesables: base GS1 real
+// ---------------------------------------------------------------------
+
+/**
+ * Devuelve el prefijo GS1 de 7 dígitos que SIESA tiene registrado para un
+ * producto pesable (formato `29` + 5 dígitos), o null si no lo tiene.
+ *
+ * ⚠️ NO se construye desde el SKU de WooCommerce. El prefijo real NO es
+ * `29` + f120_id: para la Naranja (f120 5073) SIESA guarda `2900061`, no
+ * `2950730`. Fabricarlo mandaba a la caja un código que no existe.
+ *
+ * @param {Array} siesaRows — filas de siesa_codigos_barras
+ * @param {number|string} f120_id
+ * @returns {string|null}
+ */
+function findGs1Base(siesaRows, f120_id) {
+  const id = parseInt(f120_id, 10);
+  if (isNaN(id)) return null;
+  const fila = (siesaRows || []).find((r) => {
+    if (r.f120_id !== id) return false;
+    return /^29\d{5}$/.test(normalizeBarcode(r.codigo_barras));
+  });
+  return fila ? normalizeBarcode(fila.codigo_barras) : null;
+}
+
+/**
+ * Arma el EAN-13 de peso variable: prefijo(7) + peso en gramos(5) + check(1).
+ * @param {string} base7 — prefijo GS1 de 7 dígitos ("2900061")
+ * @param {number} pesoKg
+ * @returns {string|null}
+ */
+function buildWeighableCode(base7, pesoKg) {
+  const base = normalizeBarcode(base7);
+  if (!/^29\d{5}$/.test(base)) return null;
+  const gramos = Math.round((parseFloat(pesoKg) || 0) * 1000);
+  if (!gramos || gramos < 0 || gramos > 99999) return null;
+  const sinCheck = `${base}${gramos.toString().padStart(5, "0")}`;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(sinCheck[i], 10) * ((12 - i) % 2 === 1 ? 3 : 1);
+  }
+  return `${sinCheck}${(10 - (sum % 10)) % 10}`;
+}
+
 module.exports = {
+  findGs1Base,
+  buildWeighableCode,
   REASON,
   normalizeBarcode,
   barcodeVariants,

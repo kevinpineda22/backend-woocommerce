@@ -29,6 +29,7 @@ const {
   availableUMsFor,
   resolveExpectedUM,
   buildManifestCode,
+  findGs1Base,
 } = require("../utils/siesaMatching");
 const { buildManifestItems } = require("../utils/manifestItems");
 const {
@@ -1678,6 +1679,11 @@ exports.getSessionLogsDetail = async (req, res) => {
       // códigos de barras reales — la caja no entiende un ítem suelto ni un
       // código fabricado. Si el producto no tiene ninguno, queda en null y el
       // manifiesto lo reporta para digitarlo a mano.
+      // Base GS1 REAL de SIESA para pesables ("2900061"), no fabricada desde
+      // el SKU: el prefijo real no es 29+f120_id. Sin esto el manifiesto
+      // inventaba un código que la caja no puede resolver.
+      detalle.gs1_base = findGs1Base(filasDelProducto, f120_id);
+
       detalle.barcode_sku_um = buildManifestCode({
         f120_id,
         um: resuelta.um,
