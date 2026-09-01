@@ -9,6 +9,9 @@ const {
 } = require("../services/sedeConfig");
 const { logAuditEvent } = require("../services/auditService");
 const { calcLineCharge } = require("../utils/manifestPricing");
+// Criterio único de "qué falta por hacer" en una sesión. Tiene que coincidir
+// con lo que cuenta la pantalla del picker; ver utils/pendingItems.js.
+const { findPendingItems } = require("../utils/pendingItems");
 
 // Multi-sede WooCommerce (WordPress Multisite)
 const { getWooClient } = require("../services/wooMultiService");
@@ -717,56 +720,52 @@ exports.completeSession = async (req, res) => {
 
     if (!sessData) throw new Error("Sesión no encontrada");
 
-    // ✅ VALIDACIÓN ESTRICTA: No permitir finalizar si hay pendientes
+    // ✅ VALIDACIÓN ESTRICTA: No permitir finalizar si hay pendientes.
+    //
+    // El criterio vive en utils/pendingItems.js (puro, con tests) porque tiene
+    // que contar EXACTAMENTE lo mismo que la pantalla del picker. Cuando las
+    // dos cuentas divergen el picker queda encerrado: la app le muestra 29/29
+    // y el botón le responde que faltan productos, sin decirle cuáles.
+    //
+    // Eso pasaba con los ítems retirados por el admin: `removeItemFromSession`
+    // marca `is_removed` en TODOS los pedidos del snapshot pero deja el log
+    // `eliminado_admin` colgado de UN solo pedido, y acá los logs se filtraban
+    // por `id_pedido`. En multipicking, el resto de los pedidos veía un
+    // pendiente fantasma que no había forma de resolver desde la app.
     const { data: assignments } = await supabase
       .from("wc_asignaciones_pedidos")
       .select("id, id_pedido")
       .eq("id_sesion", id_sesion);
 
     const assignIds = (assignments || []).map((a) => a.id);
-    const { data: logs } = await supabase
+    const { data: logs, error: logsError } = await supabase
       .from("wc_log_picking")
       .select("id_producto, id_producto_original, accion, id_pedido")
       .in("id_asignacion", assignIds);
 
-    const pendingItems = [];
-    const snapshotOrders = sessData.snapshot_pedidos || [];
-
-    snapshotOrders.forEach((order) => {
-      const orderLogs = (logs || []).filter(
-        (l) => String(l.id_pedido) === String(order.id),
+    // Sin los logs no se puede distinguir un ítem sin procesar de uno ya
+    // recolectado: bloquear a ciegas dejaría al picker sin salida.
+    if (logsError) {
+      throw new Error(
+        `No se pudieron leer los registros de picking: ${logsError.message}`,
       );
+    }
 
-      order.line_items?.forEach((item) => {
-        const pId = String(item.product_id);
-        const vId = item.variation_id ? String(item.variation_id) : null;
-
-        // Buscar si existe algún log definitivo para este ítem (o su variación)
-        const hasAction = orderLogs.some(
-          (l) =>
-            (String(l.id_producto) === pId ||
-              (vId && String(l.id_producto) === vId) ||
-              String(l.id_producto_original) === pId ||
-              (vId && String(l.id_producto_original) === vId)) &&
-            [
-              "recolectado",
-              "sustituido",
-              "no_encontrado",
-              "eliminado_admin",
-            ].includes(l.accion),
-        );
-
-        if (!hasAction) {
-          pendingItems.push(`${item.name} (#${order.id})`);
-        }
-      });
+    const { pendientes, resumen } = findPendingItems({
+      snapshotOrders: sessData.snapshot_pedidos || [],
+      logs: logs || [],
     });
 
-    if (pendingItems.length > 0) {
+    if (pendientes.length > 0) {
+      const details = pendientes.map((p) => `${p.name} (#${p.order_id})`);
+      console.warn(
+        `⛔ [CIERRE] Sesión ${id_sesion} bloqueada: ${pendientes.length} pendiente(s) de ${resumen.total} ítems (${resumen.retirados} retirados por admin). ${details.join(" | ")}`,
+      );
       return res.status(400).json({
         error:
           "No puedes finalizar la sesión. Aún tienes productos pendientes.",
-        details: pendingItems,
+        details,
+        resumen,
       });
     }
 
