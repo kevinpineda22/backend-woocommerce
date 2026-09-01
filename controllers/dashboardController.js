@@ -1673,12 +1673,16 @@ exports.getSessionLogsDetail = async (req, res) => {
         .map((bc) => normalizeBarcode(bc.codigo_barras))
         .filter(Boolean);
 
-      // Código para el manifiesto/QR. Devuelve null en vez de un f120_id
-      // pelado que la caja no resuelve.
+      // Código para el manifiesto/QR: se ELIGE entre los códigos que el
+      // producto realmente tiene en `siesa_codigos_barras`. En el QR solo van
+      // códigos de barras reales — la caja no entiende un ítem suelto ni un
+      // código fabricado. Si el producto no tiene ninguno, queda en null y el
+      // manifiesto lo reporta para digitarlo a mano.
       detalle.barcode_sku_um = buildManifestCode({
         f120_id,
         um: resuelta.um,
         barcode: detalle.barcode,
+        siesaRows: filasDelProducto,
       });
     });
 

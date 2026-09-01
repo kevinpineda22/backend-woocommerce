@@ -111,10 +111,17 @@ describe("siesaMatching — backend/frontend sync", () => {
   });
 
   it("buildManifestCode produce el mismo código", () => {
+    const filas = [
+      { f120_id: 185325, codigo_barras: "185325UND", unidad_medida: "UND" },
+      { f120_id: 185325, codigo_barras: "7702004009999", unidad_medida: "UND" },
+      { f120_id: 185325, codigo_barras: "185325", unidad_medida: "UND" },
+    ];
     const casos = [
+      { f120_id: 185325, um: "UND", siesaRows: filas },
+      { f120_id: 185325, um: "UND", siesaRows: [] },
+      { f120_id: 185325, um: null, siesaRows: filas },
       { f120_id: 185325, um: "UND", barcode: "7702004009999" },
-      { f120_id: 185325, um: "und", barcode: "" },
-      { f120_id: 185325, um: null, barcode: "" },
+      { f120_id: 185325, um: "UND", barcode: "185325" },
       { f120_id: "SIN-SKU", um: "UND", barcode: "" },
     ];
     casos.forEach((c) => {

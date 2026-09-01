@@ -67,11 +67,20 @@ function buildManifestItems({ ordersData = [], productDetailsMap = {} }) {
         barcode: detalle.barcode || null,
         // null = no hay código resoluble en la caja. El frontend debe
         // mostrarlo como pendiente, NO emitir una línea de QR inválida.
-        codigo_manifiesto: buildManifestCode({
-          f120_id,
-          um: detalle.unidad_medida_siesa || detalle.unidad_medida,
-          barcode: detalle.barcode,
-        }),
+        // Se elige entre los códigos REALES del producto (los que ya vienen
+        // resueltos en `detalle.barcode_sku_um`); nunca se fabrica uno.
+        codigo_manifiesto:
+          detalle.barcode_sku_um ||
+          buildManifestCode({
+            f120_id,
+            um: detalle.unidad_medida_siesa || detalle.unidad_medida,
+            barcode: detalle.barcode,
+            siesaRows: (detalle.barcodes_producto || []).map((c) => ({
+              f120_id,
+              codigo_barras: c,
+              unidad_medida: detalle.unidad_medida_siesa,
+            })),
+          }),
       });
     });
   });

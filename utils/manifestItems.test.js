@@ -107,8 +107,8 @@ describe("REGRESIÓN — dos líneas que emitirían el mismo código se REPORTAN
         },
       ],
       productDetailsMap: {
-        331: { unidad_medida: "UND", barcode: null },
-        332: { unidad_medida: "UND", barcode: null },
+        331: { unidad_medida: "UND", barcode: null, barcode_sku_um: "185325UND" },
+        332: { unidad_medida: "UND", barcode: null, barcode_sku_um: "185325UND" },
       },
     });
     expect(warnings.colisiones).toHaveLength(1);
@@ -133,7 +133,7 @@ describe("REGRESIÓN — dos líneas que emitirían el mismo código se REPORTAN
         },
       ],
       productDetailsMap: {
-        72664: { unidad_medida: "500g", unidad_medida_siesa: "KL", barcode: null },
+        72664: { unidad_medida: "500g", unidad_medida_siesa: "KL", barcode: null, barcode_sku_um: "15140KL" },
       },
     });
     expect(warnings.colisiones).toEqual([]);
@@ -151,8 +151,8 @@ describe("REGRESIÓN — dos líneas que emitirían el mismo código se REPORTAN
         },
       ],
       productDetailsMap: {
-        111: { unidad_medida: "500g", unidad_medida_siesa: "KL", barcode: null },
-        222: { unidad_medida: "Kg", unidad_medida_siesa: "KL", barcode: null },
+        111: { unidad_medida: "500g", unidad_medida_siesa: "KL", barcode: null, barcode_sku_um: "15140KL" },
+        222: { unidad_medida: "Kg", unidad_medida_siesa: "KL", barcode: null, barcode_sku_um: "15140KL" },
       },
     });
     expect(warnings.colisiones).toHaveLength(1);
@@ -173,8 +173,8 @@ describe("REGRESIÓN — dos líneas que emitirían el mismo código se REPORTAN
         },
       ],
       productDetailsMap: {
-        331: { unidad_medida: "UND", barcode: null },
-        332: { unidad_medida: "UND", barcode: null },
+        331: { unidad_medida: "UND", barcode: null, barcode_sku_um: "185325UND" },
+        332: { unidad_medida: "UND", barcode: null, barcode_sku_um: "185326UND" },
       },
     });
     expect(warnings.colisiones).toEqual([]);
@@ -213,7 +213,7 @@ describe("REGRESIÓN — nunca se emite un f120_id pelado al QR", () => {
       ordersData: [
         { id: 900, items: [{ id: 5, product_id: 111, variation_id: 0, sku: "185325", name: "Cherry", quantity: 3 }] },
       ],
-      productDetailsMap: { 111: { unidad_medida: "P25", barcode: null } },
+      productDetailsMap: { 111: { unidad_medida: "P25", unidad_medida_siesa: "P25", barcode: null, barcode_sku_um: "185325P25" } },
     });
     expect(items[0].codigo_manifiesto).toBe("185325P25");
   });
@@ -241,6 +241,8 @@ describe("REGRESIÓN — la presentación de Woo no se pisa con la de SIESA", ()
       unidad_medida_siesa: "KL", // de SIESA — gobierna el código
       unidad_medida_confiable: true,
       barcode: null,
+      // Código REAL de siesa_codigos_barras, ya resuelto por el backend.
+      barcode_sku_um: "15202KL",
     },
   };
 
@@ -264,7 +266,7 @@ describe("REGRESIÓN — la presentación de Woo no se pisa con la de SIESA", ()
   it("sin UM de SIESA cae a la de Woo para el código", () => {
     const { items } = buildManifestItems({
       ordersData,
-      productDetailsMap: { 111: { unidad_medida: "UND", barcode: null } },
+      productDetailsMap: { 111: { unidad_medida: "UND", barcode: null, barcode_sku_um: "15202UND" } },
     });
     expect(items[0].codigo_manifiesto).toBe("15202UND");
   });
@@ -306,8 +308,8 @@ describe("QR completo de un pedido", () => {
         },
       ],
       productDetailsMap: {
-        111: { unidad_medida: "UND", barcode: null },
-        222: { unidad_medida: "KL", barcode: null },
+        111: { unidad_medida: "UND", barcode: null, barcode_sku_um: "1001UND" },
+        222: { unidad_medida: "KL", barcode: null, barcode_sku_um: "1002KL" },
       },
     });
     const lineas = [

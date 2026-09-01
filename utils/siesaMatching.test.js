@@ -411,24 +411,82 @@ describe("resolveExpectedUM — la confianza es explícita, no implícita", () =
 // ---------------------------------------------------------------------
 // buildManifestCode — nada de f120_id pelado en el QR
 // ---------------------------------------------------------------------
-describe("buildManifestCode — el QR nunca emite un código que el POS no resuelve", () => {
-  it("prefiere el EAN real cuando existe", () => {
+describe("buildManifestCode — en el QR solo van códigos de barras REALES", () => {
+  // Regla del negocio: la caja lee códigos de `siesa_codigos_barras`. No
+  // entiende un ítem (el f120_id suelto) ni un código fabricado. Esta función
+  // ELIGE entre los códigos que el producto tiene; nunca inventa uno.
+  //
+  // Fabricarlos fue un error real: cuando el producto no tenía esa fila, la
+  // caja rechazaba la línea. En producción "no pasaba ningún producto, solo
+  // el fruver" — que va por el GS1 de peso variable, otra ruta.
+  const filas = [
+    { f120_id: 185325, codigo_barras: "185325", unidad_medida: "UND" },
+    { f120_id: 185325, codigo_barras: "185325UND", unidad_medida: "UND" },
+    { f120_id: 185325, codigo_barras: "7702004009999", unidad_medida: "UND" },
+    { f120_id: 185325, codigo_barras: "185325P25", unidad_medida: "P25" },
+    { f120_id: 999, codigo_barras: "7702004000000", unidad_medida: "UND" },
+  ];
+
+  it("elige el SKU+UM de la presentación, porque existe en la tabla", () => {
     expect(
-      buildManifestCode({ f120_id: 185325, um: "UND", barcode: "7702004009999" }),
+      buildManifestCode({ f120_id: 185325, um: "UND", siesaRows: filas }),
+    ).toBe("185325UND");
+  });
+
+  it("respeta la presentación pedida", () => {
+    expect(
+      buildManifestCode({ f120_id: 185325, um: "P25", siesaRows: filas }),
+    ).toBe("185325P25");
+  });
+
+  it("nunca emite el f120_id pelado aunque esté en la tabla", () => {
+    // "185325" ES una fila de SIESA, pero es el ítem, no un código de barras.
+    const soloItem = [
+      { f120_id: 185325, codigo_barras: "185325", unidad_medida: "UND" },
+    ];
+    expect(
+      buildManifestCode({ f120_id: 185325, um: "UND", siesaRows: soloItem }),
+    ).toBeNull();
+  });
+
+  it("usa el EAN cuando la presentación no tiene SKU+UM", () => {
+    const soloEan = [
+      { f120_id: 185325, codigo_barras: "185325", unidad_medida: "UND" },
+      { f120_id: 185325, codigo_barras: "7702004009999", unidad_medida: "UND" },
+    ];
+    expect(
+      buildManifestCode({ f120_id: 185325, um: "UND", siesaRows: soloEan }),
     ).toBe("7702004009999");
   });
 
-  it("cae a SKU+UM cuando no hay EAN", () => {
-    expect(buildManifestCode({ f120_id: 185325, um: "und", barcode: "" })).toBe("185325UND");
+  it("NO inventa un código que el producto no tiene", () => {
+    // Sin filas no hay nada que emitir: antes fabricaba "185325UND" y la caja
+    // lo rechazaba.
+    expect(buildManifestCode({ f120_id: 185325, um: "UND", siesaRows: [] })).toBeNull();
   });
 
-  it("sin UM devuelve null en vez del f120_id pelado", () => {
-    expect(buildManifestCode({ f120_id: 185325, um: null, barcode: "" })).toBeNull();
-    expect(buildManifestCode({ f120_id: 185325, um: "DEFAULT", barcode: "" })).toBeNull();
-    // Antes emitía "185325", que la caja no reconoce como producto.
+  it("no toma prestado el código de otro producto", () => {
+    expect(
+      buildManifestCode({ f120_id: 185325, um: "UND", siesaRows: [filas[4]] }),
+    ).toBeNull();
   });
 
-  it("sin f120_id numérico devuelve null", () => {
+  it("acepta el código ya resuelto del ítem como último recurso", () => {
+    expect(
+      buildManifestCode({ f120_id: 185325, um: "UND", barcode: "7702004009999" }),
+    ).toBe("7702004009999");
+    expect(
+      buildManifestCode({ f120_id: 185325, um: "UND", barcode: "185325UND" }),
+    ).toBe("185325UND");
+  });
+
+  it("descarta un ítem pelado también en el último recurso", () => {
+    expect(
+      buildManifestCode({ f120_id: 185325, um: "UND", barcode: "185325" }),
+    ).toBeNull();
+  });
+
+  it("sin f120_id numérico y sin código utilizable devuelve null", () => {
     expect(buildManifestCode({ f120_id: "SIN-SKU", um: "UND", barcode: "" })).toBeNull();
   });
 });

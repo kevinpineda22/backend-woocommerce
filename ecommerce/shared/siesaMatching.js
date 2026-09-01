@@ -1,8 +1,4 @@
 /**
- * ⚠️ ESPEJO ESM de `utils/siesaMatching.js` del backend (CommonJS).
- *    Guardado por `utils/siesaMatching.sync.test.js` en el repo backend:
- *    si las dos copias divergen, ese test falla. Al editar una, editá la otra.
- *
  * FUENTE ÚNICA DE VERDAD para resolver un código escaneado contra SIESA.
  *
  * Antes esta lógica estaba copiada en cuatro lugares con cuatro reglas
@@ -469,14 +465,54 @@ function resolveExpectedUM({ umWoo, sku, nombre, umsDisponibles = [] }) {
  * @param {{f120_id:number|string, um:string, barcode:string}} item
  * @returns {string|null}
  */
-function buildManifestCode({ f120_id, um, barcode }) {
-  const ean = normalizeBarcode(barcode);
-  if (/^\d{8,}$/.test(ean)) return ean;
+function buildManifestCode({ f120_id, um, barcode, siesaRows = [] }) {
+  // ══════════════════════════════════════════════════════════════
+  // EN EL QR SOLO VAN CÓDIGOS DE BARRAS REALES.
+  //
+  // La caja lee códigos de `siesa_codigos_barras`. No entiende un "ítem"
+  // (el f120_id suelto) ni un código fabricado. Antes esta función
+  // CONSTRUÍA `${f120_id}${UM}` sin verificar que existiera: cuando el
+  // producto no tenía esa fila, la caja rechazaba la línea entera.
+  //
+  // Ahora se ELIGE entre los códigos que el producto realmente tiene.
+  // Si no tiene ninguno, se devuelve null y el manifiesto lo reporta como
+  // pendiente de digitar a mano — es honesto y visible, en vez de emitir
+  // un código que la caja va a rechazar en silencio.
+  // ══════════════════════════════════════════════════════════════
   const id = parseInt(f120_id, 10);
-  if (isNaN(id)) return null;
   const u = normalizeUM(um);
-  if (!u || u === "DEFAULT") return null;
-  return `${id}${u}`;
+
+  // Códigos reales de este producto, ya normalizados.
+  const delProducto = (siesaRows || [])
+    .filter((r) => !isNaN(id) && r.f120_id === id)
+    .map((r) => ({
+      code: normalizeBarcode(r.codigo_barras),
+      um: normalizeUM(r.unidad_medida),
+    }))
+    .filter((r) => r.code);
+
+  if (delProducto.length > 0) {
+    const dePresentacion = delProducto.filter(
+      (r) => u === "DEFAULT" || r.um === u,
+    );
+    const candidatos = dePresentacion.length ? dePresentacion : delProducto;
+
+    // Entre los códigos válidos de la presentación se prefiere, en orden:
+    //   1. el SKU+UM ("4908UND") — es el que la caja resuelve directo
+    //   2. un EAN de 8+ dígitos  — el código del empaque
+    //   3. cualquier otro que exista
+    // Nunca un código de 1-7 dígitos pelado: ese es el ítem, no un código.
+    const skuUm = candidatos.find((r) => /^\d+[A-Z]+\d*$/.test(r.code));
+    if (skuUm) return skuUm.code;
+    const ean = candidatos.find((r) => /^\d{8,}$/.test(r.code));
+    if (ean) return ean.code;
+  }
+
+  // Fallback: el código que ya venía resuelto en el ítem, si es utilizable.
+  const suelto = normalizeBarcode(barcode);
+  if (/^\d+[A-Z]+\d*$/.test(suelto) || /^\d{8,}$/.test(suelto)) return suelto;
+
+  return null;
 }
 
 export {
