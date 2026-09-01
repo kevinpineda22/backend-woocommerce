@@ -19,6 +19,18 @@ const {
   summarizeSessionMethod,
 } = require("../utils/paymentSettlement");
 const { evaluarRiesgoBot } = require("../utils/botDetection");
+// Fuente única de verdad para códigos SIESA, presentaciones y códigos de
+// manifiesto. Guardada por utils/siesaMatching.test.js — no reimplementar
+// esta lógica acá adentro: cada copia divergió y trabó auditorías.
+const {
+  normalizeBarcode,
+  normalizeUM,
+  buildBarcodeIndex,
+  availableUMsFor,
+  resolveExpectedUM,
+  buildManifestCode,
+} = require("../utils/siesaMatching");
+const { buildManifestItems } = require("../utils/manifestItems");
 const {
   getSedeFromWooOrder,
   extractSedeFromOrder,
@@ -64,121 +76,11 @@ function extractMetodoPago(orderSnapshot) {
   return resolvePaymentLabel(orderSnapshot);
 }
 
-// =========================================================
-// HELPER: Obtener códigos de barras desde SIESA
-// =========================================================
-// ✅ NUEVA FUNCIÓN: Obtiene códigos de barras discriminados ESTRICTAMENTE por unidad_medida
-async function getBarcodesFromSiesaByUnitMeasure(pairs) {
-  try {
-    if (!pairs || pairs.length === 0) return {};
-
-    const f120_ids = [...new Set(pairs.map((p) => p.f120_id))];
-
-    const { data: barcodes, error } = await supabase
-      .from("siesa_codigos_barras")
-      .select("f120_id, codigo_barras, unidad_medida")
-      .in("f120_id", f120_ids);
-
-    if (error) {
-      console.error("Error obteniendo códigos de barras SIESA:", error);
-      return {};
-    }
-
-    // ✅ Estructura ESTRICTA: { "f120_id|UNIDAD_MEDIDA": [barcode1, barcode2] }
-    // Esto asegura que cada unidad_medida tiene SOLO sus códigos específicos
-    const barcodesByKey = {};
-
-    barcodes.forEach((bc) => {
-      const code = (bc.codigo_barras || "").toString().trim();
-      const cleaned = code.replace(/\+$/, "");
-
-      // Filtrar códigos válidos
-      // Permitir: dígitos puros (EAN), dígitos+UM (SKU+UM como 185325P25), dígitos con +
-      if (!cleaned || cleaned.length < 4) return;
-      if (/^[MN]\d/i.test(cleaned)) return; // Prefijo M/N antes de dígitos → excluir
-      if (!/^\d+([A-Z]*\d*)?\+?$/i.test(code)) return;
-
-      // Normalizar unidad de medida
-      let normalizedUm = (bc.unidad_medida || "DEFAULT").toUpperCase();
-      if (normalizedUm === "UN" || normalizedUm === "UNIDAD")
-        normalizedUm = "UND";
-      else if (normalizedUm === "KG" || normalizedUm === "KILO")
-        normalizedUm = "KL";
-      else if (normalizedUm === "LB" || normalizedUm === "LIBRA")
-        normalizedUm = "LB";
-      else if (normalizedUm === "" || normalizedUm === "NULL")
-        normalizedUm = "DEFAULT";
-
-      const key = `${bc.f120_id}|${normalizedUm}`;
-
-      if (!barcodesByKey[key]) {
-        barcodesByKey[key] = [];
-      }
-
-      // Evitar duplicados
-      if (!barcodesByKey[key].includes(cleaned)) {
-        barcodesByKey[key].push(cleaned);
-      }
-    });
-
-    return barcodesByKey;
-  } catch (error) {
-    console.error("Error en getBarcodesFromSiesaByUnitMeasure:", error);
-    return {};
-  }
-}
-
-// ✅ FUNCIÓN LEGACY: Mantener para compatibilidad
-async function getBarcodesFromSiesa(productIds) {
-  try {
-    if (!productIds || productIds.length === 0) return {};
-
-    const { data: barcodes, error } = await supabase
-      .from("siesa_codigos_barras")
-      .select("f120_id, codigo_barras, unidad_medida")
-      .in("f120_id", productIds);
-
-    if (error) {
-      console.error("Error obteniendo códigos de barras SIESA:", error);
-      return {};
-    }
-
-    // ✅ Agrupar por f120_id + unidad_medida
-    // Estructura: { f120_id: { unidad_medida: [barcode1, barcode2], _default: [barcode1, barcode2] } }
-    const barcodesByProduct = {};
-    barcodes.forEach((bc) => {
-      if (!barcodesByProduct[bc.f120_id]) {
-        barcodesByProduct[bc.f120_id] = { _default: [] };
-      }
-      const um = (bc.unidad_medida || "_unknown").toUpperCase();
-      const code = (bc.codigo_barras || "").toString().trim();
-      const cleaned = code.replace(/\+$/, "");
-
-      // Filtrar códigos válidos (excluyendo explícitamente prefijos M o N)
-      if (!cleaned || cleaned.length < 4) return;
-      if (/^[MN]\d/i.test(cleaned)) return;
-      if (!/^\d+([A-Z]*\d*)?\+?$/i.test(code)) return;
-
-      if (!barcodesByProduct[bc.f120_id][um]) {
-        barcodesByProduct[bc.f120_id][um] = [];
-      }
-
-      // Añadir la lista de códigos válidos para esta unidad de medida específica
-      if (!barcodesByProduct[bc.f120_id][um].includes(cleaned)) {
-        barcodesByProduct[bc.f120_id][um].push(cleaned);
-      }
-      // También guardar en un array genérico por defecto
-      if (!barcodesByProduct[bc.f120_id]._default.includes(cleaned)) {
-        barcodesByProduct[bc.f120_id]._default.push(cleaned);
-      }
-    });
-
-    return barcodesByProduct;
-  } catch (error) {
-    console.error("Error en getBarcodesFromSiesa:", error);
-    return {};
-  }
-}
+// Los helpers getBarcodesFromSiesaByUnitMeasure() y getBarcodesFromSiesa()
+// vivían acá y se borraron: cada uno reimplementaba la normalización de
+// códigos y unidades con reglas ligeramente distintas, y esa divergencia era
+// justamente lo que trababa las auditorías. La lógica ahora es única y está
+// en utils/siesaMatching.js, con tests de regresión. No la reimplementes acá.
 
 // =========================================================
 // 1. DASHBOARD EN VIVO (CÁLCULO EXACTO & REALTIME)
@@ -1200,19 +1102,53 @@ exports.completeAuditSession = async (req, res) => {
     }
 
     // ✅ BLINDAJE ANTI-FANTASMAS: Detectar ítems no procesados y marcarlos como faltantes por sistema
+    //
+    // ⚠️ Este bloque hoy es INERTE a propósito: el SELECT de la sesión no pide
+    // `snapshot_pedidos`, así que `snapshotOrders` queda vacío. Ver la nota de
+    // CLAUDE.md antes de activarlo.
+    //
+    // La consulta de logs de acá abajo estaba ROTA: filtraba por `id_sesion`,
+    // columna que `wc_log_picking` NO tiene (ver sql/2026-08-19_hot_path_indexes.sql).
+    // Fallaba en silencio y dejaba `allSessionLogs` en null — de modo que si
+    // alguien agregaba `snapshot_pedidos` al SELECT, este bloque marcaba
+    // TODOS los ítems recolectados como `no_encontrado`: se facturaban en $0 y
+    // salían rotulados "NO ENTREGADO" en WooCommerce.
+    // Ahora se enlaza por `id_asignacion`, que es como los logs cuelgan de la
+    // sesión de verdad, y el error se revisa en vez de tragarse.
     const snapshotOrders = session.snapshot_pedidos || [];
-    const { data: allSessionLogs } = await supabase
-      .from("wc_log_picking")
-      .select("*")
-      .eq("id_sesion", session_id); // Aunque no tenga id_sesion, usamos el filtro id_pedido para ser precisos
 
     const { data: sessionAssignments } = await supabase
       .from("wc_asignaciones_pedidos")
       .select("id, id_pedido")
       .eq("id_sesion", session_id);
 
+    let allSessionLogs = [];
+    let ghostGuardOk = true;
+    if (sessionAssignments && sessionAssignments.length > 0) {
+      const { data: logsSesion, error: logsErr } = await supabase
+        .from("wc_log_picking")
+        .select("*")
+        .in(
+          "id_asignacion",
+          sessionAssignments.map((a) => a.id),
+        );
+      if (logsErr) {
+        // Sin los logs no se puede distinguir un ítem no procesado de uno
+        // recolectado. Se desactiva el blindaje: marcar todo "no_encontrado"
+        // sería infinitamente peor que no marcar nada.
+        console.error(
+          "⚠️ No se pudieron leer los logs de la sesión; blindaje anti-fantasmas OMITIDO:",
+          logsErr.message,
+        );
+        ghostGuardOk = false;
+      } else {
+        allSessionLogs = logsSesion || [];
+      }
+    }
+
     const ghostLogs = [];
-    snapshotOrders.forEach((orderSnap) => {
+    const ordersParaBlindaje = ghostGuardOk ? snapshotOrders : [];
+    ordersParaBlindaje.forEach((orderSnap) => {
       const assign = sessionAssignments?.find(
         (a) => String(a.id_pedido) === String(orderSnap.id),
       );
@@ -1461,7 +1397,13 @@ exports.getSessionLogsDetail = async (req, res) => {
             const effectiveSubtotal =
               item.quantity > 0 ? lineSubtotal / item.quantity : catalogPrice;
 
-            productDetailsMap[item.product_id] = {
+            // ⚠️ `productDetailsMap` es un índice de CONSULTA por id, no la
+            // lista del manifiesto: la misma entrada se escribe bajo
+            // `product_id` y bajo `variation_id`, y el mismo producto pedido
+            // por dos clientes colapsa en una sola clave (gana el último).
+            // Para el QR / manifiesto usar `manifest_items`, que tiene una
+            // entrada por línea de pedido real.
+            const detalle = {
               name: item.name,
               image: imgUrl,
               sku: item.sku,
@@ -1470,18 +1412,25 @@ exports.getSessionLogsDetail = async (req, res) => {
               subtotal: effectiveSubtotal,
               line_total: effectivePrice,
               unidad_medida: unitMeasure,
+              pedidos_involucrados: [],
             };
+
+            const previo =
+              productDetailsMap[item.variation_id || item.product_id];
+            const historial = previo?.pedidos_involucrados || [];
+            detalle.pedidos_involucrados = [
+              ...historial,
+              { order_id: o.id, qty: item.quantity, price: effectivePrice },
+            ];
+            // Deja visible que este producto viene de varios pedidos con
+            // precios distintos: antes se pisaba en silencio.
+            detalle._precio_ambiguo = detalle.pedidos_involucrados.some(
+              (p) => p.price !== effectivePrice,
+            );
+
+            productDetailsMap[item.product_id] = detalle;
             if (item.variation_id)
-              productDetailsMap[item.variation_id] = {
-                name: item.name,
-                image: imgUrl,
-                sku: item.sku,
-                price: effectivePrice,
-                catalog_price: catalogPrice,
-                subtotal: effectiveSubtotal,
-                line_total: effectivePrice,
-                unidad_medida: unitMeasure,
-              };
+              productDetailsMap[item.variation_id] = { ...detalle };
           });
         }
         return {
@@ -1587,19 +1536,15 @@ exports.getSessionLogsDetail = async (req, res) => {
       } catch (e) {}
     }
 
-    // ✅ OBTENER CÓDIGOS DE BARRAS DESDE SIESA CON UNIDAD_MEDIDA COMO CLAVE COMPUESTA
-    // Crear lista de pares [f120_id, unidad_medida] únicos para consulta eficiente
-    const uniquePairs = new Map();
-    const f120IdOnlySet = new Set(); // Para fallback: buscar TODAS las unidades de cada f120_id
-
+    // ✅ CÓDIGOS DE BARRAS DESDE SIESA
+    // Se traen TODAS las filas de cada f120_id involucrado. La resolución de
+    // presentación se hace después contra ese universo completo (ver
+    // utils/siesaMatching.js): no se pre-filtra por unidad de medida, porque
+    // esa unidad puede ser justamente el dato equivocado.
+    const f120IdOnlySet = new Set();
     Object.values(productDetailsMap).forEach((p) => {
       const f120_id = parseInt(p.sku);
-      const um = (p.unidad_medida || "").toUpperCase() || "DEFAULT";
-      if (!isNaN(f120_id)) {
-        const key = `${f120_id}|${um}`;
-        uniquePairs.set(key, { f120_id, um });
-        f120IdOnlySet.add(f120_id); // También guardar solo el f120_id para fallback
-      }
+      if (!isNaN(f120_id)) f120IdOnlySet.add(f120_id);
     });
 
     // 🔧 TAMBIÉN incluir f120_ids de los barcodes que el picker escaneó
@@ -1628,13 +1573,8 @@ exports.getSessionLogsDetail = async (req, res) => {
       }
     }
 
-    const barcodeMapByF120IdAndUm = await getBarcodesFromSiesaByUnitMeasure(
-      Array.from(uniquePairs.values()),
-    );
-
-    // 🔧 FALLBACK: Obtener TODAS las unidades disponibles en SIESA para cada f120_id
-    // para poder hacer matching cuando WooCommerce tiene la unidad incorrecta
-    // Paginar para evitar el límite default de 1000 filas de Supabase
+    // Todas las presentaciones que SIESA conoce de cada f120_id.
+    // Paginar para evitar el límite default de 1000 filas de Supabase.
     const f120IdArray = Array.from(f120IdOnlySet);
     let allSiesaBarcodes = [];
     let siesaError = null;
@@ -1653,183 +1593,93 @@ exports.getSessionLogsDetail = async (req, res) => {
       if (batchData) allSiesaBarcodes = allSiesaBarcodes.concat(batchData);
     }
 
-    const barcodesByF120IdOnly = {};
-    if (allSiesaBarcodes && !siesaError) {
-      allSiesaBarcodes.forEach((bc) => {
-        const code = (bc.codigo_barras || "").toString().trim();
-        const cleaned = code.replace(/\+$/, "");
-        if (!cleaned || cleaned.length < 4) return;
-        if (/^[MN]\d/i.test(cleaned)) return;
-        if (!/^\d+([A-Z]*\d*)?\+?$/i.test(code)) return;
-
-        const f120 = bc.f120_id;
-        if (!barcodesByF120IdOnly[f120]) {
-          barcodesByF120IdOnly[f120] = [];
-        }
-        if (!barcodesByF120IdOnly[f120].includes(cleaned)) {
-          barcodesByF120IdOnly[f120].push(cleaned);
-        }
-      });
+    if (siesaError) {
+      console.error(
+        "⚠️ Error trayendo códigos SIESA para la auditoría:",
+        siesaError.message,
+      );
     }
 
-    // 🔧 FUNCIÓN HELPER: Hacer matching inteligente de unidad_medida usando pistas del nombre
-    // Solo se usa como fallback cuando SIESA tiene múltiples opciones
-    // Retorna { um, confident } — confident=true si un keyword hizo match real
-    const inferUnitMeasureFromName = (productName, availableUMs) => {
-      if (!availableUMs || availableUMs.length === 0)
-        return { um: null, confident: false };
-      if (availableUMs.length === 1)
-        return { um: availableUMs[0], confident: true };
-
-      const nameUpper = (productName || "").toUpperCase();
-
-      // 1. Detección dinámica: "Paca x25" → P25, "X 12" → P12, etc.
-      const dynamicMatch =
-        nameUpper.match(
-          /(?:PACA|PACK|BULTO|BOLSA|CAJA|DISPLAY)\s*(?:X|DE)?\s*(\d+)/i,
-        ) || nameUpper.match(/X\s*(\d+)\s*(?:UN|UND|H|R|\b)/i);
-      if (dynamicMatch) {
-        const n = dynamicMatch[1];
-        const candidateUM = `P${n}`;
-        if (availableUMs.includes(candidateUM)) {
-          return { um: candidateUM, confident: true };
-        }
-      }
-
-      // 2. Pistas estáticas por patrón de nombre
-      const patterns = {
-        P2: ["DÚO", "DOS", "2UN", "X2", "PAIR", "DUPLO"],
-        P3: ["TRÍO", "TRES", "3UN", "X3", "TRIPLO"],
-        P4: ["CUATRO", "4UN", "X4", "QUADRO"],
-        P6: ["SEIS", "SIX", "6UN", "X6", "SIXPACK"],
-        P10: ["DIEZ", "10UN", "X10"],
-        P12: ["DOCE", "TWELVE", "12UN", "X12", "DOCENA"],
-        P18: ["DIECIOCHO", "18UN", "X18"],
-        P24: ["VEINTICUATRO", "24UN", "X24"],
-        P25: ["PACA", "VEINTICINCO", "25UN", "X25"],
-        P30: ["TREINTA", "30UN", "X30"],
-        P48: ["CUARENTA Y OCHO", "48UN", "X48"],
-        UND: ["UNIDAD", "UNITARIO", "SOLO", "INDIVIDUAL"],
-        KL: ["KILO", "KG"],
-        LB: ["LIBRA", "LB"],
-      };
-
-      for (const [um, keywords] of Object.entries(patterns)) {
-        if (availableUMs.includes(um)) {
-          if (keywords.some((kw) => nameUpper.includes(kw))) {
-            return { um, confident: true };
-          }
-        }
-      }
-
-      // Sin pista en el nombre → baja confianza, retornar UND si disponible, sino la primera
-      const fallbackUm = availableUMs.includes("UND") ? "UND" : availableUMs[0];
-      return { um: fallbackUm, confident: false };
-    };
-
-    // 🔧 SIMPLIFICADO: La UM en SIESA es la ÚNICA fuente de verdad
-    // Si SIESA dice KL/LB → es pesable/confiable
-    // Si SIESA dice UND/P2/P3/P4/P6 → requiere validación
-
-    // Agregar códigos de barras al productDetailsMap usando el cruce exacto f120_id + unidad_medida
+    // =================================================================
+    // RESOLUCIÓN DE PRESENTACIÓN Y CÓDIGO DE BARRAS POR PRODUCTO
+    //
+    // Toda la decisión vive en `utils/siesaMatching.js`. Antes había una
+    // copia local de `inferUnitMeasureFromName` acá, con dos problemas
+    // graves que trababan auditorías:
+    //
+    //   1. La confianza de la inferencia se calculaba y se TIRABA. Una UM
+    //      adivinada sobre el nombre del producto salía al frontend
+    //      indistinguible de un dato real, y después invalidaba el código
+    //      correcto del producto correcto.
+    //   2. El fallback era `availableUMs[0]`: el orden que devolviera
+    //      Postgres. La misma sesión podía pedir distinta presentación en
+    //      dos consultas.
+    //
+    // Ahora cada producto viaja con `unidad_medida_confiable`, y el
+    // validador solo bloquea por presentación cuando eso es `true`.
+    // =================================================================
     Object.keys(productDetailsMap).forEach((productId) => {
-      const sku = productDetailsMap[productId].sku;
-      const productName = productDetailsMap[productId].name || "";
-      const f120_id = parseInt(sku);
-      const um =
-        (productDetailsMap[productId].unidad_medida || "").toUpperCase() ||
-        "DEFAULT";
-
-      if (!isNaN(f120_id)) {
-        // Normalizar unidad de medida para búsqueda
-        let normalizedUm = um;
-        if (um === "UN" || um === "UNIDAD") normalizedUm = "UND";
-        else if (um === "KG" || um === "KILO") normalizedUm = "KL";
-        else if (um === "LB" || um === "LIBRA") normalizedUm = "LB";
-        else if (um === "DEFAULT" || um === "") normalizedUm = "DEFAULT";
-
-        const key = `${f120_id}|${normalizedUm}`;
-
-        // ✅ INTENTO 1: Usar SOLO el código específico para esa combinación f120_id + unidad_medida
-        let intento1Success = false;
-        if (barcodeMapByF120IdAndUm[key]) {
-          productDetailsMap[productId].barcode =
-            barcodeMapByF120IdAndUm[key][0] || null;
-          productDetailsMap[productId].unidad_medida = normalizedUm;
-          intento1Success = true;
-        }
-
-        // ✅ INTENTO 2: Inferencia por nombre del producto
-        // Solo SOBRESCRIBE si: (a) INTENTO 1 falló, o (b) inferencia tiene ALTA confianza y da UM diferente
-        if (allSiesaBarcodes) {
-          const availableUMsForThisF120 = [];
-          const barcodesByUM = {};
-          allSiesaBarcodes
-            .filter((bc) => bc.f120_id === f120_id)
-            .forEach((bc) => {
-              let um_normalized = (bc.unidad_medida || "").toUpperCase();
-              if (um_normalized === "UN" || um_normalized === "UNIDAD")
-                um_normalized = "UND";
-              else if (um_normalized === "KG" || um_normalized === "KILO")
-                um_normalized = "KL";
-              else if (um_normalized === "LB" || um_normalized === "LIBRA")
-                um_normalized = "LB";
-
-              if (!barcodesByUM[um_normalized]) {
-                barcodesByUM[um_normalized] = bc.codigo_barras.replace(
-                  /\+$/,
-                  "",
-                );
-              }
-            });
-          availableUMsForThisF120.push(...Object.keys(barcodesByUM));
-
-          if (availableUMsForThisF120.length > 0) {
-            const inference = inferUnitMeasureFromName(
-              productName,
-              availableUMsForThisF120,
-            );
-
-            // Solo sobrescribir si: INTENTO 1 falló, O la inferencia es confiable y da UM DIFERENTE
-            const shouldOverride =
-              !intento1Success ||
-              (inference.confident && inference.um !== normalizedUm);
-
-            if (shouldOverride && inference.um) {
-              const siesaItemForBestUM = allSiesaBarcodes.find((bc) => {
-                const bc_um = (bc.unidad_medida || "").toUpperCase();
-                let bc_um_normalized = bc_um;
-                if (bc_um_normalized === "UN" || bc_um_normalized === "UNIDAD")
-                  bc_um_normalized = "UND";
-                else if (
-                  bc_um_normalized === "KG" ||
-                  bc_um_normalized === "KILO"
-                )
-                  bc_um_normalized = "KL";
-                else if (
-                  bc_um_normalized === "LB" ||
-                  bc_um_normalized === "LIBRA"
-                )
-                  bc_um_normalized = "LB";
-                return (
-                  bc.f120_id === f120_id && bc_um_normalized === inference.um
-                );
-              });
-
-              if (siesaItemForBestUM) {
-                productDetailsMap[productId].barcode =
-                  siesaItemForBestUM.codigo_barras.replace(/\+$/, "");
-                productDetailsMap[productId].unidad_medida = inference.um;
-              }
-            }
-          }
-        }
-
-        // ✅ SIEMPRE generar barcode_sku_um: código {f120_id}{UM} para el manifiesto
-        const finalUm =
-          productDetailsMap[productId].unidad_medida || normalizedUm;
-        productDetailsMap[productId].barcode_sku_um = `${f120_id}${finalUm}`;
+      const detalle = productDetailsMap[productId];
+      const f120_id = parseInt(detalle.sku, 10);
+      if (isNaN(f120_id)) {
+        detalle.unidad_medida_confiable = false;
+        detalle.unidad_medida_fuente = "sin_sku";
+        detalle.barcode_sku_um = null;
+        return;
       }
+
+      const umsDisponibles = availableUMsFor(allSiesaBarcodes || [], f120_id);
+
+      const resuelta = resolveExpectedUM({
+        umWoo: detalle.unidad_medida,
+        sku: detalle.sku,
+        nombre: detalle.name || "",
+        umsDisponibles,
+      });
+
+      // ⚠️ DOS UNIDADES DE MEDIDA DISTINTAS. No confundirlas: hacerlo cambia
+      // cuánta plata se cobra.
+      //
+      //   `unidad_medida`       — la de WooCommerce. Describe la PRESENTACIÓN
+      //     FÍSICA que compró el cliente (500g, Kg, Und). Gobierna el peso
+      //     (`kgPerUnit`) y el cobro (`calcLineCharge`). NO SE TOCA.
+      //   `unidad_medida_siesa` — cómo está catalogado el CÓDIGO DE BARRAS en
+      //     SIESA. Solo sirve para matchear códigos y armar el código del
+      //     manifiesto.
+      //
+      // Caso real que lo probó (sesión 00281109, "Tocino Carnudo Kilo - 500g"):
+      // Woo manda `500g`, SIESA solo conoce `KL`. Pisar la de Woo con la de
+      // SIESA duplicaba el peso del GS1 — `kgPerUnit("500g")` es 0.5 y
+      // `kgPerUnit("KL")` es 1.0.
+      detalle.unidad_medida_siesa = resuelta.um;
+      detalle.unidad_medida_confiable = resuelta.confiable;
+      detalle.unidad_medida_fuente = resuelta.fuente;
+      detalle.unidades_disponibles = umsDisponibles;
+
+      // Código de barras: preferir el de la presentación resuelta; si no
+      // hay, cualquiera del producto sirve para MOSTRAR (la validación ya
+      // no depende de este campo, compara contra SIESA completo).
+      const filasDelProducto = (allSiesaBarcodes || []).filter(
+        (bc) => bc.f120_id === f120_id,
+      );
+      const deLaPresentacion = filasDelProducto.find(
+        (bc) => normalizeUM(bc.unidad_medida) === normalizeUM(resuelta.um),
+      );
+      const elegida = deLaPresentacion || filasDelProducto[0] || null;
+      detalle.barcode = elegida ? normalizeBarcode(elegida.codigo_barras) : null;
+
+      // Todos los códigos válidos del producto: el auditor acepta cualquiera.
+      detalle.barcodes_producto = filasDelProducto
+        .map((bc) => normalizeBarcode(bc.codigo_barras))
+        .filter(Boolean);
+
+      // Código para el manifiesto/QR. Devuelve null en vez de un f120_id
+      // pelado que la caja no resuelve.
+      detalle.barcode_sku_um = buildManifestCode({
+        f120_id,
+        um: resuelta.um,
+        barcode: detalle.barcode,
+      });
     });
 
     // ✅ OBTENER CATEGORÍAS REALES para detección fruver/carnicería en auditor
@@ -1876,15 +1726,36 @@ exports.getSessionLogsDetail = async (req, res) => {
     // Enviar TODOS los logs sin filtrar
     const auditableLogs = logs;
 
-    // Mapa codigo_barras → { f120_id, unidad_medida } para validación del auditor
-    // ⚠️ Guardar SOLO el codigo_barras ORIGINAL (sin quitar "+") — el "+" es significativo
+    // Índice de códigos para la validación local del auditor.
+    // Claves NORMALIZADAS (sin el '+' de SIESA, que ninguna etiqueta física
+    // trae) y valor en LISTA: un mismo EAN puede estar registrado para varias
+    // presentaciones y el mapa plano anterior se quedaba con la última.
+    const auditBarcodeIndex = buildBarcodeIndex(allSiesaBarcodes || []);
     const auditBarcodeMap = {};
-    if (allSiesaBarcodes) {
-      allSiesaBarcodes.forEach((bc) => {
-        const um = (bc.unidad_medida || "").toUpperCase();
-        const original = bc.codigo_barras.toString().trim().toUpperCase();
-        auditBarcodeMap[original] = { f120_id: bc.f120_id, unidad_medida: um };
-      });
+    Object.entries(auditBarcodeIndex).forEach(([code, entries]) => {
+      auditBarcodeMap[code] = {
+        f120_id: entries[0].f120_id,
+        unidad_medida: entries[0].unidad_medida,
+        presentaciones: entries,
+      };
+    });
+
+    // Ítems canónicos del manifiesto/QR — UNA entrada por línea de pedido.
+    // `products_map` NO sirve para esto (duplica variaciones y colapsa el
+    // mismo producto pedido por dos clientes). Ver utils/manifestItems.js.
+    const { items: manifestItems, warnings: manifestWarnings } =
+      buildManifestItems({ ordersData, productDetailsMap });
+
+    if (manifestWarnings.colisiones.length > 0) {
+      console.warn(
+        `⚠️ [MANIFIESTO] ${manifestWarnings.colisiones.length} colisión(es) de código en la sesión ${sessionInfo.id}:`,
+        JSON.stringify(manifestWarnings.colisiones),
+      );
+    }
+    if (manifestWarnings.sin_codigo.length > 0) {
+      console.warn(
+        `⚠️ [MANIFIESTO] ${manifestWarnings.sin_codigo.length} ítem(s) sin código resoluble en la sesión ${sessionInfo.id}`,
+      );
     }
 
     res.status(200).json({
@@ -1899,6 +1770,10 @@ exports.getSessionLogsDetail = async (req, res) => {
       },
       orders_info: ordersData,
       products_map: productDetailsMap,
+      // ⬇️ Usar ESTO para el QR, no `products_map`.
+      manifest_items: manifestItems,
+      manifest_warnings: manifestWarnings,
+      audit_barcode_index: auditBarcodeIndex,
       audit_barcode_map: auditBarcodeMap,
       logs: auditableLogs, // 🔧 TODOS los logs sin filtrar (frontend decide qué validar)
       final_snapshot: sessionInfo.datos_salida || null,
