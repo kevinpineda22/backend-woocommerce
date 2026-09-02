@@ -9,6 +9,8 @@ const {
   availableUMsFor,
   matchScannedCode,
   resolveExpectedUM,
+  findGs1Base,
+  buildWeighableCode,
 } = require("../utils/siesaMatching");
 
 // Mapeo de acción de picking → acción de audit log
@@ -215,7 +217,26 @@ exports.registerAction = async (req, res) => {
     // =================================================================
     let finalScannedBarcode = codigo_barras_escaneado || null;
 
-    // 🚀 LÓGICA MAESTRA GS1: Si es pesable y no tenemos código GS1 completo, construirlo
+    // ═══════════════════════════════════════════════════════════════
+    // GS1 DE PESO VARIABLE: el prefijo SALE DE SIESA, no se recorta.
+    //
+    // Acá había una consulta propia que tomaba CUALQUIER código del
+    // producto que empezara con "2" (`.startsWith("codigo_barras","2")
+    // .limit(1)`) y le cortaba los primeros 7 caracteres.
+    //
+    // El prefijo GS1 de báscula es una fila de 7 dígitos con formato
+    // `29` + 5 ("2900061"). Pero el rango "2" es el de circulación
+    // restringida entero: un pesable puede tener además un EAN-13 propio
+    // que arranque en 2. Si Postgres devolvía ESE primero, `substring(0,7)`
+    // producía un prefijo INVENTADO — "2001234" de "2001234567890" — con
+    // check digit perfectamente calculado sobre una base que no existe.
+    // La caja lo rechaza y el error es indistinguible de un código válido.
+    //
+    // Es el mismo bug que el commit 16c668df mató en el manifiesto. La
+    // regla vive en `utils/siesaMatching.js` y ahí se queda: `findGs1Base`
+    // exige `/^29\d{5}$/` sobre la fila real, y `buildWeighableCode` arma
+    // prefijo(7) + gramos(5) + check(1). No reimplementar acá.
+    // ═══════════════════════════════════════════════════════════════
     if (peso_real && peso_real > 0 && f120_id_siesa) {
       const isAlreadyGS1 =
         finalScannedBarcode &&
@@ -225,39 +246,27 @@ exports.registerAction = async (req, res) => {
 
       if (!isAlreadyGS1) {
         try {
-          // 1. Buscar código base en SIESA (ej: 2900089 para Yuca)
+          // Todas las filas del producto: `findGs1Base` elige la que de
+          // verdad es un prefijo de báscula. Filtrar en SQL por "empieza
+          // con 2" era justamente lo que dejaba pasar el EAN largo.
           const { data: siesaCodes } = await supabase
             .from("siesa_codigos_barras")
-            .select("codigo_barras")
-            .eq("f120_id", f120_id_siesa)
-            .startsWith("codigo_barras", "2")
-            .limit(1);
+            .select("codigo_barras, f120_id")
+            .eq("f120_id", f120_id_siesa);
 
-          if (siesaCodes && siesaCodes.length > 0) {
-            const baseBarcode = siesaCodes[0].codigo_barras
-              .toString()
-              .replace(/\+$/, "");
-            if (baseBarcode.length >= 7) {
-              const base7 = baseBarcode.substring(0, 7);
-              const pesoGramos = Math.round(peso_real * 1000);
-              const pesoStr = pesoGramos.toString().padStart(5, "0");
-              const sinCheck = base7 + pesoStr;
+          const base7 = findGs1Base(siesaCodes || [], f120_id_siesa);
+          const gs1 = base7 ? buildWeighableCode(base7, peso_real) : null;
 
-              // Calcular Check Digit GS1 (Luhn mod 10)
-              let sum = 0;
-              for (let i = 0; i < 12; i++) {
-                const d = parseInt(sinCheck[i]);
-                const weight = (12 - i) % 2 === 1 ? 3 : 1;
-                sum += d * weight;
-              }
-              const checkDigit = (10 - (sum % 10)) % 10;
-              finalScannedBarcode = `${sinCheck}${checkDigit}`;
-            }
+          if (gs1) {
+            finalScannedBarcode = gs1;
           } else {
-            // 🚀 FALLBACK: Si no hay base 29, mantenemos lo que venga del front
-            // para no bloquear al picker.
+            // Sin prefijo real no se fabrica nada: se deja lo que vino del
+            // front para no bloquear al picker. El manifiesto es el que
+            // decide si ese código entra al QR — y ahí se verifica contra
+            // `siesa_codigos_barras`. Preferimos un ítem reportado a mano
+            // antes que un código inventado que falla en la caja.
             console.warn(
-              `⚠️ No se encontró base GS1 para item ${f120_id_siesa}. Usando SKU.`,
+              `⚠️ [GS1] Sin prefijo de báscula real (29+5 dígitos) para f120_id ${f120_id_siesa}. No se fabrica código; se conserva "${finalScannedBarcode}".`,
             );
           }
         } catch (err) {

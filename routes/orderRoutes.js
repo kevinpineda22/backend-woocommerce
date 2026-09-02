@@ -56,6 +56,9 @@ router.get("/historial", dashboardCtrl.getHistorySessions);
 router.get("/pendientes-auditoria", dashboardCtrl.getPendingAuditSessions);
 
 router.get("/historial-detalle", dashboardCtrl.getSessionLogsDetail);
+// Manifiesto/QR de salida — misma fuente que el historial, payload mínimo.
+// Lo consume el picker al cerrar sesión y sirve para reimprimir desde admin.
+router.get("/manifiesto", dashboardCtrl.getSessionManifest);
 router.post("/auditor/finalizar", dashboardCtrl.completeAuditSession);
 
 // Rutas de Gestión (items en sesión)
