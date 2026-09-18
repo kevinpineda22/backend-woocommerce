@@ -466,6 +466,141 @@ exports.cancelOrder = async (req, res) => {
 };
 
 // =========================================================
+// CANCELAR SESIÓN EN PENDIENTE DE PAGO (auditado)
+// =========================================================
+// La vista "Pendiente de Pago" se arma por estado de SESIÓN (auditado), no por
+// pedido. Cancelar un pedido suelto con cancelOrder NO saca la fila porque la
+// sesión sigue en 'auditado'. Este endpoint cancela la sesión COMPLETA: manda
+// cada pedido a Cancelados (con motivo, igual que cancelOrder) y solo entonces
+// pasa la sesión a 'cancelado' para que la fila desaparezca de la lista.
+//
+// Consistencia primero: si algún pedido no se pudo cancelar en WooCommerce, la
+// sesión NO se cierra, para no ocultar una fila cuyo pedido sigue vivo.
+exports.cancelPaymentSession = async (req, res) => {
+  const { id_sesion, motivo, admin_name, admin_email } = req.body;
+
+  try {
+    if (!id_sesion) return res.status(400).json({ error: "Falta id_sesion" });
+    if (!motivo || !motivo.trim())
+      return res.status(400).json({ error: "El motivo es obligatorio" });
+    if (!admin_name || !admin_name.trim())
+      return res
+        .status(400)
+        .json({ error: "El nombre del admin es obligatorio" });
+
+    // 1. Cargar la sesión. Solo se cancelan sesiones en pendiente de pago.
+    const { data: sess } = await supabase
+      .from("wc_picking_sessions")
+      .select("id, estado, ids_pedidos, sede_id")
+      .eq("id", id_sesion)
+      .single();
+
+    if (!sess) return res.status(404).json({ error: "Sesión no encontrada" });
+    if (sess.estado !== "auditado") {
+      return res.status(409).json({
+        error: `Solo se puede cancelar una sesión en pendiente de pago (estado actual: ${sess.estado}).`,
+      });
+    }
+
+    const now = new Date().toISOString();
+    const effectiveSedeId = sess.sede_id || req.sedeId || null;
+    const orderIds = Array.isArray(sess.ids_pedidos) ? sess.ids_pedidos : [];
+    const wooClient = await getWooClient(effectiveSedeId);
+
+    // 2. Cancelar cada pedido de la sesión (misma lógica que cancelOrder).
+    const results = [];
+    for (const orderId of orderIds) {
+      try {
+        // Ya cancelado en nuestra tabla (por sede) → no duplicar.
+        const { data: existing } = await supabase
+          .from("wc_pedidos_cancelados")
+          .select("id")
+          .eq("order_id", orderId)
+          .eq("sede_id", effectiveSedeId)
+          .is("restored_at", null)
+          .maybeSingle();
+        if (existing) {
+          results.push({ order_id: orderId, ok: true, skipped: true });
+          continue;
+        }
+
+        const { data: orderData } = await wooClient.get(`orders/${orderId}`);
+        await wooClient.put(`orders/${orderId}`, { status: "cancelled" });
+
+        const { error: insertError } = await supabase
+          .from("wc_pedidos_cancelados")
+          .insert([
+            {
+              order_id: orderId,
+              order_data: orderData,
+              motivo: motivo.trim(),
+              admin_name: admin_name.trim(),
+              admin_email: admin_email || null,
+              sede_id: effectiveSedeId || null,
+            },
+          ]);
+        if (insertError) throw insertError;
+
+        results.push({ order_id: orderId, ok: true });
+      } catch (e) {
+        results.push({ order_id: orderId, ok: false, message: e.message });
+      }
+    }
+
+    // 3. Si algún pedido falló, NO cerramos la sesión (evita ocultar una fila
+    //    cuyo pedido sigue activo en WooCommerce). El admin puede reintentar.
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length > 0) {
+      return res.status(409).json({
+        error:
+          "No se pudieron cancelar todos los pedidos de la sesión. La sesión NO se cerró para no dejar inconsistencias.",
+        results,
+      });
+    }
+
+    // 4. Todos los pedidos cancelados → cerrar la sesión y sus asignaciones.
+    //    Esto la saca de "Pendiente de Pago" (la lista filtra estado='auditado').
+    await supabase
+      .from("wc_picking_sessions")
+      .update({ estado: "cancelado", fecha_fin: now })
+      .eq("id", id_sesion);
+
+    await supabase
+      .from("wc_asignaciones_pedidos")
+      .update({ estado_asignacion: "cancelado", fecha_fin: now })
+      .eq("id_sesion", id_sesion);
+
+    invalidateResponseCache();
+
+    console.log(
+      `🗑️ [ADMIN] Sesión de pago ${id_sesion} cancelada por ${admin_name} — ${orderIds.length} pedido(s) — Motivo: ${motivo}`,
+    );
+
+    logAuditEvent({
+      actor: {
+        type: "admin",
+        id: admin_email || null,
+        name: admin_name.trim(),
+      },
+      action: "payment_session.cancelled",
+      entity: { type: "session", id: id_sesion },
+      sedeId: effectiveSedeId || null,
+      metadata: { motivo: motivo.trim(), orders: orderIds },
+    });
+
+    return res.status(200).json({
+      message: `Sesión cancelada. ${orderIds.length} pedido(s) enviados a Pedidos Cancelados.`,
+      results,
+    });
+  } catch (error) {
+    console.error("Error cancelando sesión de pago:", error.message);
+    return res
+      .status(500)
+      .json({ error: `Error al cancelar sesión: ${error.message}` });
+  }
+};
+
+// =========================================================
 // RESTAURAR PEDIDO CANCELADO (volver a processing en WooCommerce)
 // =========================================================
 exports.restoreOrder = async (req, res) => {

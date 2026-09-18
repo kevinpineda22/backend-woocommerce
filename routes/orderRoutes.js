@@ -68,6 +68,7 @@ router.post("/admin-force-pick", adminCtrl.forcePickItemToSession);
 
 // Rutas de Cancelación de Pedidos
 router.post("/cancelar-pedido", adminCtrl.cancelOrder);
+router.post("/cancelar-sesion-pago", adminCtrl.cancelPaymentSession);
 router.post("/restaurar-pedido", adminCtrl.restoreOrder);
 router.get("/pedidos-cancelados", adminCtrl.getCancelledOrders);
 
