@@ -67,6 +67,36 @@ function extractMetodoPago(orderSnapshot) {
   return resolvePaymentLabel(orderSnapshot);
 }
 
+// Instante en que el cliente hizo el pedido en WooCommerce.
+// `date_created` viene en hora LOCAL de la tienda y SIN zona horaria
+// ("2026-09-30T10:15:22"). En Vercel (UTC) `new Date()` lo leía como UTC y al
+// formatear en Bogotá restaba 5 horas. Se prefiere `date_created_gmt` (exacto)
+// y, para snapshots viejos que no lo tienen, se ancla a Bogotá (UTC-5, sin
+// horario de verano).
+const HAS_TZ = /(Z|[+-]\d{2}:?\d{2})$/i;
+function parseWooOrderDate(orderSnapshot) {
+  const gmt = orderSnapshot?.date_created_gmt;
+  const local = orderSnapshot?.date_created;
+  let d = null;
+  if (gmt) d = new Date(HAS_TZ.test(gmt) ? gmt : `${gmt}Z`);
+  else if (local) d = new Date(HAS_TZ.test(local) ? local : `${local}-05:00`);
+  return d && !isNaN(d.getTime()) ? d : null;
+}
+
+// Fecha del pedido por cada ítem del snapshot, en el mismo orden que
+// `clientes` / `pedidos`. `iso` permite al front calcular la espera exacta.
+function buildFechasPedidos(snapshotPedidos, optionsDate, optionsTime) {
+  return (snapshotPedidos || []).map((o) => {
+    const d = parseWooOrderDate(o);
+    if (!d) return null;
+    return {
+      fecha: d.toLocaleDateString("es-CO", optionsDate),
+      hora: d.toLocaleTimeString("es-CO", optionsTime),
+      iso: d.toISOString(),
+    };
+  });
+}
+
 // Los helpers getBarcodesFromSiesaByUnitMeasure() y getBarcodesFromSiesa()
 // vivían acá y se borraron: cada uno reimplementaba la normalización de
 // códigos y unidades con reglas ligeramente distintas, y esa divergencia era
@@ -831,13 +861,12 @@ exports.getHistorySessions = async (req, res) => {
 
       const telefonos = sess.snapshot_pedidos
         ? sess.snapshot_pedidos
+            // Sin filter: el índice tiene que coincidir con `clientes` / `pedidos`.
             .map((o) => o.billing?.phone || "")
-            .filter(Boolean)
         : [];
       const emails = sess.snapshot_pedidos
         ? sess.snapshot_pedidos
             .map((o) => o.billing?.email || "")
-            .filter(Boolean)
         : [];
 
       const totales = calcTotalesFromDatosSalida(
@@ -888,8 +917,17 @@ exports.getHistorySessions = async (req, res) => {
         documentos,
         metodos_pago,
         pagos_pedidos,
+        fechas_pedidos: buildFechasPedidos(
+          sess.snapshot_pedidos,
+          optionsDate,
+          optionsTime,
+        ),
         fecha: end.toLocaleDateString("es-CO", optionsDate),
+        fecha_inicio_picking: start.toLocaleDateString("es-CO", optionsDate),
+        hora_inicio: start.toLocaleTimeString("es-CO", optionsTime),
         hora_fin: end.toLocaleTimeString("es-CO", optionsTime),
+        inicio_iso: start.toISOString(),
+        fin_iso: end.toISOString(),
         duracion: `${durationMin} min`,
         estado: sess.estado,
         metodo_pago: sess.metodo_pago || null,
@@ -982,16 +1020,11 @@ exports.getPendingAuditSessions = async (req, res) => {
         ? sess.snapshot_pedidos.map((o) => extractMetodoPago(o))
         : [];
 
-      const fechas_pedidos = sess.snapshot_pedidos
-        ? sess.snapshot_pedidos.map((o) => {
-            if (!o.date_created) return null;
-            const d = new Date(o.date_created);
-            return {
-              fecha: d.toLocaleDateString("es-CO", optionsDate),
-              hora: d.toLocaleTimeString("es-CO", optionsTime),
-            };
-          })
-        : [];
+      const fechas_pedidos = buildFechasPedidos(
+        sess.snapshot_pedidos,
+        optionsDate,
+        optionsTime,
+      );
 
       return {
         id: sess.id,
@@ -1008,6 +1041,8 @@ exports.getPendingAuditSessions = async (req, res) => {
         fecha: end ? end.toLocaleDateString("es-CO", optionsDate) : "--",
         hora_inicio: start.toLocaleTimeString("es-CO", optionsTime),
         hora_fin: end ? end.toLocaleTimeString("es-CO", optionsTime) : "--",
+        inicio_iso: start.toISOString(),
+        fin_iso: end ? end.toISOString() : null,
         duracion: `${durationMin} min`,
         estado: sess.estado,
       };

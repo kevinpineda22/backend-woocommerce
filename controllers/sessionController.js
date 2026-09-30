@@ -186,6 +186,7 @@ exports.createPickingSession = async (req, res) => {
         id: o.id,
         status: o.status,
         date_created: o.date_created,
+        date_created_gmt: o.date_created_gmt,
         total: o.total,
         billing: o.billing,
         shipping: o.shipping,
