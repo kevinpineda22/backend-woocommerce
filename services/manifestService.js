@@ -239,29 +239,63 @@ export async function buildSessionManifest({
         const subClient = await getWooClient(
           sessionInfo.sede_id || sedeId,
         );
+
+        // Un producto simple trae `images[]` y `attributes[].options[]`;
+        // una variación trae `image` y `attributes[].option`.
+        const registrarSustituto = (p) => {
+          const catalogPrice = parseFloat(p.price) || 0;
+          const attrUnidad = (p.attributes || []).find((a) =>
+            (a.name || "").toLowerCase().includes("unidad"),
+          );
+          productDetailsMap[p.id] = {
+            name: p.name,
+            image: p.images?.[0]?.src || p.image?.src || null,
+            sku: p.sku,
+            price: catalogPrice,
+            catalog_price: catalogPrice,
+            subtotal: catalogPrice,
+            line_total: catalogPrice,
+            unidad_medida:
+              attrUnidad?.option || attrUnidad?.options?.[0] || "UND",
+          };
+        };
+
         const { data: subProds } = await subClient.get(
           `products?include=${Array.from(missingIds).join(",")}&per_page=100`,
         );
-        if (subProds) {
-          subProds.forEach((p) => {
-            const catalogPrice = parseFloat(p.price) || 0;
-            productDetailsMap[p.id] = {
-              name: p.name,
-              image: p.images[0]?.src,
-              sku: p.sku,
-              price: catalogPrice,
-              catalog_price: catalogPrice,
-              subtotal: catalogPrice,
-              line_total: catalogPrice,
-              unidad_medida:
-                (p.attributes || []).find((a) =>
-                  a.name.toLowerCase().includes("unidad"),
-                )?.options[0] || "UND",
-            };
-          });
-        }
+        (subProds || []).forEach(registrarSustituto);
+
+        // ⚠️ `products?include=` NO devuelve variaciones, y el buscador de
+        // sustitutos del picker ofrece cada variación como producto suelto
+        // ("Arroz MUA 500 g - Unidad"). Sin este segundo paso el sustituto
+        // llegaba al auditor con `sku: null`: no se podía validar ni por
+        // escaneo ni digitando el f120_id, y salía del QR sin código.
+        // `products/{id}` sí resuelve un id de variación.
+        const siguenFaltando = Array.from(missingIds).filter(
+          (id) => !productDetailsMap[id],
+        );
+        const sueltos = await Promise.allSettled(
+          siguenFaltando.map((id) => subClient.get(`products/${id}`)),
+        );
+        sueltos.forEach((r, idx) => {
+          if (r.status === "fulfilled" && r.value?.data?.id) {
+            registrarSustituto(r.value.data);
+          } else {
+            console.warn(
+              `⚠️ [MANIFIESTO] Sustituto ${siguenFaltando[idx]} sin detalle en Woo (sesión ${sessionInfo.id}):`,
+              r.reason?.message || "respuesta vacía",
+            );
+          }
+        });
       }
-    } catch (e) {}
+    } catch (e) {
+      // No corta el manifiesto, pero tampoco se calla: un sustituto sin
+      // detalle es un ítem que el auditor no puede validar.
+      console.warn(
+        `⚠️ [MANIFIESTO] Error resolviendo sustitutos (sesión ${sessionInfo.id}):`,
+        e.message,
+      );
+    }
   }
 
   // ✅ CÓDIGOS DE BARRAS DESDE SIESA

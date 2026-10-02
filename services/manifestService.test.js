@@ -20,7 +20,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // `vi.mock` se hoistea por encima de las declaraciones del módulo, así que el
 // estado compartido con los mocks tiene que crearse con `vi.hoisted` o la
 // factory ve un objeto distinto al que escribe el `beforeEach`.
-const estado = vi.hoisted(() => ({ tablaData: {}, wooCalls: [] }));
+const estado = vi.hoisted(() => ({ tablaData: {}, wooCalls: [], wooGet: null }));
 
 vi.mock("./supabaseClient.js", () => {
   // Builder encadenable Y awaitable: cada método devuelve el mismo objeto,
@@ -49,7 +49,11 @@ vi.mock("./supabaseClient.js", () => {
 vi.mock("./wooMultiService.js", () => ({
   getWooClient: async (sedeId) => {
     estado.wooCalls.push(sedeId);
-    return { get: async () => ({ data: [] }) };
+    return {
+      get: async (endpoint) => ({
+        data: estado.wooGet ? estado.wooGet(endpoint) : [],
+      }),
+    };
   },
 }));
 
@@ -99,6 +103,7 @@ const snapshotBase = () => [
 
 beforeEach(() => {
   estado.wooCalls = [];
+  estado.wooGet = null;
   estado.tablaData = {
     wc_picking_sessions__single: {
       id: SESSION_ID,
@@ -191,6 +196,63 @@ describe("buildSessionManifest — presentación", () => {
     // Pisar una con otra duplica el peso del GS1.
     expect(linea.unidad_medida).toBe("500g");
     expect(linea.unidad_medida_siesa).toBe("KL");
+  });
+});
+
+describe("buildSessionManifest — sustitutos", () => {
+  // Caso real (pedido #81600): el picker sustituyó por "Arroz MUA 500 g -
+  // Unidad", que es una VARIACIÓN. `products?include=` no devuelve
+  // variaciones, el sustituto quedaba sin SKU y el auditor no podía
+  // validarlo de ninguna forma.
+  const variacionMua = {
+    id: 1234,
+    name: "Arroz MUA 500 g - Unidad",
+    sku: "5555",
+    price: "3000",
+    image: { src: "https://img/mua.jpg" },
+    attributes: [{ name: "Unidad de medida", option: "Unidad" }],
+  };
+
+  beforeEach(() => {
+    estado.tablaData.wc_asignaciones_pedidos = [{ id: 1 }];
+    estado.tablaData.wc_log_picking = [
+      {
+        accion: "sustituido",
+        es_sustituto: true,
+        id_producto: 800,
+        id_producto_final: 1234,
+        id_pedido: 9001,
+      },
+    ];
+    estado.wooGet = (endpoint) => {
+      if (endpoint.startsWith("products?include=")) return [];
+      if (endpoint === "products/1234") return variacionMua;
+      return [];
+    };
+  });
+
+  it("resuelve un sustituto que es variación con products/{id}", async () => {
+    const r = await buildSessionManifest({
+      sessionId: SESSION_ID,
+      incluirCategorias: false,
+    });
+    const sub = r.products_map[1234];
+
+    expect(sub.sku).toBe("5555");
+    expect(sub.image).toBe("https://img/mua.jpg");
+    expect(sub.unidad_medida).toBe("Unidad");
+  });
+
+  it("si Woo no lo encuentra, el manifiesto sigue sin explotar", async () => {
+    estado.wooGet = () => {
+      throw new Error("404");
+    };
+    const r = await buildSessionManifest({
+      sessionId: SESSION_ID,
+      incluirCategorias: false,
+    });
+    expect(r.products_map[1234]).toBeUndefined();
+    expect(r.manifest_items).toHaveLength(2);
   });
 });
 
