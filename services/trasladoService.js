@@ -246,6 +246,26 @@ async function resolveCustomerDestino({ order, fetchCustomerByEmail }) {
 }
 
 // ============================================================
+// REMAPEO POR SKU (IDs distintos entre sub-sitios)
+// ============================================================
+
+const claveLinea = (productId, variationId) => `${productId}-${variationId || 0}`;
+
+const normalizarSku = (sku) => String(sku || "").trim().toLowerCase();
+
+/**
+ * Mapa `${product_id}-${variation_id}` (origen) → product_id en destino, a
+ * partir de los warnings `producto_remapeado` de checkStockDestino.
+ */
+function buildRemapeos(warnings) {
+  const mapa = new Map();
+  (Array.isArray(warnings) ? warnings : [])
+    .filter((w) => w && w.tipo === "producto_remapeado" && w.product_id_destino)
+    .forEach((w) => mapa.set(claveLinea(w.product_id, w.variation_id), w.product_id_destino));
+  return mapa;
+}
+
+// ============================================================
 // PAYLOAD DE CLONADO
 // ============================================================
 
@@ -260,9 +280,11 @@ async function resolveCustomerDestino({ order, fetchCustomerByEmail }) {
  *   - `customer_id`: si viene `customerId` (resuelto por email en el destino)
  *     se usa ese; si no, por compatibilidad se usa el del origen o invitado (0).
  */
-function buildClonePayload({ order, sedeOrigen, sedeDestino, adminName, motivo, orderIdOrigen, customerId }) {
+function buildClonePayload({ order, sedeOrigen, sedeDestino, adminName, motivo, orderIdOrigen, customerId, warnings }) {
+  const remapeos = buildRemapeos(warnings);
   const lineItems = (order.line_items || []).map((item) => ({
-    product_id: item.product_id,
+    product_id:
+      remapeos.get(claveLinea(item.product_id, item.variation_id)) || item.product_id,
     variation_id: item.variation_id || 0,
     quantity: item.quantity,
     price: item.price,
@@ -358,6 +380,35 @@ function clasificarLinea({ item, found, warnings }) {
 }
 
 /**
+ * Fallback cuando el product_id del origen no existe en el destino: en
+ * Multisite cada sub-sitio numera sus productos por separado, así que el mismo
+ * producto puede tener otro ID. El SKU (f120_id de SIESA) sí es común.
+ * Solo productos simples: `products?sku=` no devuelve variaciones, y un padre
+ * `variable` no se puede usar como línea. Si la consulta falla → null (la
+ * línea queda item_missing y el traslado se bloquea, como antes).
+ */
+async function buscarPorSku({ item, fetchProducts }) {
+  const sku = normalizarSku(item.sku);
+  if (!sku) return null;
+  try {
+    const candidatos = await fetchProducts("products", {
+      sku: String(item.sku).trim(),
+      per_page: 10,
+      _fields: "id,manage_stock,stock_quantity,stock_status,name,sku,type",
+    });
+    if (!Array.isArray(candidatos)) return null;
+    return (
+      candidatos.find(
+        (p) => p && p.id && normalizarSku(p.sku) === sku && p.type !== "variable",
+      ) || null
+    );
+  } catch (error) {
+    console.warn(`[traslado] Error buscando SKU ${item.sku} en destino:`, error.message);
+    return null;
+  }
+}
+
+/**
  * Pre-chequea el stock de la sede destino por línea (warnings NO bloqueantes,
  * ADR-5). `fetchProducts(endpoint, params)` está inyectado para testear sin red:
  *   - simples:      products?include=...&_fields=id,manage_stock,stock_quantity,stock_status,name
@@ -409,9 +460,22 @@ async function checkStockDestino({ lineItems, fetchProducts }) {
     }
     if (!errorDeConsulta) {
       for (const item of simples) {
-        const found = Array.isArray(products)
+        let found = Array.isArray(products)
           ? products.find((p) => p && p.id === item.product_id)
           : undefined;
+        if (!found) {
+          found = await buscarPorSku({ item, fetchProducts });
+          if (found) {
+            warnings.push({
+              tipo: "producto_remapeado",
+              product_id: item.product_id,
+              variation_id: 0,
+              nombre: item.name || `Producto #${item.product_id}`,
+              sku: item.sku,
+              product_id_destino: found.id,
+            });
+          }
+        }
         clasificarLinea({ item, found, warnings });
       }
     }

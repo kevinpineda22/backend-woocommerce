@@ -316,6 +316,7 @@ function createTrasladoController(deps = {}) {
             motivo,
             orderIdOrigen: order.id,
             customerId,
+            warnings,
           }),
         );
         clone = data;
@@ -341,6 +342,7 @@ function createTrasladoController(deps = {}) {
                 motivo,
                 orderIdOrigen: order.id,
                 customerId: 0,
+                warnings,
               }),
             );
             clone = data;
