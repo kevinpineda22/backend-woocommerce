@@ -27,6 +27,9 @@
       ]
     }
   ],
+  "crons": [
+    { "path": "/api/reportes/no-encontrados", "schedule": "0 4 * * *" }
+  ],
   "routes": [
     {
       "src": "/api/orders/(.*)",

@@ -5,6 +5,7 @@ require("dotenv").config();
 const orderRoutes = require("./routes/orderRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const webhookRoutes = require("./routes/webhookRoutes");
+const reporteRoutes = require("./routes/reporteRoutes");
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use(express.json());
 app.use("/api/orders", orderRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/webhooks", webhookRoutes);
+app.use("/api/reportes", reporteRoutes);
 
 // Ruta de prueba para saber que el backend vive
 app.get("/", (req, res) => res.send("Backend del Supermercado Funcionando 🛒"));
