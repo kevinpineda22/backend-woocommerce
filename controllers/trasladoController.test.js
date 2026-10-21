@@ -394,6 +394,56 @@ describe("validateTraslado", () => {
 // =============================================
 
 describe("ejecutarTraslado", () => {
+  it("clona con el ID de destino cuando el producto simple se resuelve por SKU", async () => {
+    const orderWithSku = {
+      ...pedidoProcessing,
+      line_items: [{ ...pedidoProcessing.line_items[0], sku: "SIESA-101" }],
+    };
+    getOrderFromAnySede.mockResolvedValue({
+      order: orderWithSku,
+      sedeId: SEDE_CENTRO.id,
+      sedeName: "Centro",
+    });
+    wooCentro.get.mockImplementation(async (endpoint) =>
+      endpoint === `orders/${pedidoProcessing.id}` ? { data: orderWithSku } : { data: [] },
+    );
+    wooNorte.get.mockImplementation(async (endpoint, params) => {
+      if (endpoint === "products" && params.include) return { data: [] };
+      if (endpoint === "products" && params.sku === "SIESA-101") {
+        return {
+          data: [
+            {
+              id: 901,
+              sku: "SIESA-101",
+              type: "simple",
+              manage_stock: true,
+              stock_quantity: 10,
+            },
+          ],
+        };
+      }
+      return { data: [] };
+    });
+    wooNorte.post.mockImplementation(async (endpoint, payload) =>
+      endpoint === "orders" ? { data: { id: 80062, ...payload } } : { data: {} },
+    );
+
+    const req = { body: bodyValido, sedeId: null };
+    const res = mockRes();
+    await ejecutarTraslado(req, res);
+
+    expect(res.statusCode).toBe(200);
+    const cloneCall = wooNorte.post.mock.calls.find(([endpoint]) => endpoint === "orders");
+    expect(cloneCall[1].line_items[0].product_id).toBe(901);
+    expect(res.body.warnings).toContainEqual(
+      expect.objectContaining({
+        tipo: "producto_remapeado",
+        product_id: 101,
+        product_id_destino: 901,
+      }),
+    );
+  });
+
   it("200 feliz: clon con precios de origen, notas filtradas, cancel origen, insert completado, audit", async () => {
     setupStockSuficiente();
 

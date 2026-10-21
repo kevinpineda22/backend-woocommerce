@@ -439,6 +439,28 @@ describe("buildClonePayload", () => {
     ]);
   });
 
+  it("usa el product_id destino cuando warnings contiene un remapeo por SKU", () => {
+    const payload = buildClonePayload({
+      order: pedidoOrigen,
+      sedeOrigen,
+      sedeDestino,
+      adminName: "Juan",
+      motivo: "m",
+      orderIdOrigen: 80446,
+      warnings: [
+        {
+          tipo: "producto_remapeado",
+          product_id: 100,
+          variation_id: 0,
+          product_id_destino: 900,
+        },
+      ],
+    });
+
+    expect(payload.line_items[0].product_id).toBe(900);
+    expect(payload.line_items[1].product_id).toBe(200);
+  });
+
   it("copia billing/shipping completos y shipping_lines", () => {
     const payload = buildClonePayload({
       order: pedidoOrigen,
@@ -573,6 +595,47 @@ describe("checkStockDestino", () => {
         qty: 1,
       },
     ]);
+  });
+
+  it("remapea productos simples por SKU normalizado e ignora padres variables", async () => {
+    const fetchProducts = vi.fn(async (endpoint, params) => {
+      if (params.include) return [];
+      if (params.sku === "f120-abc") {
+        return [
+          { id: 901, sku: "f120-abc", type: "simple", manage_stock: true, stock_quantity: 8 },
+          { id: 902, sku: "F120-ABC", type: "variable", manage_stock: true, stock_quantity: 8 },
+        ];
+      }
+      return [];
+    });
+    const warnings = await checkStockDestino({
+      lineItems: [
+        {
+          product_id: 100,
+          variation_id: 0,
+          quantity: 2,
+          name: "Arroz",
+          sku: " f120-abc ",
+        },
+      ],
+      fetchProducts,
+    });
+
+    expect(warnings).toEqual([
+      {
+        tipo: "producto_remapeado",
+        product_id: 100,
+        variation_id: 0,
+        nombre: "Arroz",
+        sku: " f120-abc ",
+        product_id_destino: 901,
+      },
+    ]);
+    expect(fetchProducts).toHaveBeenCalledWith("products", {
+      sku: "f120-abc",
+      per_page: 10,
+      _fields: "id,manage_stock,stock_quantity,stock_status,name,sku,type",
+    });
   });
 
   it("reporta item_missing para variación ausente en destino", async () => {
