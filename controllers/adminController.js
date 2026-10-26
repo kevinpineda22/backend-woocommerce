@@ -466,7 +466,7 @@ exports.cancelOrder = async (req, res) => {
 };
 
 // =========================================================
-// CANCELAR SESIÓN EN PENDIENTE DE PAGO (auditado)
+// CANCELAR SESIÓN EN PENDIENTE DE PAGO (auditado) O DE AUDITORÍA
 // =========================================================
 // La vista "Pendiente de Pago" se arma por estado de SESIÓN (auditado), no por
 // pedido. Cancelar un pedido suelto con cancelOrder NO saca la fila porque la
@@ -488,7 +488,9 @@ exports.cancelPaymentSession = async (req, res) => {
         .status(400)
         .json({ error: "El nombre del admin es obligatorio" });
 
-    // 1. Cargar la sesión. Solo se cancelan sesiones en pendiente de pago.
+    // 1. Cargar la sesión. Solo se cancelan sesiones en pendiente de pago
+    //    ('auditado') o pendiente de auditoría ('pendiente_auditoria'). En
+    //    ambos el picker ya quedó libre al cerrar el picking.
     const { data: sess } = await supabase
       .from("wc_picking_sessions")
       .select("id, estado, ids_pedidos, sede_id")
@@ -496,9 +498,9 @@ exports.cancelPaymentSession = async (req, res) => {
       .single();
 
     if (!sess) return res.status(404).json({ error: "Sesión no encontrada" });
-    if (sess.estado !== "auditado") {
+    if (!["auditado", "pendiente_auditoria"].includes(sess.estado)) {
       return res.status(409).json({
-        error: `Solo se puede cancelar una sesión en pendiente de pago (estado actual: ${sess.estado}).`,
+        error: `Solo se puede cancelar una sesión en pendiente de pago o de auditoría (estado actual: ${sess.estado}).`,
       });
     }
 
@@ -559,7 +561,8 @@ exports.cancelPaymentSession = async (req, res) => {
     }
 
     // 4. Todos los pedidos cancelados → cerrar la sesión y sus asignaciones.
-    //    Esto la saca de "Pendiente de Pago" (la lista filtra estado='auditado').
+    //    Esto la saca de "Pendiente de Pago" (filtra estado='auditado') o de
+    //    "Pendientes de Auditoría" (filtra estado='pendiente_auditoria').
     await supabase
       .from("wc_picking_sessions")
       .update({ estado: "cancelado", fecha_fin: now })
