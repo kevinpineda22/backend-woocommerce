@@ -82,6 +82,16 @@ async function getBarcodesFromSiesa(productIds) {
 exports.createPickingSession = async (req, res) => {
   const { id_picker, picker_email, ids_pedidos, admin_name, admin_email } =
     req.body;
+
+  // Sin pedidos no hay nada que pickear: la sesión nacía vacía, el picker la
+  // cerraba en 1 min (cero pendientes) y quedaba una fila sin cliente en
+  // Pendientes de Auditoría.
+  if (!Array.isArray(ids_pedidos) || ids_pedidos.length === 0) {
+    return res
+      .status(400)
+      .json({ error: "Debes seleccionar al menos un pedido para crear la sesión." });
+  }
+
   try {
     // 1. Obtener Nombre y Sede del Picker (Priorizar búsqueda por Email para evitar desajustes de ID)
     let pickerQuery = supabase
